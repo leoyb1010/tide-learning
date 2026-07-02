@@ -107,7 +107,7 @@ export function Spotlight({ children, className }: { children: ReactNode; classN
   const my = useMotionValue(-200);
   const bg = useTransform(
     [mx, my],
-    ([x, y]) => `radial-gradient(220px circle at ${x}px ${y}px, rgba(31,107,96,0.10), transparent 60%)`,
+    ([x, y]) => `radial-gradient(220px circle at ${x}px ${y}px, rgba(252,1,26,0.08), transparent 60%)`,
   );
 
   function onMove(e: React.MouseEvent<HTMLDivElement>) {

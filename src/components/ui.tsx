@@ -110,8 +110,8 @@ export function CardSkeleton() {
 
 /* ============ 封面渐变（染背景 + 细网格）============ */
 export const COVER_GRADIENTS: Record<string, string> = {
-  tide: "linear-gradient(145deg, #17564d 0%, #1f6b60 55%, #4f9488 100%)",
-  dawn: "linear-gradient(145deg, #0d332d 0%, #1f6b60 60%, #7fb3a8 100%)",
+  tide: "linear-gradient(145deg, #2a0a0d 0%, #a30514 55%, #fc011a 100%)",
+  dawn: "linear-gradient(145deg, #17181a 0%, #7d0812 60%, #d60018 100%)",
 };
 export function CoverBg({ color, className = "", children }: { color: string; className?: string; children?: ReactNode }) {
   return (

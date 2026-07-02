@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Compass, BookOpen, Sparkle, NotePencil, User, GearSix } from "@phosphor-icons/react/dist/ssr";
-import { TideMark } from "./TideMark";
+import { YoudaoLogo } from "./YoudaoLogo";
 
 const TABS = [
   { href: "/", label: "发现", Icon: Compass },
@@ -23,8 +23,9 @@ export function Nav({ user }: { user: { nickname: string; role: string } | null 
       <header className="sticky top-0 z-40 border-b border-ink-100/80 bg-paper/70 backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-5 sm:px-8">
           <Link href="/" className="group flex items-center gap-2.5">
-            <TideMark size={26} className="transition-transform duration-300 [transition-timing-function:var(--ease-spring)] group-hover:-rotate-6" />
-            <span className="text-[1.05rem] font-semibold tracking-tight text-ink-950">潮汐学习</span>
+            <YoudaoLogo variant="red" height={19} priority className="transition-opacity duration-200 group-hover:opacity-80" />
+            <span className="h-4 w-px bg-ink-200" />
+            <span className="text-[1.02rem] font-semibold tracking-tight text-ink-950">潮汐学习</span>
           </Link>
 
           <nav className="hidden items-center gap-0.5 md:flex">

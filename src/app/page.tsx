@@ -8,6 +8,7 @@ import { CourseCard } from "@/components/CourseCard";
 import { VoteButton } from "@/components/VoteButton";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { Button, Badge, CoverBg } from "@/components/ui";
+import { YoudaoLogo } from "@/components/YoudaoLogo";
 import { Reveal, Stagger, StaggerItem, CountUp, Magnetic } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { UPDATE_TYPE_LABELS } from "@/lib/format";
@@ -37,6 +38,13 @@ export default async function HomePage() {
       {/* ============ 1. HERO — 非对称分栏 ============ */}
       <section className="relative -mx-5 grid gap-10 px-5 pt-6 sm:-mx-8 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-6">
         <div className="relative z-10 max-w-xl">
+          <Reveal>
+            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-ink-100 bg-paper-raised px-3 py-1.5">
+              <YoudaoLogo variant="red" height={14} />
+              <span className="h-3 w-px bg-ink-200" />
+              <span className="text-xs font-medium text-ink-500">网易有道 出品</span>
+            </div>
+          </Reveal>
           <Reveal>
             <div className="overline flex items-center gap-2 text-accent-600">
               <span className="live-dot h-1.5 w-1.5 rounded-full text-accent-600"><span className="block h-1.5 w-1.5 rounded-full bg-accent-600" /></span>
@@ -201,7 +209,7 @@ export default async function HomePage() {
             <div className="mt-7"><Button href="/notes" variant="secondary">查看我的笔记</Button></div>
           </div>
           <div className="rounded-[var(--radius-card)] border border-ink-100 bg-paper p-5">
-            <div className="mb-3 aspect-video overflow-hidden rounded-xl" style={{ background: "linear-gradient(140deg,#0d332d,#1f6b60)" }}>
+            <div className="mb-3 aspect-video overflow-hidden rounded-xl" style={{ background: "linear-gradient(140deg,#2a0a0d,#fc011a)" }}>
               <div className="flex h-full items-center justify-center">
                 <PlayCircle size={44} weight="fill" className="text-white/90" />
               </div>

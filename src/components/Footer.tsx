@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { TideMark } from "./TideMark";
+import { YoudaoLogo } from "./YoudaoLogo";
 
 export function Footer() {
   return (
@@ -7,11 +7,12 @@ export function Footer() {
       <div className="mx-auto grid max-w-[1200px] gap-10 px-5 py-14 sm:px-8 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
         <div>
           <div className="flex items-center gap-2.5">
-            <TideMark size={24} />
+            <YoudaoLogo variant="ink" height={20} />
+            <span className="h-4 w-px bg-ink-200" />
             <span className="font-semibold tracking-tight text-ink-950">潮汐学习</span>
           </div>
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-ink-500">
-            订阅制学习平台。按月订阅，解锁持续更新的体系化课程；全站畅学或单赛道自由组合，用需求投票决定下一批课程。
+            网易有道 出品。订阅制学习平台，按月订阅解锁持续更新的体系化课程；全站畅学或单赛道自由组合，用需求投票决定下一批课程。
           </p>
         </div>
         <FooterCol title="产品" links={[
@@ -38,7 +39,7 @@ export function Footer() {
         </div>
       </div>
       <div className="border-t border-ink-100 py-5 text-center">
-        <p className="num text-[0.72rem] text-ink-400">© 2026 潮汐学习 · v0.5 · 内容仅供学习参考</p>
+        <p className="num text-[0.72rem] text-ink-400">© 2026 网易有道 · 潮汐学习 v0.6 · 内容仅供学习参考</p>
       </div>
     </footer>
   );

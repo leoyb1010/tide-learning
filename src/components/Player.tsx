@@ -83,7 +83,7 @@ export function Player({
   const VideoArea = (
     <div className="overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-ink-950">
       {/* 模拟视频画面 */}
-      <div className="relative flex aspect-video items-center justify-center" style={{ background: "linear-gradient(140deg,#0d332d,#17564d,#1f6b60)" }}>
+      <div className="relative flex aspect-video items-center justify-center" style={{ background: "linear-gradient(140deg,#2a0a0d,#a30514,#fc011a)" }}>
         <div className="absolute inset-0 opacity-[0.1]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "18px 18px" }} />
         {!access ? (
           <div className="relative text-center text-white/90">
@@ -206,7 +206,7 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
   const upcoming = start ? start.getTime() > Date.now() : false;
   return (
     <div className="overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised">
-      <div className="relative flex items-center justify-center py-16" style={{ background: "linear-gradient(140deg,#0d332d,#1f6b60)" }}>
+      <div className="relative flex items-center justify-center py-16" style={{ background: "linear-gradient(140deg,#2a0a0d,#fc011a)" }}>
         <div className="absolute inset-0 opacity-[0.1]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "18px 18px" }} />
         <div className="relative text-center text-white">
           <div className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
