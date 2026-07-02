@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "./ui";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
+import { trackLabel } from "@/lib/tracks";
 
 export interface PlanData {
   id: string;
@@ -12,6 +13,7 @@ export interface PlanData {
   priceCents: number;
   firstPriceCents: number | null;
   currency: string;
+  scope: string;
   highlight: boolean;
 }
 
@@ -89,17 +91,28 @@ export function SubscriptionCard({
         <span className="text-sm text-ink-500">¥</span>
         <span className="text-4xl font-semibold text-ink-950 tabular">{yuan(price)}</span>
         <span className="text-sm text-ink-400">
-          /{plan.billingPeriod === "year" ? "年" : "月"}
+          /{plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月"}
         </span>
       </div>
       {plan.firstPriceCents != null && plan.firstPriceCents < plan.priceCents && (
         <p className="mt-1 text-xs text-dawn-500">首月特惠，之后 ¥{yuan(plan.priceCents)}/月</p>
       )}
       <ul className="mt-5 flex-1 space-y-2 text-sm text-ink-500">
-        <li>✓ 解锁全站课程</li>
-        <li>✓ 本周上新可学习</li>
-        <li>✓ 无限笔记 + 时间戳锚点</li>
-        <li>✓ 需求投票权</li>
+        {plan.scope === "all" ? (
+          <>
+            <li>✓ 解锁<span className="font-medium text-ink-800">全部赛道</span>课程</li>
+            <li>✓ 本周上新可学习</li>
+            <li>✓ 无限笔记 + 时间戳锚点</li>
+            <li>✓ 需求投票权</li>
+          </>
+        ) : (
+          <>
+            <li>✓ 解锁「{trackLabel(plan.scope)}」全部课程</li>
+            <li>✓ 该赛道持续更新</li>
+            <li>✓ 无限笔记 + 投票权</li>
+            <li className="text-ink-400">升级全站可解锁其他赛道</li>
+          </>
+        )}
       </ul>
       <button
         onClick={subscribe}

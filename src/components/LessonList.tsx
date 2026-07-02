@@ -28,6 +28,7 @@ export function LessonList({ courseSlug, lessons }: { courseSlug: string; lesson
                 <span className="truncate font-medium text-ink-950">{l.title}</span>
                 {l.isFree && <Badge tone="tide">免费试学</Badge>}
                 {l.contentType === "article" && <Badge tone="muted">图文</Badge>}
+                {l.contentType === "live" && <Badge tone="dawn">直播小班</Badge>}
               </div>
               {l.summary && <p className="mt-0.5 truncate text-sm text-ink-400">{l.summary}</p>}
             </div>

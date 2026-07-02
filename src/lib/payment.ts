@@ -88,6 +88,7 @@ export async function processWebhook(channel: string, payload: {
           userId: order.userId,
           planId: order.planId,
           channel,
+          scope: order.plan.scope, // 快照套餐覆盖范围（全站/单赛道）
           status,
           currentPeriodStart: start,
           currentPeriodEnd: end,

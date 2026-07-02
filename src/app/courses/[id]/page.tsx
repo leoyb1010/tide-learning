@@ -2,10 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getCourseDetail, listCourses } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
+import { canAccessTrack } from "@/lib/entitlement";
 import { CoverBg, Badge, Button } from "@/components/ui";
 import { LessonList } from "@/components/LessonList";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
+import { TrialBooking } from "@/components/TrialBooking";
+import { TRACK_MAP } from "@/lib/tracks";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,7 +26,9 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const { course, snapshot, categoryLabel, levelLabel, durationText, lessons, updateLogs } = detail;
   const firstFree = lessons.find((l) => l.isFree);
   const firstLesson = lessons[0];
-  const needsCompliance = ["life"].includes(course.category) && course.reviewerName;
+  const needsCompliance = ["life", "silver_english"].includes(course.category) && course.reviewerName;
+  const hasAccess = canAccessTrack(course.category, snapshot); // 按赛道判断，非全站
+  const isEnglish = TRACK_MAP[course.category]?.isEnglish;
   const related = (await listCourses({ category: course.category })).filter((c) => c.id !== course.id).slice(0, 3);
 
   return (
@@ -42,6 +47,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
           {course.description && <p className="prose-body mt-4 text-ink-800">{course.description}</p>}
           <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink-500">
             <span>讲师：{course.instructorName}</span>
+            {course.contributorName && <span>内容供给：{course.contributorName}</span>}
             {course.reviewerName && <span>审核人：{course.reviewerName}</span>}
           </div>
         </div>
@@ -55,16 +61,20 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             <Data label="免费试学" value={`${lessons.filter((l) => l.isFree).length} 讲`} />
           </dl>
           <div className="mt-5 space-y-2.5">
-            {snapshot.isSubscriber ? (
+            {hasAccess ? (
               <Button href={`/courses/${course.slug}/learn/${firstLesson?.id}`} full size="lg">继续学习</Button>
             ) : (
               <>
                 {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg">免费试学第一章</Button>}
                 <Button href="/pricing" variant="secondary" full>订阅解锁全部</Button>
+                {/* 英语赛道提供预约试听（有道 0转正入口） */}
+                {isEnglish && <TrialBooking courseId={course.id} track={course.category} source="youdao_dict" />}
               </>
             )}
           </div>
-          <p className="mt-3 text-center text-xs text-ink-400">订阅后解锁全站课程 · 笔记永久保留</p>
+          <p className="mt-3 text-center text-xs text-ink-400">
+            {snapshot.isSubscriber && !hasAccess ? "你的订阅未覆盖该赛道，升级全站即可解锁" : "订阅后解锁该赛道课程 · 笔记永久保留"}
+          </p>
         </aside>
       </section>
 

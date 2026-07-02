@@ -9,6 +9,7 @@ import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { Button, Badge } from "@/components/ui";
 import { TrackView } from "@/components/TrackView";
 import { UPDATE_TYPE_LABELS } from "@/lib/format";
+import { TRACKS } from "@/lib/tracks";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
@@ -22,13 +23,11 @@ export default async function HomePage() {
 
   const featured = all.filter((c) => c.isFeatured).slice(0, 6);
   const popular = [...all].sort((a, b) => b.learnersCount - a.learnersCount).slice(0, 3);
-  const lines = {
-    ai_skill: all.filter((c) => c.categoryLabel === "AI 技能").slice(0, 3),
-    exam: all.filter((c) => c.categoryLabel === "备考").slice(0, 3),
-    life: all.filter((c) => c.categoryLabel === "生活").slice(0, 3),
-  };
+  // 按赛道分组（融合有道内容板块）
+  const trackLines = TRACKS.map((t) => ({ track: t, courses: all.filter((c) => c.category === t.key).slice(0, 3) })).filter((l) => l.courses.length > 0);
   const totalLearners = all.reduce((s, c) => s + c.learnersCount, 0);
-  const mainPlans = plans.filter((p) => p.billingPeriod !== "month").slice(0, 2);
+  // 全站会员主推：连续包月 + 年卡
+  const mainPlans = plans.filter((p) => p.scope === "all" && p.billingPeriod !== "month").slice(0, 2);
 
   return (
     <div className="space-y-20">
@@ -82,11 +81,11 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      {/* 4. 三条内容线 */}
+      {/* 4. 内容赛道（融合有道内容板块） */}
       <section className="space-y-10">
-        <ContentLine title="AI 技能" hint="P1 主力：付费决策快、更新快" courses={lines.ai_skill} />
-        <ContentLine title="备考" hint="雅思跟随题季更新，刚需稳定" courses={lines.exam} />
-        <ContentLine title="生活" hint="长辈 AI、防诈骗、就医前信息整理" courses={lines.life} />
+        {trackLines.map((l) => (
+          <ContentLine key={l.track.key} title={l.track.label} hint={`${l.track.people} · ${l.track.blurb}`} courses={l.courses} />
+        ))}
       </section>
 
       {/* 5. 需求排行榜预览 */}

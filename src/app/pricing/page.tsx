@@ -3,15 +3,17 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { TrackView } from "@/components/TrackView";
+import { trackLabel, FUTURE_TRACKS } from "@/lib/tracks";
+import { Badge } from "@/components/ui";
 
 export const metadata = { title: "订阅方案" };
 
-// §7.2 权益分层
 const RIGHTS = [
   { name: "试看首章", free: "是", premium: "是", expired: "是" },
   { name: "课程目录", free: "是", premium: "是", expired: "是" },
-  { name: "全站课程", free: "—", premium: "是", expired: "—" },
+  { name: "订阅赛道课程", free: "—", premium: "是", expired: "—" },
   { name: "本周上新", free: "可浏览", premium: "可学习", expired: "可浏览" },
+  { name: "直播小班课", free: "—", premium: "是", expired: "—" },
   { name: "需求投票", free: "—", premium: "是", expired: "—" },
   { name: "笔记创建", free: "3 篇", premium: "无限", expired: "仅查看" },
 ];
@@ -20,34 +22,59 @@ export default async function PricingPage() {
   const user = await getCurrentUser();
   const snapshot = await resolveEntitlement(user?.id ?? null);
   const plans = await prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } });
-  // P1 主推：连续包月、年度；单月弱展示锚点（§7.1）
-  const mainPlans = plans.filter((p) => p.billingPeriod !== "month");
-  const anchorPlan = plans.find((p) => p.billingPeriod === "month");
+
+  // 全站会员：主推连续包月 + 年卡 + 季卡；单月弱锚点
+  const fullPlans = plans.filter((p) => p.scope === "all" && p.billingPeriod !== "month");
+  const anchor = plans.find((p) => p.scope === "all" && p.billingPeriod === "month");
+  const trackPlans = plans.filter((p) => p.scope !== "all");
 
   return (
-    <div className="space-y-12 py-4">
+    <div className="space-y-14 py-4">
       <TrackView event="paywall_view" properties={{ trigger: "pricing_page" }} />
       <div className="text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink-950">一次订阅，解锁全站课程</h1>
-        <p className="mt-2 text-ink-500">持续更新的学习流 · 笔记永久保留 · 随时可取消</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-ink-950">按需订阅，自由组合</h1>
+        <p className="mt-2 text-ink-500">全站畅学，或只订你要的赛道 · 笔记永久保留 · 随时可取消</p>
         {snapshot.isSubscriber && (
           <p className="mt-3 inline-block rounded-full bg-success/10 px-4 py-1.5 text-sm text-success">
-            你已是订阅用户，有效至 {snapshot.validUntil ? new Date(snapshot.validUntil).toLocaleDateString("zh-CN") : ""}
+            你已订阅（{snapshot.accessibleTracks === "all" ? "全站" : snapshot.accessibleTracks.map(trackLabel).join("、")}），有效至 {snapshot.validUntil ? new Date(snapshot.validUntil).toLocaleDateString("zh-CN") : ""}
           </p>
         )}
       </div>
 
-      <div className="mx-auto grid max-w-2xl gap-5 sm:grid-cols-2">
-        {mainPlans.map((p) => (
-          <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />
-        ))}
-      </div>
+      {/* 全站会员 */}
+      <section>
+        <div className="mb-5 text-center">
+          <h2 className="text-xl font-semibold text-ink-950">全站会员</h2>
+          <p className="mt-1 text-sm text-ink-500">一次订阅，解锁全部赛道</p>
+        </div>
+        <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-3">
+          {fullPlans.map((p) => <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />)}
+        </div>
+        {anchor && (
+          <p className="mt-4 text-center text-sm text-ink-400">
+            也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首月优惠）
+          </p>
+        )}
+      </section>
 
-      {anchorPlan && (
-        <p className="text-center text-sm text-ink-400">
-          也可选择单月 ¥{(anchorPlan.priceCents / 100).toFixed(0)}/月（不含首月优惠）· 家庭年卡、学生年卡将于后续上线
-        </p>
-      )}
+      {/* 单赛道会员 */}
+      <section>
+        <div className="mb-5 text-center">
+          <h2 className="text-xl font-semibold text-ink-950">单赛道会员</h2>
+          <p className="mt-1 text-sm text-ink-500">低门槛切入，只学你需要的方向</p>
+        </div>
+        <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-3">
+          {trackPlans.map((p) => <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />)}
+        </div>
+      </section>
+
+      {/* 未来赛道 */}
+      <section className="text-center">
+        <p className="text-sm text-ink-400">即将上线更多赛道：</p>
+        <div className="mt-3 flex flex-wrap justify-center gap-2">
+          {FUTURE_TRACKS.map((t) => <Badge key={t.key} tone="muted">{t.label}</Badge>)}
+        </div>
+      </section>
 
       {/* 权益对比 */}
       <section className="mx-auto max-w-2xl">

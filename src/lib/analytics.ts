@@ -19,6 +19,7 @@ export const CORE_EVENTS = [
   "demand_submit",
   "demand_vote",
   "demand_status_view",
+  "trial_booking",
   "subscription_cancel_start",
   "subscription_cancel_confirm",
   "signup_start",

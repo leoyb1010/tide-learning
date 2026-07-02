@@ -14,12 +14,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ asse
   const exp = Number(req.nextUrl.searchParams.get("exp") ?? 0);
   if (exp && exp < Date.now()) return fail("链接已过期，请刷新页面", 403);
 
-  const lesson = await prisma.lesson.findFirst({ where: { videoAssetId: assetId } });
+  const lesson = await prisma.lesson.findFirst({ where: { videoAssetId: assetId }, include: { course: { select: { category: true } } } });
   if (!lesson) return fail("资源不存在", 404);
 
   const user = await getCurrentUser();
   const snapshot = await resolveEntitlement(user?.id ?? null);
-  if (!canAccessLesson(lesson.isFree, snapshot)) {
+  if (!canAccessLesson(lesson.course.category, lesson.isFree, snapshot)) {
     return fail("无权访问该资源，请先订阅", 403);
   }
 

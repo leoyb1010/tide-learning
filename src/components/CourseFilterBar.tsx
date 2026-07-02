@@ -1,13 +1,9 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import { TRACKS } from "@/lib/tracks";
 
-const CATEGORIES = [
-  { key: "all", label: "全部" },
-  { key: "ai_skill", label: "AI 技能" },
-  { key: "exam", label: "备考" },
-  { key: "life", label: "生活" },
-];
+const CATEGORIES = [{ key: "all", label: "全部" }, ...TRACKS.map((t) => ({ key: t.key, label: t.label }))];
 const SORTS = [
   { key: "recommended", label: "推荐" },
   { key: "newest", label: "最新更新" },

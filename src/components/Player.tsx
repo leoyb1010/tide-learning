@@ -12,6 +12,7 @@ interface OutlineItem { id: string; title: string; isFree: boolean; durationSec:
 interface LessonData {
   id: string; title: string; summary: string | null; contentType: string;
   durationSec: number; isFree: boolean; videoUrl: string | null; articleMd: string | null;
+  liveStartAt?: string | null; liveSeatLimit?: number | null;
 }
 
 /**
@@ -131,7 +132,9 @@ export function Player({
         <div className="grid gap-4 lg:grid-cols-[1fr_380px]">
           {/* 左：视频/图文 */}
           <div>
-            {lesson.contentType === "article" && lesson.articleMd ? (
+            {lesson.contentType === "live" ? (
+              <LiveBanner lesson={lesson} />
+            ) : lesson.contentType === "article" && lesson.articleMd ? (
               <article className="prose-body rounded-2xl border border-ink-100 bg-paper-raised p-6">
                 <h2 className="text-xl font-semibold text-ink-950">{lesson.title}</h2>
                 <div className="mt-4 whitespace-pre-wrap text-ink-800">{lesson.articleMd}</div>
@@ -192,6 +195,38 @@ export function Player({
 
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button onClick={onClick} className={`rounded-lg px-4 py-1.5 text-sm ${active ? "bg-tide-600 text-white" : "bg-white border border-ink-200 text-ink-500"}`}>{children}</button>;
+}
+
+// 直播小班课（融合有道口语小班）
+function LiveBanner({ lesson }: { lesson: LessonData }) {
+  const [booked, setBooked] = useState(false);
+  const start = lesson.liveStartAt ? new Date(lesson.liveStartAt) : null;
+  const upcoming = start ? start.getTime() > Date.now() : false;
+  return (
+    <div className="overflow-hidden rounded-2xl border border-dawn-400/40 bg-paper-raised">
+      <div className="flex items-center justify-center py-14" style={{ background: "linear-gradient(135deg,#185f57,#e2924a)" }}>
+        <div className="text-center text-white">
+          <div className="text-3xl">🔴 直播小班</div>
+          <p className="mt-2 text-sm text-white/90">真人连麦纠音 · 限额 {lesson.liveSeatLimit ?? 20} 人</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+        <div>
+          <p className="font-medium text-ink-950">{lesson.title}</p>
+          <p className="text-sm text-ink-500">
+            {start ? `开播时间：${start.toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "开播时间待定"}
+          </p>
+        </div>
+        <button
+          onClick={() => setBooked(true)}
+          disabled={booked}
+          className="rounded-xl bg-tide-600 px-5 py-2.5 text-sm font-medium text-white disabled:bg-success"
+        >
+          {booked ? "✓ 已预约" : upcoming ? "预约席位" : "进入直播间"}
+        </button>
+      </div>
+    </div>
+  );
 }
 
 function Outline({ courseSlug, outline }: { courseSlug: string; outline: OutlineItem[] }) {

@@ -8,6 +8,7 @@ const ITEMS = [
   { href: "/admin/courses", label: "课程管理" },
   { href: "/admin/content-calendar", label: "内容排期" },
   { href: "/admin/demands", label: "需求审核" },
+  { href: "/admin/leads", label: "建联队列" },
   { href: "/admin/orders", label: "订单/订阅" },
   { href: "/admin/users", label: "用户管理" },
 ];

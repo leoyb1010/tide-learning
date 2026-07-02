@@ -1,12 +1,12 @@
 import { prisma } from "./db";
 import { resolveEntitlement, canAccessLesson, type EntitlementSnapshot } from "./entitlement";
 import { rankDemands } from "./demand-score";
+import { TRACK_MAP, trackLabel } from "./tracks";
 
-export const CATEGORY_LABELS: Record<string, string> = {
-  ai_skill: "AI 技能",
-  exam: "备考",
-  life: "生活",
-};
+// 赛道标签（融合有道内容板块）。保留 CATEGORY_LABELS 名以兼容旧引用。
+export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
+  Object.entries(TRACK_MAP).map(([k, t]) => [k, t.label]),
+);
 export const LEVEL_LABELS: Record<string, string> = { L1: "L1 入门", L2: "L2 进阶", L3: "L3 高阶" };
 
 export function relativeTime(date: Date): string {
@@ -107,7 +107,7 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
       contentType: l.contentType,
       durationSec: l.durationSec,
       isFree: l.isFree,
-      canAccess: canAccessLesson(l.isFree, snapshot),
+      canAccess: canAccessLesson(course.category, l.isFree, snapshot),
     })),
     updateLogs: course.updateLogs.map((u) => ({
       ...u,
@@ -124,7 +124,7 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   });
   if (!lesson) return null;
   const snapshot = await resolveEntitlement(userId);
-  const access = canAccessLesson(lesson.isFree, snapshot);
+  const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot);
 
   const siblings = lesson.course.lessons;
   const idx = siblings.findIndex((l) => l.id === lesson.id);
@@ -133,6 +133,7 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
     snapshot,
     access,
     course: lesson.course,
+    track: lesson.course.category,
     lesson: {
       id: lesson.id,
       title: lesson.title,
@@ -140,6 +141,8 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       contentType: lesson.contentType,
       durationSec: lesson.durationSec,
       isFree: lesson.isFree,
+      liveStartAt: lesson.liveStartAt ? lesson.liveStartAt.toISOString() : null,
+      liveSeatLimit: lesson.liveSeatLimit,
       // 关键：付费章节且无权益时，videoUrl / articleMd 一律为 null
       videoUrl: access && lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : null,
       articleMd: access ? lesson.articleMd : null,

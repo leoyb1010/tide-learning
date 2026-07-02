@@ -1,22 +1,17 @@
 import { prisma } from "./db";
 
 /**
- * Entitlement 状态机与权益快照 — 对应计划书 v0.3 §7.3。
+ * Entitlement 状态机与权益快照 — 计划书 v0.3 §7.3 + 有道融合（分赛道订阅）。
  *
- * 核心原则（§17 技术要求 4 / §19 技术验收）：
+ * 核心原则：
  *   - 权益判断只在服务端，客户端只展示 snapshot。
- *   - 订单 / 订阅 / 权益分表，此处从 subscriptions 归约出 entitlement 快照。
+ *   - 订单/订阅/权益分表，从 subscriptions 归约出权益快照。
+ *   - 支持"全站会员"与"单赛道会员"并存：accessibleTracks = "all" | 赛道 key 列表。
  */
 
 export type SubscriptionStatus =
-  | "trial"
-  | "active"
-  | "grace_period"
-  | "billing_retry"
-  | "canceled_but_active"
-  | "expired"
-  | "refunded"
-  | "revoked";
+  | "trial" | "active" | "grace_period" | "billing_retry"
+  | "canceled_but_active" | "expired" | "refunded" | "revoked";
 
 // §6.7 订阅状态展示文案
 export const STATUS_LABELS: Record<string, { label: string; tone: "ok" | "warn" | "muted" }> = {
@@ -31,24 +26,25 @@ export const STATUS_LABELS: Record<string, { label: string; tone: "ok" | "warn" 
   revoked: { label: "权益已撤销，如有疑问联系客服", tone: "muted" },
 };
 
-// 仍享有 premium 学习权益的状态
 const PREMIUM_STATUSES = new Set(["trial", "active", "grace_period", "canceled_but_active"]);
 
 export interface EntitlementSnapshot {
-  isSubscriber: boolean;      // 是否可学习付费章节
+  isSubscriber: boolean;                      // 是否有任一有效订阅
   accessLevel: "free" | "premium" | "family_member";
-  subscriptionStatus: string; // free / active / expired ...
+  accessibleTracks: "all" | string[];         // 可学习的赛道（分赛道订阅）
+  subscriptionStatus: string;
   statusLabel: string;
   statusTone: "ok" | "warn" | "muted";
   validUntil: string | null;
-  canVote: boolean;           // §7.2：仅订阅用户可投票
+  canVote: boolean;
   canCreateNoteUnlimited: boolean;
-  noteFreeLimit: number;      // 免费用户 3 篇（§7.2）
+  noteFreeLimit: number;
 }
 
 export const FREE_SNAPSHOT: EntitlementSnapshot = {
   isSubscriber: false,
   accessLevel: "free",
+  accessibleTracks: [],
   subscriptionStatus: "free",
   statusLabel: STATUS_LABELS.free.label,
   statusTone: "muted",
@@ -58,16 +54,10 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   noteFreeLimit: 3,
 };
 
-/**
- * 归约用户当前权益：先把过期订阅落地为 expired，再取最优活跃订阅生成快照。
- * 每次读取都会顺带修正过期状态，保证客户端拿到的快照是权威的。
- */
 export async function resolveEntitlement(userId: string | null | undefined): Promise<EntitlementSnapshot> {
   if (!userId) return FREE_SNAPSHOT;
-
   const now = new Date();
 
-  // 到期但仍标记为 active/grace 的订阅 → expired
   await prisma.subscription.updateMany({
     where: {
       userId,
@@ -77,35 +67,39 @@ export async function resolveEntitlement(userId: string | null | undefined): Pro
     data: { status: "expired" },
   });
 
-  const subs = await prisma.subscription.findMany({
-    where: { userId },
-    orderBy: { currentPeriodEnd: "desc" },
-  });
+  const subs = await prisma.subscription.findMany({ where: { userId }, orderBy: { currentPeriodEnd: "desc" } });
+  const activeSubs = subs.filter((s) => PREMIUM_STATUSES.has(s.status) && s.currentPeriodEnd >= now);
 
-  const activeSub = subs.find(
-    (s) => PREMIUM_STATUSES.has(s.status) && s.currentPeriodEnd >= now,
-  );
+  if (activeSubs.length > 0) {
+    // 覆盖赛道：任一全站订阅 → "all"，否则为各单赛道 scope 的并集
+    const hasAll = activeSubs.some((s) => s.scope === "all");
+    const accessibleTracks: "all" | string[] = hasAll
+      ? "all"
+      : Array.from(new Set(activeSubs.map((s) => s.scope)));
 
-  if (activeSub) {
+    // 主订阅（用于状态/有效期展示）：优先全站，其次有效期最长
+    const primary = activeSubs.find((s) => s.scope === "all") ?? activeSubs[0];
+    const meta = STATUS_LABELS[primary.status] ?? STATUS_LABELS.active;
+
     const snapshot: EntitlementSnapshot = {
       isSubscriber: true,
       accessLevel: "premium",
-      subscriptionStatus: activeSub.status,
-      statusLabel: (STATUS_LABELS[activeSub.status] ?? STATUS_LABELS.active).label,
-      statusTone: (STATUS_LABELS[activeSub.status] ?? STATUS_LABELS.active).tone,
-      validUntil: activeSub.currentPeriodEnd.toISOString(),
+      accessibleTracks,
+      subscriptionStatus: primary.status,
+      statusLabel: meta.label,
+      statusTone: meta.tone,
+      validUntil: primary.currentPeriodEnd.toISOString(),
       canVote: true,
       canCreateNoteUnlimited: true,
       noteFreeLimit: 3,
     };
-    await persistSnapshot(userId, activeSub.id, "active", snapshot);
+    await persistSnapshot(userId, primary.id, "active", snapshot);
     return snapshot;
   }
 
-  // 无活跃订阅：区分 expired / refunded / revoked / 从未订阅
   const latest = subs[0];
   if (latest) {
-    const status = latest.status; // expired / refunded / revoked
+    const status = latest.status;
     const meta = STATUS_LABELS[status] ?? STATUS_LABELS.expired;
     const snapshot: EntitlementSnapshot = {
       ...FREE_SNAPSHOT,
@@ -121,31 +115,25 @@ export async function resolveEntitlement(userId: string | null | undefined): Pro
   return FREE_SNAPSHOT;
 }
 
-async function persistSnapshot(
-  userId: string,
-  subscriptionId: string,
-  status: string,
-  snapshot: EntitlementSnapshot,
-) {
-  const existing = await prisma.entitlement.findFirst({
-    where: { userId, sourceSubscriptionId: subscriptionId },
-  });
+async function persistSnapshot(userId: string, subscriptionId: string, status: string, snapshot: EntitlementSnapshot) {
+  const existing = await prisma.entitlement.findFirst({ where: { userId, sourceSubscriptionId: subscriptionId } });
   const data = {
     status,
     accessLevel: snapshot.accessLevel,
     validUntil: snapshot.validUntil ? new Date(snapshot.validUntil) : null,
     snapshotJson: JSON.stringify(snapshot),
   };
-  if (existing) {
-    await prisma.entitlement.update({ where: { id: existing.id }, data });
-  } else {
-    await prisma.entitlement.create({
-      data: { userId, sourceSubscriptionId: subscriptionId, ...data },
-    });
-  }
+  if (existing) await prisma.entitlement.update({ where: { id: existing.id }, data });
+  else await prisma.entitlement.create({ data: { userId, sourceSubscriptionId: subscriptionId, ...data } });
 }
 
-/** 服务端判断某章节是否可学：免费章节任何人可学，付费章节需订阅。 */
-export function canAccessLesson(isFree: boolean, snapshot: EntitlementSnapshot): boolean {
-  return isFree || snapshot.isSubscriber;
+/** 是否可访问某赛道（全站 or 该赛道单订阅）。 */
+export function canAccessTrack(track: string, snapshot: EntitlementSnapshot): boolean {
+  if (snapshot.accessibleTracks === "all") return true;
+  return snapshot.accessibleTracks.includes(track);
+}
+
+/** 服务端判断某章节是否可学：免费章节任何人可学；付费章节需订阅且覆盖该赛道。 */
+export function canAccessLesson(track: string, isFree: boolean, snapshot: EntitlementSnapshot): boolean {
+  return isFree || canAccessTrack(track, snapshot);
 }

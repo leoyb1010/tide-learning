@@ -23,7 +23,7 @@ export default async function ContentCalendarPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-ink-950">内容排期</h1>
-      <p className="text-sm text-ink-400">固定上新日 + 延期说明，保证滚动更新对用户可见。</p>
+      <p className="text-sm text-ink-400">固定上新日 + 延期说明，保证滚动更新对用户可见。选题双输入：共创投票 + 投流数据。</p>
       <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-paper-raised">
         <table className="w-full text-sm">
           <thead className="border-b border-ink-100 text-left text-ink-400">
@@ -36,7 +36,10 @@ export default async function ContentCalendarPage() {
                 <tr key={it.id}>
                   <td className="px-4 py-3 tabular text-ink-950">{new Date(it.plannedPublishDate).toLocaleDateString("zh-CN")}</td>
                   <td className="px-4 py-3">{it.course.title}</td>
-                  <td className="px-4 py-3 text-ink-500">{it.title}</td>
+                  <td className="px-4 py-3 text-ink-500">
+                    {it.title}
+                    {it.demandId && <span className="ml-2"><Badge tone="tide">共创选题</Badge></span>}
+                  </td>
                   <td className="px-4 py-3 text-ink-500">{it.owner ?? "—"}</td>
                   <td className="px-4 py-3"><Badge tone={it.riskLevel === "high" ? "error" : it.riskLevel === "medium" ? "warning" : "muted"}>{it.riskLevel}</Badge></td>
                   <td className="px-4 py-3"><Badge tone={s.tone}>{s.label}</Badge></td>

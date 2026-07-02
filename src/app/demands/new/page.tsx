@@ -4,12 +4,9 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import { TRACKS } from "@/lib/tracks";
 
-const CATEGORIES = [
-  { key: "ai_skill", label: "AI 技能" },
-  { key: "exam", label: "备考" },
-  { key: "life", label: "生活" },
-];
+const CATEGORIES = TRACKS.map((t) => ({ key: t.key, label: t.label }));
 const DEPTHS = [
   { key: "intro", label: "入门" },
   { key: "advanced", label: "进阶" },

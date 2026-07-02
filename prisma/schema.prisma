@@ -61,7 +61,7 @@ model Course {
   title          String
   subtitle       String?
   description    String?
-  category       String // ai_skill / exam / life
+  category       String // 赛道/内容板块 key（见 src/lib/tracks.ts）
   level          String // L1 / L2 / L3
   status         String   @default("draft") // draft / beta / published / archived
   coverColor     String   @default("tide") // 用渐变色替代封面图，避免二进制资源
@@ -69,6 +69,8 @@ model Course {
   instructorName String?
   reviewerName   String? // 健康/财务/防诈骗类必填
   disclaimer     String? // 免责声明
+  contributorName String? // 内容供给方/主讲（融合：弱化单一主讲依赖）
+  revenueSharePct Int?     // 主讲分成比例，成本核算（有道痛点：主讲要 50-60%）
   updateCadence  String? // 每周更新 / 按题季 等
   totalDurationSec Int    @default(0)
   learnersCount  Int      @default(0)
@@ -91,11 +93,13 @@ model Lesson {
   title       String
   summary     String?
   sortOrder   Int      @default(0)
-  contentType String   @default("video") // video / article / mixed
+  contentType String   @default("video") // video / article / mixed / live
   videoAssetId String? // 指向受控视频资源，非订阅用户拿不到直链
   articleMd   String?
   durationSec Int      @default(0)
   isFree      Boolean  @default(false)
+  liveStartAt DateTime? // 直播小班课开播时间（融合：有道口语小班课）
+  liveSeatLimit Int?    // 小班名额上限
   status      String   @default("published")
   publishedAt DateTime?
   createdAt   DateTime @default(now())
@@ -201,11 +205,12 @@ model DemandStatusLog {
 model Plan {
   id            String  @id @default(cuid())
   name          String
-  billingPeriod String // month / year / month_recurring
+  billingPeriod String // month / quarter / year / month_recurring
   priceCents    Int
   firstPriceCents Int?
   currency      String  @default("CNY")
   channel       String  @default("any")
+  scope         String  @default("all") // "all"=全站会员；否则为单赛道 key（分赛道自由组合订阅）
   highlight     Boolean @default(false)
   isActive      Boolean @default(true)
 
@@ -235,6 +240,7 @@ model Subscription {
   planId               String
   plan                 Plan     @relation(fields: [planId], references: [id])
   channel              String
+  scope                String   @default("all") // 从 plan.scope 快照，决定该订阅覆盖的赛道
   externalSubscriptionId String?
   status               String // trial / active / grace_period / billing_retry / canceled_but_active / expired / refunded / revoked
   currentPeriodStart   DateTime @default(now())
@@ -312,12 +318,30 @@ model ContentCalendar {
   courseId           String
   course             Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId           String?
+  demandId           String?  // 融合：共创需求 → 选题排期（投票驱动 + 投流数据双输入）
   title              String
   plannedPublishDate DateTime
   owner              String?
   status             String   @default("planned") // planned / recording / editing / review / scheduled / published / delayed
   riskLevel          String   @default("low")
   delayReason        String?
+}
+
+// ---------- 预约试听 / 建联线索（融合有道 0转正 + 电联建联漏斗）----------
+model Lead {
+  id           String   @id @default(cuid())
+  userId       String?  // 登录用户可关联；未登录留资也可
+  name         String?
+  phone        String?
+  courseId     String?  // 意向课程/赛道
+  track        String?
+  source       String   @default("youdao_dict") // 渠道：youdao_dict(端内私域) / ad_external(端外投放) / private_domain(私域) / organic
+  channelDetail String? // 具体投放位/活动
+  status       String   @default("new") // new / contacting(电联中) / booked(已预约试听) / trialing(试听中) / converted(已转化) / lost(流失)
+  assigneeId   String?  // support 跟进人
+  followUpNote String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 }
 
 // ---------- 后台审计日志 (§19 技术验收: audit log) ----------

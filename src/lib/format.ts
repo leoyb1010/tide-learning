@@ -35,6 +35,24 @@ export const DEMAND_STATUS: Record<string, { label: string; tone: string }> = {
 
 export const PLAN_PERIOD_LABELS: Record<string, string> = {
   month: "每月",
+  quarter: "每季",
   month_recurring: "连续包月",
   year: "每年",
+};
+
+// 渠道来源（融合有道流量结构）
+export const CHANNEL_LABELS: Record<string, string> = {
+  youdao_dict: "端内私域（词典）",
+  ad_external: "端外投放",
+  private_domain: "私域运营",
+  organic: "自然流量",
+};
+
+export const LEAD_STATUS: Record<string, { label: string; tone: string }> = {
+  new: { label: "新线索", tone: "tide" },
+  contacting: { label: "电联中", tone: "dawn" },
+  booked: { label: "已预约试听", tone: "dawn" },
+  trialing: { label: "试听中", tone: "dawn" },
+  converted: { label: "已转化", tone: "success" },
+  lost: { label: "已流失", tone: "muted" },
 };
