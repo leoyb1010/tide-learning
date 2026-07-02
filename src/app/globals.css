@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+/* ============================================================
+   潮汐学习 设计 Token — 对应计划书 v0.3 §13.2
+   方向：Calm Premium（安静、高级、可信、低压、可读）
+   ============================================================ */
+@theme {
+  /* 色彩 — 主品牌 tide、CTA dawn、纸背景、墨色文字 */
+  --color-tide-50: #eef7f6;
+  --color-tide-100: #d4ece9;
+  --color-tide-400: #4d9d95;
+  --color-tide-600: #1f7a70;
+  --color-tide-700: #185f57;
+  --color-tide-900: #0e3833;
+
+  --color-dawn-300: #f6c99a;
+  --color-dawn-400: #f0ad63;
+  --color-dawn-500: #e2924a;
+
+  --color-paper: #fbfaf7;
+  --color-paper-raised: #ffffff;
+
+  --color-ink-950: #14171a;
+  --color-ink-800: #2b3238;
+  --color-ink-500: #5c666e;
+  --color-ink-400: #7a848c;
+  --color-ink-200: #d9dee1;
+  --color-ink-100: #eaedef;
+
+  --color-success: #3f9a6d;
+  --color-warning: #c9922f;
+  --color-error: #c15a4e;
+
+  /* 圆角 / 阴影 — 细腻，避免廉价感 */
+  --radius-card: 16px;
+  --shadow-soft: 0 1px 2px rgba(20, 23, 26, 0.04), 0 8px 24px rgba(20, 23, 26, 0.06);
+
+  /* 字体 */
+  --font-sans: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", Roboto, sans-serif;
+}
+
+/* ---------- 基础 ---------- */
+:root {
+  --font-scale: 1; /* 长辈模式可放大：由 data-mode 覆盖 */
+  color-scheme: light;
+}
+
+html {
+  font-size: calc(16px * var(--font-scale));
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink-950);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 正文可读性：行高 ≥1.7（§13.2） */
+.prose-body {
+  line-height: 1.75;
+  font-size: 1rem;
+}
+
+/* ---------- 长辈模式（§5.2 / §13.6 预留）---------- */
+[data-mode="elder"] {
+  --font-scale: 1.25;
+}
+[data-mode="elder"] body {
+  line-height: 1.7;
+}
+[data-mode="elder"] .btn {
+  min-height: 56px;
+  font-size: 1.125rem;
+}
+
+/* ---------- 动效降级（§13.5 reduced-motion）---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Hero 慢渐变（§13.5：20s，低端设备静态） */
+@keyframes tide-drift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+.hero-gradient {
+  background: linear-gradient(120deg, #d4ece9, #eef7f6, #f6c99a33, #d4ece9);
+  background-size: 300% 300%;
+  animation: tide-drift 20s ease infinite;
+}
+
+/* 卡片横向滚动，露出下一张（§13.4） */
+.scroll-row {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding-bottom: 4px;
+}
+.scroll-row::-webkit-scrollbar { display: none; }
+.scroll-row > * { scroll-snap-align: start; flex: 0 0 auto; }
+
+/* Skeleton 微光 */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.skeleton {
+  background: var(--color-ink-100);
+  border-radius: 8px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+/* 数字滚动占位（简化为直接显示，reduced-motion 友好） */
+.tabular { font-variant-numeric: tabular-nums; }

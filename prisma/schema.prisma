@@ -1,0 +1,332 @@
+// 潮汐学习 数据模型 — 对应产品计划书 v0.3 §9
+// 订单 / 订阅 / 权益分表（§7.3 后端原则），客户端不判断权益。
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------- §9.1 用户与账户 ----------
+model User {
+  id           String    @id @default(cuid())
+  email        String?   @unique
+  phone        String?   @unique
+  nickname     String
+  avatarUrl    String?
+  authProvider String    @default("password") // password / wechat
+  passwordHash String?
+  role         String    @default("user") // user / admin / content_manager / demand_moderator / support / finance / reviewer
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  profile       UserProfile?
+  sessions      Session[]
+  progress      LearningProgress[]
+  notes         Note[]
+  demands       Demand[]
+  votes         DemandVote[]
+  orders        Order[]
+  subscriptions Subscription[]
+  entitlements  Entitlement[]
+  events        AnalyticsEvent[]
+}
+
+model UserProfile {
+  userId                  String  @id
+  user                    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  birthYear               Int?
+  ageBand                 String? // 18-24 / 22-40 / 35-45 / 45-65
+  learningGoal            String?
+  preferredMode           String  @default("standard") // standard / elder
+  fontScale               Float   @default(1.0)
+  notificationPreferences String  @default("{}")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+// ---------- §9.2 课程 ----------
+model Course {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  title          String
+  subtitle       String?
+  description    String?
+  category       String // ai_skill / exam / life
+  level          String // L1 / L2 / L3
+  status         String   @default("draft") // draft / beta / published / archived
+  coverColor     String   @default("tide") // 用渐变色替代封面图，避免二进制资源
+  ownerId        String?
+  instructorName String?
+  reviewerName   String? // 健康/财务/防诈骗类必填
+  disclaimer     String? // 免责声明
+  updateCadence  String? // 每周更新 / 按题季 等
+  totalDurationSec Int    @default(0)
+  learnersCount  Int      @default(0)
+  isFeatured     Boolean  @default(false)
+  publishedAt    DateTime?
+  lastUpdatedAt  DateTime @default(now())
+  createdAt      DateTime @default(now())
+
+  lessons    Lesson[]
+  updateLogs CourseUpdateLog[]
+  progress   LearningProgress[]
+  notes      Note[]
+  calendar   ContentCalendar[]
+}
+
+model Lesson {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title       String
+  summary     String?
+  sortOrder   Int      @default(0)
+  contentType String   @default("video") // video / article / mixed
+  videoAssetId String? // 指向受控视频资源，非订阅用户拿不到直链
+  articleMd   String?
+  durationSec Int      @default(0)
+  isFree      Boolean  @default(false)
+  status      String   @default("published")
+  publishedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  progress LearningProgress[]
+  notes    Note[]
+}
+
+model CourseUpdateLog {
+  id          String   @id @default(cuid())
+  courseId    String
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId    String?
+  updateType  String // added / revised / fixed / removed
+  title       String
+  description String?
+  ownerId     String?
+  publishedAt DateTime @default(now())
+}
+
+// ---------- §9.3 学习进度 ----------
+model LearningProgress {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  progressSec  Int      @default(0)
+  completedAt  DateTime?
+  lastPlayedAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, lessonId])
+}
+
+// ---------- §9.4 笔记 ----------
+model Note {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId    String
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId    String
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  timestampSec Int?
+  title       String?
+  contentMd   String
+  sourceText  String?
+  visibility  String    @default("private") // private / shared_later
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+}
+
+// ---------- §9.5 共创需求 ----------
+model Demand {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id])
+  title          String
+  description    String?
+  category       String   @default("ai_skill")
+  desiredDepth   String   @default("intro") // intro / advanced / mastery
+  status         String   @default("pending_review")
+  mergedToDemandId String?
+  officialReply  String?
+  riskLevel      String   @default("low")
+  launchedCourseId String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  votes      DemandVote[]
+  statusLogs DemandStatusLog[]
+}
+
+model DemandVote {
+  id        String   @id @default(cuid())
+  demandId  String
+  demand    Demand   @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  voteCount Int      @default(1)
+  weekKey   String // e.g. 2026-W27
+  createdAt DateTime @default(now())
+
+  @@unique([demandId, userId, weekKey])
+}
+
+model DemandStatusLog {
+  id         String   @id @default(cuid())
+  demandId   String
+  demand     Demand   @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  fromStatus String?
+  toStatus   String
+  operatorId String?
+  reason     String?
+  createdAt  DateTime @default(now())
+}
+
+// ---------- §9.6 订阅与订单 ----------
+model Plan {
+  id            String  @id @default(cuid())
+  name          String
+  billingPeriod String // month / year / month_recurring
+  priceCents    Int
+  firstPriceCents Int?
+  currency      String  @default("CNY")
+  channel       String  @default("any")
+  highlight     Boolean @default(false)
+  isActive      Boolean @default(true)
+
+  orders        Order[]
+  subscriptions Subscription[]
+}
+
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  planId        String
+  plan          Plan     @relation(fields: [planId], references: [id])
+  channel       String // web_wechat / web_alipay / stripe / apple_iap / google_play
+  amountCents   Int
+  currency      String   @default("CNY")
+  status        String   @default("pending") // pending / paid / refunded / failed
+  externalOrderId String?
+  createdAt     DateTime @default(now())
+  paidAt        DateTime?
+}
+
+model Subscription {
+  id                   String   @id @default(cuid())
+  userId               String
+  user                 User     @relation(fields: [userId], references: [id])
+  planId               String
+  plan                 Plan     @relation(fields: [planId], references: [id])
+  channel              String
+  externalSubscriptionId String?
+  status               String // trial / active / grace_period / billing_retry / canceled_but_active / expired / refunded / revoked
+  currentPeriodStart   DateTime @default(now())
+  currentPeriodEnd     DateTime
+  cancelAtPeriodEnd    Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  entitlements Entitlement[]
+}
+
+model Entitlement {
+  id                 String   @id @default(cuid())
+  userId             String
+  user               User     @relation(fields: [userId], references: [id])
+  sourceSubscriptionId String?
+  subscription       Subscription? @relation(fields: [sourceSubscriptionId], references: [id])
+  status             String // active / expired / revoked
+  accessLevel        String   @default("free") // free / premium / family_member
+  validFrom          DateTime @default(now())
+  validUntil         DateTime?
+  snapshotJson       String   @default("{}")
+  updatedAt          DateTime @updatedAt
+}
+
+model PaymentWebhookLog {
+  id           String   @id @default(cuid())
+  channel      String
+  eventType    String
+  externalId   String
+  payloadJson  String
+  processedAt  DateTime?
+  status       String   @default("received") // received / processed / duplicate / error
+  errorMessage String?
+  createdAt    DateTime @default(now())
+
+  @@unique([channel, externalId])
+}
+
+// ---------- §9.7 家庭组 (P2 预留) ----------
+model FamilyGroup {
+  id          String   @id @default(cuid())
+  ownerUserId String
+  planId      String?
+  createdAt   DateTime @default(now())
+  expiredAt   DateTime?
+  members     FamilyMember[]
+}
+
+model FamilyMember {
+  id            String   @id @default(cuid())
+  familyGroupId String
+  familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
+  userId        String?
+  role          String   @default("member") // owner / member
+  inviteStatus  String   @default("pending") // pending / joined
+  joinedAt      DateTime?
+}
+
+// ---------- §9.8 埋点事件 ----------
+model AnalyticsEvent {
+  id           String   @id @default(cuid())
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id])
+  anonymousId  String?
+  eventName    String
+  propertiesJson String @default("{}")
+  platform     String   @default("web")
+  createdAt    DateTime @default(now())
+}
+
+// ---------- §8.2.2 内容排期 ----------
+model ContentCalendar {
+  id                 String   @id @default(cuid())
+  courseId           String
+  course             Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId           String?
+  title              String
+  plannedPublishDate DateTime
+  owner              String?
+  status             String   @default("planned") // planned / recording / editing / review / scheduled / published / delayed
+  riskLevel          String   @default("low")
+  delayReason        String?
+}
+
+// ---------- 后台审计日志 (§19 技术验收: audit log) ----------
+model AuditLog {
+  id         String   @id @default(cuid())
+  operatorId String?
+  action     String
+  targetType String?
+  targetId   String?
+  detail     String?
+  createdAt  DateTime @default(now())
+}
