@@ -49,7 +49,7 @@ export function AdminDemandManager() {
               {d.description && <p className="mt-1 line-clamp-2 text-sm text-ink-500">{d.description}</p>}
               <p className="mt-1 text-xs text-ink-400">{d._count.votes} 人投票 · 由 {d.user.nickname} 提出</p>
             </div>
-            <button onClick={() => setActive(active === d.id ? null : d.id)} className="rounded-lg border border-ink-200 px-3 py-1.5 text-sm hover:border-tide-400">审核</button>
+            <button onClick={() => setActive(active === d.id ? null : d.id)} className="rounded-lg border border-ink-200 px-3 py-1.5 text-sm hover:border-accent-400">审核</button>
           </div>
           {active === d.id && <DemandReviewPanel demand={d} allDemands={demands} onDone={() => { setActive(null); load(); }} />}
         </div>
@@ -102,11 +102,11 @@ function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand
           </select>
         </label>
       </div>
-      <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="官方反馈（展示给用户）" className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-tide-400" />
+      <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="官方反馈（展示给用户）" className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-accent-400" />
       {status === "rejected" && (
         <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="未采纳原因（必填）" className="w-full rounded-lg border border-error/40 px-3 py-2 text-sm outline-none focus:border-error" />
       )}
-      <button disabled={busy} onClick={saveStatus} className="rounded-lg bg-tide-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-50">保存状态</button>
+      <button disabled={busy} onClick={saveStatus} className="rounded-lg bg-accent-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-50">保存状态</button>
 
       <div className="flex items-center gap-2 border-t border-ink-100 pt-3">
         <span className="text-sm text-ink-500">合并到：</span>
@@ -114,7 +114,7 @@ function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand
           <option value="">选择目标需求</option>
           {allDemands.filter((x) => x.id !== demand.id).map((x) => <option key={x.id} value={x.id}>{x.title}</option>)}
         </select>
-        <button disabled={busy || !mergeTarget} onClick={merge} className="rounded-lg border border-ink-200 px-4 py-2 text-sm hover:border-tide-400 disabled:opacity-50">合并</button>
+        <button disabled={busy || !mergeTarget} onClick={merge} className="rounded-lg border border-ink-200 px-4 py-2 text-sm hover:border-accent-400 disabled:opacity-50">合并</button>
       </div>
       <p className="text-xs text-ink-400">合并后原投票会迁移到目标需求，不会丢失。</p>
     </div>

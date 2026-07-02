@@ -27,16 +27,16 @@ export function DemandCard({
 }) {
   const status = DEMAND_STATUS[demand.status] ?? { label: demand.status, tone: "muted" };
   return (
-    <div className="flex items-start gap-4 rounded-2xl border border-ink-100 bg-paper-raised p-4 transition-shadow hover:shadow-[var(--shadow-soft)]">
+    <div className="flex items-start gap-4 rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised p-5 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-0.5 hover:border-accent-200 hover:shadow-[var(--shadow-soft)]">
       {rank != null && (
-        <div className={`mt-0.5 w-6 shrink-0 text-center text-lg font-semibold ${rank <= 3 ? "text-dawn-500" : "text-ink-200"}`}>
-          {rank}
+        <div className={`num mt-0.5 w-7 shrink-0 text-center text-lg ${rank <= 3 ? "text-accent-600" : "text-ink-300"}`}>
+          {String(rank).padStart(2, "0")}
         </div>
       )}
       <div className="min-w-0 flex-1">
         <Link href={`/demands/${demand.id}`} className="block">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-semibold text-ink-950 hover:text-tide-700">{demand.title}</h3>
+            <h3 className="font-semibold text-ink-950 hover:text-accent-700">{demand.title}</h3>
             <Badge tone={status.tone}>{status.label}</Badge>
             <Badge tone="muted">{demand.categoryLabel}</Badge>
           </div>

@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { CATEGORY_LABELS, relativeTime } from "@/lib/queries";
 import { Badge } from "@/components/ui";
+import { Confetti, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { VoteButton } from "@/components/VoteButton";
 import { TrackView } from "@/components/TrackView";
 import { DEMAND_STATUS } from "@/lib/format";
@@ -38,7 +39,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
   return (
     <div className="mx-auto max-w-3xl space-y-8 py-4">
       <TrackView event="demand_status_view" properties={{ demand_id: demandId, status: demand.status }} />
-      <Link href="/demands" className="text-sm text-tide-700 hover:underline">← 需求广场</Link>
+      <Link href="/demands" className="text-sm text-accent-700 hover:underline">← 需求广场</Link>
 
       <div className="rounded-2xl border border-ink-100 bg-paper-raised p-6">
         <div className="flex items-start justify-between gap-4">
@@ -55,16 +56,18 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
         </div>
 
         {demand.status === "launched" && launchedCourse && (
-          <Link href={`/courses/${launchedCourse.slug}`} className="mt-4 flex items-center gap-2 rounded-xl bg-success/10 px-4 py-3 text-sm font-medium text-success">
-            🎉 该需求已上线：{launchedCourse.title} →
+          <Link href={`/courses/${launchedCourse.slug}`} className="mt-4 flex items-center gap-2 rounded-xl bg-success/10 px-4 py-3 text-sm font-medium text-success transition-colors hover:bg-success/15">
+            <Confetti size={17} weight="fill" className="shrink-0" />
+            该需求已上线：{launchedCourse.title}
+            <ArrowRight size={15} className="ml-auto" />
           </Link>
         )}
       </div>
 
       {/* 官方反馈 */}
       {demand.officialReply && (
-        <div className="rounded-2xl border border-tide-100 bg-tide-50 p-5">
-          <p className="text-sm font-medium text-tide-700">官方反馈</p>
+        <div className="rounded-2xl border border-accent-100 bg-accent-50 p-5">
+          <p className="text-sm font-medium text-accent-700">官方反馈</p>
           <p className="mt-1.5 text-sm text-ink-800">{demand.officialReply}</p>
         </div>
       )}
@@ -75,7 +78,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
         <ol className="relative space-y-4 border-l border-ink-100 pl-5">
           {demand.statusLogs.map((log) => (
             <li key={log.id} className="relative">
-              <span className="absolute -left-[1.45rem] top-1.5 h-2.5 w-2.5 rounded-full bg-tide-400 ring-4 ring-paper" />
+              <span className="absolute -left-[1.45rem] top-1.5 h-2.5 w-2.5 rounded-full bg-accent-400 ring-4 ring-paper" />
               <div className="flex items-center gap-2">
                 <span className="font-medium text-ink-950">{DEMAND_STATUS[log.toStatus]?.label ?? log.toStatus}</span>
                 <span className="text-xs text-ink-400">{relativeTime(log.createdAt)}</span>
@@ -92,7 +95,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
           <h2 className="mb-4 text-lg font-semibold text-ink-950">相似需求</h2>
           <div className="grid gap-3 sm:grid-cols-2">
             {similar.map((s) => (
-              <Link key={s.id} href={`/demands/${s.id}`} className="rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-tide-400">
+              <Link key={s.id} href={`/demands/${s.id}`} className="rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-accent-400">
                 <div className="flex items-center gap-2">
                   <Badge tone={DEMAND_STATUS[s.status]?.tone ?? "muted"}>{DEMAND_STATUS[s.status]?.label ?? s.status}</Badge>
                 </div>

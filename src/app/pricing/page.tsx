@@ -85,7 +85,7 @@ export default async function PricingPage() {
               <tr className="border-b border-ink-100 text-ink-500">
                 <th className="px-4 py-3 text-left font-medium">权益</th>
                 <th className="px-4 py-3 text-center font-medium">免费</th>
-                <th className="px-4 py-3 text-center font-medium text-tide-700">订阅</th>
+                <th className="px-4 py-3 text-center font-medium text-accent-700">订阅</th>
                 <th className="px-4 py-3 text-center font-medium">到期</th>
               </tr>
             </thead>
@@ -94,7 +94,7 @@ export default async function PricingPage() {
                 <tr key={r.name}>
                   <td className="px-4 py-3 text-ink-800">{r.name}</td>
                   <td className="px-4 py-3 text-center text-ink-400">{r.free}</td>
-                  <td className="px-4 py-3 text-center font-medium text-tide-700">{r.premium}</td>
+                  <td className="px-4 py-3 text-center font-medium text-accent-700">{r.premium}</td>
                   <td className="px-4 py-3 text-center text-ink-400">{r.expired}</td>
                 </tr>
               ))}

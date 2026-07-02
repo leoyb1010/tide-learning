@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { EmptyState, ErrorState, LoadingSkeleton, Button } from "@/components/ui";
+import { Clock } from "@phosphor-icons/react/dist/ssr";
 import { mmss } from "@/lib/format";
 
 interface NoteRow {
@@ -59,7 +60,7 @@ export default function NotesPage() {
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter") load(q); }}
           placeholder="搜索笔记标题或正文…"
-          className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-tide-400"
+          className="flex-1 rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-accent-400"
         />
         <Button onClick={() => load(q)} variant="secondary">搜索</Button>
       </div>
@@ -77,15 +78,15 @@ export default function NotesPage() {
           {Object.entries(grouped).map(([courseId, { course, items }]) => (
             <section key={courseId}>
               <div className="mb-3 flex items-center justify-between">
-                <Link href={`/courses/${course.slug}`} className="font-medium text-ink-950 hover:text-tide-700">{course.title}</Link>
+                <Link href={`/courses/${course.slug}`} className="font-medium text-ink-950 hover:text-accent-700">{course.title}</Link>
                 <span className="text-xs text-ink-400">{items.length} 条</span>
               </div>
               <div className="space-y-2">
                 {items.map((n) => (
-                  <Link key={n.id} href={`/courses/${n.courseId}/learn/${n.lessonId}`} className="block rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-tide-400">
+                  <Link key={n.id} href={`/courses/${n.courseId}/learn/${n.lessonId}`} className="block rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-accent-400">
                     <div className="mb-1.5 flex items-center gap-2 text-xs text-ink-400">
                       <span>{n.lesson.title}</span>
-                      {n.timestampSec != null && <span className="rounded bg-tide-50 px-1.5 text-tide-700">⏱ {mmss(n.timestampSec)}</span>}
+                      {n.timestampSec != null && <span className="num inline-flex items-center gap-1 rounded bg-accent-50 px-1.5 text-accent-700"><Clock size={11} weight="fill" /> {mmss(n.timestampSec)}</span>}
                     </div>
                     {n.title && <p className="font-medium text-ink-950">{n.title}</p>}
                     <p className="line-clamp-2 text-sm text-ink-800">{n.contentMd}</p>

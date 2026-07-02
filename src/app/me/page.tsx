@@ -32,7 +32,7 @@ export default async function MePage() {
     <div className="space-y-6">
       {/* 用户信息 */}
       <section className="flex items-center gap-4 rounded-2xl border border-ink-100 bg-paper-raised p-6">
-        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-tide-600 text-xl font-semibold text-white">
+        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-accent-600 text-xl font-semibold text-white">
           {user.nickname.slice(0, 1)}
         </div>
         <div className="min-w-0 flex-1">
@@ -55,12 +55,12 @@ export default async function MePage() {
           <h2 className="mb-3 font-medium text-ink-950">继续学习</h2>
           <div className="space-y-2">
             {recent.map((r) => (
-              <Link key={r.lessonId} href={`/courses/${r.course.slug}/learn/${r.lesson.id}`} className="flex items-center justify-between rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-tide-400">
+              <Link key={r.lessonId} href={`/courses/${r.course.slug}/learn/${r.lesson.id}`} className="flex items-center justify-between rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-accent-400">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium text-ink-950">{r.course.title}</p>
                   <p className="truncate text-xs text-ink-400">{r.lesson.title}</p>
                 </div>
-                <span className="shrink-0 text-sm text-tide-700">继续 →</span>
+                <span className="shrink-0 text-sm text-accent-700">继续 →</span>
               </Link>
             ))}
           </div>
@@ -98,7 +98,7 @@ function StatBox({ value, label }: { value: string; label: string }) {
 }
 function MenuLink({ href, label, hint }: { href: string; label: string; hint?: string }) {
   return (
-    <Link href={href} className="flex items-center justify-between rounded-xl border border-ink-100 bg-paper-raised px-4 py-3.5 hover:border-tide-400">
+    <Link href={href} className="flex items-center justify-between rounded-xl border border-ink-100 bg-paper-raised px-4 py-3.5 hover:border-accent-400">
       <span className="text-sm font-medium text-ink-950">{label}</span>
       <span className="flex items-center gap-2 text-sm text-ink-400">{hint}<span className="text-ink-300">›</span></span>
     </Link>

@@ -1,163 +1,248 @@
 import Link from "next/link";
+import { ArrowRight, Waves, Users, PlayCircle, Broadcast, NotePencil, Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { listCourses, listUpdates, listRankedDemands } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { CourseCard } from "@/components/CourseCard";
-import { DemandCard } from "@/components/DemandCard";
+import { VoteButton } from "@/components/VoteButton";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
-import { Button, Badge } from "@/components/ui";
+import { Button, Badge, CoverBg } from "@/components/ui";
+import { Reveal, Stagger, StaggerItem, CountUp, Magnetic } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { UPDATE_TYPE_LABELS } from "@/lib/format";
 import { TRACKS } from "@/lib/tracks";
 
 export default async function HomePage() {
   const user = await getCurrentUser();
-  const [all, updates, demands, plans, snapshot] = await Promise.all([
+  const [all, updates, demands, plans] = await Promise.all([
     listCourses({ sort: "recommended" }),
     listUpdates(8),
     listRankedDemands(["collecting", "evaluating", "scheduled", "producing"]),
     prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
-    resolveEntitlement(user?.id ?? null),
   ]);
+  await resolveEntitlement(user?.id ?? null);
 
-  const featured = all.filter((c) => c.isFeatured).slice(0, 6);
-  const popular = [...all].sort((a, b) => b.learnersCount - a.learnersCount).slice(0, 3);
-  // 按赛道分组（融合有道内容板块）
-  const trackLines = TRACKS.map((t) => ({ track: t, courses: all.filter((c) => c.category === t.key).slice(0, 3) })).filter((l) => l.courses.length > 0);
+  const featured = all.filter((c) => c.isFeatured);
+  const hero = featured[0] ?? all[0];
+  const trackLines = TRACKS.map((t) => ({ track: t, courses: all.filter((c) => c.category === t.key) })).filter((l) => l.courses.length > 0);
   const totalLearners = all.reduce((s, c) => s + c.learnersCount, 0);
-  // 全站会员主推：连续包月 + 年卡
   const mainPlans = plans.filter((p) => p.scope === "all" && p.billingPeriod !== "month").slice(0, 2);
+  const snapshot = await resolveEntitlement(user?.id ?? null);
 
   return (
-    <div className="space-y-20">
+    <div className="space-y-24 md:space-y-32">
       <TrackView event="homepage_view" properties={{ mode: "standard" }} />
 
-      {/* 1. Hero */}
-      <section className="relative -mx-4 overflow-hidden rounded-b-3xl px-4 pb-16 pt-10 sm:-mx-6 sm:px-6">
-        <div className="hero-gradient absolute inset-0 -z-10 opacity-70" />
-        <div className="mx-auto max-w-3xl text-center">
-          <Badge tone="tide">订阅制 · 持续更新 · 用户共创</Badge>
-          <h1 className="mt-5 text-3xl font-semibold leading-tight tracking-tight text-ink-950 sm:text-5xl">
-            订阅一次，
-            <br className="sm:hidden" />
-            学不完的持续更新课程
-          </h1>
-          <p className="mx-auto mt-5 max-w-xl text-base leading-relaxed text-ink-800 sm:text-lg">
-            AI 实用技能、雅思备考、生活实用课，每周滚动上新。
-            你投票，我们上新；边学边记，笔记永远属于你。
-          </p>
-          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-            <Button href="/courses" variant="primary" size="lg">免费试学第一章</Button>
-            <Button href="/pricing" variant="secondary" size="lg">查看订阅方案</Button>
-          </div>
-          <p className="mt-4 text-sm text-ink-500">
-            已有 {totalLearners.toLocaleString()}+ 人在学 · 首月 ¥19 · 随时可取消
-          </p>
+      {/* ============ 1. HERO — 非对称分栏 ============ */}
+      <section className="relative -mx-5 grid gap-10 px-5 pt-6 sm:-mx-8 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-6">
+        <div className="relative z-10 max-w-xl">
+          <Reveal>
+            <div className="overline flex items-center gap-2 text-accent-600">
+              <span className="live-dot h-1.5 w-1.5 rounded-full text-accent-600"><span className="block h-1.5 w-1.5 rounded-full bg-accent-600" /></span>
+              订阅制 · 持续更新 · 用户共创
+            </div>
+          </Reveal>
+          <Reveal delay={0.06}>
+            <h1 className="mt-5 text-[2.35rem] font-semibold leading-[1.08] tracking-tight text-ink-950 sm:text-[3.1rem]">
+              订阅一次，
+              <br />
+              学不完的<span className="relative whitespace-nowrap text-accent-700">持续更新<span className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full bg-accent-200" /></span>课程
+            </h1>
+          </Reveal>
+          <Reveal delay={0.12}>
+            <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed text-ink-600">
+              口语实战、AI 技能、银发英语、生活实用——每周滚动上新。全站畅学或单赛道自由组合，边学边记，投票决定下一门课。
+            </p>
+          </Reveal>
+          <Reveal delay={0.18}>
+            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+              <Magnetic>
+                <Button href="/courses" variant="primary" size="lg" icon>免费试学第一章</Button>
+              </Magnetic>
+              <Button href="/pricing" variant="secondary" size="lg">查看订阅方案</Button>
+            </div>
+          </Reveal>
+          <Reveal delay={0.24}>
+            <p className="num mt-6 text-sm text-ink-400">
+              已有 <span className="text-ink-700">{totalLearners.toLocaleString()}+</span> 人在学 · 首月 ¥19.9 · 随时可取消
+            </p>
+          </Reveal>
         </div>
-      </section>
 
-      {/* 2. 本周上新 */}
-      <Section title="本周上新" subtitle="每门课都有更新日志，这不是死课" href="/updates" linkText="查看全部">
-        <div className="scroll-row">
-          {updates.map((u) => (
-            <Link key={u.id} href={`/courses/${u.courseSlug}`} className="w-[260px] rounded-2xl border border-ink-100 bg-paper-raised p-4 transition-shadow hover:shadow-[var(--shadow-soft)]">
-              <div className="mb-3 flex items-center gap-2">
-                <Badge tone="success">{UPDATE_TYPE_LABELS[u.updateType]}</Badge>
-                <span className="text-xs text-ink-400">{u.relativeTime}</span>
+        {/* 右侧：编辑式产品掠影 */}
+        <Reveal delay={0.15} y={24}>
+          <div className="relative">
+            <div className="mesh-bg rounded-[28px]" />
+            <div className="relative rounded-[28px] border border-ink-100 bg-paper-raised/70 p-5 backdrop-blur-sm">
+              {hero && (
+                <Link href={`/courses/${hero.slug}`} className="block overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised transition-transform duration-300 hover:-translate-y-1">
+                  <CoverBg color={hero.coverColor} className="aspect-[16/9] w-full">
+                    <div className="absolute inset-0 flex items-end p-5">
+                      <div className="text-white">
+                        <span className="rounded-full bg-black/25 px-2.5 py-1 text-[0.7rem] backdrop-blur-sm">{hero.categoryLabel}</span>
+                        <p className="mt-2 text-lg font-semibold tracking-tight">{hero.title}</p>
+                      </div>
+                    </div>
+                  </CoverBg>
+                </Link>
+              )}
+              {/* 悬浮信息 chips */}
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <FloatChip icon={<Broadcast size={16} weight="fill" className="text-accent-600" />} label="直播小班" sub="真人纠音" />
+                <FloatChip icon={<NotePencil size={16} weight="fill" className="text-accent-600" />} label="时间戳笔记" sub="一键回跳" />
+                <FloatChip icon={<Sparkle size={16} weight="fill" className="text-accent-600" />} label="需求共创" sub="投票上新" />
               </div>
-              <p className="font-medium text-ink-950">{u.courseTitle}</p>
-              <p className="mt-1 line-clamp-2 text-sm text-ink-500">{u.title}</p>
-              <p className="mt-3 text-xs text-ink-400">预计总时长 {u.duration}</p>
-            </Link>
-          ))}
-        </div>
-      </Section>
-
-      {/* 3. 热门课程 */}
-      <Section title="热门课程" subtitle="最多人在学的体系化课程" href="/courses" linkText="全部课程">
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {popular.map((c) => <CourseCard key={c.id} course={c} />)}
-        </div>
-      </Section>
-
-      {/* 4. 内容赛道（融合有道内容板块） */}
-      <section className="space-y-10">
-        {trackLines.map((l) => (
-          <ContentLine key={l.track.key} title={l.track.label} hint={`${l.track.people} · ${l.track.blurb}`} courses={l.courses} />
-        ))}
-      </section>
-
-      {/* 5. 需求排行榜预览 */}
-      <Section title="需求排行榜" subtitle="你投票，决定平台下一批课程" href="/demands" linkText="进入共创">
-        <div className="space-y-3">
-          {demands.slice(0, 5).map((d, i) => (
-            <DemandCard
-              key={d.id}
-              demand={d}
-              rank={i + 1}
-              canVote={snapshot.canVote}
-              disabledReason={snapshot.canVote ? undefined : "订阅后可投票"}
-            />
-          ))}
-        </div>
-      </Section>
-
-      {/* 6. 学习 + 笔记演示 */}
-      <section className="grid items-center gap-8 rounded-3xl border border-ink-100 bg-paper-raised p-8 md:grid-cols-2">
-        <div>
-          <h2 className="text-2xl font-semibold text-ink-950">边学边记，笔记带时间戳</h2>
-          <p className="mt-3 leading-relaxed text-ink-500">
-            记笔记不打断视频。每条笔记自动绑定课程、章节和时间戳，
-            下次点一下就回到视频对应位置。停订后笔记仍然可以查看和导出。
-          </p>
-          <ul className="mt-5 space-y-2 text-sm text-ink-800">
-            <li>✓ 时间戳锚点，一键回跳</li>
-            <li>✓ 按课程归档、全文搜索</li>
-            <li>✓ 笔记永久保留，属于你自己</li>
-          </ul>
-          <div className="mt-6"><Button href="/notes" variant="secondary">查看我的笔记</Button></div>
-        </div>
-        <div className="rounded-2xl border border-ink-100 bg-white p-4 shadow-[var(--shadow-soft)]">
-          <div className="mb-3 aspect-video rounded-xl" style={{ background: "linear-gradient(135deg,#1f7a70,#4d9d95)" }} />
-          <div className="space-y-2">
-            <div className="rounded-lg border border-ink-100 p-3">
-              <span className="rounded bg-tide-50 px-2 py-0.5 text-xs text-tide-700">⏱ 3:00</span>
-              <p className="mt-1.5 text-sm text-ink-800">关键点：把 AI 当协作者，先给背景再提要求。</p>
             </div>
           </div>
+        </Reveal>
+      </section>
+
+      {/* ============ 2. 赛道跑马灯 ============ */}
+      <section className="marquee -mx-5 overflow-hidden border-y border-ink-100 py-5 sm:-mx-8">
+        <div className="marquee-track">
+          {[...TRACKS, ...TRACKS, ...TRACKS].map((t, i) => (
+            <span key={i} className="mx-6 inline-flex items-center gap-3 text-[1.35rem] font-medium tracking-tight text-ink-300">
+              {t.label}
+              <Waves size={16} weight="light" className="text-accent-400" />
+            </span>
+          ))}
         </div>
       </section>
 
-      {/* 7. 数据证明 */}
-      <section className="grid gap-6 rounded-3xl bg-tide-600 px-8 py-12 text-center text-white sm:grid-cols-3">
-        <Stat value={`${all.length}`} label="门体系化课程" />
-        <Stat value={`${totalLearners.toLocaleString()}+`} label="累计学习人次" />
-        <Stat value="每周" label="滚动上新节奏" />
+      {/* ============ 3. 本周上新 — 横向 rail ============ */}
+      <Section overline="ROLLING" title="本周上新" desc="每门课都有更新日志，这不是死课" href="/updates" linkText="查看全部">
+        <div className="rail -mx-5 px-5 sm:-mx-8 sm:px-8">
+          {updates.map((u, i) => (
+            <Reveal key={u.id} delay={i * 0.04}>
+              <Link href={`/courses/${u.courseSlug}`} className="block w-[280px] rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised p-5 transition-all duration-300 hover:-translate-y-1 hover:border-accent-200">
+                <div className="flex items-center justify-between">
+                  <Badge tone="success">{UPDATE_TYPE_LABELS[u.updateType]}</Badge>
+                  <span className="num text-xs text-ink-400">{u.relativeTime}</span>
+                </div>
+                <p className="mt-4 font-semibold tracking-tight text-ink-950">{u.courseTitle}</p>
+                <p className="mt-1 line-clamp-2 text-sm text-ink-500">{u.title}</p>
+                <p className="num mt-4 border-t border-ink-100 pt-3 text-xs text-ink-400">预计总时长 {u.duration}</p>
+              </Link>
+            </Reveal>
+          ))}
+        </div>
+      </Section>
+
+      {/* ============ 4. 精选 — Bento（1 大 + 2 小，避免三等分）============ */}
+      <Section overline="FEATURED" title="精选课程" desc="最值得先学的几门" href="/courses" linkText="全部课程">
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2 lg:row-span-2">
+            {featured[0] && <FeatureLarge course={featured[0]} />}
+          </div>
+          {featured.slice(1, 3).map((c) => (
+            <CourseCard key={c.id} course={c} />
+          ))}
+        </div>
+      </Section>
+
+      {/* ============ 5. 内容赛道 — zig-zag ============ */}
+      <div className="space-y-20">
+        {trackLines.map((l, i) => (
+          <Reveal key={l.track.key}>
+            <div className={`grid gap-6 lg:grid-cols-[0.8fr_2.2fr] lg:items-center ${i % 2 === 1 ? "lg:[&>*:first-child]:order-2" : ""}`}>
+              <div className={i % 2 === 1 ? "lg:pl-8 lg:text-right" : ""}>
+                <div className="overline text-accent-600">TRACK</div>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-ink-950">{l.track.label}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-ink-500">{l.track.people} · {l.track.blurb}</p>
+              </div>
+              <div className="rail">
+                {l.courses.map((c) => (
+                  <div key={c.id} className="w-[300px]"><CourseCard course={c} /></div>
+                ))}
+              </div>
+            </div>
+          </Reveal>
+        ))}
+      </div>
+
+      {/* ============ 6. 需求榜 — 编辑式榜单（分隔线，不装盒）============ */}
+      <Section overline="CO-CREATE" title="需求排行榜" desc="你投票，决定平台下一批课程" href="/demands" linkText="进入共创">
+        <Stagger className="divide-y divide-ink-100 border-y border-ink-100">
+          {demands.slice(0, 5).map((d, i) => (
+            <StaggerItem key={d.id}>
+              <div className="flex items-center gap-5 py-5">
+                <span className={`num w-8 shrink-0 text-lg ${i === 0 ? "text-accent-600" : "text-ink-300"}`}>{String(i + 1).padStart(2, "0")}</span>
+                <div className="min-w-0 flex-1">
+                  <Link href={`/demands/${d.id}`} className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-ink-950 hover:text-accent-700">{d.title}</span>
+                    <Badge tone="muted">{d.categoryLabel}</Badge>
+                  </Link>
+                  {d.description && <p className="mt-1 line-clamp-1 text-sm text-ink-500">{d.description}</p>}
+                </div>
+                <VoteButton demandId={d.id} initialVotes={d.totalVotes} canVote={snapshot.canVote} disabledReason={snapshot.canVote ? undefined : "订阅后可投票"} />
+              </div>
+            </StaggerItem>
+          ))}
+        </Stagger>
+      </Section>
+
+      {/* ============ 7. 学习+笔记 演示 — 分栏 ============ */}
+      <Reveal>
+        <section className="grid items-center gap-10 rounded-[28px] border border-ink-100 bg-paper-raised p-8 sm:p-12 lg:grid-cols-2">
+          <div>
+            <div className="overline text-accent-600">NOTES</div>
+            <h2 className="mt-3 text-[1.75rem] font-semibold tracking-tight text-ink-950">边学边记，笔记带时间戳</h2>
+            <p className="mt-4 leading-relaxed text-ink-600">
+              记笔记不打断视频。每条笔记自动绑定课程、章节与时间戳，下次点一下就回到视频对应位置。停订后笔记仍可查看和导出。
+            </p>
+            <ul className="mt-6 space-y-3">
+              {["时间戳锚点，一键回跳", "按课程归档、全文搜索", "笔记永久保留，属于你自己"].map((t) => (
+                <li key={t} className="flex items-center gap-2.5 text-sm text-ink-700">
+                  <ArrowRight size={15} weight="bold" className="text-accent-600" /> {t}
+                </li>
+              ))}
+            </ul>
+            <div className="mt-7"><Button href="/notes" variant="secondary">查看我的笔记</Button></div>
+          </div>
+          <div className="rounded-[var(--radius-card)] border border-ink-100 bg-paper p-5">
+            <div className="mb-3 aspect-video overflow-hidden rounded-xl" style={{ background: "linear-gradient(140deg,#0d332d,#1f6b60)" }}>
+              <div className="flex h-full items-center justify-center">
+                <PlayCircle size={44} weight="fill" className="text-white/90" />
+              </div>
+            </div>
+            <div className="rounded-lg border border-ink-100 bg-paper-raised p-3.5">
+              <span className="num inline-block rounded bg-accent-50 px-2 py-0.5 text-xs text-accent-700">03:00</span>
+              <p className="mt-2 text-sm text-ink-700">关键点：把 AI 当协作者，先给背景再提要求。</p>
+            </div>
+          </div>
+        </section>
+      </Reveal>
+
+      {/* ============ 8. 数据条 — 分隔线，不装盒 ============ */}
+      <section className="grid gap-8 border-y border-ink-100 py-12 sm:grid-cols-3 sm:divide-x sm:divide-ink-100">
+        <Stat value={all.length} label="门体系化课程" />
+        <Stat value={totalLearners} label="累计学习人次" suffix="+" />
+        <StatText value={`${TRACKS.length} 条`} label="在售赛道 · 每周上新" />
       </section>
 
-      {/* 8. 订阅方案 */}
-      <Section title="订阅方案" subtitle="一次订阅，解锁全站课程" center>
-        <div className="mx-auto grid max-w-2xl gap-5 sm:grid-cols-2">
+      {/* ============ 9. 订阅 ============ */}
+      <Section overline="PRICING" title="按需订阅，自由组合" desc="全站畅学，或只订你要的赛道" center>
+        <div className="mx-auto grid max-w-2xl gap-6 sm:grid-cols-2">
           {mainPlans.map((p) => (
             <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />
           ))}
         </div>
-        <p className="mt-4 text-center text-sm text-ink-400">
-          还有单月套餐作为价格参考 · <Link href="/pricing" className="text-tide-700 hover:underline">查看完整方案</Link>
+        <p className="mt-5 text-center text-sm text-ink-400">
+          还有单赛道月卡低门槛切入 · <Link href="/pricing" className="link-underline text-accent-700">查看完整方案</Link>
         </p>
       </Section>
 
-      {/* 9. FAQ */}
-      <Section title="常见问题" center>
-        <div className="mx-auto max-w-2xl divide-y divide-ink-100 rounded-2xl border border-ink-100 bg-paper-raised">
+      {/* ============ 10. FAQ ============ */}
+      <Section overline="FAQ" title="常见问题" center>
+        <div className="mx-auto max-w-2xl divide-y divide-ink-100 border-y border-ink-100">
           {FAQ.map((f) => (
-            <details key={f.q} className="group px-5 py-4">
+            <details key={f.q} className="group py-5">
               <summary className="flex cursor-pointer list-none items-center justify-between font-medium text-ink-950">
                 {f.q}
-                <span className="text-ink-400 transition-transform group-open:rotate-45">＋</span>
+                <span className="text-ink-300 transition-transform duration-300 group-open:rotate-45"><ArrowRight size={18} className="rotate-45" /></span>
               </summary>
-              <p className="mt-2 text-sm leading-relaxed text-ink-500">{f.a}</p>
+              <p className="mt-3 text-sm leading-relaxed text-ink-500">{f.a}</p>
             </details>
           ))}
         </div>
@@ -167,47 +252,78 @@ export default async function HomePage() {
 }
 
 const FAQ = [
-  { q: "订阅后可以学哪些课程？", a: "订阅后解锁全站所有课程，包含每周上新的新章节。停订后课程锁定，但你的笔记永久保留。" },
-  { q: "怎么取消订阅？", a: "在「我的-订阅管理」中随时可取消，取消入口清晰可见。取消后权益保留到当前周期结束，不会二次扣费。" },
-  { q: "需求投票真的有用吗？", a: "有。订阅用户每周有 5 票，投票进入综合排行榜，影响课程排期。需求上线后，投过票的用户会收到通知。" },
-  { q: "健康类课程靠谱吗？", a: "健康类内容仅用于健康信息素养学习，不构成诊断、治疗或用药建议，且必须经过审核人审核并标注免责声明。" },
+  { q: "订阅后可以学哪些课程？", a: "全站会员解锁全部赛道；单赛道会员解锁所订赛道，含每周上新的新章节。停订后课程锁定，但笔记永久保留。" },
+  { q: "怎么取消订阅？", a: "在「我的 · 订阅管理」中随时可取消，取消入口清晰可见。取消后权益保留到当前周期结束，不会二次扣费。" },
+  { q: "需求投票真的有用吗？", a: "有。订阅用户每周有 5 票，投票进入综合排行榜，与投流数据一起决定课程排期。需求上线后，投过票的用户会收到通知。" },
+  { q: "健康类课程靠谱吗？", a: "健康内容仅用于健康信息素养学习，不构成诊断、治疗或用药建议，且必须经审核人审核并标注免责声明。" },
 ];
 
-function Section({ title, subtitle, href, linkText, center, children }: { title: string; subtitle?: string; href?: string; linkText?: string; center?: boolean; children: React.ReactNode }) {
+/* ---------- 局部组件 ---------- */
+function Section({ overline, title, desc, href, linkText, center, children }: { overline?: string; title: string; desc?: string; href?: string; linkText?: string; center?: boolean; children: React.ReactNode }) {
   return (
     <section>
-      <div className={`mb-6 flex items-end justify-between ${center ? "flex-col items-center text-center" : ""}`}>
-        <div>
-          <h2 className="text-2xl font-semibold tracking-tight text-ink-950">{title}</h2>
-          {subtitle && <p className="mt-1.5 text-ink-500">{subtitle}</p>}
+      <Reveal>
+        <div className={`mb-8 flex items-end justify-between gap-4 ${center ? "flex-col items-center text-center" : ""}`}>
+          <div>
+            {overline && <div className="overline mb-2 text-accent-600">{overline}</div>}
+            <h2 className="text-[1.75rem] font-semibold tracking-tight text-ink-950">{title}</h2>
+            {desc && <p className="mt-2 text-ink-500">{desc}</p>}
+          </div>
+          {href && linkText && !center && (
+            <Link href={href} className="group inline-flex shrink-0 items-center gap-1 text-sm font-medium text-accent-700">
+              {linkText}
+              <ArrowRight size={15} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+          )}
         </div>
-        {href && linkText && !center && <Link href={href} className="shrink-0 text-sm font-medium text-tide-700 hover:underline">{linkText} →</Link>}
-      </div>
+      </Reveal>
       {children}
     </section>
   );
 }
 
-function ContentLine({ title, hint, courses }: { title: string; hint: string; courses: Awaited<ReturnType<typeof listCourses>> }) {
-  if (courses.length === 0) return null;
+function FloatChip({ icon, label, sub }: { icon: React.ReactNode; label: string; sub: string }) {
   return (
-    <div>
-      <div className="mb-4 flex items-baseline gap-3">
-        <h3 className="text-lg font-semibold text-ink-950">{title}</h3>
-        <span className="text-sm text-ink-400">{hint}</span>
-      </div>
-      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-        {courses.map((c) => <CourseCard key={c.id} course={c} />)}
-      </div>
+    <div className="rounded-xl border border-ink-100 bg-paper-raised p-3">
+      {icon}
+      <p className="mt-2 text-xs font-medium text-ink-950">{label}</p>
+      <p className="text-[0.68rem] text-ink-400">{sub}</p>
     </div>
   );
 }
 
-function Stat({ value, label }: { value: string; label: string }) {
+function FeatureLarge({ course }: { course: import("@/components/CourseCard").CourseCardData }) {
   return (
-    <div>
-      <div className="text-3xl font-semibold tabular sm:text-4xl">{value}</div>
-      <div className="mt-1 text-sm text-white/80">{label}</div>
+    <Link href={`/courses/${course.slug}`} className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-ink-100 bg-paper-raised transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 hover:border-accent-200 hover:shadow-[0_32px_64px_-32px_rgba(13,51,45,0.3)]">
+      <CoverBg color={course.coverColor} className="aspect-[16/9] w-full lg:aspect-[16/8]">
+        <div className="absolute left-4 top-4"><span className="rounded-full bg-black/25 px-3 py-1 text-xs text-white backdrop-blur-sm">{course.categoryLabel}</span></div>
+      </CoverBg>
+      <div className="flex flex-1 flex-col p-6">
+        <div className="overline flex items-center gap-2 text-ink-400"><span>{course.levelLabel}</span><span className="h-3 w-px bg-ink-200" /><span>{course.duration}</span></div>
+        <h3 className="mt-2 text-xl font-semibold tracking-tight text-ink-950 group-hover:text-accent-700">{course.title}</h3>
+        {course.subtitle && <p className="mt-1.5 text-ink-500">{course.subtitle}</p>}
+        <div className="num mt-auto flex items-center gap-2 pt-4 text-sm text-accent-700">
+          {course.updateText}
+          <span className="ml-auto flex items-center gap-1 text-ink-400"><Users size={14} />{course.learnersCount.toLocaleString()}</span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function Stat({ value, label, suffix }: { value: number; label: string; suffix?: string }) {
+  return (
+    <div className="text-center sm:px-4">
+      <div className="num text-4xl font-semibold tracking-tight text-ink-950"><CountUp value={value} suffix={suffix} /></div>
+      <div className="mt-2 text-sm text-ink-500">{label}</div>
+    </div>
+  );
+}
+function StatText({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="text-center sm:px-4">
+      <div className="text-4xl font-semibold tracking-tight text-ink-950">{value}</div>
+      <div className="mt-2 text-sm text-ink-500">{label}</div>
     </div>
   );
 }

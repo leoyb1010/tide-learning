@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { NoteEditor, type NoteItem } from "./NoteEditor";
 import { Paywall } from "./Paywall";
 import { Badge } from "./ui";
+import { Play, Pause, LockSimple, CaretLeft, CaretRight, Check } from "@phosphor-icons/react/dist/ssr";
 import { mmss } from "@/lib/format";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
@@ -80,32 +81,33 @@ export function Player({
   const seek = useCallback((sec: number) => { setTime(Math.min(sec, lesson.durationSec)); }, [lesson.durationSec]);
 
   const VideoArea = (
-    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-ink-950">
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-ink-950">
       {/* 模拟视频画面 */}
-      <div className="relative flex aspect-video items-center justify-center" style={{ background: "linear-gradient(135deg,#0e3833,#1f7a70,#4d9d95)" }}>
+      <div className="relative flex aspect-video items-center justify-center" style={{ background: "linear-gradient(140deg,#0d332d,#17564d,#1f6b60)" }}>
+        <div className="absolute inset-0 opacity-[0.1]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "18px 18px" }} />
         {!access ? (
-          <div className="text-center text-white/90">
-            <p className="text-4xl">🔒</p>
+          <div className="relative text-center text-white/90">
+            <LockSimple size={40} weight="light" className="mx-auto" />
             <p className="mt-2 text-sm">该章节需要订阅后观看</p>
           </div>
         ) : (
-          <button onClick={() => setPlaying((p) => !p)} className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 text-2xl text-tide-700 transition-transform hover:scale-105">
-            {playing ? "⏸" : "▶"}
+          <button onClick={() => setPlaying((p) => !p)} className="relative flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-accent-700 shadow-lg transition-transform duration-200 [transition-timing-function:var(--ease-spring)] hover:scale-110 active:scale-95">
+            {playing ? <Pause size={26} weight="fill" /> : <Play size={26} weight="fill" className="ml-0.5" />}
           </button>
         )}
-        {lesson.isFree && <div className="absolute right-3 top-3"><Badge tone="dawn">免费试学</Badge></div>}
+        {lesson.isFree && <div className="absolute right-3 top-3"><Badge tone="accent">免费试学</Badge></div>}
       </div>
       {/* 控制条 */}
       {access && (
         <div className="flex items-center gap-3 bg-ink-950 px-4 py-3 text-white">
-          <button onClick={() => setPlaying((p) => !p)} className="text-sm">{playing ? "暂停" : "播放"}</button>
-          <span className="text-xs tabular text-white/70">{mmss(Math.floor(time))} / {mmss(lesson.durationSec)}</span>
+          <button onClick={() => setPlaying((p) => !p)} className="text-white/90 transition-colors hover:text-white">{playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}</button>
+          <span className="num text-xs text-white/60">{mmss(Math.floor(time))} / {mmss(lesson.durationSec)}</span>
           <input
             type="range" min={0} max={lesson.durationSec} value={time}
             onChange={(e) => seek(Number(e.target.value))}
-            className="flex-1 accent-dawn-400"
+            className="flex-1 accent-accent-400"
           />
-          <select value={rate} onChange={(e) => setRate(Number(e.target.value))} className="rounded bg-white/10 px-1.5 py-1 text-xs">
+          <select value={rate} onChange={(e) => setRate(Number(e.target.value))} className="num rounded bg-white/10 px-1.5 py-1 text-xs">
             {[0.75, 1, 1.25, 1.5, 2].map((r) => <option key={r} value={r} className="text-ink-950">{r}x</option>)}
           </select>
         </div>
@@ -117,7 +119,7 @@ export function Player({
     <div className="space-y-4">
       {/* 面包屑 */}
       <div className="flex items-center gap-2 text-sm text-ink-500">
-        <Link href={`/courses/${courseSlug}`} className="hover:text-tide-700">{courseTitle}</Link>
+        <Link href={`/courses/${courseSlug}`} className="hover:text-accent-700">{courseTitle}</Link>
         <span>/</span>
         <span className="text-ink-950">{lesson.title}</span>
       </div>
@@ -149,10 +151,10 @@ export function Player({
             {/* 上一讲/下一讲 */}
             <div className="mt-4 flex items-center justify-between">
               {prevLessonId ? (
-                <Link href={`/courses/${courseSlug}/learn/${prevLessonId}`} onClick={() => saveProgress()} className="text-sm text-tide-700 hover:underline">← 上一讲</Link>
+                <Link href={`/courses/${courseSlug}/learn/${prevLessonId}`} onClick={() => saveProgress()} className="inline-flex items-center gap-1 text-sm text-accent-700 hover:underline"><CaretLeft size={14} /> 上一讲</Link>
               ) : <span />}
               {nextLessonId ? (
-                <Link href={`/courses/${courseSlug}/learn/${nextLessonId}`} onClick={() => saveProgress()} className="text-sm text-tide-700 hover:underline">下一讲 →</Link>
+                <Link href={`/courses/${courseSlug}/learn/${nextLessonId}`} onClick={() => saveProgress()} className="inline-flex items-center gap-1 text-sm text-accent-700 hover:underline">下一讲 <CaretRight size={14} /></Link>
               ) : <span className="text-sm text-ink-400">已是最后一讲</span>}
             </div>
 
@@ -194,7 +196,7 @@ export function Player({
 }
 
 function TabBtn({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`rounded-lg px-4 py-1.5 text-sm ${active ? "bg-tide-600 text-white" : "bg-white border border-ink-200 text-ink-500"}`}>{children}</button>;
+  return <button onClick={onClick} className={`rounded-lg px-4 py-1.5 text-sm transition-colors ${active ? "bg-accent-600 text-white" : "bg-paper-raised border border-ink-200 text-ink-500"}`}>{children}</button>;
 }
 
 // 直播小班课（融合有道口语小班）
@@ -203,14 +205,18 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
   const start = lesson.liveStartAt ? new Date(lesson.liveStartAt) : null;
   const upcoming = start ? start.getTime() > Date.now() : false;
   return (
-    <div className="overflow-hidden rounded-2xl border border-dawn-400/40 bg-paper-raised">
-      <div className="flex items-center justify-center py-14" style={{ background: "linear-gradient(135deg,#185f57,#e2924a)" }}>
-        <div className="text-center text-white">
-          <div className="text-3xl">🔴 直播小班</div>
-          <p className="mt-2 text-sm text-white/90">真人连麦纠音 · 限额 {lesson.liveSeatLimit ?? 20} 人</p>
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised">
+      <div className="relative flex items-center justify-center py-16" style={{ background: "linear-gradient(140deg,#0d332d,#1f6b60)" }}>
+        <div className="absolute inset-0 opacity-[0.1]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "18px 18px" }} />
+        <div className="relative text-center text-white">
+          <div className="inline-flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <span className="live-dot h-2.5 w-2.5 rounded-full text-error"><span className="relative block h-2.5 w-2.5 rounded-full bg-error" /></span>
+            直播小班
+          </div>
+          <p className="num mt-2 text-sm text-white/80">真人连麦纠音 · 限额 {lesson.liveSeatLimit ?? 20} 人</p>
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-5">
         <div>
           <p className="font-medium text-ink-950">{lesson.title}</p>
           <p className="text-sm text-ink-500">
@@ -220,9 +226,9 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
         <button
           onClick={() => setBooked(true)}
           disabled={booked}
-          className="rounded-xl bg-tide-600 px-5 py-2.5 text-sm font-medium text-white disabled:bg-success"
+          className="inline-flex items-center gap-1.5 rounded-xl bg-accent-600 px-5 py-2.5 text-sm font-medium text-white transition-all duration-200 active:scale-[0.97] disabled:bg-success"
         >
-          {booked ? "✓ 已预约" : upcoming ? "预约席位" : "进入直播间"}
+          {booked ? <><Check size={15} weight="bold" /> 已预约</> : upcoming ? "预约席位" : "进入直播间"}
         </button>
       </div>
     </div>
@@ -231,16 +237,16 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
 
 function Outline({ courseSlug, outline }: { courseSlug: string; outline: OutlineItem[] }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-paper-raised">
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised">
       <p className="border-b border-ink-100 px-4 py-3 text-sm font-medium text-ink-950">课程目录</p>
       <ul className="max-h-[300px] divide-y divide-ink-100 overflow-y-auto">
         {outline.map((o, i) => (
           <li key={o.id}>
-            <Link href={`/courses/${courseSlug}/learn/${o.id}`} className={`flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-tide-50 ${o.current ? "bg-tide-50 font-medium text-tide-700" : "text-ink-800"}`}>
-              <span className="w-5 text-center text-xs text-ink-400">{i + 1}</span>
+            <Link href={`/courses/${courseSlug}/learn/${o.id}`} className={`flex items-center gap-3 px-4 py-2.5 text-sm transition-colors hover:bg-accent-50 ${o.current ? "bg-accent-50 font-medium text-accent-700" : "text-ink-800"}`}>
+              <span className="num w-5 text-center text-xs text-ink-400">{i + 1}</span>
               <span className="flex-1 truncate">{o.title}</span>
-              {o.isFree && <span className="text-xs text-tide-700">免费</span>}
-              {!o.isFree && <span className="text-ink-300">🔒</span>}
+              {o.isFree && <span className="text-xs text-accent-700">免费</span>}
+              {!o.isFree && <LockSimple size={13} className="text-ink-300" />}
             </Link>
           </li>
         ))}

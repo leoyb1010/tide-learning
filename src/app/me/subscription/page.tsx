@@ -24,7 +24,7 @@ export default async function SubscriptionPage() {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-4">
-      <Link href="/me" className="text-sm text-tide-700 hover:underline">← 我的</Link>
+      <Link href="/me" className="text-sm text-accent-700 hover:underline">← 我的</Link>
       <h1 className="text-2xl font-semibold text-ink-950">订阅管理</h1>
 
       {/* 当前状态 */}
@@ -58,7 +58,7 @@ export default async function SubscriptionPage() {
         </div>
       </section>
 
-      <p className="rounded-xl bg-tide-50 px-4 py-3 text-sm text-tide-700">
+      <p className="rounded-xl bg-accent-50 px-4 py-3 text-sm text-accent-700">
         取消订阅后：课程锁定，但笔记永久保留、可继续查看和导出。这是我们的承诺。
       </p>
 

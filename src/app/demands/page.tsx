@@ -23,7 +23,7 @@ export default async function DemandsPage() {
       </div>
 
       {!snapshot.canVote && (
-        <div className="rounded-xl bg-tide-50 px-4 py-3 text-sm text-tide-700">
+        <div className="rounded-xl bg-accent-50 px-4 py-3 text-sm text-accent-700">
           订阅用户每周有 5 票，可对同一需求最多投 3 票。<Link href="/pricing" className="font-medium underline">订阅后即可投票</Link>
         </div>
       )}

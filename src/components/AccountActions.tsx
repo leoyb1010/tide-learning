@@ -50,9 +50,9 @@ export function CancelSubscription() {
         取消后：当前周期结束前仍可学习，之后课程锁定。
         <span className="text-ink-950">你的笔记会永久保留，可继续查看和导出。</span>
       </p>
-      <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="可以告诉我们原因吗？（可选）" className="mt-3 w-full resize-none rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-tide-400" />
+      <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="可以告诉我们原因吗？（可选）" className="mt-3 w-full resize-none rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-accent-400" />
       <div className="mt-3 flex gap-2">
-        <button onClick={() => setConfirming(false)} className="flex-1 rounded-lg bg-tide-600 py-2.5 text-sm font-medium text-white">继续订阅</button>
+        <button onClick={() => setConfirming(false)} className="flex-1 rounded-lg bg-accent-600 py-2.5 text-sm font-medium text-white">继续订阅</button>
         <button onClick={cancel} disabled={loading} className="rounded-lg border border-ink-200 px-4 py-2.5 text-sm text-ink-500 hover:text-error">
           {loading ? "处理中…" : "确认取消"}
         </button>
@@ -67,7 +67,7 @@ export function RestoreButton() {
   return (
     <button
       onClick={async () => { setLoading(true); await fetch("/api/subscription/restore", { method: "POST" }); setLoading(false); router.refresh(); }}
-      className="text-sm text-tide-700 hover:underline"
+      className="text-sm text-accent-700 hover:underline"
     >
       {loading ? "恢复中…" : "恢复购买"}
     </button>

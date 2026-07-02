@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <div className="py-24 text-center">
         <h1 className="text-xl font-semibold text-ink-950">无权访问</h1>
         <p className="mt-2 text-ink-500">该页面仅限后台角色访问</p>
-        <Link href="/" className="mt-4 inline-block text-tide-700 hover:underline">返回首页</Link>
+        <Link href="/" className="mt-4 inline-block text-accent-700 hover:underline">返回首页</Link>
       </div>
     );
   }

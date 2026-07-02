@@ -50,14 +50,14 @@ function LoginInner() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               placeholder="13900000000 或 you@example.com"
-              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-tide-400"
+              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-accent-400"
               required
             />
           </div>
           {mode === "signup" && (
             <div>
               <label className="mb-1.5 block text-sm text-ink-800">昵称（可选）</label>
-              <input value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-tide-400" />
+              <input value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-accent-400" />
             </div>
           )}
           <div>
@@ -67,7 +67,7 @@ function LoginInner() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="至少 6 位"
-              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-tide-400"
+              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-accent-400"
               required
             />
           </div>
@@ -79,11 +79,11 @@ function LoginInner() {
 
         <p className="mt-5 text-center text-sm text-ink-500">
           {mode === "login" ? "还没有账号？" : "已有账号？"}
-          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); }} className="ml-1 font-medium text-tide-700 hover:underline">
+          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); }} className="ml-1 font-medium text-accent-700 hover:underline">
             {mode === "login" ? "去注册" : "去登录"}
           </button>
         </p>
-        <div className="mt-6 rounded-xl bg-tide-50 p-3 text-xs text-tide-700">
+        <div className="mt-6 rounded-xl bg-accent-50 p-3 text-xs text-accent-700">
           体验账号：demo@tide.learning / demo123（已订阅）· admin@tide.learning / admin123（后台）
         </div>
       </div>

@@ -47,7 +47,7 @@ export function AdminLeadManager() {
           <div key={src} className="rounded-2xl border border-ink-100 bg-paper-raised p-4">
             <div className="text-xs text-ink-400">{CHANNEL_LABELS[src] ?? src}</div>
             <div className="mt-1 text-xl font-semibold text-ink-950 tabular">{s.converted}/{s.total}</div>
-            <div className="text-xs text-tide-700">转化 {s.total ? ((s.converted / s.total) * 100).toFixed(0) : 0}%</div>
+            <div className="text-xs text-accent-700">转化 {s.total ? ((s.converted / s.total) * 100).toFixed(0) : 0}%</div>
           </div>
         ))}
       </div>
@@ -81,7 +81,7 @@ export function AdminLeadManager() {
                     defaultValue={l.followUpNote ?? ""}
                     onBlur={(e) => { if (e.target.value !== (l.followUpNote ?? "")) update(l.id, { followUpNote: e.target.value }); }}
                     placeholder="电联备注…"
-                    className="w-40 rounded-lg border border-ink-200 px-2 py-1.5 text-xs outline-none focus:border-tide-400"
+                    className="w-40 rounded-lg border border-ink-200 px-2 py-1.5 text-xs outline-none focus:border-accent-400"
                   />
                 </td>
               </tr>
@@ -94,5 +94,5 @@ export function AdminLeadManager() {
 }
 
 function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button onClick={onClick} className={`rounded-full px-3 py-1.5 text-sm ${active ? "bg-tide-600 text-white" : "border border-ink-200 bg-white text-ink-500"}`}>{children}</button>;
+  return <button onClick={onClick} className={`rounded-full px-3 py-1.5 text-sm ${active ? "bg-accent-600 text-white" : "border border-ink-200 bg-white text-ink-500"}`}>{children}</button>;
 }

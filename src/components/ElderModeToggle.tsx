@@ -14,7 +14,7 @@ export function ElderModeToggle() {
         </div>
         <button
           onClick={() => setMode(mode === "elder" ? "standard" : "elder")}
-          className={`relative h-7 w-12 rounded-full transition-colors ${mode === "elder" ? "bg-tide-600" : "bg-ink-200"}`}
+          className={`relative h-7 w-12 rounded-full transition-colors ${mode === "elder" ? "bg-accent-600" : "bg-ink-200"}`}
           aria-pressed={mode === "elder"}
         >
           <span className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition-transform ${mode === "elder" ? "translate-x-5" : "translate-x-0.5"}`} />
@@ -29,7 +29,7 @@ export function ElderModeToggle() {
           step={0.05}
           value={fontScale}
           onChange={(e) => setFontScale(Number(e.target.value))}
-          className="w-full accent-tide-600"
+          className="w-full accent-accent-600"
         />
       </div>
     </div>

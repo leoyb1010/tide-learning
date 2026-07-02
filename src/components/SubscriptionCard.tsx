@@ -74,13 +74,13 @@ export function SubscriptionCard({
 
   return (
     <div
-      className={`relative flex flex-col rounded-2xl border p-6 ${
-        plan.highlight ? "border-tide-600 bg-paper-raised shadow-[var(--shadow-soft)]" : "border-ink-200 bg-paper-raised"
+      className={`relative flex flex-col rounded-[var(--radius-card)] border p-6 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 ${
+        plan.highlight ? "border-accent-600 bg-paper-raised shadow-[var(--shadow-soft)]" : "border-ink-200 bg-paper-raised hover:border-accent-300"
       }`}
     >
       {plan.highlight && (
         <div className="absolute -top-3 left-6">
-          <Badge tone="tide">推荐</Badge>
+          <Badge tone="accent">推荐</Badge>
         </div>
       )}
       <div className="flex items-baseline justify-between">
@@ -89,13 +89,13 @@ export function SubscriptionCard({
       </div>
       <div className="mt-4 flex items-baseline gap-1">
         <span className="text-sm text-ink-500">¥</span>
-        <span className="text-4xl font-semibold text-ink-950 tabular">{yuan(price)}</span>
+        <span className="num text-4xl font-semibold text-ink-950">{yuan(price)}</span>
         <span className="text-sm text-ink-400">
           /{plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月"}
         </span>
       </div>
       {plan.firstPriceCents != null && plan.firstPriceCents < plan.priceCents && (
-        <p className="mt-1 text-xs text-dawn-500">首月特惠，之后 ¥{yuan(plan.priceCents)}/月</p>
+        <p className="mt-1 text-xs text-accent-700">首月特惠，之后 ¥{yuan(plan.priceCents)}/月</p>
       )}
       <ul className="mt-5 flex-1 space-y-2 text-sm text-ink-500">
         {plan.scope === "all" ? (
@@ -118,7 +118,7 @@ export function SubscriptionCard({
         onClick={subscribe}
         disabled={loading}
         className={`btn mt-6 w-full rounded-xl py-3 font-medium transition-all duration-150 disabled:opacity-50 ${
-          plan.highlight ? "bg-tide-600 text-white hover:bg-tide-700" : "border border-ink-200 bg-white text-ink-950 hover:border-tide-400"
+          plan.highlight ? "bg-accent-600 text-white hover:bg-accent-700" : "border border-ink-200 bg-white text-ink-950 hover:border-accent-400"
         }`}
       >
         {loading ? "处理中…" : isLoggedIn ? "立即订阅" : "登录后订阅"}

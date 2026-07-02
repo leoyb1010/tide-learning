@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { Clock } from "@phosphor-icons/react/dist/ssr";
 import { mmss } from "@/lib/format";
 
 export interface NoteItem {
@@ -113,19 +114,20 @@ export function NoteEditor({
               onChange={(e) => setDraft(e.target.value)}
               placeholder="记下此刻的想法…（不会打断视频）"
               rows={3}
-              className="w-full resize-none rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm outline-none focus:border-tide-400"
+              className="w-full resize-none rounded-lg border border-ink-200 bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-accent-400"
             />
             <div className="mt-2 flex items-center justify-between">
               <button
                 onClick={() => setAttachTs(Math.floor(getCurrentTime()))}
-                className="text-xs text-tide-700 hover:underline"
+                className="inline-flex items-center gap-1 text-xs text-accent-700 hover:underline"
               >
-                {attachTs != null ? `已锚定 ${mmss(attachTs)}` : "＋ 锚定当前时间"}
+                <Clock size={13} />
+                {attachTs != null ? `已锚定 ${mmss(attachTs)}` : "锚定当前时间"}
               </button>
               <button
                 onClick={createNote}
                 disabled={!draft.trim()}
-                className="rounded-lg bg-tide-600 px-4 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+                className="rounded-lg bg-accent-600 px-4 py-1.5 text-sm font-medium text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40"
               >
                 记笔记
               </button>
@@ -139,11 +141,11 @@ export function NoteEditor({
       <div className="flex-1 space-y-3 overflow-y-auto p-4">
         {notes.length === 0 && <p className="pt-8 text-center text-sm text-ink-400">还没有笔记</p>}
         {notes.map((n) => (
-          <div key={n.id} className="group rounded-lg border border-ink-100 bg-white p-3">
+          <div key={n.id} className="group rounded-lg border border-ink-100 bg-paper-raised p-3">
             <div className="mb-1.5 flex items-center justify-between">
               {n.timestampSec != null ? (
-                <button onClick={() => onSeek(n.timestampSec!)} className="rounded bg-tide-50 px-2 py-0.5 text-xs font-medium text-tide-700 hover:bg-tide-100">
-                  ⏱ {mmss(n.timestampSec)}
+                <button onClick={() => onSeek(n.timestampSec!)} className="inline-flex items-center gap-1 rounded bg-accent-50 px-2 py-0.5 text-xs font-medium text-accent-700 transition-colors hover:bg-accent-100">
+                  <Clock size={12} weight="fill" /> {mmss(n.timestampSec)}
                 </button>
               ) : (
                 <span className="text-xs text-ink-400">无时间戳</span>

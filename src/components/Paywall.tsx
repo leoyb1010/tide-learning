@@ -1,8 +1,8 @@
+import { Waves, Check } from "@phosphor-icons/react/dist/ssr";
 import { Button } from "./ui";
 
 /**
- * Paywall — §6.4 文案规则：不制造焦虑、不倒计时逼单、明确解锁内容、明确取消方式。
- * 服务端已判定无权访问后展示；不含任何倒计时或红色促销。
+ * Paywall — 不制造焦虑、不倒计时、明确解锁内容与取消方式。
  */
 export function Paywall({
   remainingLessons,
@@ -14,29 +14,31 @@ export function Paywall({
   isLoggedIn: boolean;
 }) {
   return (
-    <div className="mx-auto max-w-lg rounded-2xl border border-ink-100 bg-paper-raised p-8 text-center shadow-[var(--shadow-soft)]">
-      <div className="mb-4 text-3xl">🌊</div>
-      <h3 className="text-lg font-semibold text-ink-950">
-        继续学习后面的 {remainingLessons} 讲
-      </h3>
-      <p className="mt-3 text-sm leading-relaxed text-ink-500">
-        订阅后可解锁《{courseTitle}》全部章节，以及全站课程。
-        <br />
-        包含：实战模板、案例拆解、每周更新。
-        <br />
-        <span className="text-ink-950">笔记永久保留，随时可取消，取消后仍可查看笔记。</span>
-      </p>
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center">
-        <Button href="/pricing" variant="primary" size="lg">
-          查看订阅方案
-        </Button>
-        {!isLoggedIn && (
-          <Button href="/login" variant="secondary" size="lg">
-            登录 / 注册
-          </Button>
-        )}
+    <div className="mx-auto max-w-lg overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised">
+      <div className="flex items-center justify-center border-b border-ink-100 bg-accent-50/50 py-8">
+        <Waves size={34} weight="light" className="text-accent-600" />
       </div>
-      <p className="mt-4 text-xs text-ink-400">连续包月首月 ¥19，之后 ¥38/月 · 随时在「我的-订阅」取消</p>
+      <div className="px-8 py-7 text-center">
+        <h3 className="text-lg font-semibold tracking-tight text-ink-950">
+          继续学习后面的 <span className="num text-accent-700">{remainingLessons}</span> 讲
+        </h3>
+        <p className="mt-2 text-sm text-ink-500">订阅《{courseTitle}》所在赛道，即可解锁全部章节</p>
+
+        <ul className="mx-auto mt-5 max-w-xs space-y-2 text-left text-sm text-ink-600">
+          {["实战模板与案例拆解", "每周持续更新", "无限笔记 + 时间戳锚点", "笔记永久保留，随时可取消"].map((t) => (
+            <li key={t} className="flex items-center gap-2.5">
+              <Check size={15} weight="bold" className="shrink-0 text-accent-600" />
+              {t}
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-7 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
+          <Button href="/pricing" variant="primary" size="lg" icon>查看订阅方案</Button>
+          {!isLoggedIn && <Button href="/login" variant="secondary" size="lg">登录 / 注册</Button>}
+        </div>
+        <p className="num mt-4 text-[0.72rem] text-ink-400">连续包月首月 ¥19.9，之后 ¥99/月 · 随时可取消</p>
+      </div>
     </div>
   );
 }

@@ -95,7 +95,7 @@ export default async function AdminDashboard() {
                   <td className="py-2.5 pr-4 tabular">{s.views}</td>
                   <td className="py-2.5 pr-4 tabular">{s.leads}</td>
                   <td className="py-2.5 pr-4 tabular text-success">{s.converted}</td>
-                  <td className="py-2.5 tabular text-tide-700">{s.leads ? ((s.converted / s.leads) * 100).toFixed(0) : 0}%</td>
+                  <td className="py-2.5 tabular text-accent-700">{s.leads ? ((s.converted / s.leads) * 100).toFixed(0) : 0}%</td>
                 </tr>
               ))}
             </tbody>

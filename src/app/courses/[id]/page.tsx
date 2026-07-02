@@ -127,7 +127,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       )}
 
       <div className="text-center">
-        <Link href="/courses" className="text-sm text-tide-700 hover:underline">← 返回课程库</Link>
+        <Link href="/courses" className="text-sm text-accent-700 hover:underline">← 返回课程库</Link>
       </div>
     </div>
   );

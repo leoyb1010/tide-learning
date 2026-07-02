@@ -28,14 +28,14 @@ export function CourseFilterBar({ category, sort, q }: { category: string; sort:
         defaultValue={q}
         onKeyDown={(e) => { if (e.key === "Enter") update("q", (e.target as HTMLInputElement).value); }}
         placeholder="搜索课程标题…"
-        className="w-full rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-tide-400"
+        className="w-full rounded-xl border border-ink-200 bg-white px-4 py-2.5 text-sm outline-none focus:border-accent-400"
       />
       <div className="flex flex-wrap items-center gap-2">
         {CATEGORIES.map((c) => (
           <button
             key={c.key}
             onClick={() => update("category", c.key)}
-            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${category === c.key ? "bg-tide-600 text-white" : "bg-white text-ink-500 border border-ink-200 hover:border-tide-400"}`}
+            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${category === c.key ? "bg-accent-600 text-white" : "bg-white text-ink-500 border border-ink-200 hover:border-accent-400"}`}
           >
             {c.label}
           </button>

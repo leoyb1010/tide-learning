@@ -19,7 +19,7 @@ export function UpdateLog({ logs, ownerName }: { logs: UpdateLogItem[]; ownerNam
     <ol className="relative space-y-5 border-l border-ink-100 pl-5">
       {logs.map((log) => (
         <li key={log.id} className="relative">
-          <span className="absolute -left-[1.45rem] top-1.5 h-2.5 w-2.5 rounded-full bg-tide-400 ring-4 ring-paper" />
+          <span className="absolute -left-[1.45rem] top-1.5 h-2.5 w-2.5 rounded-full bg-accent-400 ring-4 ring-paper" />
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={toneOf[log.updateType] ?? "muted"}>{UPDATE_TYPE_LABELS[log.updateType] ?? log.updateType}</Badge>
             <span className="font-medium text-ink-950">{log.title}</span>
