@@ -166,6 +166,14 @@ export function DemandComments({
           }`}
         >
           <div className="flex items-center gap-2">
+            {/* 作者头像：有图显图，无则首字母圆底兜底 */}
+            {c.author.avatarUrl ? (
+              <img src={c.author.avatarUrl} alt="" width={24} height={24} loading="lazy" className="h-6 w-6 shrink-0 rounded-full object-cover" />
+            ) : (
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent-100 text-[0.7rem] font-medium text-accent-700" aria-hidden>
+                {c.author.nickname.charAt(0) || "?"}
+              </span>
+            )}
             {c.isOfficial && (
               <span className="inline-flex items-center gap-1 rounded-full bg-accent-600 px-2 py-0.5 text-[0.65rem] font-medium text-white">
                 <Megaphone size={11} weight="fill" /> 官方

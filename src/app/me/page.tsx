@@ -84,15 +84,30 @@ export default async function MePage() {
         <section>
           <h2 className="mb-3 font-medium text-ink-950">成就徽章</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {gamification.achievements.map((a) => (
-              <div key={a.key} className="flex items-center gap-3 rounded-xl border border-ink-100 bg-paper-raised p-3.5">
-                <span className="text-2xl" aria-hidden>{a.icon || "🌊"}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-ink-950">{a.name}</p>
-                  {a.description && <p className="truncate text-xs text-ink-400">{a.description}</p>}
+            {gamification.achievements.map((a) => {
+              // 成就 key → 徽章图（缺省回退 emoji/icon 文本）
+              const badgeImg: Record<string, string> = {
+                week_streak: "/badges/badge-streak.png",
+                first_subscribe: "/badges/badge-milestone.png",
+                first_note: "/badges/badge-note.png",
+                first_tide: "/badges/badge-vote.png",
+                cocreator: "/badges/badge-vote.png",
+              };
+              const img = badgeImg[a.key];
+              return (
+                <div key={a.key} className="flex items-center gap-3 rounded-xl border border-ink-100 bg-paper-raised p-3.5">
+                  {img ? (
+                    <img src={img} alt="" width={44} height={44} loading="lazy" className="h-11 w-11 shrink-0 object-contain" />
+                  ) : (
+                    <span className="text-2xl" aria-hidden>{a.icon || "🌊"}</span>
+                  )}
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-ink-950">{a.name}</p>
+                    {a.description && <p className="truncate text-xs text-ink-400">{a.description}</p>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}

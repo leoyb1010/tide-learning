@@ -16,7 +16,15 @@ export const metadata: Metadata = {
   description:
     "按月订阅，解锁持续更新的体系化课程：口语实战、AI 技能、银发英语、生活实用。全站畅学或单赛道自由组合，学习与笔记一体。",
   keywords: ["订阅学习", "口语", "AI技能", "银发英语", "在线课程", "持续更新"],
-  openGraph: { title: "潮汐学习", description: "持续更新的订阅制学习流", type: "website" },
+  openGraph: {
+    title: "潮汐学习 · 订阅制学习平台",
+    description: "持续更新的订阅制学习流：口语实战、AI 技能、银发英语、生活实用。",
+    type: "website",
+    siteName: "潮汐学习",
+    locale: "zh_CN",
+    // opengraph-image.jpg 由 Next 约定式自动关联（src/app/opengraph-image.jpg）
+  },
+  twitter: { card: "summary_large_image", title: "潮汐学习 · 订阅制学习平台", description: "持续更新的订阅制学习流" },
 };
 
 export const viewport: Viewport = {

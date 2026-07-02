@@ -113,14 +113,30 @@ export const COVER_GRADIENTS: Record<string, string> = {
   tide: "linear-gradient(145deg, #2a0a0d 0%, #a30514 55%, #fc011a 100%)",
   dawn: "linear-gradient(145deg, #17181a 0%, #7d0812 60%, #d60018 100%)",
 };
-export function CoverBg({ color, className = "", children }: { color: string; className?: string; children?: ReactNode }) {
+export function CoverBg({
+  color, className = "", children, imageSrc, alt = "",
+}: {
+  color: string; className?: string; children?: ReactNode;
+  /** 课程封面图；提供时覆盖在渐变之上，加载失败/缺省时回退纯渐变（避免二进制资源硬依赖）。 */
+  imageSrc?: string | null; alt?: string;
+}) {
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ background: COVER_GRADIENTS[color] ?? COVER_GRADIENTS.tide }}>
-      <div
-        className="absolute inset-0 opacity-[0.12]"
-        style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "16px 16px" }}
-      />
+      {imageSrc ? (
+        // 封面图铺满；渐变作为加载前/失败后的兜底底色
+        <img src={imageSrc} alt={alt} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
+      ) : (
+        <div
+          className="absolute inset-0 opacity-[0.12]"
+          style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "16px 16px" }}
+        />
+      )}
       {children}
     </div>
   );
+}
+
+/** 按课程 slug 约定拼封面图路径（public/covers/cover-<slug>.jpg）。 */
+export function coverSrc(slug: string): string {
+  return `/covers/cover-${slug}.jpg`;
 }

@@ -100,7 +100,15 @@ export function EmptyTide({
       className="flex flex-col items-center justify-center py-14 text-center"
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
     >
-      <TideIllustration variant={variant} />
+      {/* 统一潮汐水潭插画：一叶红纸船漂在空空的潮池，点题「潮汐」且更有温度 */}
+      <img
+        src="/illustrations/empty-tide.png"
+        alt={TITLES[variant]}
+        width={220}
+        height={165}
+        loading="lazy"
+        className="h-auto w-[220px] max-w-full opacity-95"
+      />
       <p className="mt-4 text-base font-medium text-ink-800">{TITLES[variant]}</p>
       {description && <p className="mt-1 max-w-xs text-sm text-ink-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}

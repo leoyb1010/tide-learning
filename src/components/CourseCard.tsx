@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Users, PlayCircle, Sparkle } from "@phosphor-icons/react/dist/ssr";
-import { Badge, CoverBg } from "./ui";
+import { Badge, CoverBg, coverSrc } from "./ui";
 import { Spotlight } from "./motion";
 
 export interface CourseCardData {
@@ -27,7 +27,7 @@ export function CourseCard({ course }: { course: CourseCardData }) {
         href={`/courses/${course.slug}`}
         className="group flex h-full flex-col overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 hover:border-accent-200 hover:shadow-[0_24px_48px_-24px_rgba(13,51,45,0.25)]"
       >
-        <CoverBg color={course.coverColor} className="aspect-[16/10] w-full">
+        <CoverBg color={course.coverColor} imageSrc={coverSrc(course.slug)} alt={course.title} className="aspect-[16/10] w-full">
           <div className="absolute left-3.5 top-3.5">
             <span className="rounded-full bg-black/20 px-2.5 py-1 text-[0.7rem] font-medium text-white backdrop-blur-sm">{course.categoryLabel}</span>
           </div>

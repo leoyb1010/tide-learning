@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { CourseCard } from "@/components/CourseCard";
 import { VoteButton } from "@/components/VoteButton";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
-import { Button, Badge, CoverBg } from "@/components/ui";
+import { Button, Badge, CoverBg, coverSrc } from "@/components/ui";
 import { YoudaoLogo } from "@/components/YoudaoLogo";
 import { TidalReveal as Reveal, Stagger, StaggerItem, FlipCounter, Magnetic } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
@@ -92,12 +92,12 @@ export default async function HomePage() {
         {/* 右侧：编辑式产品掠影 */}
         <Reveal delay={0.15} y={24}>
           <div className="relative">
-            {/* 多层正弦波形（点题「潮汐」）：缓慢相位横移，reduced-motion 下静止 */}
+            {/* 主视觉潮汐插画作为右侧背景层；叠一层缓动正弦波形保留动感（reduced-motion 下静止） */}
             <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[28px]">
+              <img src="/illustrations/hero.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
               {[
                 { fill: "rgba(252,1,26,0.05)", dur: "13s", top: "18%", rev: false },
                 { fill: "rgba(252,1,26,0.08)", dur: "9s", top: "34%", rev: true },
-                { fill: "rgba(252,1,26,0.12)", dur: "6s", top: "52%", rev: false },
               ].map((w, i) => (
                 <svg
                   key={i}
@@ -114,8 +114,8 @@ export default async function HomePage() {
             <div className="relative rounded-[28px] border border-ink-100 bg-paper-raised/70 p-5 backdrop-blur-sm">
               {hero && (
                 <Link href={`/courses/${hero.slug}`} className="block overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised transition-transform duration-300 hover:-translate-y-1">
-                  <CoverBg color={hero.coverColor} className="aspect-[16/9] w-full">
-                    <div className="absolute inset-0 flex items-end p-5">
+                  <CoverBg color={hero.coverColor} imageSrc={coverSrc(hero.slug)} alt={hero.title} className="aspect-[16/9] w-full">
+                    <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/50 to-transparent p-5">
                       <div className="text-white">
                         <span className="rounded-full bg-black/25 px-2.5 py-1 text-[0.7rem] backdrop-blur-sm">{hero.categoryLabel}</span>
                         <p className="mt-2 text-lg font-semibold tracking-tight">{hero.title}</p>
@@ -333,7 +333,7 @@ function FloatChip({ icon, label, sub }: { icon: React.ReactNode; label: string;
 function FeatureLarge({ course }: { course: import("@/components/CourseCard").CourseCardData }) {
   return (
     <Link href={`/courses/${course.slug}`} className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-ink-100 bg-paper-raised transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 hover:border-accent-200 hover:shadow-[0_32px_64px_-32px_rgba(13,51,45,0.3)]">
-      <CoverBg color={course.coverColor} className="aspect-[16/9] w-full lg:aspect-[16/8]">
+      <CoverBg color={course.coverColor} imageSrc={coverSrc(course.slug)} alt={course.title} className="aspect-[16/9] w-full lg:aspect-[16/8]">
         <div className="absolute left-4 top-4"><span className="rounded-full bg-black/25 px-3 py-1 text-xs text-white backdrop-blur-sm">{course.categoryLabel}</span></div>
       </CoverBg>
       <div className="flex flex-1 flex-col p-6">

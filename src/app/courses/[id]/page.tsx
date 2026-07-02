@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getCourseDetail, listCourses } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
-import { CoverBg, Badge, Button } from "@/components/ui";
+import { CoverBg, Badge, Button, coverSrc } from "@/components/ui";
 import { LessonList } from "@/components/LessonList";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
@@ -36,7 +36,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       {/* 封面 + 概要 */}
       <section className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
         <div>
-          <CoverBg color={course.coverColor} className="mb-5 aspect-[16/8] w-full rounded-2xl" />
+          <CoverBg color={course.coverColor} imageSrc={coverSrc(course.slug)} alt={course.title} className="mb-5 aspect-[16/8] w-full rounded-2xl" />
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone="tide">{categoryLabel}</Badge>
             <Badge tone="muted">{levelLabel}</Badge>
