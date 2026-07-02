@@ -29,6 +29,10 @@ export async function POST(req: NextRequest) {
       outcome?: "success" | "fail";
     };
     if (!externalOrderId) return fail("缺少订单号");
+    // 严格白名单化 outcome：缺省/非法值一律拒绝，避免「未指定即成功」的隐患
+    if (outcome !== "success" && outcome !== "fail") {
+      return fail("非法的支付结果，outcome 必须为 success 或 fail");
+    }
 
     // 只允许模拟本人订单，取回渠道
     const order = await prisma.order.findFirst({
@@ -42,17 +46,23 @@ export async function POST(req: NextRequest) {
       return ok({ paid: false, message: "模拟支付失败" });
     }
 
+    // 走到这里 outcome 必为 "success"（已白名单校验）
+
     const channel = order.channel;
+    const provider = getProvider(channel);
+    if (!provider) throw new AppError("不支持的支付渠道");
+    const eventType = "payment.succeeded";
     const payload = {
-      eventType: "payment.succeeded",
-      externalId: externalOrderId, // 幂等键
+      eventType,
+      // 幂等键与真实 webhook 路由保持一致：绑定事件类型，避免与退款事件共键
+      externalId: `${eventType}:${externalOrderId}`,
       externalOrderId,
     };
     const rawBody = JSON.stringify(payload);
     const signature = signPayload(channel, rawBody);
 
     // 自校验（与真实 webhook 一致的安全边界）
-    if (!getProvider(channel).verifyWebhookSignature(rawBody, signature)) {
+    if (!provider.verifyWebhookSignature(rawBody, signature)) {
       throw new AppError("签名生成异常");
     }
 

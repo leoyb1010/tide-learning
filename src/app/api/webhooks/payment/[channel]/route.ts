@@ -20,12 +20,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
     const { channel } = await params;
     assertRateLimit(req, `webhook:${channel}`, 120, 60_000);
 
+    // 未知渠道：绝不回退到 mock provider，直接拒绝
+    const provider = getProvider(channel);
+    if (!provider) return fail("未知支付渠道", 400);
+
     // 1. 原始 body 用于验签
     const rawBody = await req.text();
     const signature = req.headers.get("x-tide-signature");
 
     // 2. 验签失败直接拒绝
-    if (!getProvider(channel).verifyWebhookSignature(rawBody, signature)) {
+    if (!provider.verifyWebhookSignature(rawBody, signature)) {
       return fail("签名校验失败", 401);
     }
 
@@ -38,9 +42,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
     }
     if (!body.externalOrderId) return fail("缺少订单号");
 
+    const eventType = body.eventType ?? "payment.succeeded";
+    // 幂等键绑定事件类型：支付成功与退款是两个独立事件，即使渠道不提供 externalId
+    // 也不能因回退到同一 externalOrderId 而让退款被误判为「支付回调的重复」而丢弃。
+    const externalId = `${eventType}:${body.externalId ?? body.externalOrderId}`;
+
     const result = await processWebhook(channel, {
-      eventType: body.eventType ?? "payment.succeeded",
-      externalId: body.externalId ?? body.externalOrderId, // 幂等键
+      eventType,
+      externalId,
       externalOrderId: body.externalOrderId,
     });
     return ok(result);

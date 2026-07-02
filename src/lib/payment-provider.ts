@@ -30,10 +30,18 @@ export interface PaymentProvider {
   verifyWebhookSignature(rawBody: string, signature: string | null): boolean;
 }
 
-/** 每渠道密钥从环境变量读取，缺失时用开发默认（生产必须覆盖）。 */
+/**
+ * 每渠道密钥严格从环境变量读取，缺失即抛错 —— 绝不回退到共享/硬编码默认密钥。
+ * A1-1：回退到可预测的默认密钥会让攻击者用已知密钥伪造 webhook（0 元开通权益），
+ * 因此宁可让漏配的渠道 webhook 直接失败，也不静默降级验签强度。
+ */
 function secretFor(channel: string): string {
   const key = `PAY_${channel.toUpperCase()}_SECRET`;
-  return process.env[key] ?? process.env.PAY_MOCK_SECRET ?? "dev-mock-secret";
+  const secret = process.env[key];
+  if (!secret) {
+    throw new Error(`支付渠道密钥缺失：请配置环境变量 ${key}`);
+  }
+  return secret;
 }
 
 /** HMAC-SHA256 签名（mock / 部分渠道通用）。 */
@@ -64,7 +72,12 @@ class MockProvider implements PaymentProvider {
 
   verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
     if (!signature) return false;
-    return safeEqualHex(signPayload(this.channel, rawBody), signature);
+    // 密钥缺失时 signPayload 会抛错：此处兜底为验签失败，绝不放行未签名/错配渠道的请求。
+    try {
+      return safeEqualHex(signPayload(this.channel, rawBody), signature);
+    } catch {
+      return false;
+    }
   }
 }
 
@@ -75,6 +88,7 @@ const PROVIDERS: Record<string, PaymentProvider> = {
   stripe: new MockProvider("stripe"),
 };
 
-export function getProvider(channel: string): PaymentProvider {
-  return PROVIDERS[channel] ?? PROVIDERS.mock;
+/** 未知渠道返回 null —— webhook route 应据此返回 400，绝不回退到 mock provider。 */
+export function getProvider(channel: string): PaymentProvider | null {
+  return PROVIDERS[channel] ?? null;
 }

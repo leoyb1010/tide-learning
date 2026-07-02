@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { ok, fail, handle } from "@/lib/api";
 
@@ -9,7 +9,7 @@ const VALID = ["new", "contacting", "booked", "trialing", "converted", "lost"];
 // PATCH /api/admin/leads/:id — 更新建联状态/跟进备注（电联建联流转）
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("lead:manage");
     const { id } = await params;
     const body = (await req.json()) as { status?: string; followUpNote?: string };
     if (body.status && !VALID.includes(body.status)) return fail("非法状态");

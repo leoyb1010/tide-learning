@@ -38,11 +38,28 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   return { ok: true, remaining: limit - b.count, retryAfterSec: 0 };
 }
 
-/** 取客户端 IP（信任反代 header，退化到 unknown）。 */
+/**
+ * 取客户端 IP 用于限流。
+ * 安全要点（A1-5）：X-Forwarded-For 的**首段是客户端可任意伪造的**——攻击者每次换一个
+ * 首段即可获得全新限流桶、绕过 IP 限流。真实客户端 IP 应取「可信反代追加的那一跳」。
+ * XFF 形如 `client, proxy1, proxy2`，最右侧由最靠近应用的可信反代写入，最难伪造。
+ * 用 TRUSTED_PROXY_HOPS 声明可信反代层数（默认 1）：取倒数第 N 段作为客户端 IP。
+ * 优先信任平台注入的不可伪造 header（x-real-ip 由反代设置）。
+ */
+const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? "1");
 export function clientIp(req: NextRequest): string {
+  const realIp = req.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
   const xff = req.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  return req.headers.get("x-real-ip") ?? "unknown";
+  if (xff) {
+    const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
+    if (parts.length > 0) {
+      // 取倒数第 TRUSTED_PROXY_HOPS 段：反代之后、客户端无法越过反代覆盖的那一跳
+      const idx = Math.max(0, parts.length - TRUSTED_PROXY_HOPS);
+      return parts[idx];
+    }
+  }
+  return "unknown";
 }
 
 export class RateLimitError extends Error {

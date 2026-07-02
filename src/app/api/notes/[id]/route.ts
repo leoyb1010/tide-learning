@@ -30,7 +30,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     assertSameOrigin(req);
     const user = await requireUser();
     const { id } = await params;
-    const body = (await req.json()) as {
+    // 空/畸形 body 折叠为 {}，走下方必填校验返回 fail，而非抛 SyntaxError 触发 500
+    const body = (await req.json().catch(() => ({}))) as {
       title?: string | null;
       contentMd?: string;
       starred?: boolean;
@@ -38,6 +39,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       addTagId?: string;
       removeTagId?: string;
     };
+
+    // 运行时类型收窄：脏输入返回 400 而非透传 Prisma 触发 500
+    if (body.starred !== undefined && typeof body.starred !== "boolean") {
+      return fail("收藏状态非法", 400);
+    }
+    if (
+      body.timestampSec !== undefined &&
+      body.timestampSec !== null &&
+      !Number.isInteger(body.timestampSec)
+    ) {
+      return fail("时间戳非法", 400);
+    }
 
     const note = await prisma.note.findFirst({ where: { id, userId: user.id, deletedAt: null } });
     if (!note) return fail("笔记不存在", 404);

@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, handle } from "@/lib/api";
 
 // GET /api/admin/dashboard — 运营数据看板（§8.2.5，P1 十项指标）
 export async function GET() {
   return handle(async () => {
-    await requireAdmin();
+    await requirePermission("dashboard:read");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 

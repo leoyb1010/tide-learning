@@ -95,12 +95,23 @@ export function Player({
     }).catch(() => {});
   }, [isLoggedIn, access, lesson.id]);
 
+  // 用 ref 持有最新 saveProgress，供卸载/离开页面时读取，避免下方定时器 effect 因依赖变化重挂时误触发保存
+  const saveProgressRef = useRef(saveProgress);
+  saveProgressRef.current = saveProgress;
+
+  // 定时保存（每 10 秒）+ 离开页面保存：cleanup 只清理资源，不在此主动保存进度，
+  // 否则切章等导致 saveProgress 引用变化重挂时会多发一次 POST
   useEffect(() => {
     const id = setInterval(() => saveProgress(), 10000);
     const onLeave = () => saveProgress();
     window.addEventListener("beforeunload", onLeave);
-    return () => { clearInterval(id); onLeave(); window.removeEventListener("beforeunload", onLeave); };
+    return () => { clearInterval(id); window.removeEventListener("beforeunload", onLeave); };
   }, [saveProgress]);
+
+  // 仅在组件真正卸载时保存一次（空依赖），通过 ref 读取最新的 saveProgress
+  useEffect(() => {
+    return () => { saveProgressRef.current(); };
+  }, []);
 
   useEffect(() => {
     if (time >= lesson.durationSec && lesson.durationSec > 0) saveProgress(true);
@@ -160,19 +171,21 @@ export function Player({
   }
 
   // 键盘快捷键：空格播放 / S 截帧 / N 批注 / F 焦点
+  // 用 ref 持有最新处理逻辑，监听器只在 mount 时绑定一次，避免依赖数组不全导致的陈旧闭包
+  const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
+  onKeyRef.current = (e: KeyboardEvent) => {
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === "TEXTAREA" || tag === "INPUT") return;
+    if (e.key === " ") { e.preventDefault(); togglePlay(); }
+    else if (e.key.toLowerCase() === "s") { e.preventDefault(); captureFrame(); }
+    else if (e.key.toLowerCase() === "n") { e.preventDefault(); quickNote(); }
+    else if (e.key.toLowerCase() === "f") { e.preventDefault(); setFocus((f) => !f); }
+  };
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement)?.tagName;
-      if (tag === "TEXTAREA" || tag === "INPUT") return;
-      if (e.key === " ") { e.preventDefault(); togglePlay(); }
-      else if (e.key.toLowerCase() === "s") { e.preventDefault(); captureFrame(); }
-      else if (e.key.toLowerCase() === "n") { e.preventDefault(); quickNote(); }
-      else if (e.key.toLowerCase() === "f") { e.preventDefault(); setFocus((f) => !f); }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hasRealVideo, access]);
+    const handler = (e: KeyboardEvent) => onKeyRef.current(e);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, []);
 
   useEffect(() => {
     document.documentElement.dataset.focus = focus ? "on" : "off";
@@ -377,7 +390,11 @@ function placeholderFrame(ts: string, title: string): string {
 function LiveBanner({ lesson }: { lesson: LessonData }) {
   const [booked, setBooked] = useState(false);
   const start = lesson.liveStartAt ? new Date(lesson.liveStartAt) : null;
-  const upcoming = start ? start.getTime() > Date.now() : false;
+  // upcoming 依赖 Date.now()，SSR 与首帧 hydration 各算一次会不一致；
+  // 挂载后再计算，SSR 首帧统一按“进入直播间”渲染，避免 hydration mismatch
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const upcoming = mounted && start ? start.getTime() > Date.now() : false;
   return (
     <div className="overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised">
       <div className="relative flex items-center justify-center py-16" style={{ background: "linear-gradient(140deg,#2a0a0d,#fc011a)" }}>
@@ -394,7 +411,7 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
         <div>
           <p className="font-medium text-ink-950">{lesson.title}</p>
           <p className="text-sm text-ink-500">
-            {start ? `开播时间：${start.toLocaleString("zh-CN", { month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "开播时间待定"}
+            {start ? `开播时间：${start.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "开播时间待定"}
           </p>
         </div>
         <button

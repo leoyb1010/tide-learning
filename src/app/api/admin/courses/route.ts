@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { ok, fail, handle } from "@/lib/api";
 
@@ -11,7 +11,7 @@ function slugify(s: string) {
 // GET /api/admin/courses — 课程列表（后台）
 export async function GET() {
   return handle(async () => {
-    await requireAdmin();
+    await requirePermission("course:write");
     const courses = await prisma.course.findMany({
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { lessons: true, updateLogs: true } } },
@@ -23,7 +23,7 @@ export async function GET() {
 // POST /api/admin/courses — 新建课程（草稿）
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("course:write");
     const body = (await req.json()) as {
       title: string;
       subtitle?: string;

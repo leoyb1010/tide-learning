@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { ok, fail, handle } from "@/lib/api";
 
@@ -9,7 +9,7 @@ const VALID = ["pending_review", "collecting", "evaluating", "scheduled", "produ
 // PATCH /api/admin/demands/:id/status — 变更状态 + 官方反馈（§6.6：未采纳必须填原因）
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("demand:moderate");
     const { id } = await params;
     const body = (await req.json()) as {
       status: string;

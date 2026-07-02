@@ -369,15 +369,17 @@ model Order {
   amountCents     Int
   currency        String    @default("CNY")
   status          String    @default("pending") // pending / paid / refunded / failed
-  externalOrderId String?
+  externalOrderId String?   @unique // 渠道订单号：唯一，webhook 据此精确定位订单，杜绝重复激活
   couponId        String?
   coupon          Coupon?   @relation(fields: [couponId], references: [id])
   discountCents   Int       @default(0)
+  // 支付成功后记录本单激活/续期的订阅：退款时据此精确撤销「这一笔」而非该 plan 下全部订阅
+  subscriptionId  String?
+  subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
   createdAt       DateTime  @default(now())
   paidAt          DateTime?
 
   @@index([userId, status, createdAt])
-  @@index([externalOrderId])
 }
 
 model Subscription {
@@ -399,6 +401,7 @@ model Subscription {
   updatedAt              DateTime @updatedAt
 
   entitlements Entitlement[]
+  orders       Order[] // 激活/续期本订阅的订单（退款时据此精确定位）
 
   @@index([userId, status, currentPeriodEnd])
 }

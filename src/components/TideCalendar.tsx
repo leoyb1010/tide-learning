@@ -18,8 +18,13 @@ const FULL_TIDE_MINUTES = 60;
 /**
  * TideCalendar — 潮汐日历：月历每格水位高度 = 当日学习分钟数。
  * 水位越高说明当天学得越久，形成一片起伏的“潮汐海面”。
+ *
+ * todayKey 由服务端按 Asia/Shanghai 计算好传入（"YYYY-MM-DD"），
+ * 作为「当前日」与「基准月」的唯一来源；避免渲染期调用 new Date() 用本地时区
+ * 导致 SSR 与 hydration（浏览器时区）在月末/日界处算出不同的月份或高亮，产生 hydration mismatch。
+ * 客户端仅用 offset 相对基准月前后翻页。
  */
-export function TideCalendar({ calendar }: { calendar: TideDay[] }) {
+export function TideCalendar({ calendar, todayKey }: { calendar: TideDay[]; todayKey: string }) {
   const reduce = useReducedMotion();
   const byDay = useMemo(() => {
     const m = new Map<string, TideDay>();
@@ -27,15 +32,17 @@ export function TideCalendar({ calendar }: { calendar: TideDay[] }) {
     return m;
   }, [calendar]);
 
-  // 以“当前月”为基准，可前后翻月
+  // 以服务端给定的「当前月」为基准，可前后翻月（纯本地展示，不涉及时区）
   const [offset, setOffset] = useState(0);
-  const base = new Date();
-  const cursor = new Date(base.getFullYear(), base.getMonth() + offset, 1);
+  const [baseYear, baseMonth] = useMemo(() => {
+    const [y, m] = todayKey.split("-").map(Number);
+    return [y, m - 1] as const; // month 0-based
+  }, [todayKey]);
+  const cursor = new Date(baseYear, baseMonth + offset, 1);
   const year = cursor.getFullYear();
   const month = cursor.getMonth(); // 0-based
 
   const cells = useMemo(() => buildMonthCells(year, month), [year, month]);
-  const todayKey = fmtKey(base);
 
   return (
     <div className="rounded-2xl border border-ink-100 bg-paper-raised p-5">

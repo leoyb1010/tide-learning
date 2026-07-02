@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { MagnifyingGlass, DownloadSimple, Waves, GridFour, BookOpen, Star } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
@@ -65,7 +65,12 @@ export default function NotesPage() {
   const [captureOnly, setCaptureOnly] = useState(false);
   const [starredOnly, setStarredOnly] = useState(false);
 
+  // 请求序号守卫：筛选快速变化时，仅接受最新一次请求的结果，
+  // 防止较慢的旧响应后返回覆盖较新筛选的结果（竞态）。
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setError(false);
     try {
       const params = new URLSearchParams();
@@ -80,11 +85,14 @@ export default function NotesPage() {
         fetch(`/api/note-tags`).then((r) => r.json()),
         fetch(`/api/auth/me`).then((r) => r.json()),
       ]);
+      // 已有更新的请求发出，丢弃本次过期结果
+      if (seq !== loadSeq.current) return;
       if (!notesRes.ok) throw new Error();
       setNotes(notesRes.data.notes as NoteRow[]);
       setTags((tagsRes.ok ? tagsRes.data.tags : []) as TagFacet[]);
       setNeedLogin(!meRes.data?.user);
     } catch {
+      if (seq !== loadSeq.current) return;
       setError(true);
     }
   }, [q, courseId, tagId, captureOnly, starredOnly]);

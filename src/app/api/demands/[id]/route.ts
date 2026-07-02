@@ -12,14 +12,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const demand = await prisma.demand.findUnique({
       where: { id },
       include: {
-        votes: true,
         statusLogs: { orderBy: { createdAt: "asc" } },
         user: { select: { nickname: true } },
       },
     });
     if (!demand) return fail("需求不存在", 404);
 
-    const totalVotes = demand.votes.reduce((s, v) => s + v.voteCount, 0);
+    // 用聚合求票数总和，避免把所有 DemandVote 明细行拉回内存（与 demand-score.ts 聚合口径一致）
+    const voteAgg = await prisma.demandVote.aggregate({ _sum: { voteCount: true }, where: { demandId: id } });
+    const totalVotes = voteAgg._sum.voteCount ?? 0;
     const similar = await prisma.demand.findMany({
       where: { id: { not: id }, category: demand.category, status: { not: "rejected" } },
       take: 3,

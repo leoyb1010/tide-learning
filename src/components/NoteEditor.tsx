@@ -50,7 +50,15 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<Record<string, boolean>>({});
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const delTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const draftRef = useRef<HTMLTextAreaElement>(null);
+
+  // 切讲时组件被 Player 复用而非重挂，需在 lessonId 变化时同步 initialNotes，
+  // 避免跨讲串显上一讲的笔记（initialNotes 仅用于挂载初值，此处显式重置）。
+  useEffect(() => {
+    setNotes(initialNotes);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lessonId]);
 
   const post = useCallback(async (payload: Record<string, unknown>) => {
     const res = await fetch("/api/notes", {
@@ -134,14 +142,20 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
         onClick: () => { undone = true; if (removed) setNotes((n) => [removed, ...n]); },
       },
     });
-    setTimeout(async () => {
+    // 计时器存入 ref，卸载时统一清理，避免卸载后仍发 DELETE 并静默硬删撤销数据。
+    delTimers.current[id] = setTimeout(async () => {
+      delete delTimers.current[id];
       if (!undone) await fetch(`/api/notes/${id}`, { method: "DELETE" }).catch(() => {});
     }, 4200);
   }
 
   useEffect(() => {
     const timers = saveTimers.current;
-    return () => Object.values(timers).forEach(clearTimeout);
+    const delayedDeletes = delTimers.current;
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
+      Object.values(delayedDeletes).forEach(clearTimeout);
+    };
   }, []);
 
   return (

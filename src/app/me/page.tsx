@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui";
 import { LogoutButton } from "@/components/AccountActions";
 import { TideCalendar } from "@/components/TideCalendar";
 import { formatDurationSec } from "@/lib/format";
+import { shanghaiDayKey } from "@/lib/week";
 
 export const metadata = { title: "我的" };
 
@@ -75,8 +76,8 @@ export default async function MePage() {
         </div>
       </section>
 
-      {/* 潮汐日历 */}
-      <TideCalendar calendar={gamification.calendar} />
+      {/* 潮汐日历：当前日基准由服务端按 Asia/Shanghai 算好传入，保证 SSR/CSR 一致 */}
+      <TideCalendar calendar={gamification.calendar} todayKey={shanghaiDayKey()} />
 
       {/* 成就徽章 */}
       {gamification.achievements.length > 0 && (

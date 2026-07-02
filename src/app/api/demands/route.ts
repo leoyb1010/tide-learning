@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser, getCurrentUser } from "@/lib/session";
 import { listRankedDemands } from "@/lib/queries";
 import { track } from "@/lib/analytics";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 // GET /api/demands?status=
 export async function GET(req: NextRequest) {
@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
 // POST /api/demands — 提交需求（进入待审核）
 export async function POST(req: NextRequest) {
   return handle(async () => {
+    assertSameOrigin(req); // A2：写操作 CSRF 防护
     const user = await requireUser();
     const body = (await req.json()) as {
       title: string;

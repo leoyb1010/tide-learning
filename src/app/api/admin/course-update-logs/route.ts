@@ -1,13 +1,13 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { ok, fail, handle } from "@/lib/api";
 
 // POST /api/admin/course-update-logs — 新增更新日志（§6.3 五要素）
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("course:write");
     const body = (await req.json()) as {
       courseId: string;
       lessonId?: string;

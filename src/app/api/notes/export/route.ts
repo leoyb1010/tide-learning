@@ -20,7 +20,10 @@ export async function GET(req: NextRequest) {
     const format = req.nextUrl.searchParams.get("format") ?? "md";
     if (format !== "md") return fail("暂不支持该导出格式");
 
-    const notes = await prisma.note.findMany({
+    // 硬上限：capture 笔记的 captureUrl 可能是超大 data-url，全量拉表并在内存拼字符串有内存/延迟风险，
+    // 故限制单次导出最多 MAX_EXPORT 篇；多取 1 条用于判断是否被截断并在导出头提示。
+    const MAX_EXPORT = 1000;
+    const rows = await prisma.note.findMany({
       where: { userId: user.id, deletedAt: null },
       include: {
         course: { select: { title: true } },
@@ -28,7 +31,10 @@ export async function GET(req: NextRequest) {
         tags: { include: { tag: { select: { name: true } } } },
       },
       orderBy: [{ courseId: "asc" }, { createdAt: "asc" }],
+      take: MAX_EXPORT + 1,
     });
+    const truncated = rows.length > MAX_EXPORT;
+    const notes = truncated ? rows.slice(0, MAX_EXPORT) : rows;
 
     // 按课程分组拼装 Markdown
     const byCourse = new Map<string, { title: string; items: typeof notes }>();
@@ -42,6 +48,10 @@ export async function GET(req: NextRequest) {
     lines.push(`# 我的潮汐笔记`);
     lines.push("");
     lines.push(`> 导出时间：${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })} · 共 ${notes.length} 篇`);
+    if (truncated) {
+      lines.push("");
+      lines.push(`> ⚠️ 笔记数量超过单次导出上限（${MAX_EXPORT} 篇），本次仅导出最早的 ${MAX_EXPORT} 篇。`);
+    }
     lines.push("");
 
     for (const { title, items } of byCourse.values()) {
@@ -75,7 +85,7 @@ export async function GET(req: NextRequest) {
     }
 
     const md = lines.join("\n");
-    await track({ eventName: "note_export", userId: user.id, properties: { format, count: notes.length } });
+    await track({ eventName: "note_export", userId: user.id, properties: { format, count: notes.length, truncated } });
 
     const filename = `tide-notes-${new Date().toISOString().slice(0, 10)}.md`;
     return new NextResponse(md, {
