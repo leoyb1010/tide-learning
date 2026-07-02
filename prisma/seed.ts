@@ -156,6 +156,16 @@ const courses: CourseSeed[] = [
   },
 ];
 
+// 本地版 Asia/Shanghai 日期 key，与 src/lib/week.ts 的 shanghaiDayKey 逻辑一致（seed 不引 src/）。
+const SHANGHAI_OFFSET_MS = 8 * 3600 * 1000;
+function shanghaiDayKey(date = new Date()): string {
+  const s = new Date(date.getTime() + SHANGHAI_OFFSET_MS);
+  const y = s.getUTCFullYear();
+  const m = String(s.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(s.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function currentWeekKey(): string {
   const date = new Date();
   const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
@@ -171,9 +181,22 @@ async function main() {
   await prisma.analyticsEvent.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.lead.deleteMany();
+  // C2/C3 新增关联表：先删子表再删主表，保证可重复执行
+  await prisma.userAchievement.deleteMany();
+  await prisma.achievement.deleteMany();
+  await prisma.streakDay.deleteMany();
+  await prisma.streak.deleteMany();
+  await prisma.demandStage.deleteMany();
+  await prisma.demandFollow.deleteMany();
+  await prisma.comment.deleteMany();
   await prisma.demandStatusLog.deleteMany();
   await prisma.demandVote.deleteMany();
   await prisma.demand.deleteMany();
+  // 笔记标签关联表（NoteTagOnNote 随 Note/NoteTag 级联，显式清理更稳妥）
+  await prisma.noteTagOnNote.deleteMany();
+  await prisma.noteTag.deleteMany();
+  await prisma.subtitle.deleteMany();
+  await prisma.coupon.deleteMany();
   await prisma.note.deleteMany();
   await prisma.learningProgress.deleteMany();
   await prisma.entitlement.deleteMany();
@@ -289,6 +312,7 @@ async function main() {
     { title: "职场英语面试专项", desc: "英文面试问答", status: "collecting", track: "english_oral", votes: 45 },
     { title: "Excel 与 AI 结合", desc: "已由 AI 办公课覆盖", status: "launched", track: "ai_skill", votes: 200 },
   ];
+  const demandIds: Record<string, string> = {}; // title -> demand.id，供后续阶段/评论/关注关联
   for (const d of demandSeeds) {
     const demand = await prisma.demand.create({
       data: {
@@ -297,6 +321,7 @@ async function main() {
         launchedCourseId: d.status === "launched" ? courseIds["ai-office-005"] : null,
       },
     });
+    demandIds[d.title] = demand.id;
     await prisma.demandVote.create({ data: { demandId: demand.id, userId: demoUser.id, voteCount: Math.min(3, Math.ceil(d.votes / 40)), weekKey: currentWeekKey() } });
     await prisma.demandStatusLog.create({ data: { demandId: demand.id, fromStatus: "pending_review", toStatus: d.status, operatorId: admin.id, reason: "种子初始化" } });
     // 已排期/制作中的需求接入内容排期
@@ -334,7 +359,298 @@ async function main() {
     }
   }
 
+  // ========================================================================
+  // 潮汐学习 v1.0 增量种子（C1 字幕/笔记馆 · C2 需求剧场 · C3 游戏化）
+  // ========================================================================
+
+  // ---------- C1：章节字幕 cue（供「字幕划线剪藏」演示）----------
+  // 为若干代表性课程的前几讲补 5-10 条中文字幕；lessonIdMap 已在上文构建。
+  const subtitleScripts: Record<string, string[][]> = {
+    // AI 办公：第 1、2 讲
+    "ai-office-005": [
+      [
+        "欢迎来到 AI 办公效率入门，这一讲我们先建立正确心态。",
+        "很多人把 AI 当搜索引擎，其实它更像一位随叫随到的协作者。",
+        "把背景、目标、约束一次讲清楚，AI 的产出质量会明显提升。",
+        "记住一个原则：先给上下文，再提要求，最后给示例。",
+        "这样它才能理解你真正想要什么，而不是泛泛而谈。",
+        "接下来的几讲，我们会把这套方法用到邮件、纪要和 PPT 上。",
+        "现在，先在笔记里划下这句：AI 是协作者，不是许愿池。",
+      ],
+      [
+        "这一讲我们用 AI 来写一封得体的商务邮件。",
+        "第一步，先说清楚收件人是谁、你们的关系如何。",
+        "第二步，交代这封邮件要达成的目标，比如约会议还是催进度。",
+        "第三步，给出语气要求：正式、友好，还是简洁直接。",
+        "把这三点写进提示词，AI 生成的初稿就已经能用八成。",
+        "剩下的两成，是你补充细节、核对事实、调整称呼。",
+        "试着把刚才的结构套用到你手头一封真实邮件上。",
+      ],
+    ],
+    // 口语小班课：第 1、2 讲
+    "oral-smallclass-001": [
+      [
+        "开口的第一句，往往是最难的一句。",
+        "别担心语法完美，先让声音发出来。",
+        "我们从最安全的三个万能开场白练起。",
+        "第一句：Hi, nice to meet you. 简单但永远好用。",
+        "第二句：How's it going? 比 How are you 更自然。",
+        "第三句：Sorry, could you say that again? 听不懂时的救命句。",
+        "把这三句大声重复五遍，肌肉记住了，开口就不慌。",
+      ],
+      [
+        "这一讲进入点餐与购物的高频场景。",
+        "点餐时最常用的一句：I'll have the..., please.",
+        "想问推荐，就说：What do you recommend?",
+        "购物结账，记住：Do you take card? 问能不能刷卡。",
+        "想要小一号，说：Do you have this in a smaller size?",
+        "这些句子短、好记，今天就能在生活里用上。",
+      ],
+    ],
+    // 银发口语：第 1 讲（慢速、重复友好）
+    "silver-oral-003": [
+      [
+        "这一讲，我们学最常用的见面打招呼。",
+        "见到人，最简单的一句就是 Hello，你好。",
+        "想问对方好不好，说 How are you，你好吗。",
+        "回答可以很简单：I'm fine，我很好。",
+        "分别的时候说 Goodbye，再见。",
+        "别急，我们把这几句慢慢多念几遍。",
+      ],
+    ],
+    // 防诈骗：第 1 讲
+    "anti-fraud-007": [
+      [
+        "这一讲，我们先认识常见的诈骗类型。",
+        "凡是让你转账、验证码给别人的，几乎都是骗局。",
+        "冒充公检法、冒充客服，是最常见的两种套路。",
+        "记住：正规机构不会用电话要你的银行密码。",
+        "遇到催你、吓你、不让你挂电话的，先冷静挂断。",
+        "把这几条记在笔记里，遇事多留个心眼。",
+      ],
+    ],
+  };
+  let subtitleCount = 0;
+  for (const [slug, lessonCues] of Object.entries(subtitleScripts)) {
+    const lessons = lessonIdMap[slug];
+    if (!lessons) continue;
+    for (let li = 0; li < lessonCues.length; li++) {
+      const lessonId = lessons[li];
+      if (!lessonId) continue;
+      const cues = lessonCues[li];
+      // 每条 cue 约 6 秒，首尾相接，形成可划线的连续字幕轨
+      for (let ci = 0; ci < cues.length; ci++) {
+        const startSec = 12 + ci * 6.5;
+        await prisma.subtitle.create({
+          data: { lessonId, lang: "zh", startSec, endSec: startSec + 6, text: cues[ci] },
+        });
+        subtitleCount++;
+      }
+    }
+  }
+
+  // ---------- C3：成就种子（Phosphor 图标名）----------
+  const achievementSeeds = [
+    { key: "first_subscribe", name: "扬帆起航", description: "完成首次订阅，正式加入潮汐。", icon: "Medal" },
+    { key: "first_note", name: "落笔成潮", description: "记下第一条学习笔记。", icon: "NotePencil" },
+    { key: "week_streak", name: "七日不辍", description: "连续 7 天保持学习潮汐。", icon: "Flame" },
+    { key: "cocreator", name: "共创者", description: "参与共创需求，与内容团队同行。", icon: "Users" },
+    { key: "first_tide", name: "首潮", description: "参与首批共创投票，掀起一次潮汐。", icon: "Waves" },
+  ];
+  const achievementIds: Record<string, string> = {};
+  for (const a of achievementSeeds) {
+    const created = await prisma.achievement.create({ data: a });
+    achievementIds[a.key] = created.id;
+  }
+
+  // ---------- C1：笔记标签 + demo 用户多形态笔记（三视图内容）----------
+  // 标签：先建标签，再在建笔记时关联。
+  const tagSeeds = [
+    { name: "重点", color: "accent" },
+    { name: "待复习", color: "warning" },
+    { name: "灵感", color: "tide" },
+    { name: "口语句型", color: "success" },
+  ];
+  const tagIds: Record<string, string> = {};
+  for (const t of tagSeeds) {
+    const created = await prisma.noteTag.create({
+      data: { userId: demoUser.id, name: t.name, color: t.color },
+    });
+    tagIds[t.name] = created.id;
+  }
+
+  // 目标课程/章节 id（复用上文已建记录）
+  const aiOfficeLessons = lessonIdMap["ai-office-005"];
+  const oralLessons = lessonIdMap["oral-smallclass-001"];
+  // 1x1 透明 PNG 占位，作为截帧 data-url（演示 kind=capture）
+  const CAPTURE_PLACEHOLDER =
+    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+
+  type NoteSeed = {
+    courseSlug: string; lessonIdx: number; timestampSec?: number; title?: string;
+    contentMd: string; kind?: string; captureUrl?: string; sourceText?: string;
+    starred?: boolean; tags?: string[];
+  };
+  const noteSeeds: NoteSeed[] = [
+    {
+      courseSlug: "ai-office-005", lessonIdx: 0, timestampSec: 46, title: "AI 是协作者",
+      contentMd: "**核心心态**：把 AI 当协作者——先给上下文，再提要求，最后给示例。",
+      kind: "clip", sourceText: "把背景、目标、约束一次讲清楚，AI 的产出质量会明显提升。",
+      starred: true, tags: ["重点"],
+    },
+    {
+      courseSlug: "ai-office-005", lessonIdx: 1, timestampSec: 78, title: "写邮件三步法",
+      contentMd: "写邮件三要素：收件人关系 → 目标 → 语气。三点写进提示词，初稿即可用八成。",
+      kind: "clip", sourceText: "把这三点写进提示词，AI 生成的初稿就已经能用八成。",
+      tags: ["重点", "待复习"],
+    },
+    {
+      courseSlug: "ai-office-005", lessonIdx: 0, timestampSec: 20, title: "开场截帧",
+      contentMd: "这一页的心态图很好，先存下来回头复习。",
+      kind: "capture", captureUrl: CAPTURE_PLACEHOLDER, tags: ["灵感"],
+    },
+    {
+      courseSlug: "oral-smallclass-001", lessonIdx: 0, timestampSec: 55, title: "万能救命句",
+      contentMd: "听不懂时救命：Sorry, could you say that again?",
+      kind: "clip", sourceText: "Sorry, could you say that again? 听不懂时的救命句。",
+      starred: true, tags: ["口语句型", "重点"],
+    },
+    {
+      courseSlug: "oral-smallclass-001", lessonIdx: 1, timestampSec: 30, title: "点餐句型",
+      contentMd: "点餐通用句：I'll have the..., please. 想要推荐问 What do you recommend?",
+      kind: "clip", sourceText: "点餐时最常用的一句：I'll have the..., please.",
+      tags: ["口语句型"],
+    },
+    {
+      courseSlug: "oral-smallclass-001", lessonIdx: 0,
+      contentMd: "随手记：今天开口练了 5 遍，明显没那么紧张了。",
+      kind: "text", tags: ["灵感"],
+    },
+  ];
+  let noteCount = 0;
+  for (const n of noteSeeds) {
+    const lessons = lessonIdMap[n.courseSlug];
+    const lessonId = lessons?.[n.lessonIdx];
+    if (!lessonId) continue;
+    const note = await prisma.note.create({
+      data: {
+        userId: demoUser.id, courseId: courseIds[n.courseSlug], lessonId,
+        timestampSec: n.timestampSec ?? null, title: n.title ?? null, contentMd: n.contentMd,
+        kind: n.kind ?? "text", captureUrl: n.captureUrl ?? null, sourceText: n.sourceText ?? null,
+        starred: n.starred ?? false,
+        tags: n.tags?.length
+          ? { create: n.tags.map((t) => ({ tagId: tagIds[t] })) }
+          : undefined,
+      },
+    });
+    noteCount++;
+    void note;
+  }
+  void aiOfficeLessons;
+  void oralLessons;
+
+  // ---------- C2：需求制作剧场（DemandStage）+ 评论 + 关注 ----------
+  // 阶段模板：scripting → recording → editing → reviewing → published
+  const STAGE_FLOW = ["scripting", "recording", "editing", "reviewing", "published"] as const;
+  // 为「制作中/已评估/已排期」的需求补阶段：activeStageIdx 之前为 done，当前为 active，之后 pending。
+  const stagePlans: { title: string; activeIdx: number }[] = [
+    { title: "雅思口语新题季精讲", activeIdx: 1 }, // producing：录制中
+    { title: "AI 数据分析入门", activeIdx: 0 }, // scheduled：脚本撰写中
+    { title: "银发群体微信视频通话英语", activeIdx: 0 }, // evaluating：刚进入脚本
+  ];
+  const stageNotes: Record<string, string> = {
+    scripting: "脚本大纲撰写中，锁定核心场景。",
+    recording: "讲师录制进行中，预计本周完成。",
+    editing: "后期剪辑与字幕制作。",
+    reviewing: "内容合规与质量复核。",
+    published: "已上线，欢迎学习。",
+  };
+  let stageCount = 0;
+  for (const p of stagePlans) {
+    const demandId = demandIds[p.title];
+    if (!demandId) continue;
+    for (let si = 0; si < STAGE_FLOW.length; si++) {
+      const stage = STAGE_FLOW[si];
+      const status = si < p.activeIdx ? "done" : si === p.activeIdx ? "active" : "pending";
+      await prisma.demandStage.create({
+        data: { demandId, stage, status, note: status === "pending" ? null : stageNotes[stage] },
+      });
+      stageCount++;
+    }
+  }
+
+  // 需求评论：普通用户留言 + 1 条官方回复（isOfficial）
+  const producingDemandId = demandIds["雅思口语新题季精讲"];
+  const collectingDemandId = demandIds["希望出商务邮件写作口语课"];
+  if (producingDemandId) {
+    await prisma.comment.create({
+      data: { userId: oralUser.id, demandId: producingDemandId, contentMd: "太期待了！新题季一定要跟上速度～" },
+    });
+    await prisma.comment.create({
+      data: { userId: admin.id, demandId: producingDemandId, isOfficial: true, contentMd: "**官方回复**：已进入录制阶段，预计两周内上线首批章节，感谢支持！" },
+    });
+  }
+  if (collectingDemandId) {
+    await prisma.comment.create({
+      data: { userId: demoUser.id, demandId: collectingDemandId, contentMd: "商务邮件太需要了，尤其是跨国同事沟通的语气把握。" },
+    });
+  }
+
+  // 需求关注（进度订阅）：demo 关注制作中/已排期需求，oral 关注商务邮件
+  const followPairs: { userId: string; title: string }[] = [
+    { userId: demoUser.id, title: "雅思口语新题季精讲" },
+    { userId: demoUser.id, title: "AI 数据分析入门" },
+    { userId: oralUser.id, title: "希望出商务邮件写作口语课" },
+    { userId: oralUser.id, title: "雅思口语新题季精讲" },
+  ];
+  let followCount = 0;
+  for (const f of followPairs) {
+    const demandId = demandIds[f.title];
+    if (!demandId) continue;
+    await prisma.demandFollow.create({ data: { demandId, userId: f.userId } });
+    followCount++;
+  }
+
+  // ---------- 演示优惠券 ----------
+  await prisma.coupon.create({
+    data: {
+      code: "TIDE20", kind: "percent", value: 20, maxRedeem: 0, planScope: "any",
+      isActive: true, expiresAt: new Date(Date.now() + 60 * 864e5),
+    },
+  });
+
+  // ---------- C3：demo 用户潮汐日历（Streak + StreakDay）+ 已解锁成就 ----------
+  // 最近 14 天，minutes 递增形成上升水位；shanghaiDayKey 与 gamification 保持一致。
+  const STREAK_DAYS = 14;
+  const todayKey = shanghaiDayKey();
+  let streakDayCount = 0;
+  for (let ago = STREAK_DAYS - 1; ago >= 0; ago--) {
+    const day = shanghaiDayKey(new Date(Date.now() - ago * 864e5));
+    // 递增水位：越近学习越久（20 → 90 分钟），并带少量笔记
+    const minutes = 20 + (STREAK_DAYS - 1 - ago) * 5;
+    const notes = ago % 3 === 0 ? 2 : 1;
+    await prisma.streakDay.create({
+      data: { userId: demoUser.id, day, minutes, notes },
+    });
+    streakDayCount++;
+  }
+  await prisma.streak.create({
+    data: { userId: demoUser.id, currentStreak: STREAK_DAYS, longestStreak: STREAK_DAYS, lastActiveDay: todayKey },
+  });
+
+  // demo 已解锁的成就：首订阅（有年卡）、首笔记、连续 7 天、首潮（已投票）
+  const demoUnlocked = ["first_subscribe", "first_note", "week_streak", "first_tide"];
+  for (const key of demoUnlocked) {
+    const achievementId = achievementIds[key];
+    if (!achievementId) continue;
+    await prisma.userAchievement.create({
+      data: { userId: demoUser.id, achievementId },
+    });
+  }
+
   console.log("✅ 融合种子完成：");
+  console.log(`   字幕 ${subtitleCount} 条 · 笔记 ${noteCount} 条 · 成就 ${achievementSeeds.length} 个（demo 解锁 ${demoUnlocked.length}）`);
+  console.log(`   需求阶段 ${stageCount} 条 · 关注 ${followCount} 条 · 潮汐日历 ${streakDayCount} 天 · 优惠券 TIDE20`);
   console.log(`   课程 ${courses.length} 门（有道英语板块 + 潮汐 AI/生活）`);
   console.log(`   套餐：全站(月/季/年) + 单赛道(口语/银发/AI) · 线索 ${leadSeeds.length} 条`);
   console.log("   admin@tide.learning/admin123 · demo@tide.learning/demo123(全站) · oral@tide.learning/oral123(仅口语)");

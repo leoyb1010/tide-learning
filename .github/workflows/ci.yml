@@ -1,0 +1,47 @@
+name: CI
+
+# 潮汐学习 CI：类型检查 + 单元测试 + 构建。
+# DATABASE_URL 用本地 SQLite 文件（file:./ci.db），构建前先 db push 生成表结构。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # CI 用一次性 SQLite；生产为 PostgreSQL（见 .env.example）。
+      DATABASE_URL: "file:./ci.db"
+      # 构建/运行时占位密钥（生产必须覆盖）。
+      SESSION_SECRET: "ci-session-secret-not-for-production"
+      PAY_MOCK_SECRET: "ci-mock-secret"
+      NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Push database schema
+        run: npx prisma db push
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Build
+        run: npm run build

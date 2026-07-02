@@ -5,22 +5,42 @@ import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { Badge, Button } from "@/components/ui";
 import { CancelSubscription, RestoreButton } from "@/components/AccountActions";
+import { ChangePlanButton } from "@/components/SubscriptionManager";
+import { WaveProgress, TidalReveal } from "@/components/motion";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
 
+export const dynamic = "force-dynamic";
 export const metadata = { title: "订阅管理" };
 
 export default async function SubscriptionPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/me/subscription");
 
-  const [snapshot, subscription, orders] = await Promise.all([
+  const [snapshot, subscription, orders, plans] = await Promise.all([
     resolveEntitlement(user.id),
     prisma.subscription.findFirst({ where: { userId: user.id }, orderBy: { currentPeriodEnd: "desc" }, include: { plan: true } }),
     prisma.order.findMany({ where: { userId: user.id }, orderBy: { createdAt: "desc" }, include: { plan: true } }),
+    prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
   ]);
 
   const meta = STATUS_LABELS[snapshot.subscriptionStatus] ?? STATUS_LABELS.free;
   const canCancel = ["active", "trial", "grace_period"].includes(snapshot.subscriptionStatus);
+  const canChange = ["active", "trial", "grace_period", "canceled_but_active"].includes(snapshot.subscriptionStatus);
+
+  // 周期已过占比（WaveProgress 展示剩余）——0~100
+  let elapsedPct = 0;
+  let daysLeft = 0;
+  if (subscription) {
+    const start = new Date(subscription.currentPeriodStart).getTime();
+    const end = new Date(subscription.currentPeriodEnd).getTime();
+    const now = Date.now();
+    const total = Math.max(1, end - start);
+    elapsedPct = Math.min(100, Math.max(0, Math.round(((now - start) / total) * 100)));
+    daysLeft = Math.max(0, Math.ceil((end - now) / 864e5));
+  }
+  const switchablePlans = plans
+    .filter((p) => p.id !== subscription?.planId)
+    .map((p) => ({ id: p.id, name: p.name, billingPeriod: p.billingPeriod, priceCents: p.priceCents, scope: p.scope }));
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-4">
@@ -28,43 +48,67 @@ export default async function SubscriptionPage() {
       <h1 className="text-2xl font-semibold text-ink-950">订阅管理</h1>
 
       {/* 当前状态 */}
-      <section className="rounded-2xl border border-ink-100 bg-paper-raised p-6">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-ink-500">当前状态</span>
-          <Badge tone={meta.tone === "ok" ? "success" : meta.tone === "warn" ? "warning" : "muted"}>{meta.label}</Badge>
-        </div>
-        {subscription ? (
-          <div className="mt-4 space-y-2 text-sm">
-            <Row label="套餐" value={subscription.plan.name} />
-            <Row label="周期" value={PLAN_PERIOD_LABELS[subscription.plan.billingPeriod] ?? subscription.plan.billingPeriod} />
-            <Row label="有效至" value={new Date(subscription.currentPeriodEnd).toLocaleDateString("zh-CN")} />
-            <Row label="到期后自动续费" value={subscription.cancelAtPeriodEnd ? "否" : "是"} />
+      <TidalReveal>
+        <section className="rounded-2xl border border-ink-100 bg-paper-raised p-6">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-ink-500">当前状态</span>
+            <Badge tone={meta.tone === "ok" ? "success" : meta.tone === "warn" ? "warning" : "muted"}>{meta.label}</Badge>
           </div>
-        ) : (
-          <div className="mt-4">
-            <p className="text-sm text-ink-500">你还没有订阅。订阅后解锁全站课程与投票权益。</p>
-            <div className="mt-4"><Button href="/pricing">查看订阅方案</Button></div>
+
+          {subscription ? (
+            <>
+              <div className="mt-4 space-y-2 text-sm">
+                <Row label="套餐" value={subscription.plan.name} />
+                <Row label="周期" value={PLAN_PERIOD_LABELS[subscription.plan.billingPeriod] ?? subscription.plan.billingPeriod} />
+                <Row label="有效至" value={new Date(subscription.currentPeriodEnd).toLocaleDateString("zh-CN")} />
+                <Row label="到期后自动续费" value={subscription.cancelAtPeriodEnd ? "否" : "是"} />
+              </div>
+
+              {/* 周期剩余可视化（涨潮进度）*/}
+              <div className="mt-5">
+                <div className="mb-1.5 flex items-center justify-between text-xs text-ink-400">
+                  <span>本周期进度</span>
+                  <span>还剩 {daysLeft} 天</span>
+                </div>
+                <WaveProgress value={elapsedPct} height={10} />
+              </div>
+
+              {canChange && switchablePlans.length > 0 && (
+                <div className="mt-5 border-t border-ink-100 pt-4">
+                  <ChangePlanButton
+                    currentPriceCents={subscription.plan.priceCents}
+                    currentPlanId={subscription.planId}
+                    plans={switchablePlans}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="mt-4">
+              <p className="text-sm text-ink-500">你还没有订阅。订阅后解锁全站课程与投票权益。</p>
+              <div className="mt-4"><Button href="/pricing">查看订阅方案</Button></div>
+            </div>
+          )}
+
+          {snapshot.subscriptionStatus === "billing_retry" && (
+            <div className="mt-4 rounded-xl bg-warning/10 p-3 text-sm text-warning">扣款失败，请更新支付方式后重试。</div>
+          )}
+
+          {/* 取消 / 恢复（§6.7） */}
+          <div className="mt-5 flex items-center justify-between border-t border-ink-100 pt-4">
+            <RestoreButton />
+            {canCancel && <CancelSubscription />}
           </div>
-        )}
-
-        {snapshot.subscriptionStatus === "billing_retry" && (
-          <div className="mt-4 rounded-xl bg-warning/10 p-3 text-sm text-warning">扣款失败，请更新支付方式后重试。</div>
-        )}
-
-        {/* 取消 / 恢复（§6.7） */}
-        <div className="mt-5 flex items-center justify-between border-t border-ink-100 pt-4">
-          <RestoreButton />
-          {canCancel && <CancelSubscription />}
-        </div>
-      </section>
+        </section>
+      </TidalReveal>
 
       <p className="rounded-xl bg-accent-50 px-4 py-3 text-sm text-accent-700">
         取消订阅后：课程锁定，但笔记永久保留、可继续查看和导出。这是我们的承诺。
       </p>
 
-      {/* 订单记录 */}
+      {/* 账单历史 */}
       <section>
-        <h2 className="mb-3 font-medium text-ink-950">订单记录</h2>
+        <h2 className="mb-3 font-medium text-ink-950">账单历史</h2>
         {orders.length === 0 ? (
           <p className="rounded-xl border border-ink-100 bg-paper-raised p-4 text-sm text-ink-400">暂无订单</p>
         ) : (

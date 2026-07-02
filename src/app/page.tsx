@@ -9,7 +9,7 @@ import { VoteButton } from "@/components/VoteButton";
 import { SubscriptionCard } from "@/components/SubscriptionCard";
 import { Button, Badge, CoverBg } from "@/components/ui";
 import { YoudaoLogo } from "@/components/YoudaoLogo";
-import { Reveal, Stagger, StaggerItem, CountUp, Magnetic } from "@/components/motion";
+import { TidalReveal as Reveal, Stagger, StaggerItem, FlipCounter, Magnetic } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { UPDATE_TYPE_LABELS } from "@/lib/format";
 import { TRACKS } from "@/lib/tracks";
@@ -26,6 +26,9 @@ export default async function HomePage() {
 
   const featured = all.filter((c) => c.isFeatured);
   const hero = featured[0] ?? all[0];
+  // 近期有更新日志的课程 → 卡片打 NEW 角标（A3）
+  const newSlugs = new Set(updates.map((u) => u.courseSlug));
+  const withNew = (c: import("@/components/CourseCard").CourseCardData) => ({ ...c, isNew: newSlugs.has(c.slug) });
   const trackLines = TRACKS.map((t) => ({ track: t, courses: all.filter((c) => c.category === t.key) })).filter((l) => l.courses.length > 0);
   const totalLearners = all.reduce((s, c) => s + c.learnersCount, 0);
   const mainPlans = plans.filter((p) => p.scope === "all" && p.billingPeriod !== "month").slice(0, 2);
@@ -34,6 +37,14 @@ export default async function HomePage() {
   return (
     <div className="space-y-24 md:space-y-32">
       <TrackView event="homepage_view" properties={{ mode: "standard" }} />
+
+      {/* 「本周上新」水位滚动条样式：让 rail 露出 accent 色滚动条作为水位提示 */}
+      <style>{`
+        .rail-tide { scrollbar-width: thin; scrollbar-color: var(--color-accent-400, #fca5a5) transparent; padding-bottom: 14px; }
+        .rail-tide::-webkit-scrollbar { display: block; height: 6px; }
+        .rail-tide::-webkit-scrollbar-track { background: var(--color-ink-100, #eef0f0); border-radius: 999px; }
+        .rail-tide::-webkit-scrollbar-thumb { background: linear-gradient(90deg, var(--color-accent-300, #fca5a5), var(--color-accent-500, #ef4444)); border-radius: 999px; }
+      `}</style>
 
       {/* ============ 1. HERO — 非对称分栏 ============ */}
       <section className="relative -mx-5 grid gap-10 px-5 pt-6 sm:-mx-8 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-6">
@@ -81,7 +92,25 @@ export default async function HomePage() {
         {/* 右侧：编辑式产品掠影 */}
         <Reveal delay={0.15} y={24}>
           <div className="relative">
-            <div className="mesh-bg rounded-[28px]" />
+            {/* 多层正弦波形（点题「潮汐」）：缓慢相位横移，reduced-motion 下静止 */}
+            <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[28px]">
+              {[
+                { fill: "rgba(252,1,26,0.05)", dur: "13s", top: "18%", rev: false },
+                { fill: "rgba(252,1,26,0.08)", dur: "9s", top: "34%", rev: true },
+                { fill: "rgba(252,1,26,0.12)", dur: "6s", top: "52%", rev: false },
+              ].map((w, i) => (
+                <svg
+                  key={i}
+                  className={`absolute left-0 h-[46%] w-[200%] motion-reduce:animate-none`}
+                  style={{ top: w.top, animation: `wave-x ${w.dur} linear infinite${w.rev ? " reverse" : ""}` }}
+                  viewBox="0 0 1440 160"
+                  preserveAspectRatio="none"
+                  fill="none"
+                >
+                  <path d="M0 80 Q180 20 360 80 T720 80 T1080 80 T1440 80 V160 H0 Z" fill={w.fill} />
+                </svg>
+              ))}
+            </div>
             <div className="relative rounded-[28px] border border-ink-100 bg-paper-raised/70 p-5 backdrop-blur-sm">
               {hero && (
                 <Link href={`/courses/${hero.slug}`} className="block overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised transition-transform duration-300 hover:-translate-y-1">
@@ -95,8 +124,8 @@ export default async function HomePage() {
                   </CoverBg>
                 </Link>
               )}
-              {/* 悬浮信息 chips */}
-              <div className="mt-4 grid grid-cols-3 gap-3">
+              {/* 悬浮信息 chips（A3-2：响应式 2/3 列） */}
+              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
                 <FloatChip icon={<Broadcast size={16} weight="fill" className="text-accent-600" />} label="直播小班" sub="真人纠音" />
                 <FloatChip icon={<NotePencil size={16} weight="fill" className="text-accent-600" />} label="时间戳笔记" sub="一键回跳" />
                 <FloatChip icon={<Sparkle size={16} weight="fill" className="text-accent-600" />} label="需求共创" sub="投票上新" />
@@ -120,7 +149,8 @@ export default async function HomePage() {
 
       {/* ============ 3. 本周上新 — 横向 rail ============ */}
       <Section overline="ROLLING" title="本周上新" desc="每门课都有更新日志，这不是死课" href="/updates" linkText="查看全部">
-        <div className="rail -mx-5 px-5 sm:-mx-8 sm:px-8">
+        {/* 滚动水位条：可见的 accent 水位滚动条（原生 thumb = 当前水位）；末尾留白让下一张卡片露出约 20% */}
+        <div className="rail rail-tide -mx-5 px-5 pr-[20%] sm:-mx-8 sm:px-8 sm:pr-[15%]">
           {updates.map((u, i) => (
             <Reveal key={u.id} delay={i * 0.04}>
               <Link href={`/courses/${u.courseSlug}`} className="block w-[280px] rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised p-5 transition-all duration-300 hover:-translate-y-1 hover:border-accent-200">
@@ -144,7 +174,7 @@ export default async function HomePage() {
             {featured[0] && <FeatureLarge course={featured[0]} />}
           </div>
           {featured.slice(1, 3).map((c) => (
-            <CourseCard key={c.id} course={c} />
+            <CourseCard key={c.id} course={withNew(c)} />
           ))}
         </div>
       </Section>
@@ -161,7 +191,7 @@ export default async function HomePage() {
               </div>
               <div className="rail">
                 {l.courses.map((c) => (
-                  <div key={c.id} className="w-[300px]"><CourseCard course={c} /></div>
+                  <div key={c.id} className="w-[300px]"><CourseCard course={withNew(c)} /></div>
                 ))}
               </div>
             </div>
@@ -322,7 +352,10 @@ function FeatureLarge({ course }: { course: import("@/components/CourseCard").Co
 function Stat({ value, label, suffix }: { value: number; label: string; suffix?: string }) {
   return (
     <div className="text-center sm:px-4">
-      <div className="num text-4xl font-semibold tracking-tight text-ink-950"><CountUp value={value} suffix={suffix} /></div>
+      <div className="num flex items-baseline justify-center text-4xl font-semibold tracking-tight text-ink-950">
+        <FlipCounter value={value} />
+        {suffix && <span>{suffix}</span>}
+      </div>
       <div className="mt-2 text-sm text-ink-500">{label}</div>
     </div>
   );

@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Badge } from "./ui";
+import { Ripple } from "./motion";
+import { useToast } from "./Toast";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
 import { trackLabel } from "@/lib/tracks";
+import { track } from "@/lib/analytics-client";
 
 export interface PlanData {
   id: string;
@@ -17,60 +20,69 @@ export interface PlanData {
   highlight: boolean;
 }
 
+/** 支付流程分步状态，供 CTA 文案反馈。 */
+type PayStep = "idle" | "creating" | "redirecting";
+
 /**
  * SubscriptionCard — §6.1：连续包月默认高亮，但不得默认勾选额外服务。
- * 点击后走 mock 收银台：checkout/session → webhook（模拟支付成功）。
+ * D1：首月 vs 之后价格对比清晰（大字 + 小字标注）；点击后发起 checkout，
+ * 跳转 mock 收银台页（payUrl）完成「支付」——不再前端直连 webhook。
+ * couponCode 可由 pricing 页透传，进入结算。
  */
 export function SubscriptionCard({
   plan,
   isLoggedIn,
   redirectTo,
+  couponCode,
 }: {
   plan: PlanData;
   isLoggedIn: boolean;
   redirectTo?: string;
+  couponCode?: string;
 }) {
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const { toast } = useToast();
+  const [step, setStep] = useState<PayStep>("idle");
 
-  const price = plan.firstPriceCents ?? plan.priceCents;
+  const hasFirstDeal = plan.firstPriceCents != null && plan.firstPriceCents < plan.priceCents;
+  const shownPrice = plan.firstPriceCents ?? plan.priceCents;
   const periodLabel = PLAN_PERIOD_LABELS[plan.billingPeriod] ?? plan.billingPeriod;
+  const perUnit = plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月";
+  const loading = step !== "idle";
 
   async function subscribe() {
     if (!isLoggedIn) {
       router.push(`/login?next=${encodeURIComponent(redirectTo ?? "/pricing")}`);
       return;
     }
-    setLoading(true);
-    setErr(null);
+    setStep("creating");
     try {
-      // 1. 发起支付
+      track("checkout_start", { plan_id: plan.id, coupon: couponCode ?? null });
       const s = await fetch("/api/checkout/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planId: plan.id, channel: "stripe" }),
+        body: JSON.stringify({ planId: plan.id, channel: "mock", couponCode: couponCode || undefined }),
       }).then((r) => r.json());
       if (!s.ok) throw new Error(s.error);
-      // 2. 模拟收银台回调支付成功（真实环境由渠道 webhook 触发）
-      const w = await fetch(s.data.confirmUrl, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          eventType: "payment.succeeded",
-          externalId: s.data.externalOrderId,
-          externalOrderId: s.data.externalOrderId,
-        }),
-      }).then((r) => r.json());
-      if (!w.ok) throw new Error(w.error);
-      router.push(redirectTo ?? "/me/subscription");
-      router.refresh();
+
+      // 跳转 mock 收银台页；真实环境这里应是渠道收银台链接
+      setStep("redirecting");
+      const payUrl: string = s.data.payUrl ?? `/checkout/mock?order=${encodeURIComponent(s.data.externalOrderId)}`;
+      const next = redirectTo ?? "/me/subscription";
+      router.push(`${payUrl}${payUrl.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}`);
     } catch (e) {
-      setErr((e as Error).message || "支付失败，请重试");
-    } finally {
-      setLoading(false);
+      setStep("idle");
+      toast((e as Error).message || "发起支付失败，请重试", { tone: "warn" });
     }
   }
+
+  const ctaText = !isLoggedIn
+    ? "登录后订阅"
+    : step === "creating"
+      ? "生成订单…"
+      : step === "redirecting"
+        ? "前往收银台…"
+        : "立即订阅";
 
   return (
     <div
@@ -87,16 +99,25 @@ export function SubscriptionCard({
         <h3 className="text-base font-semibold text-ink-950">{plan.name}</h3>
         <span className="text-xs text-ink-400">{periodLabel}</span>
       </div>
-      <div className="mt-4 flex items-baseline gap-1">
-        <span className="text-sm text-ink-500">¥</span>
-        <span className="num text-4xl font-semibold text-ink-950">{yuan(price)}</span>
-        <span className="text-sm text-ink-400">
-          /{plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月"}
-        </span>
+
+      {/* 价格区：首月大字 + 之后原价小字标注 */}
+      <div className="mt-4">
+        <div className="flex items-baseline gap-1">
+          {hasFirstDeal && <span className="rounded bg-accent-50 px-1.5 py-0.5 text-[11px] font-medium text-accent-700">首月</span>}
+          <span className="text-sm text-ink-500">¥</span>
+          <span className="num text-4xl font-semibold text-ink-950">{yuan(shownPrice)}</span>
+          <span className="text-sm text-ink-400">/{perUnit}</span>
+        </div>
+        {hasFirstDeal ? (
+          <p className="mt-1.5 text-xs text-ink-400">
+            首月 <span className="font-medium text-accent-700">¥{yuan(plan.firstPriceCents!)}</span>，
+            之后每月 <span className="text-ink-500 line-through decoration-ink-300">¥{yuan(plan.priceCents)}</span>
+          </p>
+        ) : (
+          <p className="mt-1.5 text-xs text-ink-400">价格透明，无隐藏续费涨价</p>
+        )}
       </div>
-      {plan.firstPriceCents != null && plan.firstPriceCents < plan.priceCents && (
-        <p className="mt-1 text-xs text-accent-700">首月特惠，之后 ¥{yuan(plan.priceCents)}/月</p>
-      )}
+
       <ul className="mt-5 flex-1 space-y-2 text-sm text-ink-500">
         {plan.scope === "all" ? (
           <>
@@ -114,16 +135,21 @@ export function SubscriptionCard({
           </>
         )}
       </ul>
-      <button
-        onClick={subscribe}
-        disabled={loading}
-        className={`btn mt-6 w-full rounded-xl py-3 font-medium transition-all duration-150 disabled:opacity-50 ${
-          plan.highlight ? "bg-accent-600 text-white hover:bg-accent-700" : "border border-ink-200 bg-white text-ink-950 hover:border-accent-400"
-        }`}
-      >
-        {loading ? "处理中…" : isLoggedIn ? "立即订阅" : "登录后订阅"}
-      </button>
-      {err && <p className="mt-2 text-center text-xs text-error">{err}</p>}
+
+      <div className="mt-6">
+        <Ripple className="w-full rounded-xl">
+          <button
+            onClick={subscribe}
+            disabled={loading}
+            className={`btn flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium transition-all duration-150 disabled:opacity-60 ${
+              plan.highlight ? "bg-accent-600 text-white hover:bg-accent-700" : "border border-ink-200 bg-white text-ink-950 hover:border-accent-400"
+            }`}
+          >
+            {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
+            {ctaText}
+          </button>
+        </Ripple>
+      </div>
       <p className="mt-3 text-center text-xs text-ink-400">随时可取消 · 取消后笔记仍保留</p>
     </div>
   );

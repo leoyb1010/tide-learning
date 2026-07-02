@@ -1,10 +1,13 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Flame, Trophy } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
+import { getGamificationSummary } from "@/lib/gamification";
 import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui";
 import { LogoutButton } from "@/components/AccountActions";
+import { TideCalendar } from "@/components/TideCalendar";
 import { formatDurationSec } from "@/lib/format";
 
 export const metadata = { title: "我的" };
@@ -13,7 +16,7 @@ export default async function MePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/me");
 
-  const [snapshot, progressAgg, notesCount, votesAgg, recent] = await Promise.all([
+  const [snapshot, progressAgg, notesCount, votesAgg, recent, gamification] = await Promise.all([
     resolveEntitlement(user.id),
     prisma.learningProgress.aggregate({ where: { userId: user.id }, _sum: { progressSec: true } }),
     prisma.note.count({ where: { userId: user.id, deletedAt: null } }),
@@ -24,6 +27,7 @@ export default async function MePage() {
       take: 3,
       include: { course: { select: { slug: true, title: true } }, lesson: { select: { id: true, title: true } } },
     }),
+    getGamificationSummary(user.id),
   ]);
 
   const meta = STATUS_LABELS[snapshot.subscriptionStatus] ?? STATUS_LABELS.free;
@@ -48,6 +52,49 @@ export default async function MePage() {
         <StatBox value={`${notesCount}`} label="笔记" />
         <StatBox value={`${votesAgg._sum.voteCount ?? 0}`} label="投票" />
       </section>
+
+      {/* 连续学习 streak */}
+      <section className="grid grid-cols-2 gap-4">
+        <div className="flex items-center gap-3 rounded-2xl border border-ink-100 bg-paper-raised p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-50 text-accent-600">
+            <Flame size={22} weight="fill" />
+          </div>
+          <div>
+            <div className="num text-2xl font-semibold text-ink-950">{gamification.currentStreak}<span className="ml-1 text-sm font-normal text-ink-400">天</span></div>
+            <div className="text-xs text-ink-400">连续学习</div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 rounded-2xl border border-ink-100 bg-paper-raised p-5">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ink-50 text-ink-500">
+            <Trophy size={22} weight="fill" />
+          </div>
+          <div>
+            <div className="num text-2xl font-semibold text-ink-950">{gamification.longestStreak}<span className="ml-1 text-sm font-normal text-ink-400">天</span></div>
+            <div className="text-xs text-ink-400">最长连续记录</div>
+          </div>
+        </div>
+      </section>
+
+      {/* 潮汐日历 */}
+      <TideCalendar calendar={gamification.calendar} />
+
+      {/* 成就徽章 */}
+      {gamification.achievements.length > 0 && (
+        <section>
+          <h2 className="mb-3 font-medium text-ink-950">成就徽章</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {gamification.achievements.map((a) => (
+              <div key={a.key} className="flex items-center gap-3 rounded-xl border border-ink-100 bg-paper-raised p-3.5">
+                <span className="text-2xl" aria-hidden>{a.icon || "🌊"}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-ink-950">{a.name}</p>
+                  {a.description && <p className="truncate text-xs text-ink-400">{a.description}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 继续学习 */}
       {recent.length > 0 && (

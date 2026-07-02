@@ -29,32 +29,33 @@ export function Footer() {
             <li>取消后课程锁定，笔记永久保留</li>
           </ul>
         </div>
-        <div>
-          <h4 className="overline mb-4 text-ink-400">合规</h4>
-          <ul className="space-y-2.5 text-sm text-ink-500">
-            <li>健康内容仅用于健康信息素养</li>
-            <li>不构成诊断、治疗或用药建议</li>
-            <li>防诈骗内容仅讲识别与防范</li>
-          </ul>
-        </div>
+        <FooterCol title="合规" links={[
+          { href: "/terms", label: "用户协议" },
+          { href: "/privacy", label: "隐私政策" },
+        ]}>
+          <li className="text-ink-400">健康内容仅用于健康信息素养</li>
+          <li className="text-ink-400">不构成诊断、治疗或用药建议</li>
+        </FooterCol>
       </div>
       <div className="border-t border-ink-100 py-5 text-center">
-        <p className="num text-[0.72rem] text-ink-400">© 2026 网易有道 · 潮汐学习 v0.6 · 内容仅供学习参考</p>
+        <p className="num text-[0.72rem] text-ink-400">© 2026 网易有道 · 潮汐学习 v1.0 · 内容仅供学习参考</p>
       </div>
     </footer>
   );
 }
 
-function FooterCol({ title, links }: { title: string; links: { href: string; label: string }[] }) {
+function FooterCol({ title, links, children }: { title: string; links: { href: string; label: string }[]; children?: React.ReactNode }) {
   return (
     <div>
       <h4 className="overline mb-4 text-ink-400">{title}</h4>
       <ul className="space-y-2.5 text-sm text-ink-500">
         {links.map((l) => (
           <li key={l.href}>
-            <Link href={l.href} className="link-underline hover:text-accent-700">{l.label}</Link>
+            {/* A3-9：链接改用 accent-700 提升可见性 */}
+            <Link href={l.href} className="link-underline font-medium text-accent-700 hover:text-accent-600">{l.label}</Link>
           </li>
         ))}
+        {children}
       </ul>
     </div>
   );

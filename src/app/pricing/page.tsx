@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
-import { SubscriptionCard } from "@/components/SubscriptionCard";
+import { PricingPlans } from "@/components/PricingPlans";
 import { TrackView } from "@/components/TrackView";
 import { trackLabel, FUTURE_TRACKS } from "@/lib/tracks";
 import { Badge } from "@/components/ui";
@@ -41,31 +41,18 @@ export default async function PricingPage() {
         )}
       </div>
 
-      {/* 全站会员 */}
+      {/* 全站会员 + 单赛道会员（优惠券预览 + 折后价）*/}
       <section>
         <div className="mb-5 text-center">
           <h2 className="text-xl font-semibold text-ink-950">全站会员</h2>
           <p className="mt-1 text-sm text-ink-500">一次订阅，解锁全部赛道</p>
         </div>
-        <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-3">
-          {fullPlans.map((p) => <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />)}
-        </div>
+        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} />
         {anchor && (
           <p className="mt-4 text-center text-sm text-ink-400">
             也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首月优惠）
           </p>
         )}
-      </section>
-
-      {/* 单赛道会员 */}
-      <section>
-        <div className="mb-5 text-center">
-          <h2 className="text-xl font-semibold text-ink-950">单赛道会员</h2>
-          <p className="mt-1 text-sm text-ink-500">低门槛切入，只学你需要的方向</p>
-        </div>
-        <div className="mx-auto grid max-w-3xl gap-5 sm:grid-cols-3">
-          {trackPlans.map((p) => <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />)}
-        </div>
       </section>
 
       {/* 未来赛道 */}
