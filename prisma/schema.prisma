@@ -23,16 +23,24 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  profile       UserProfile?
-  sessions      Session[]
-  progress      LearningProgress[]
-  notes         Note[]
-  demands       Demand[]
-  votes         DemandVote[]
-  orders        Order[]
-  subscriptions Subscription[]
-  entitlements  Entitlement[]
-  events        AnalyticsEvent[]
+  profile        UserProfile?
+  sessions       Session[]
+  progress       LearningProgress[]
+  notes          Note[]
+  demands        Demand[]
+  votes          DemandVote[]
+  orders         Order[]
+  subscriptions  Subscription[]
+  entitlements   Entitlement[]
+  events         AnalyticsEvent[]
+  comments       Comment[]
+  demandFollows  DemandFollow[]
+  streak         Streak?
+  streakDays     StreakDay[]
+  achievements   UserAchievement[]
+  passwordResets PasswordReset[]
+
+  @@index([role])
 }
 
 model UserProfile {
@@ -52,32 +60,47 @@ model Session {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   expiresAt DateTime
+
+  @@index([userId])
+}
+
+// ---------- 密码重置（A1-10：找回密码）----------
+model PasswordReset {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // sha256(token)，明文 token 仅回传一次
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // ---------- §9.2 课程 ----------
 model Course {
-  id             String   @id @default(cuid())
-  slug           String   @unique
-  title          String
-  subtitle       String?
-  description    String?
-  category       String // 赛道/内容板块 key（见 src/lib/tracks.ts）
-  level          String // L1 / L2 / L3
-  status         String   @default("draft") // draft / beta / published / archived
-  coverColor     String   @default("tide") // 用渐变色替代封面图，避免二进制资源
-  ownerId        String?
-  instructorName String?
-  reviewerName   String? // 健康/财务/防诈骗类必填
-  disclaimer     String? // 免责声明
-  contributorName String? // 内容供给方/主讲（融合：弱化单一主讲依赖）
-  revenueSharePct Int?     // 主讲分成比例，成本核算（有道痛点：主讲要 50-60%）
-  updateCadence  String? // 每周更新 / 按题季 等
-  totalDurationSec Int    @default(0)
-  learnersCount  Int      @default(0)
-  isFeatured     Boolean  @default(false)
-  publishedAt    DateTime?
-  lastUpdatedAt  DateTime @default(now())
-  createdAt      DateTime @default(now())
+  id               String    @id @default(cuid())
+  slug             String    @unique
+  title            String
+  subtitle         String?
+  description      String?
+  category         String // 赛道/内容板块 key（见 src/lib/tracks.ts）
+  level            String // L1 / L2 / L3
+  status           String    @default("draft") // draft / beta / published / archived
+  coverColor       String    @default("tide") // 用渐变色替代封面图，避免二进制资源
+  ownerId          String?
+  instructorName   String?
+  reviewerName     String? // 健康/财务/防诈骗类必填
+  disclaimer       String? // 免责声明
+  contributorName  String? // 内容供给方/主讲（融合：弱化单一主讲依赖）
+  revenueSharePct  Int? // 主讲分成比例，成本核算（有道痛点：主讲要 50-60%）
+  updateCadence    String? // 每周更新 / 按题季 等
+  totalDurationSec Int       @default(0)
+  learnersCount    Int       @default(0)
+  isFeatured       Boolean   @default(false)
+  publishedAt      DateTime?
+  lastUpdatedAt    DateTime  @default(now())
+  createdAt        DateTime  @default(now())
 
   lessons    Lesson[]
   updateLogs CourseUpdateLog[]
@@ -87,25 +110,42 @@ model Course {
 }
 
 model Lesson {
-  id          String   @id @default(cuid())
-  courseId    String
-  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  title       String
-  summary     String?
-  sortOrder   Int      @default(0)
-  contentType String   @default("video") // video / article / mixed / live
-  videoAssetId String? // 指向受控视频资源，非订阅用户拿不到直链
-  articleMd   String?
-  durationSec Int      @default(0)
-  isFree      Boolean  @default(false)
-  liveStartAt DateTime? // 直播小班课开播时间（融合：有道口语小班课）
-  liveSeatLimit Int?    // 小班名额上限
-  status      String   @default("published")
-  publishedAt DateTime?
-  createdAt   DateTime @default(now())
+  id            String    @id @default(cuid())
+  courseId      String
+  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title         String
+  summary       String?
+  sortOrder     Int       @default(0)
+  contentType   String    @default("video") // video / article / mixed / live
+  videoAssetId  String? // 指向受控视频资源，非订阅用户拿不到直链
+  articleMd     String?
+  durationSec   Int       @default(0)
+  isFree        Boolean   @default(false)
+  liveStartAt   DateTime? // 直播小班课开播时间（融合：有道口语小班课）
+  liveSeatLimit Int? // 小班名额上限
+  status        String    @default("published")
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
 
-  progress LearningProgress[]
-  notes    Note[]
+  progress  LearningProgress[]
+  notes     Note[]
+  subtitles Subtitle[]
+
+  @@index([courseId, sortOrder])
+  @@index([videoAssetId])
+}
+
+// ---------- 字幕（C1：字幕划线捕捉）----------
+model Subtitle {
+  id       String @id @default(cuid())
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lang     String @default("zh") // zh / en
+  startSec Float
+  endSec   Float
+  text     String
+
+  @@index([lessonId, startSec])
 }
 
 model CourseUpdateLog {
@@ -122,59 +162,97 @@ model CourseUpdateLog {
 
 // ---------- §9.3 学习进度 ----------
 model LearningProgress {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   courseId     String
-  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId     String
-  lesson       Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  progressSec  Int      @default(0)
+  lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  progressSec  Int       @default(0)
   completedAt  DateTime?
-  lastPlayedAt DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  lastPlayedAt DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   @@unique([userId, lessonId])
 }
 
-// ---------- §9.4 笔记 ----------
+// ---------- §9.4 笔记（2.0：捕捉 + 资产化）----------
 model Note {
-  id          String    @id @default(cuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  courseId    String
-  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessonId    String
-  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  id           String    @id @default(cuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId     String
+  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId     String
+  lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   timestampSec Int?
-  title       String?
-  contentMd   String
-  sourceText  String?
-  visibility  String    @default("private") // private / shared_later
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  deletedAt   DateTime?
+  title        String?
+  contentMd    String
+  sourceText   String? // C1：字幕划线引用的原文
+  kind         String    @default("text") // text / capture(截帧) / clip(字幕剪藏)
+  captureUrl   String? // 截帧图 data-url 或对象存储 key
+  starred      Boolean   @default(false) // 收藏/星标
+  visibility   String    @default("private") // private / shared_later
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  tags NoteTagOnNote[]
+
+  @@index([userId, createdAt])
+  @@index([userId, lessonId])
+}
+
+// ---------- 笔记标签（C1：标签系统）----------
+model NoteTag {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  color     String   @default("accent")
+  createdAt DateTime @default(now())
+
+  notes NoteTagOnNote[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model NoteTagOnNote {
+  noteId String
+  note   Note    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    NoteTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@index([tagId])
 }
 
 // ---------- §9.5 共创需求 ----------
 model Demand {
-  id             String   @id @default(cuid())
-  userId         String
-  user           User     @relation(fields: [userId], references: [id])
-  title          String
-  description    String?
-  category       String   @default("ai_skill")
-  desiredDepth   String   @default("intro") // intro / advanced / mastery
-  status         String   @default("pending_review")
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  title            String
+  description      String?
+  category         String   @default("ai_skill")
+  desiredDepth     String   @default("intro") // intro / advanced / mastery
+  status           String   @default("pending_review")
   mergedToDemandId String?
-  officialReply  String?
-  riskLevel      String   @default("low")
+  officialReply    String?
+  riskLevel        String   @default("low")
   launchedCourseId String?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   votes      DemandVote[]
   statusLogs DemandStatusLog[]
+  comments   Comment[]
+  follows    DemandFollow[]
+  stages     DemandStage[]
+
+  @@index([category, status])
+  @@index([createdAt])
 }
 
 model DemandVote {
@@ -188,6 +266,53 @@ model DemandVote {
   createdAt DateTime @default(now())
 
   @@unique([demandId, userId, weekKey])
+  @@index([weekKey, userId])
+  @@index([demandId])
+}
+
+// ---------- 共创讨论（C2.1：需求讨论区，多态挂载）----------
+model Comment {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  demandId   String?
+  demand     Demand?   @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  parentId   String? // 楼中楼
+  parent     Comment?  @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies    Comment[] @relation("CommentReplies")
+  contentMd  String
+  isOfficial Boolean   @default(false) // 官方回复置顶
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  @@index([demandId, createdAt])
+}
+
+// ---------- 需求关注（C2.4：进度订阅）----------
+model DemandFollow {
+  id        String   @id @default(cuid())
+  demandId  String
+  demand    Demand   @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([demandId, userId])
+  @@index([userId])
+}
+
+// ---------- 制作进度剧场（C2.2：Kickstarter 式阶段）----------
+model DemandStage {
+  id        String   @id @default(cuid())
+  demandId  String
+  demand    Demand   @relation(fields: [demandId], references: [id], onDelete: Cascade)
+  stage     String // scripting / recording / editing / reviewing / published
+  status    String   @default("pending") // pending / active / done
+  note      String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([demandId])
 }
 
 model DemandStatusLog {
@@ -203,113 +328,139 @@ model DemandStatusLog {
 
 // ---------- §9.6 订阅与订单 ----------
 model Plan {
-  id            String  @id @default(cuid())
-  name          String
-  billingPeriod String // month / quarter / year / month_recurring
-  priceCents    Int
+  id              String  @id @default(cuid())
+  name            String
+  billingPeriod   String // month / quarter / year / month_recurring
+  priceCents      Int
   firstPriceCents Int?
-  currency      String  @default("CNY")
-  channel       String  @default("any")
-  scope         String  @default("all") // "all"=全站会员；否则为单赛道 key（分赛道自由组合订阅）
-  highlight     Boolean @default(false)
-  isActive      Boolean @default(true)
+  currency        String  @default("CNY")
+  channel         String  @default("any")
+  scope           String  @default("all") // "all"=全站会员；否则为单赛道 key（分赛道自由组合订阅）
+  highlight       Boolean @default(false)
+  isActive        Boolean @default(true)
 
   orders        Order[]
   subscriptions Subscription[]
 }
 
+// ---------- 优惠券 / 兑换码（D1：运营必需）----------
+model Coupon {
+  id            String    @id @default(cuid())
+  code          String    @unique
+  kind          String    @default("percent") // percent / fixed
+  value         Int // percent: 0-100；fixed: 分
+  maxRedeem     Int       @default(0) // 0=不限
+  redeemedCount Int       @default(0)
+  planScope     String    @default("any") // any 或指定 planId
+  expiresAt     DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  orders Order[]
+}
+
 model Order {
-  id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
-  planId        String
-  plan          Plan     @relation(fields: [planId], references: [id])
-  channel       String // web_wechat / web_alipay / stripe / apple_iap / google_play
-  amountCents   Int
-  currency      String   @default("CNY")
-  status        String   @default("pending") // pending / paid / refunded / failed
+  id              String    @id @default(cuid())
+  userId          String
+  user            User      @relation(fields: [userId], references: [id])
+  planId          String
+  plan            Plan      @relation(fields: [planId], references: [id])
+  channel         String // web_wechat / web_alipay / stripe / apple_iap / google_play
+  amountCents     Int
+  currency        String    @default("CNY")
+  status          String    @default("pending") // pending / paid / refunded / failed
   externalOrderId String?
-  createdAt     DateTime @default(now())
-  paidAt        DateTime?
+  couponId        String?
+  coupon          Coupon?   @relation(fields: [couponId], references: [id])
+  discountCents   Int       @default(0)
+  createdAt       DateTime  @default(now())
+  paidAt          DateTime?
+
+  @@index([userId, status, createdAt])
+  @@index([externalOrderId])
 }
 
 model Subscription {
-  id                   String   @id @default(cuid())
-  userId               String
-  user                 User     @relation(fields: [userId], references: [id])
-  planId               String
-  plan                 Plan     @relation(fields: [planId], references: [id])
-  channel              String
-  scope                String   @default("all") // 从 plan.scope 快照，决定该订阅覆盖的赛道
+  id                     String   @id @default(cuid())
+  userId                 String
+  user                   User     @relation(fields: [userId], references: [id])
+  planId                 String
+  plan                   Plan     @relation(fields: [planId], references: [id])
+  channel                String
+  scope                  String   @default("all") // 从 plan.scope 快照，决定该订阅覆盖的赛道
   externalSubscriptionId String?
-  status               String // trial / active / grace_period / billing_retry / canceled_but_active / expired / refunded / revoked
-  currentPeriodStart   DateTime @default(now())
-  currentPeriodEnd     DateTime
-  cancelAtPeriodEnd    Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  status                 String // trial / active / grace_period / billing_retry / canceled_but_active / expired / refunded / revoked
+  priceSnapshotCents     Int      @default(0) // D1：下次续费价格快照
+  billingRetryCount      Int      @default(0) // 扣款重试次数
+  currentPeriodStart     DateTime @default(now())
+  currentPeriodEnd       DateTime
+  cancelAtPeriodEnd      Boolean  @default(false)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   entitlements Entitlement[]
+
+  @@index([userId, status, currentPeriodEnd])
 }
 
 model Entitlement {
-  id                 String   @id @default(cuid())
-  userId             String
-  user               User     @relation(fields: [userId], references: [id])
+  id                   String        @id @default(cuid())
+  userId               String
+  user                 User          @relation(fields: [userId], references: [id])
   sourceSubscriptionId String?
-  subscription       Subscription? @relation(fields: [sourceSubscriptionId], references: [id])
-  status             String // active / expired / revoked
-  accessLevel        String   @default("free") // free / premium / family_member
-  validFrom          DateTime @default(now())
-  validUntil         DateTime?
-  snapshotJson       String   @default("{}")
-  updatedAt          DateTime @updatedAt
+  subscription         Subscription? @relation(fields: [sourceSubscriptionId], references: [id])
+  status               String // active / expired / revoked
+  accessLevel          String        @default("free") // free / premium / family_member
+  validFrom            DateTime      @default(now())
+  validUntil           DateTime?
+  snapshotJson         String        @default("{}")
+  updatedAt            DateTime      @updatedAt
 }
 
 model PaymentWebhookLog {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   channel      String
   eventType    String
   externalId   String
   payloadJson  String
   processedAt  DateTime?
-  status       String   @default("received") // received / processed / duplicate / error
+  status       String    @default("received") // received / processed / duplicate / error
   errorMessage String?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
   @@unique([channel, externalId])
 }
 
 // ---------- §9.7 家庭组 (P2 预留) ----------
 model FamilyGroup {
-  id          String   @id @default(cuid())
+  id          String         @id @default(cuid())
   ownerUserId String
   planId      String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime       @default(now())
   expiredAt   DateTime?
   members     FamilyMember[]
 }
 
 model FamilyMember {
-  id            String   @id @default(cuid())
+  id            String      @id @default(cuid())
   familyGroupId String
   familyGroup   FamilyGroup @relation(fields: [familyGroupId], references: [id], onDelete: Cascade)
   userId        String?
-  role          String   @default("member") // owner / member
-  inviteStatus  String   @default("pending") // pending / joined
+  role          String      @default("member") // owner / member
+  inviteStatus  String      @default("pending") // pending / joined
   joinedAt      DateTime?
 }
 
 // ---------- §9.8 埋点事件 ----------
 model AnalyticsEvent {
-  id           String   @id @default(cuid())
-  userId       String?
-  user         User?    @relation(fields: [userId], references: [id])
-  anonymousId  String?
-  eventName    String
-  propertiesJson String @default("{}")
-  platform     String   @default("web")
-  createdAt    DateTime @default(now())
+  id             String   @id @default(cuid())
+  userId         String?
+  user           User?    @relation(fields: [userId], references: [id])
+  anonymousId    String?
+  eventName      String
+  propertiesJson String   @default("{}")
+  platform       String   @default("web")
+  createdAt      DateTime @default(now())
 }
 
 // ---------- §8.2.2 内容排期 ----------
@@ -318,7 +469,7 @@ model ContentCalendar {
   courseId           String
   course             Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId           String?
-  demandId           String?  // 融合：共创需求 → 选题排期（投票驱动 + 投流数据双输入）
+  demandId           String? // 融合：共创需求 → 选题排期（投票驱动 + 投流数据双输入）
   title              String
   plannedPublishDate DateTime
   owner              String?
@@ -329,19 +480,19 @@ model ContentCalendar {
 
 // ---------- 预约试听 / 建联线索（融合有道 0转正 + 电联建联漏斗）----------
 model Lead {
-  id           String   @id @default(cuid())
-  userId       String?  // 登录用户可关联；未登录留资也可
-  name         String?
-  phone        String?
-  courseId     String?  // 意向课程/赛道
-  track        String?
-  source       String   @default("youdao_dict") // 渠道：youdao_dict(端内私域) / ad_external(端外投放) / private_domain(私域) / organic
+  id            String   @id @default(cuid())
+  userId        String? // 登录用户可关联；未登录留资也可
+  name          String?
+  phone         String?
+  courseId      String? // 意向课程/赛道
+  track         String?
+  source        String   @default("youdao_dict") // 渠道：youdao_dict(端内私域) / ad_external(端外投放) / private_domain(私域) / organic
   channelDetail String? // 具体投放位/活动
-  status       String   @default("new") // new / contacting(电联中) / booked(已预约试听) / trialing(试听中) / converted(已转化) / lost(流失)
-  assigneeId   String?  // support 跟进人
-  followUpNote String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  status        String   @default("new") // new / contacting(电联中) / booked(已预约试听) / trialing(试听中) / converted(已转化) / lost(流失)
+  assigneeId    String? // support 跟进人
+  followUpNote  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 // ---------- 后台审计日志 (§19 技术验收: audit log) ----------
@@ -353,4 +504,50 @@ model AuditLog {
   targetId   String?
   detail     String?
   createdAt  DateTime @default(now())
+}
+
+// ---------- 学习激励（C3：连续学习 + 潮汐日历）----------
+model Streak {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentStreak Int      @default(0)
+  longestStreak Int      @default(0)
+  lastActiveDay String? // YYYY-MM-DD（Asia/Shanghai）
+  updatedAt     DateTime @updatedAt
+}
+
+model StreakDay {
+  id      String @id @default(cuid())
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  day     String // YYYY-MM-DD（Asia/Shanghai）
+  minutes Int    @default(0) // 当日学习分钟，决定潮汐日历水位
+  notes   Int    @default(0)
+
+  @@unique([userId, day])
+  @@index([userId, day])
+}
+
+// ---------- 成就 / 徽章（C3）----------
+model Achievement {
+  id          String @id @default(cuid())
+  key         String @unique // first_tide / week_streak / first_note / cocreator ...
+  name        String
+  description String
+  icon        String @default("Medal")
+
+  users UserAchievement[]
+}
+
+model UserAchievement {
+  id            String      @id @default(cuid())
+  userId        String
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  unlockedAt    DateTime    @default(now())
+
+  @@unique([userId, achievementId])
+  @@index([userId])
 }

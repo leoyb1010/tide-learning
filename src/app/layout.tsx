@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ModeProvider } from "@/components/ModeProvider";
+import { ToastProvider } from "@/components/Toast";
 import { Nav } from "@/components/Nav";
 import { Footer } from "@/components/Footer";
 import { getCurrentUser } from "@/lib/session";
@@ -31,11 +32,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     <html lang="zh-CN" className={`${GeistSans.variable} ${GeistMono.variable}`}>
       <body>
         <ModeProvider>
-          <Nav user={navUser} />
-          <main className="mx-auto min-h-[70vh] w-full max-w-[1200px] px-5 pb-28 pt-4 sm:px-8 md:pb-10">
-            {children}
-          </main>
-          <Footer />
+          <ToastProvider>
+            <Nav user={navUser} />
+            <main className="mx-auto min-h-[70vh] w-full max-w-[1280px] px-5 pb-28 pt-4 sm:px-8 md:pb-10">
+              {children}
+            </main>
+            <Footer />
+          </ToastProvider>
         </ModeProvider>
       </body>
     </html>

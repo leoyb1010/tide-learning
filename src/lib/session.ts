@@ -22,6 +22,24 @@ export function verifyPassword(password: string, stored: string | null): boolean
   return keyBuf.length === derived.length && timingSafeEqual(keyBuf, derived);
 }
 
+// ---------- A1-10：密码强度校验 + 常见密码黑名单 ----------
+const WEAK_PASSWORDS = new Set([
+  "12345678", "123456789", "password", "qwerty123", "abc12345",
+  "11111111", "00000000", "88888888", "123123123", "666666666",
+]);
+
+/** 返回错误文案；null 表示通过。要求 ≥8 位、含字母与数字、非黑名单。 */
+export function validatePasswordStrength(pw: string): string | null {
+  if (pw.length < 8) return "密码至少 8 位";
+  if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return "密码需同时包含字母和数字";
+  if (WEAK_PASSWORDS.has(pw.toLowerCase())) return "密码过于常见，请更换";
+  return null;
+}
+
+export function sha256(input: string): string {
+  return createHash("sha256").update(input).digest("hex");
+}
+
 export function anonId(seed?: string): string {
   return createHash("sha256")
     .update((seed ?? randomBytes(8).toString("hex")) + Date.now())
@@ -36,7 +54,7 @@ export async function createSession(userId: string): Promise<string> {
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, session.id, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict", // A2：从 lax 收紧到 strict，堵住 CSRF
     path: "/",
     expires: expiresAt,
     secure: process.env.NODE_ENV === "production",
@@ -73,13 +91,55 @@ export async function requireUser(): Promise<User> {
   return user;
 }
 
+// ---------- A1-5：细粒度后台权限（RBAC）----------
+export type Permission =
+  | "course:write"      // 课程/章节/更新日志/排期
+  | "demand:moderate"   // 需求审核/合并/状态/官方回复
+  | "order:read"        // 订单/订阅报表
+  | "order:refund"      // 退款/权益补偿
+  | "user:read"         // 用户查询
+  | "lead:manage"       // 建联队列
+  | "content:review"    // 健康/财务/防诈骗内容审核
+  | "dashboard:read";   // 运营看板
+
+const ROLE_PERMISSIONS: Record<string, Permission[]> = {
+  admin: [
+    "course:write", "demand:moderate", "order:read", "order:refund",
+    "user:read", "lead:manage", "content:review", "dashboard:read",
+  ],
+  content_manager: ["course:write", "dashboard:read"],
+  demand_moderator: ["demand:moderate", "dashboard:read"],
+  support: ["user:read", "lead:manage", "order:read"],
+  finance: ["order:read", "order:refund", "dashboard:read"],
+  reviewer: ["content:review"],
+};
+
+const ADMIN_ROLES = Object.keys(ROLE_PERMISSIONS);
+
+export function hasPermission(role: string, perm: Permission): boolean {
+  return ROLE_PERMISSIONS[role]?.includes(perm) ?? false;
+}
+
+/** 后台入口：任一后台角色即可（用于布局壳）。 */
 export async function requireAdmin(): Promise<User> {
   const user = await requireUser();
-  const adminRoles = ["admin", "content_manager", "demand_moderator", "support", "finance", "reviewer"];
-  if (!adminRoles.includes(user.role)) throw new AuthError("需要后台权限");
+  if (!ADMIN_ROLES.includes(user.role)) throw new AuthError("需要后台权限");
+  return user;
+}
+
+/** 细粒度：要求具体权限，否则 403。 */
+export async function requirePermission(perm: Permission): Promise<User> {
+  const user = await requireUser();
+  if (!hasPermission(user.role, perm)) {
+    throw new AuthError("权限不足", 403);
+  }
   return user;
 }
 
 export class AuthError extends Error {
-  status = 401;
+  status: number;
+  constructor(message: string, status = 401) {
+    super(message);
+    this.status = status;
+  }
 }

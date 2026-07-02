@@ -1,12 +1,12 @@
 @import "tailwindcss";
 
 /* ============================================================
-   潮汐学习 · 设计系统 v0.5
+   潮汐学习 · 设计系统 v1.0 「潮汐引力 / Tidal Pull」
    约束：taste-skill (variance 8 / motion 6 / density 4)
-   - 单强调色（去 lila / 去双强调色）：deep tide teal，饱和度 < 80%
+   - 单强调色：网易有道红 #FC011A（VIS）；红=行动，同屏 ≤2 处，大面积红只出现在水位/波形
    - 中性基座：warm stone/zinc；无纯黑
-   - 字体：Geist（拉丁/数字）+ 系统 CN sans；禁 Inter
-   - 材质：边框/分隔线优先于卡片堆叠；阴影染背景色
+   - 双潮换肤：浅色 paper / 深海 deep（学习页沉浸）
+   - Tide Motion System 2.0：涨潮进场 / 退潮离场 / 进度即水位
    ============================================================ */
 @theme {
   /* —— 品牌强调色：网易有道红 #FC011A（VIS 规范）—— */
@@ -31,6 +31,11 @@
   --color-paper:        #f7f6f3; /* 编辑感暖白背景 */
   --color-paper-raised: #ffffff; /* 表面白 */
 
+  /* —— 深海模式基座（学习页沉浸）—— */
+  --color-deep-bg:     #0c1418;
+  --color-deep-raised: #121c22;
+  --color-deep-border: #22323b;
+
   /* —— 语义色（低饱和）—— */
   --color-success: #3d8a63;
   --color-warning: #b7822c;
@@ -41,17 +46,44 @@
   --font-sans: var(--font-geist-sans), -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
   --font-mono: var(--font-geist-mono), "SF Mono", ui-monospace, monospace;
 
+  /* —— Tide Motion System 2.0：时长阶梯 —— */
+  --dur-instant: 100ms; /* 按压、开关 */
+  --dur-fast:    200ms; /* hover、图标切换 */
+  --dur-normal:  320ms; /* 抽屉、卡片、Toast */
+  --dur-slow:    560ms; /* 页面转场、水位 */
+  --dur-tide:    900ms; /* 签名级：涨潮进场、笔记飞入 */
+
   /* —— 缓动 —— */
-  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-  --ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo:   cubic-bezier(0.16, 1, 0.3, 1);    /* 退场 / 揭示 */
+  --ease-spring:     cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-tide:       cubic-bezier(0.22, 1.2, 0.36, 1);  /* 涨潮：轻微过冲 */
+  --ease-anticipate: cubic-bezier(0.36, 0, 0.66, -0.3); /* 退潮预备 */
 }
 
 :root {
   --font-scale: 1;
   color-scheme: light;
+  /* 语义化表面变量（供深海模式覆盖） */
+  --surface-bg: var(--color-paper);
+  --surface-raised: var(--color-paper-raised);
+  --surface-border: var(--color-ink-100);
+  --surface-ink: var(--color-ink-950);
+  --surface-ink-muted: var(--color-ink-500);
   /* 阴影染背景色（taste-skill: tint shadow to bg hue） */
   --shadow-soft: 0 1px 2px rgba(125,8,18,0.05), 0 18px 40px -20px rgba(125,8,18,0.18);
 }
+
+/* 深海模式：学习页 data-theme="deep" 或全站切换 */
+[data-theme="deep"] {
+  color-scheme: dark;
+  --surface-bg: var(--color-deep-bg);
+  --surface-raised: var(--color-deep-raised);
+  --surface-border: var(--color-deep-border);
+  --surface-ink: #eef4f6;
+  --surface-ink-muted: #8ea3ac;
+  --shadow-soft: 0 1px 2px rgba(0,0,0,0.4), 0 18px 40px -20px rgba(0,0,0,0.6);
+}
+[data-theme="deep"] body { background: var(--surface-bg); color: var(--surface-ink); }
 
 html { font-size: calc(16px * var(--font-scale)); -webkit-text-size-adjust: 100%; }
 
@@ -62,7 +94,6 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  /* 细颗粒噪点，固定层不随滚动重绘（性能） */
 }
 body::before {
   content: "";
@@ -125,6 +156,21 @@ body::before {
   from { opacity: 0; transform: translateY(12px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+/* 涟漪扩散（点击水波） */
+@keyframes ripple {
+  from { transform: scale(0); opacity: 0.5; }
+  to   { transform: scale(2.4); opacity: 0; }
+}
+/* 波形横移（Hero / 水位表面波动） */
+@keyframes wave-x {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+/* 保存中的三点波浪 */
+@keyframes dot-wave {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-3px); }
+}
 
 /* 网格状有机渐变背景（mesh，非 lila） */
 .mesh-bg {
@@ -145,7 +191,7 @@ body::before {
   animation: accent-mesh 22s var(--ease-out-expo) infinite reverse;
 }
 
-/* Skeleton 微光扫过 */
+/* Skeleton 微光扫过（相位由 --i 错开，形成浪扫过列表） */
 .skeleton {
   position: relative; overflow: hidden;
   background: var(--color-ink-100); border-radius: 10px;
@@ -153,8 +199,9 @@ body::before {
 .skeleton::after {
   content: ""; position: absolute; inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.78), transparent);
   animation: shimmer 1.6s var(--ease-out-expo) infinite;
+  animation-delay: calc(var(--i, 0) * 80ms);
 }
 
 /* 呼吸状态点 */
@@ -164,7 +211,16 @@ body::before {
   background: currentColor; animation: breathe 2.4s ease-in-out infinite;
 }
 
-/* 横向滚动 rail（露出下一张） */
+/* 保存中三点波浪 */
+.saving-dots span {
+  display: inline-block; width: 3px; height: 3px; border-radius: 999px;
+  background: currentColor; margin: 0 1px;
+  animation: dot-wave 0.9s ease-in-out infinite;
+}
+.saving-dots span:nth-child(2) { animation-delay: 0.15s; }
+.saving-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+/* 横向滚动 rail（露出下一张 20%） */
 .rail {
   display: flex; gap: 20px; overflow-x: auto;
   scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
@@ -197,3 +253,11 @@ body::before {
   transition: background-size 0.4s var(--ease-out-expo);
 }
 .link-underline:hover { background-size: 100% 1px; }
+
+/* 磁吸 / spotlight 仅在精确指针设备启用（触屏禁用，A3-7） */
+@media (hover: none), (pointer: coarse) {
+  .hover-only { transform: none !important; }
+}
+
+/* 焦点模式：隐藏侧栏、居中放大播放器 */
+[data-focus="on"] .focus-hide { display: none !important; }
