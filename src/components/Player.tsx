@@ -53,7 +53,9 @@ export function Player({
   const savedRef = useRef(initialProgress);
   const videoRef = useRef<HTMLVideoElement>(null);
   const noteRef = useRef<NoteEditorHandle>(null);
-  const hasRealVideo = Boolean(lesson.videoUrl);
+  // 仅当 videoUrl 指向真实媒体（.mp4/.m3u8/.webm）时用 <video>；
+  // MVP 的受控 mock 流（/api/stream 返回占位 JSON）继续走模拟播放器，保留品牌渐变画面，截帧走兜底帧。
+  const hasRealVideo = /\.(mp4|m3u8|webm)(\?|$)/i.test(lesson.videoUrl ?? "");
 
   // 模拟播放推进（无真实视频时）
   useEffect(() => {

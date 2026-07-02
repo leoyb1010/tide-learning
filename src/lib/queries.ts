@@ -163,9 +163,15 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   };
 }
 
-/** 短时签名视频 URL（§16/§19：短时 URL / 访问控制。MVP 用带过期戳的 mock 直链）。 */
+/**
+ * 短时签名视频 URL（§16/§19：短时 URL / 访问控制。MVP 用带过期戳的 mock 直链）。
+ * exp 对齐到 10 分钟窗口边界：同一窗口内多次渲染（SSR HTML 与 hydration payload）得到
+ * 完全一致的 URL，避免 Date.now() 抖动导致的 hydration mismatch；同时仍保留"短时过期"语义。
+ */
+const STREAM_TTL_MS = 10 * 60 * 1000;
 function signedVideoUrl(assetId: string): string {
-  const exp = Date.now() + 10 * 60 * 1000;
+  // 取当前所在时间窗口的下一个边界作为过期戳 —— 稳定、可缓存、跨渲染一致。
+  const exp = (Math.floor(Date.now() / STREAM_TTL_MS) + 1) * STREAM_TTL_MS;
   return `/api/stream/${assetId}?exp=${exp}`;
 }
 
