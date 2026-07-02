@@ -59,3 +59,44 @@
 `free → trial → active → grace_period → billing_retry → active/expired`
 `active → canceled_but_active → expired` · `active → refunded / revoked`
 — 全部映射到 `STATUS_LABELS` 展示文案，服务端 `resolveEntitlement` 归约。
+
+---
+
+# v1.0 验收补充（升级优化计划）
+
+> 在 P1 基础上补齐差异化体验与生产级健壮性；详见 [`docs/升级优化计划-v1.0.md`](./docs/升级优化计划-v1.0.md)。
+
+## 新增能力验收
+
+- [x] 笔记捕捉 2.0 — 学习工作台：截帧(S)/批注(N)/字幕剪藏/焦点(F)/深海模式/Markdown/时间戳编辑/删除撤销 — `src/components/Player.tsx`、`NoteEditor.tsx`（实测 S 键截帧生成 `capture` 笔记并落库）
+- [x] 笔记馆三视图 + 标签 + 导出 Markdown — `src/app/notes`、`src/app/api/notes/export`
+- [x] 共创剧场 — 评论/楼中楼、关注进度、制作阶段轨道、水滴票额与衰减 — `DemandComments.tsx`、`DemandStageTrack.tsx`
+- [x] 支付真实化 — 渠道抽象 + HMAC 验签、mock 收银台、订阅升降级/取消/恢复、优惠券、密码找回 — `src/lib/payment*.ts`、`src/app/api/checkout|subscription|coupons|auth`
+- [x] 激励体系 — streak / 潮汐日历 / 成就 / 激励页 — `src/lib/gamification.ts`、`TideCalendar.tsx`
+- [x] Tide Motion 2.0 + 深海模式 — `src/components/motion.tsx`、`globals.css`
+- [x] SEO/运营 — 波形 Hero、CommandK、sitemap/robots/terms/privacy
+- [x] 单测 + CI — vitest 55 用例、GitHub Actions
+
+## 终审安全/支付/健壮性验收（多智能体六维度终审 + 对抗验证，共修 31 项 CONFIRMED）
+
+| 项 | 修复 | 实测 |
+|---|---|---|
+| webhook 密钥伪造 | 移除默认密钥回退，未知渠道 400 | 未知渠道 400 ✅ / 无签名 401 ✅ |
+| 细粒度 RBAC | 14 admin 路由 requireAdmin→requirePermission | reviewer 越权 403 ✅ / admin 200 ✅ |
+| 登录暴力破解 | 账号 5/min + IP 20/min 双限流 | 第 6 次起 429 ✅ |
+| 限流 XFF 绕过 | clientIp 取可信反代跳（TRUSTED_PROXY_HOPS） | — |
+| 退款误撤全部订阅 | Order.subscriptionId 精确定位单条 | 退款仅撤本单订阅 ✅ |
+| 重复支付并行订阅 | 同 scope 有效订阅改续期 | 未新建第 2 条、到期正确延长 ✅ |
+| 优惠券超发/薅首单 | 支付事务内条件自增 + 首单看 paid∪refunded | — |
+| 计费状态机复活/白嫖 | 前置状态校验、宽限期派生、升级须补差 | — |
+| 投票并发超发 | 配额校验+写入包 $transaction | — |
+| SSR/hydration | 时区固定 Asia/Shanghai、活值客户端计算 | 学习页/我的/共创页 0 hydration error ✅ |
+| React 竞态/泄漏 | 定时器 cleanup、请求序号 guard、评论框独立 state | 评论框不串台 ✅ |
+
+## 回归验证
+
+`tsc --noEmit` 0 错误 · `vitest run` 55/55 · `next build` 成功。
+
+---
+
+_v1.0 · 2026-07（网易有道出品）_

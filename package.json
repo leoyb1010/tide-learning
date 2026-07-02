@@ -1,8 +1,8 @@
 {
   "name": "tide-learning",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "private": true,
-  "description": "潮汐学习 — 全龄订阅制学习平台 P1 MVP (v0.3)",
+  "description": "潮汐学习 — 全龄订阅制学习平台 v1.0（网易有道出品）",
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
