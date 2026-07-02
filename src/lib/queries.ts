@@ -120,7 +120,10 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
 export async function getLessonForUser(lessonId: string, userId: string | null) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: { course: { include: { lessons: { orderBy: { sortOrder: "asc" } } } } },
+    include: {
+      course: { include: { lessons: { orderBy: { sortOrder: "asc" } } } },
+      subtitles: { orderBy: { startSec: "asc" } },
+    },
   });
   if (!lesson) return null;
   const snapshot = await resolveEntitlement(userId);
@@ -146,6 +149,7 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       // 关键：付费章节且无权益时，videoUrl / articleMd 一律为 null
       videoUrl: access && lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : null,
       articleMd: access ? lesson.articleMd : null,
+      subtitles: access ? lesson.subtitles.map((s) => ({ startSec: s.startSec, endSec: s.endSec, text: s.text })) : [],
     },
     outline: siblings.map((l) => ({
       id: l.id,

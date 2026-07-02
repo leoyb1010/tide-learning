@@ -39,7 +39,7 @@ export function Button({
     <>
       {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
       {children}
-      {icon && !loading && <ArrowRight weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" size={16} />}
+      {icon && !loading && <ArrowRight weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:translate-x-0" size={16} />}
     </>
   );
   if (href && !disabled) return <Link href={href} className={cls}>{content}</Link>;

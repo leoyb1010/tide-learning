@@ -261,3 +261,14 @@ body::before {
 
 /* 焦点模式：隐藏侧栏、居中放大播放器 */
 [data-focus="on"] .focus-hide { display: none !important; }
+
+/* Markdown 渲染（笔记预览） */
+.tide-md .tide-md-h { font-weight: 600; margin: 0.4em 0 0.2em; color: var(--color-ink-950); }
+.tide-md .tide-md-p { margin: 0.2em 0; }
+.tide-md .tide-md-ul, .tide-md .tide-md-ol { margin: 0.3em 0; padding-left: 1.2em; }
+.tide-md .tide-md-ul { list-style: disc; }
+.tide-md .tide-md-ol { list-style: decimal; }
+.tide-md .tide-md-quote { border-left: 2px solid var(--color-accent-300, #ffb8bf); padding-left: 0.6em; color: var(--color-ink-600); margin: 0.3em 0; }
+.tide-md .tide-md-code { font-family: var(--font-mono); background: var(--color-ink-100); padding: 0.05em 0.3em; border-radius: 4px; font-size: 0.9em; }
+.tide-md .tide-md-pre { background: var(--color-ink-950); color: #eef4f6; padding: 0.6em 0.8em; border-radius: 8px; overflow-x: auto; margin: 0.4em 0; font-size: 0.85em; }
+.tide-md .tide-md-pre code { font-family: var(--font-mono); background: none; padding: 0; }
