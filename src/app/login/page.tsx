@@ -50,14 +50,14 @@ function LoginInner() {
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               placeholder="13900000000 或 you@example.com"
-              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-accent-400"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]"
               required
             />
           </div>
           {mode === "signup" && (
             <div>
               <label className="mb-1.5 block text-sm text-ink-800">昵称（可选）</label>
-              <input value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-accent-400" />
+              <input value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
             </div>
           )}
           <div>
@@ -67,7 +67,7 @@ function LoginInner() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="至少 6 位"
-              className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 outline-none focus:border-accent-400"
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]"
               required
             />
           </div>

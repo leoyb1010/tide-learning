@@ -146,106 +146,123 @@ export default function NotesPage() {
   const hasNotes = (notes?.length ?? 0) > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       <TidalReveal>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-ink-950">笔记馆</h1>
-            <p className="mt-1 text-ink-500">时间轴 · 画廊 · 课程 —— 你的每一次涨落都留在这里</p>
+            <div className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">NOTES · 笔记馆</div>
+            <h1 className="mt-2 text-[26px] font-bold leading-tight text-[var(--ink)]">笔记馆</h1>
+            <p className="mt-1.5 max-w-[520px] text-[15px] leading-[1.7] text-[var(--ink2)]">
+              你在所有课程里记下与截取的一切，都收在这里。
+            </p>
           </div>
           {hasNotes && (
-            <Button variant="secondary" size="sm" onClick={exportNotes}>
-              <DownloadSimple size={16} weight="bold" /> 导出 Markdown
-            </Button>
+            <button
+              type="button"
+              onClick={exportNotes}
+              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+            >
+              <DownloadSimple size={15} weight="bold" /> 导出 Markdown
+            </button>
           )}
         </div>
       </TidalReveal>
 
-      {/* 视图切换 */}
-      <div className="flex items-center gap-1 rounded-xl bg-ink-50 p-1">
-        {VIEWS.map((v) => {
-          const Icon = v.icon;
-          const active = view === v.key;
+      {/* 视图切换 + 筛选胶囊行 */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        {/* 三视图分段控件 */}
+        <div className="inline-flex items-center gap-1 rounded-full bg-[var(--surface2)] p-1">
+          {VIEWS.map((v) => {
+            const Icon = v.icon;
+            const active = view === v.key;
+            return (
+              <button
+                key={v.key}
+                type="button"
+                onClick={() => setView(v.key)}
+                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
+                  active
+                    ? "bg-[var(--ink)] text-[var(--surface)] shadow-[var(--card)]"
+                    : "text-[var(--ink3)] hover:text-[var(--ink)]"
+                }`}
+              >
+                <Icon size={15} weight={active ? "fill" : "regular"} /> {v.label}
+              </button>
+            );
+          })}
+        </div>
+
+        <span className="mx-0.5 hidden h-5 w-px bg-[var(--border)] sm:block" />
+
+        {/* 筛选胶囊：仅截帧 / 仅收藏 */}
+        <button
+          type="button"
+          onClick={() => setCaptureOnly((v) => !v)}
+          className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+            captureOnly
+              ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+              : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
+          }`}
+        >
+          仅截帧
+        </button>
+        <button
+          type="button"
+          onClick={() => setStarredOnly((v) => !v)}
+          className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+            starredOnly
+              ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+              : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
+          }`}
+        >
+          <Star size={12} weight={starredOnly ? "fill" : "regular"} /> 仅收藏
+        </button>
+
+        {/* 标签筛选胶囊 */}
+        {tags.map((t) => {
+          const active = tagId === t.id;
           return (
             <button
-              key={v.key}
+              key={t.id}
               type="button"
-              onClick={() => setView(v.key)}
-              className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                active ? "bg-paper-raised text-accent-700 shadow-sm" : "text-ink-500 hover:text-ink-800"
+              onClick={() => setTagId(active ? "" : t.id)}
+              className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+                active
+                  ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                  : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
               }`}
             >
-              <Icon size={16} weight={active ? "fill" : "regular"} /> {v.label}
+              {t.name} <span className="mono text-[11px] opacity-80">{t.count}</span>
             </button>
           );
         })}
       </div>
 
-      {/* 筛选栏 */}
-      <div className="space-y-3">
-        <div className="relative">
-          <MagnifyingGlass size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400" />
+      {/* 搜索框 + 课程下拉 */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        <div className="relative min-w-[240px] flex-1">
+          <MagnifyingGlass size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--ink4)]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="搜索标题、正文或剪藏原文…"
-            className="w-full rounded-xl border border-ink-200 bg-paper-raised py-2.5 pl-9 pr-4 text-sm outline-none focus:border-accent-400"
+            className="w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] py-2.5 pl-10 pr-4 text-[14px] text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {courseOptions.length > 0 && (
-            <select
-              value={courseId}
-              onChange={(e) => setCourseId(e.target.value)}
-              className="rounded-lg border border-ink-200 bg-paper-raised px-3 py-1.5 text-sm text-ink-700 outline-none focus:border-accent-400"
-            >
-              <option value="">全部课程</option>
-              {courseOptions.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.title}
-                </option>
-              ))}
-            </select>
-          )}
-          <button
-            type="button"
-            onClick={() => setCaptureOnly((v) => !v)}
-            className={`rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
-              captureOnly
-                ? "bg-accent-50 text-accent-700 ring-accent-200"
-                : "bg-paper-raised text-ink-500 ring-ink-200 hover:text-ink-800"
-            }`}
+        {courseOptions.length > 0 && (
+          <select
+            value={courseId}
+            onChange={(e) => setCourseId(e.target.value)}
+            className="rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink2)] shadow-[var(--card)] outline-none transition-colors focus:border-[var(--ink3)]"
           >
-            仅截帧
-          </button>
-          <button
-            type="button"
-            onClick={() => setStarredOnly((v) => !v)}
-            className={`inline-flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-medium ring-1 transition-colors ${
-              starredOnly
-                ? "bg-accent-50 text-accent-700 ring-accent-200"
-                : "bg-paper-raised text-ink-500 ring-ink-200 hover:text-ink-800"
-            }`}
-          >
-            <Star size={12} weight={starredOnly ? "fill" : "regular"} /> 仅收藏
-          </button>
-          {/* 标签筛选 */}
-          {tags.map((t) => {
-            const active = tagId === t.id;
-            return (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setTagId(active ? "" : t.id)}
-                className={active ? "" : "opacity-70 hover:opacity-100"}
-              >
-                <Badge tone={active ? t.color : "muted"}>
-                  {t.name} · {t.count}
-                </Badge>
-              </button>
-            );
-          })}
-        </div>
+            <option value="">全部课程</option>
+            {courseOptions.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* 主体 */}
@@ -294,7 +311,7 @@ function CourseView({ notes }: { notes: NoteRow[] }) {
   }, [notes]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-9">
       {groups.map(([courseId, { course, items }]) => (
         <CourseNoteGroup key={courseId} courseId={courseId} course={course} items={items} />
       ))}
@@ -340,31 +357,41 @@ function CourseNoteGroup({
   }
 
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between gap-2">
-        <Link href={`/courses/${course.slug}`} className="font-medium text-ink-950 hover:text-accent-700">
+    <section className="studio-rise">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <Link
+          href={`/courses/${course.slug}`}
+          className="text-[18px] font-bold text-[var(--ink)] transition-colors hover:text-[var(--red)]"
+        >
           {course.title}
         </Link>
-        <div className="flex shrink-0 items-center gap-2">
-          <Button variant="secondary" size="sm" onClick={summarize} disabled={summarizing} loading={summarizing}>
+        <div className="flex shrink-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={summarize}
+            disabled={summarizing}
+            className="studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45"
+          >
             {summarizing ? "总结中…" : "AI 总结本课笔记"}
-          </Button>
-          <span className="text-xs text-ink-400">{items.length} 条</span>
+          </button>
+          <span className="mono text-[12px] text-[var(--ink4)]">{items.length} 条</span>
         </div>
       </div>
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         {items.map((n) => (
           <Link
             key={n.id}
             href={`/courses/${n.courseId}/learn/${n.lessonId}${n.timestampSec != null ? `?t=${n.timestampSec}` : ""}`}
-            className="block rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-accent-400"
+            className="studio-lift block rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
           >
-            <div className="mb-1 flex items-center gap-2 text-xs text-ink-400">
+            <div className="mb-1.5 flex items-center gap-2 text-[12px] text-[var(--ink4)]">
               <span className="truncate">{n.lesson.title}</span>
-              {n.starred && <Star size={12} weight="fill" className="text-accent-500" />}
+              {n.starred && <Star size={12} weight="fill" className="text-[var(--red)]" />}
             </div>
-            {n.title && <p className="font-medium text-ink-950">{n.title}</p>}
-            {n.contentMd?.trim() && <p className="line-clamp-2 text-sm text-ink-800">{n.contentMd}</p>}
+            {n.title && <p className="font-semibold text-[var(--ink)]">{n.title}</p>}
+            {n.contentMd?.trim() && (
+              <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink2)]">{n.contentMd}</p>
+            )}
           </Link>
         ))}
       </div>
@@ -374,8 +401,8 @@ function CourseNoteGroup({
         {summary && (
           <ul className="space-y-2.5">
             {summary.map((point, i) => (
-              <li key={i} className="flex gap-2.5 text-sm text-ink-800">
-                <span className="num mt-0.5 shrink-0 font-medium text-accent-600">{i + 1}.</span>
+              <li key={i} className="flex gap-2.5 text-[14px] text-[var(--ink2)]">
+                <span className="mono mt-0.5 shrink-0 font-semibold text-[var(--red)]">{i + 1}.</span>
                 <span>{point}</span>
               </li>
             ))}

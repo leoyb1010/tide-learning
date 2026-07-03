@@ -11,7 +11,7 @@ export function LogoutButton() {
     router.refresh();
   }
   return (
-    <button onClick={logout} className="w-full rounded-xl border border-ink-200 bg-white px-4 py-3 text-left text-sm text-ink-800 hover:border-error hover:text-error">
+    <button onClick={logout} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left text-sm text-ink-800 hover:border-error hover:text-error">
       退出登录
     </button>
   );
@@ -44,13 +44,13 @@ export function CancelSubscription() {
     );
   }
   return (
-    <div className="rounded-xl border border-ink-200 bg-white p-4">
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
       <p className="text-sm font-medium text-ink-950">确定要取消吗？</p>
       <p className="mt-1.5 text-sm text-ink-500">
         取消后：当前周期结束前仍可学习，之后课程锁定。
         <span className="text-ink-950">你的笔记会永久保留，可继续查看和导出。</span>
       </p>
-      <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="可以告诉我们原因吗？（可选）" className="mt-3 w-full resize-none rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-accent-400" />
+      <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={2} placeholder="可以告诉我们原因吗？（可选）" className="mt-3 w-full resize-none rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-[var(--ink3)]" />
       <div className="mt-3 flex gap-2">
         <button onClick={() => setConfirming(false)} className="flex-1 rounded-lg bg-accent-600 py-2.5 text-sm font-medium text-white">继续订阅</button>
         <button onClick={cancel} disabled={loading} className="rounded-lg border border-ink-200 px-4 py-2.5 text-sm text-ink-500 hover:text-error">

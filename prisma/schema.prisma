@@ -39,6 +39,10 @@ model User {
   streakDays     StreakDay[]
   achievements   UserAchievement[]
   passwordResets PasswordReset[]
+  importedSources ImportedSource[]
+  generationJobs GenerationJob[]
+  chatThreads    ChatThread[]
+  reviewCards    ReviewCard[]
 
   @@index([role])
 }
@@ -89,6 +93,12 @@ model Course {
   status           String    @default("draft") // draft / beta / published / archived
   coverColor       String    @default("tide") // 用渐变色替代封面图，避免二进制资源
   ownerId          String?
+  // —— AI 自习室：课程来源与归属 ——
+  origin           String    @default("official") // official / ai_generated / user_imported
+  authorUserId     String?   // AI生成课/导入课的归属用户；官方课为 null
+  visibility       String    @default("public")   // public / private / unlisted
+  genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
+  sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
   instructorName   String?
   reviewerName     String? // 健康/财务/防诈骗类必填
   disclaimer       String? // 免责声明
@@ -116,9 +126,10 @@ model Lesson {
   title         String
   summary       String?
   sortOrder     Int       @default(0)
-  contentType   String    @default("video") // video / article / mixed / live
+  contentType   String    @default("video") // video / article / mixed / live / ai_block
   videoAssetId  String? // 指向受控视频资源，非订阅用户拿不到直链
   articleMd     String?
+  blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）
   durationSec   Int       @default(0)
   isFree        Boolean   @default(false)
   liveStartAt   DateTime? // 直播小班课开播时间（融合：有道口语小班课）
@@ -187,6 +198,7 @@ model Note {
   lessonId     String
   lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   timestampSec Int?
+  anchorRef    String? // 块课件锚点 "block:<id>" / "chapter:<n>"（视频课继续用 timestampSec）
   title        String?
   contentMd    String
   sourceText   String? // C1：字幕划线引用的原文
@@ -553,4 +565,91 @@ model UserAchievement {
 
   @@unique([userId, achievementId])
   @@index([userId])
+}
+
+// ============================================================
+// AI 自习室：生成引擎 / 导入资料 / 学习伴侣 / 复习卡
+// ============================================================
+
+// 引擎B：用户导入资料 → 结构化成课
+model ImportedSource {
+  id                String   @id @default(cuid())
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind              String   // paste_text / pdf / url / video(留接口)
+  title             String?
+  rawText           String?  // 提取出的纯文本（MVP：粘贴文本）
+  sourceUrl         String?
+  assetId           String?  // pdf/video 走 upload 路由的占位 assetId
+  charCount         Int      @default(0)
+  parseStatus       String   @default("pending") // pending / parsed / failed
+  generatedCourseId String?  // 结构化成功后产出的 Course.id
+  createdAt         DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// 引擎A/B 共用：AI 生成任务（状态记录 + 幂等 + 成本埋点，MVP 同步执行不做真队列）
+model GenerationJob {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             String   // course_outline / course_lesson / import_structure
+  status           String   @default("queued") // queued / running / done / failed
+  inputJson        String   @default("{}")
+  resultRef        String?  // 产出的 courseId / lessonId
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  errorMessage     String?
+  attempts         Int      @default(0)
+  createdAt        DateTime @default(now())
+  finishedAt       DateTime?
+
+  @@index([userId, status])
+}
+
+// 中枢：AI 学习伴侣 对话线程
+model ChatThread {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope     String   // lesson:<id> / course:<id> / studio
+  courseId  String?
+  lessonId  String?
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([userId, updatedAt])
+}
+
+model ChatMessage {
+  id            String     @id @default(cuid())
+  threadId      String
+  thread        ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  role          String     // user / assistant
+  contentMd     String
+  citationsJson String     @default("[]") // 引用的笔记/字幕/块锚点，前端可跳转
+  createdAt     DateTime   @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+// 中枢：复习卡（P0 落库，P1 做 SM-2 调度）
+model ReviewCard {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId       String?  // 来源笔记（可空：AI 生成卡）
+  courseId     String?
+  front        String
+  back         String
+  dueAt        DateTime // 下次复习
+  ease         Float    @default(2.5)
+  intervalDays Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, dueAt])
 }

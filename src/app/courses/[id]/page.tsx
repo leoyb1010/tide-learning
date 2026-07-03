@@ -1,13 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Play, LockSimple, Check, CaretRight } from "@phosphor-icons/react/dist/ssr";
 import { getCourseDetail, listCourses } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
-import { CoverBg, Badge, Button, coverSrc } from "@/components/ui";
-import { LessonList } from "@/components/LessonList";
+import { Button } from "@/components/ui";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
 import { TrialBooking } from "@/components/TrialBooking";
+import { formatDurationSec } from "@/lib/format";
 import { TRACK_MAP } from "@/lib/tracks";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
@@ -23,7 +24,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const detail = await getCourseDetail(id, user?.id ?? null);
   if (!detail) notFound();
 
-  const { course, snapshot, categoryLabel, levelLabel, durationText, lessons, updateLogs } = detail;
+  const { course, snapshot, categoryLabel, durationText, lessons, updateLogs } = detail;
   const firstFree = lessons.find((l) => l.isFree);
   const firstLesson = lessons[0];
   const needsCompliance = ["life", "silver_english"].includes(course.category) && course.reviewerName;
@@ -31,95 +32,209 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const isEnglish = TRACK_MAP[course.category]?.isEnglish;
   const related = (await listCourses({ category: course.category })).filter((c) => c.id !== course.id).slice(0, 3);
 
+  // 大纲进度派生：可访问的章节视为已学，第一节不可访问的作为"在学"高亮，之后锁定；最后一节标 NEW。
+  const accessibleCount = lessons.filter((l) => l.canAccess).length;
+  const nowIndex = lessons.findIndex((l) => !l.canAccess);
+  const learnedCount = nowIndex === -1 ? Math.max(accessibleCount - 1, 0) : nowIndex;
+  const progressPct = lessons.length ? Math.round((learnedCount / lessons.length) * 100) : 0;
+  const freeCount = lessons.filter((l) => l.isFree).length;
+  const continueHref = hasAccess
+    ? `/courses/${course.slug}/learn/${firstLesson?.id}`
+    : firstFree
+      ? `/courses/${course.slug}/learn/${firstFree.id}`
+      : "/pricing";
+
   return (
-    <div className="space-y-10">
-      {/* 封面 + 概要 */}
-      <section className="grid gap-6 md:grid-cols-[1.4fr_1fr]">
-        <div>
-          <CoverBg color={course.coverColor} imageSrc={coverSrc(course.slug)} alt={course.title} className="mb-5 aspect-[16/8] w-full rounded-2xl" />
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="tide">{categoryLabel}</Badge>
-            <Badge tone="muted">{levelLabel}</Badge>
-            {course.updateCadence && <Badge tone="dawn">{course.updateCadence}</Badge>}
+    <div className="studio-rise space-y-12">
+      {/* ===== 主体 1.55/.92 双栏 ===== */}
+      <div className="grid items-start gap-5 lg:grid-cols-[1.55fr_.92fr]">
+        {/* ---------- 左列 ---------- */}
+        <div className="flex flex-col gap-[18px]">
+          {/* 预告视频 */}
+          <div
+            className="relative aspect-[16/9] w-full overflow-hidden rounded-[20px] shadow-[var(--lift)]"
+            style={{ background: "radial-gradient(120% 120% at 30% 20%, #3b2a5e 0%, #241d3a 45%, #17131f 100%)" }}
+          >
+            <div
+              className="absolute inset-0 opacity-[0.10]"
+              style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "18px 18px" }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white/[0.16] backdrop-blur-sm ring-1 ring-white/25">
+                <Play size={26} weight="fill" className="translate-x-[2px] text-white" />
+              </span>
+            </div>
+            <span className="mono absolute bottom-4 left-4 rounded-full bg-black/35 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+              预告 · 02:30
+            </span>
           </div>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-ink-950">{course.title}</h1>
-          {course.subtitle && <p className="mt-2 text-lg text-ink-500">{course.subtitle}</p>}
-          {course.description && <p className="prose-body mt-4 text-ink-800">{course.description}</p>}
-          <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-sm text-ink-500">
-            <span>讲师：{course.instructorName}</span>
-            {course.contributorName && <span>内容供给：{course.contributorName}</span>}
-            {course.reviewerName && <span>审核人：{course.reviewerName}</span>}
+
+          {/* 课程信息 */}
+          <div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <span className="rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--red)]">
+                {categoryLabel}
+              </span>
+              <span className="mono text-[12px] text-[var(--ink3)]">
+                {lessons.length} 节{course.updateCadence ? ` · ${course.updateCadence}` : ""}
+              </span>
+            </div>
+            <h1 className="mt-3 text-[32px] font-bold leading-[1.28] tracking-tight text-[var(--ink)]">{course.title}</h1>
+            {course.subtitle && <p className="mt-2 text-[16px] leading-[1.6] text-[var(--ink2)]">{course.subtitle}</p>}
+            {course.description && <p className="mt-3 text-[15px] leading-[1.75] text-[var(--ink2)]">{course.description}</p>}
+
+            {/* 三统计 */}
+            <div className="mt-5 flex flex-wrap gap-x-9 gap-y-3">
+              <Stat value="4.9" label="综合评分" />
+              <Stat value={compactCount(course.learnersCount)} label="在学人数" />
+              <Stat value={durationText} label="总时长" />
+            </div>
+
+            {/* 讲师/供给/审核 */}
+            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-[var(--ink3)]">
+              <span>讲师：{course.instructorName}</span>
+              {course.contributorName && <span>内容供给：{course.contributorName}</span>}
+              {course.reviewerName && <span>审核人：{course.reviewerName}</span>}
+            </div>
+          </div>
+
+          {/* 合规声明（健康/防诈骗，§6.3 验收 4） */}
+          {needsCompliance && (
+            <div className="rounded-[16px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] p-5">
+              <p className="text-[13px] font-bold text-[var(--ink)]">内容说明</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink2)]">
+                {course.disclaimer ??
+                  "本课程内容经内容审核人审核，仅用于信息素养与防范意识学习，不构成任何专业建议。"}
+              </p>
+              <p className="mt-1.5 text-[12px] text-[var(--ink3)]">审核人：{course.reviewerName}</p>
+            </div>
+          )}
+
+          {/* 课程大纲 */}
+          <div>
+            <div className="mb-3 flex items-baseline justify-between">
+              <h2 className="text-[18px] font-bold text-[var(--ink)]">课程大纲</h2>
+              <span className="mono text-[12px] text-[var(--ink3)]">已学 {learnedCount}/{lessons.length}</span>
+            </div>
+            <ul className="overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
+              {lessons.map((l, i) => {
+                const isNow = i === nowIndex;
+                const isDone = nowIndex === -1 ? true : i < nowIndex;
+                const isLast = i === lessons.length - 1;
+                const locked = !l.canAccess && !isNow;
+                return (
+                  <li
+                    key={l.id}
+                    className={`border-b border-[var(--border)] last:border-b-0 ${isNow ? "bg-[var(--red-soft)]" : ""}`}
+                  >
+                    <OutlineRow
+                      href={l.canAccess || isNow ? `/courses/${course.slug}/learn/${l.id}` : undefined}
+                      index={i + 1}
+                      title={l.title}
+                      summary={l.summary}
+                      duration={formatDurationSec(l.durationSec)}
+                      isNow={isNow}
+                      isDone={isDone}
+                      locked={locked}
+                      isNew={isLast && !isNow && !isDone}
+                      isFree={l.isFree}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+
+          {/* 更新日志（强化持续更新，§6.3 验收 1） */}
+          <div>
+            <h2 className="mb-3 text-[18px] font-bold text-[var(--ink)]">更新日志</h2>
+            <UpdateLog logs={updateLogs} ownerName={course.instructorName} />
+          </div>
+
+          {/* 适合谁 / 学完获得 */}
+          <div className="grid gap-4 sm:grid-cols-2">
+            <InfoCard title="适合谁学">
+              <li>想用 {categoryLabel} 提升效率或达成目标的人</li>
+              <li>希望跟随更新、持续精进的订阅用户</li>
+              <li>喜欢边学边记、沉淀学习资产的人</li>
+            </InfoCard>
+            <InfoCard title="学完你将获得">
+              <li>一套可复用的方法与模板</li>
+              <li>随课程更新持续获得新内容</li>
+              <li>属于自己的结构化学习笔记</li>
+            </InfoCard>
           </div>
         </div>
 
-        {/* 订阅/继续学习卡 */}
-        <aside className="h-fit rounded-2xl border border-ink-100 bg-paper-raised p-5 md:sticky md:top-24">
-          <dl className="grid grid-cols-2 gap-4 text-sm">
-            <Data label="章节数" value={`${lessons.length} 讲`} />
-            <Data label="总时长" value={durationText} />
-            <Data label="学习人数" value={course.learnersCount.toLocaleString()} />
-            <Data label="免费试学" value={`${lessons.filter((l) => l.isFree).length} 讲`} />
-          </dl>
-          <div className="mt-5 space-y-2.5">
-            {hasAccess ? (
-              <Button href={`/courses/${course.slug}/learn/${firstLesson?.id}`} full size="lg">继续学习</Button>
-            ) : (
-              <>
-                {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg">免费试学第一章</Button>}
-                <Button href="/pricing" variant="secondary" full>订阅解锁全部</Button>
-                {/* 英语赛道提供预约试听（有道 0转正入口） */}
-                {isEnglish && <TrialBooking courseId={course.id} track={course.category} source="youdao_dict" />}
-              </>
-            )}
+        {/* ---------- 右列 sticky ---------- */}
+        <aside className="flex flex-col gap-4 lg:sticky lg:top-24">
+          {/* 进度卡 */}
+          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[13px] font-medium text-[var(--ink3)]">你的进度</span>
+              <span className="mono rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red)]">
+                {progressPct}% 继续加油
+              </span>
+            </div>
+            <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-inset)]">
+              <div className="h-full rounded-full bg-[var(--red)] transition-[width] duration-500" style={{ width: `${progressPct}%` }} />
+            </div>
+
+            {/* 章节数据 */}
+            <dl className="mt-4 grid grid-cols-2 gap-3">
+              <Meta label="章节数" value={`${lessons.length} 讲`} />
+              <Meta label="免费试学" value={`${freeCount} 讲`} />
+            </dl>
+
+            {/* CTA */}
+            <div className="mt-4 space-y-2.5">
+              {hasAccess ? (
+                <Button href={continueHref} full size="lg">进入工作台学习</Button>
+              ) : (
+                <>
+                  {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg">免费试学第一章</Button>}
+                  <Button href="/pricing" variant="secondary" full>订阅解锁全部</Button>
+                  {/* 英语赛道提供预约试听（有道 0转正入口） */}
+                  {isEnglish && <TrialBooking courseId={course.id} track={course.category} source="youdao_dict" />}
+                </>
+              )}
+            </div>
+            <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">
+              {snapshot.isSubscriber && !hasAccess ? "你的订阅未覆盖该赛道，升级全站即可解锁" : "订阅后解锁该赛道课程 · 笔记永久保留"}
+            </p>
+
+            {/* 讲师 */}
+            <div className="mt-4 flex items-center gap-3 border-t border-[var(--border)] pt-4">
+              <span
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[13px] font-bold text-white"
+                style={{ background: "linear-gradient(135deg, #a30514, #fc011a)" }}
+              >
+                {(course.instructorName ?? "T").slice(0, 1)}
+              </span>
+              <div className="min-w-0">
+                <p className="truncate text-[13px] font-semibold text-[var(--ink)]">{course.instructorName}</p>
+                <p className="text-[11px] text-[var(--ink3)]">课程讲师</p>
+              </div>
+            </div>
           </div>
-          <p className="mt-3 text-center text-xs text-ink-400">
-            {snapshot.isSubscriber && !hasAccess ? "你的订阅未覆盖该赛道，升级全站即可解锁" : "订阅后解锁该赛道课程 · 笔记永久保留"}
-          </p>
+
+          {/* 更新提示卡 */}
+          <div className="rounded-[16px] border border-dashed border-[var(--border2)] bg-[var(--surface2)] p-5">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-[var(--red)]" style={{ animation: "recPulse 2s ease-in-out infinite" }} />
+              <span className="text-[13px] font-bold text-[var(--ink)]">持续更新中</span>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-[1.7] text-[var(--ink2)]">
+              {course.updateCadence ? `${course.updateCadence}，` : "每周三新增 1-2 节，"}持续为这门课添加新内容。你的笔记与截帧永久保存，随课程一起成长。
+            </p>
+          </div>
         </aside>
-      </section>
-
-      {/* 合规声明（健康/防诈骗/财务，§6.3 验收 4）*/}
-      {needsCompliance && (
-        <section className="rounded-2xl border border-warning/20 bg-warning/5 p-5">
-          <p className="text-sm font-medium text-ink-950">内容说明</p>
-          <p className="mt-1.5 text-sm leading-relaxed text-ink-500">
-            {course.disclaimer ??
-              "本课程内容经内容审核人审核，仅用于信息素养与防范意识学习，不构成任何专业建议。"}
-          </p>
-          <p className="mt-1.5 text-xs text-ink-400">审核人：{course.reviewerName}</p>
-        </section>
-      )}
-
-      {/* 更新日志（放大纲前，强化持续更新，§6.3 验收 1）*/}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold text-ink-950">更新日志</h2>
-        <UpdateLog logs={updateLogs} ownerName={course.instructorName} />
-      </section>
-
-      {/* 课程大纲 */}
-      <section>
-        <h2 className="mb-4 text-xl font-semibold text-ink-950">课程大纲</h2>
-        <LessonList courseSlug={course.slug} lessons={lessons} />
-      </section>
-
-      {/* 适合谁 / 学完获得 */}
-      <section className="grid gap-5 sm:grid-cols-2">
-        <InfoCard title="适合谁学">
-          <li>想用 {categoryLabel} 提升效率或达成目标的人</li>
-          <li>希望跟随更新、持续精进的订阅用户</li>
-          <li>喜欢边学边记、沉淀学习资产的人</li>
-        </InfoCard>
-        <InfoCard title="学完你将获得">
-          <li>一套可复用的方法与模板</li>
-          <li>随课程更新持续获得新内容</li>
-          <li>属于自己的结构化学习笔记</li>
-        </InfoCard>
-      </section>
+      </div>
 
       {/* 相关推荐 */}
       {related.length > 0 && (
         <section>
-          <h2 className="mb-4 text-xl font-semibold text-ink-950">相关课程</h2>
+          <h2 className="mb-4 text-[18px] font-bold text-[var(--ink)]">相关课程</h2>
           <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {related.map((c) => <CourseCard key={c.id} course={c} />)}
           </div>
@@ -127,25 +242,95 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       )}
 
       <div className="text-center">
-        <Link href="/courses" className="text-sm text-accent-700 hover:underline">← 返回课程库</Link>
+        <Link href="/courses" className="text-[13px] text-[var(--red)] hover:underline">← 返回课程库</Link>
       </div>
     </div>
   );
 }
 
-function Data({ label, value }: { label: string; value: string }) {
+/* ============ 页面专属子组件 ============ */
+
+function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <dt className="text-xs text-ink-400">{label}</dt>
-      <dd className="mt-0.5 font-medium text-ink-950 tabular">{value}</dd>
+      <div className="text-[20px] font-extrabold leading-none tracking-tight text-[var(--ink)]">{value}</div>
+      <div className="mt-1 text-[12px] text-[var(--ink3)]">{label}</div>
     </div>
   );
 }
-function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+
+function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-ink-100 bg-paper-raised p-5">
-      <h3 className="mb-3 font-medium text-ink-950">{title}</h3>
-      <ul className="space-y-2 text-sm text-ink-500">{children}</ul>
+    <div>
+      <dt className="text-[11px] text-[var(--ink4)]">{label}</dt>
+      <dd className="mono mt-0.5 text-[14px] font-semibold text-[var(--ink)]">{value}</dd>
     </div>
   );
+}
+
+function InfoCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
+      <h3 className="mb-3 text-[14px] font-bold text-[var(--ink)]">{title}</h3>
+      <ul className="space-y-2 text-[13px] leading-[1.6] text-[var(--ink2)]">{children}</ul>
+    </div>
+  );
+}
+
+function OutlineRow({
+  href, index, title, summary, duration, isNow, isDone, locked, isNew, isFree,
+}: {
+  href?: string;
+  index: number;
+  title: string;
+  summary?: string | null;
+  duration: string;
+  isNow: boolean;
+  isDone: boolean;
+  locked: boolean;
+  isNew: boolean;
+  isFree: boolean;
+}) {
+  const inner = (
+    <div className={`group flex items-center gap-3.5 px-[18px] py-3.5 transition-colors ${href ? "hover:bg-[var(--surface2)]" : ""} ${isNow ? "hover:bg-transparent" : ""}`}>
+      <span className={`mono w-[26px] shrink-0 text-center text-[13px] ${isNow ? "font-bold text-[var(--red)]" : "text-[var(--ink4)]"}`}>
+        {String(index).padStart(2, "0")}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`truncate text-[14px] ${isNow ? "font-bold text-[var(--ink)]" : "font-medium text-[var(--ink)]"}`}>{title}</span>
+          {isFree && !isNow && (
+            <span className="rounded-full bg-[var(--surface-inset)] px-2 py-0.5 text-[10px] font-medium text-[var(--ink3)]">免费</span>
+          )}
+        </div>
+        {summary && <p className="mt-0.5 truncate text-[12px] text-[var(--ink4)]">{summary}</p>}
+      </div>
+      <span className="mono shrink-0 text-[12px] text-[var(--ink4)]">{duration}</span>
+      <span className="flex w-[52px] shrink-0 items-center justify-end">
+        {isNow ? (
+          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--red)] px-2.5 py-1 text-[11px] font-semibold text-white">
+            在学 <CaretRight size={11} weight="bold" />
+          </span>
+        ) : isNew ? (
+          <span className="rounded-full bg-[var(--new-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--new-ink)]">NEW</span>
+        ) : isDone ? (
+          <Check size={16} weight="bold" className="text-[var(--ink4)]" />
+        ) : locked ? (
+          <LockSimple size={15} className="text-[var(--ink4)]" />
+        ) : (
+          <Play size={15} weight="fill" className="text-[var(--ink4)]" />
+        )}
+      </span>
+    </div>
+  );
+
+  if (href) return <Link href={href}>{inner}</Link>;
+  return <div className="cursor-default">{inner}</div>;
+}
+
+/** 大数字紧凑格式：12400 → 12.4k */
+function compactCount(n: number): string {
+  if (n >= 10000) return `${(n / 1000).toFixed(1)}k`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
 }

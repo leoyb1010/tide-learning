@@ -11,10 +11,13 @@ import { useToast } from "./Toast";
 import { useMode } from "./ModeProvider";
 import {
   Play, Pause, LockSimple, CaretLeft, CaretRight, Check,
-  Camera, NotePencil, ArrowsOut, ArrowsIn, Moon, Sun, CornersOut,
+  Camera, NotePencil, ArrowsOut, ArrowsIn, Moon, Sun, CornersOut, Sparkle,
 } from "@phosphor-icons/react";
 import { mmss } from "@/lib/format";
 import { track } from "@/lib/analytics-client";
+import { BlockRenderer } from "./BlockRenderer";
+import { CompanionPanel } from "./CompanionPanel";
+import { validateBlocks } from "@/lib/blocks";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
 interface SubtitleCue { startSec: number; endSec: number; text: string }
@@ -23,6 +26,7 @@ interface LessonData {
   durationSec: number; isFree: boolean; videoUrl: string | null; articleMd: string | null;
   liveStartAt?: string | null; liveSeatLimit?: number | null;
   subtitles?: SubtitleCue[];
+  blocksJson?: string | null; // ai_block 类型：结构化块课件 JSON 字符串
 }
 
 /**
@@ -45,6 +49,7 @@ export function Player({
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
   const [showNotesDrawer, setShowNotesDrawer] = useState(true);
+  const [panelTab, setPanelTab] = useState<"notes" | "companion">("notes"); // 侧栏：笔记 / AI 伴侣
   const [sheetOpen, setSheetOpen] = useState(false);
   const [focus, setFocus] = useState(false);
   const [seekPulse, setSeekPulse] = useState<number | null>(null);
@@ -195,6 +200,11 @@ export function Player({
   const activeCue = lesson.subtitles?.find((c) => time >= c.startSec && time < c.endSec);
   const progress = lesson.durationSec > 0 ? time / lesson.durationSec : 0;
 
+  // ai_block 块课件：解析并校验块数组（validateBlocks 永不抛错，脏数据归空数组）。
+  // 块课无视频时间轴——不做截帧 / 进度条；MVP 笔记走普通笔记（anchorRef 可空），先保证能记能显示。
+  const isBlockLesson = lesson.contentType === "ai_block";
+  const blocks = isBlockLesson ? validateBlocks(safeParseJson(lesson.blocksJson)) : [];
+
   const CaptureBar = access && (
     <div className="flex items-center gap-2">
       <Tooltip label="截取画面 (S)"><button onClick={captureFrame} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition-colors hover:bg-white/20" aria-label="截取画面"><Camera size={16} /></button></Tooltip>
@@ -305,7 +315,12 @@ export function Player({
         <div className={`grid gap-4 ${focus ? "" : "lg:grid-cols-[1fr_360px]"}`}>
           {/* 左：视频/图文 */}
           <div className={focus ? "mx-auto w-full max-w-4xl" : ""}>
-            {lesson.contentType === "live" ? (
+            {isBlockLesson ? (
+              // 块课件：左侧内容区渲染块，而非视频。无视频时间轴 → 无截帧 / 无播放控制条。
+              <div className="rounded-2xl border border-ink-100 bg-paper-raised p-4 sm:p-6">
+                <BlockRenderer blocks={blocks} courseId={courseId} />
+              </div>
+            ) : lesson.contentType === "live" ? (
               <LiveBanner lesson={lesson} />
             ) : lesson.contentType === "article" && lesson.articleMd ? (
               <article className="prose-body rounded-2xl border border-ink-100 bg-paper-raised p-4 sm:p-6">
@@ -317,10 +332,11 @@ export function Player({
             <div className="mt-4 rounded-2xl border border-ink-100 bg-paper-raised p-4">
               <div className="flex items-center justify-between gap-3">
                 <h1 className="text-lg font-semibold text-ink-950">{lesson.title}</h1>
-                <span className="num shrink-0 text-xs text-ink-400">已学 {Math.round(progress * 100)}%</span>
+                {/* 块课无时间轴，不显示基于播放时长的进度 */}
+                {!isBlockLesson && <span className="num shrink-0 text-xs text-ink-400">已学 {Math.round(progress * 100)}%</span>}
               </div>
               {lesson.summary && <p className="mt-1 text-sm text-ink-500">{lesson.summary}</p>}
-              <div className="mt-3"><WaveProgress value={progress} /></div>
+              {!isBlockLesson && <div className="mt-3"><WaveProgress value={progress} /></div>}
             </div>
 
             {/* 上一讲/下一讲 */}
@@ -342,20 +358,29 @@ export function Player({
             </div>
           </div>
 
-          {/* 右：笔记面板（桌面，360px，可折叠）*/}
+          {/* 右：笔记 / AI 伴侣 双 Tab 面板（桌面，360px）*/}
           {!focus && (
             <aside className="focus-hide hidden lg:block">
               <div className="sticky top-24 space-y-4">
-                <div className="flex items-center justify-between">
-                  <button onClick={() => setShowNotesDrawer((s) => !s)} className="text-sm text-ink-500 hover:text-ink-950">
-                    {showNotesDrawer ? "收起笔记 ›" : "‹ 展开笔记"}
+                {/* Tab 切换 */}
+                <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
+                  <button
+                    onClick={() => setPanelTab("notes")}
+                    className={`rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "notes" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
+                  >
+                    笔记
+                  </button>
+                  <button
+                    onClick={() => setPanelTab("companion")}
+                    className={`inline-flex items-center gap-1.5 rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "companion" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
+                  >
+                    <Sparkle size={13} weight={panelTab === "companion" ? "fill" : "regular"} className="text-[var(--red)]" />
+                    AI 伴侣
                   </button>
                 </div>
-                {showNotesDrawer && (
-                  <div className="h-[540px] overflow-hidden rounded-2xl border border-ink-100 bg-paper-raised">
-                    {noteEditor}
-                  </div>
-                )}
+                <div className="h-[540px] overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
+                  {panelTab === "notes" ? noteEditor : <CompanionPanel lessonId={lesson.id} courseId={courseId} />}
+                </div>
                 <Outline courseSlug={courseSlug} outline={outline} />
               </div>
             </aside>
@@ -369,6 +394,12 @@ export function Player({
       </SheetDrag>
     </div>
   );
+}
+
+/** 安全解析块课件 JSON 字符串：解析失败或空值返回 null，交给 validateBlocks 归空。 */
+function safeParseJson(raw: string | null | undefined): unknown {
+  if (!raw) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
 /** 模拟视频截帧兜底：品牌色 + 时间戳 canvas 图。 */

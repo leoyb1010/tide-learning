@@ -9,42 +9,49 @@
    - Tide Motion System 2.0：涨潮进场 / 退潮离场 / 进度即水位
    ============================================================ */
 @theme {
-  /* —— 品牌强调色：网易有道红 #FC011A（VIS 规范）—— */
-  --color-accent-50:  #fff1f2;
-  --color-accent-100: #ffdbde;
+  /* ============================================================
+     STUDIO v2 设计系统 · 冷灰蓝中性 + 有道红作专注信号(~7%)
+     现有 Tailwind 类名(ink/paper/accent)映射到 STUDIO 冷灰蓝色值，
+     全站类名无需改动即自动换肤；新组件另用 §STUDIO 语义 token(--bg/--surface/--red)。
+     亮/暗跟随系统(prefers-color-scheme) + data-theme 手动覆盖。
+     ============================================================ */
+
+  /* —— 品牌红 #FC011A（唯一强调色，锁定，全局 ~7% 占比）—— */
+  --color-accent-50:  #fff1f2;   /* = redSoft */
+  --color-accent-100: #ffd9dd;   /* = redSoftBorder */
   --color-accent-200: #ffb8bf;
   --color-accent-400: #ff5462;
   --color-accent-600: #fc011a;   /* 有道品牌红 */
-  --color-accent-700: #d60018;   /* hover / active */
+  --color-accent-700: #c8000f;   /* = redInk（hover/深字） */
   --color-accent-900: #7d0812;
 
-  /* —— 中性基座（暖 stone，无纯黑）—— */
-  --color-ink-950: #17181a;      /* 近黑正文 */
-  --color-ink-800: #2c2f33;
-  --color-ink-600: #565b61;
-  --color-ink-500: #6b7178;      /* 次级文字 */
-  --color-ink-400: #8b9198;
-  --color-ink-200: #d8dad9;
-  --color-ink-100: #e9eae7;
-  --color-ink-50:  #f2f2ee;
+  /* —— 中性基座（STUDIO 冷灰蓝墨色四阶 + 冷灰蓝背景）—— */
+  --color-ink-950: #232935;      /* = ink 主文字/标题（冷灰蓝近黑） */
+  --color-ink-800: #3a4250;
+  --color-ink-600: #5b6474;      /* = ink2 次级文字 */
+  --color-ink-500: #6e7686;
+  --color-ink-400: #8790a0;      /* = ink3 三级文字 */
+  --color-ink-200: #aeb6c2;      /* = ink4 最弱/占位 */
+  --color-ink-100: #e2e6ec;      /* = border 主描边 */
+  --color-ink-50:  #eaedf2;      /* = surfaceInset 内凹表面 */
 
-  --color-paper:        #f7f6f3; /* 编辑感暖白背景 */
-  --color-paper-raised: #ffffff; /* 表面白 */
+  --color-paper:        #e7eaf0; /* = bg 冷灰蓝页面底 */
+  --color-paper-raised: #ffffff; /* = surface 卡片表面白 */
 
-  /* —— 深海模式基座（学习页沉浸）—— */
-  --color-deep-bg:     #0c1418;
-  --color-deep-raised: #121c22;
-  --color-deep-border: #22323b;
+  /* —— 深色模式基座（STUDIO dark，冷调深灰蓝非纯黑）—— */
+  --color-deep-bg:     #0e1116;
+  --color-deep-raised: #191d25;
+  --color-deep-border: #2b3350;
 
-  /* —— 语义色（低饱和）—— */
-  --color-success: #3d8a63;
+  /* —— 语义色（低饱和，配冷灰蓝）—— */
+  --color-success: #1f9e6e;
   --color-warning: #b7822c;
   --color-error:   #c0392b;
 
-  /* —— 半径 / 字体 —— */
-  --radius-card: 20px;
-  --font-sans: var(--font-geist-sans), -apple-system, "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-  --font-mono: var(--font-geist-mono), "SF Mono", ui-monospace, monospace;
+  /* —— 半径 / 字体（STUDIO：Plus Jakarta + Noto Sans SC + IBM Plex Mono）—— */
+  --radius-card: 18px;
+  --font-sans: var(--font-jakarta), var(--font-noto-sc), -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  --font-mono: var(--font-plex-mono), "SF Mono", ui-monospace, monospace;
 
   /* —— Tide Motion System 2.0：时长阶梯 —— */
   --dur-instant: 100ms; /* 按压、开关 */
@@ -60,20 +67,111 @@
   --ease-anticipate: cubic-bezier(0.36, 0, 0.66, -0.3); /* 退潮预备 */
 }
 
+/* ============================================================
+   STUDIO 语义 token（新组件直接用；亮色默认，暗色由 §暗色 覆盖）
+   命名对齐设计规范：bg/surface/ink/red/border + 阴影
+   ============================================================ */
 :root {
   --font-scale: 1;
   color-scheme: light;
-  /* 语义化表面变量（供深海模式覆盖） */
-  --surface-bg: var(--color-paper);
-  --surface-raised: var(--color-paper-raised);
-  --surface-border: var(--color-ink-100);
-  --surface-ink: var(--color-ink-950);
-  --surface-ink-muted: var(--color-ink-500);
-  /* 阴影染背景色（taste-skill: tint shadow to bg hue） */
-  --shadow-soft: 0 1px 2px rgba(125,8,18,0.05), 0 18px 40px -20px rgba(125,8,18,0.18);
+
+  /* STUDIO 表面/背景 */
+  --bg:            #e7eaf0;
+  --bg2:           #edeff3;
+  --surface:       #ffffff;
+  --surface2:      #f4f6f9;
+  --surface-inset: #eaedf2;
+  --border:        #e2e6ec;
+  --border2:       #d3d9e2;
+
+  /* STUDIO 墨色四阶（冷灰蓝） */
+  --ink:  #232935;
+  --ink2: #5b6474;
+  --ink3: #8790a0;
+  --ink4: #aeb6c2;
+
+  /* STUDIO 品牌红 */
+  --red:             #fc011a;
+  --red-soft:        #fff1f2;
+  --red-soft-border: #ffd9dd;
+  --red-ink:         #c8000f;
+
+  /* 深色区 / 视频 / NEW 徽章 */
+  --video-bg: #232935;
+  --new-bg:   #fff3d0;
+  --new-ink:  #8a6a00;
+
+  /* 软深度阴影（双层柔投影，基色 = ink 的 RGB） */
+  --card:  0 2px 6px -2px rgba(35,41,53,.12);
+  --lift:  0 10px 26px -12px rgba(35,41,53,.28), 0 1px 0 rgba(255,255,255,.7) inset;
+
+  /* 兼容旧 surface-* 语义（映射到 STUDIO） */
+  --surface-bg: var(--bg);
+  --surface-raised: var(--surface);
+  --surface-border: var(--border);
+  --surface-ink: var(--ink);
+  --surface-ink-muted: var(--ink2);
+  --shadow-soft: var(--card);
 }
 
-/* 深海模式：学习页 data-theme="deep" 或全站切换 */
+/* ============================================================
+   暗色模式：跟随系统 prefers-color-scheme:dark（默认），
+   或 data-theme=dark 手动强制；data-theme=light 手动强制亮色。
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg:            #0e1116;
+    --bg2:           #12151b;
+    --surface:       #191d25;
+    --surface2:      #20252f;
+    --surface-inset: #20252f;
+    --border:        #2b3350;
+    --border2:       #39415e;
+    --ink:  #edeff3;
+    --ink2: #aeb6c2;
+    --ink3: #9aa3b2;   /* 已从原型 #8790a0 提亮，改善暗色对比度/无障碍 */
+    --ink4: #5b6474;
+    --red-soft:        #2a1216;
+    --red-soft-border: #4c1c22;
+    --red-ink:         #ff6470;
+    --video-bg: #0a0c10;
+    --card:  0 2px 8px -3px rgba(0,0,0,.5);
+    --lift:  0 14px 30px -14px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.03) inset;
+    /* 旧 Tailwind ink/paper 类名在暗色下的映射（让全站类名自动变暗） */
+    --color-paper:        #0e1116;
+    --color-paper-raised: #191d25;
+    --color-ink-950: #edeff3;
+    --color-ink-800: #cdd3dd;
+    --color-ink-600: #aeb6c2;
+    --color-ink-500: #9aa3b2;
+    --color-ink-400: #8790a0;
+    --color-ink-200: #5b6474;
+    --color-ink-100: #2b3350;   /* border */
+    --color-ink-50:  #20252f;
+    --surface-bg: var(--bg); --surface-raised: var(--surface);
+    --surface-border: var(--border); --surface-ink: var(--ink); --surface-ink-muted: var(--ink2);
+    --shadow-soft: var(--card);
+  }
+}
+/* 手动强制暗色（右上角切换 → data-theme=dark），复用同一套暗色值 */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#0e1116; --bg2:#12151b; --surface:#191d25; --surface2:#20252f; --surface-inset:#20252f;
+  --border:#2b3350; --border2:#39415e;
+  --ink:#edeff3; --ink2:#aeb6c2; --ink3:#9aa3b2; --ink4:#5b6474;
+  --red-soft:#2a1216; --red-soft-border:#4c1c22; --red-ink:#ff6470;
+  --video-bg:#0a0c10;
+  --card:0 2px 8px -3px rgba(0,0,0,.5);
+  --lift:0 14px 30px -14px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.03) inset;
+  --color-paper:#0e1116; --color-paper-raised:#191d25;
+  --color-ink-950:#edeff3; --color-ink-800:#cdd3dd; --color-ink-600:#aeb6c2; --color-ink-500:#9aa3b2;
+  --color-ink-400:#8790a0; --color-ink-200:#5b6474; --color-ink-100:#2b3350; --color-ink-50:#20252f;
+  --surface-bg:var(--bg); --surface-raised:var(--surface); --surface-border:var(--border);
+  --surface-ink:var(--ink); --surface-ink-muted:var(--ink2); --shadow-soft:var(--card);
+}
+
+/* 深海模式（学习页沉浸，保留）：直接复用暗色基座 */
 [data-theme="deep"] {
   color-scheme: dark;
   --surface-bg: var(--color-deep-bg);
@@ -110,6 +208,7 @@ body::before {
 .text-balance { text-wrap: balance; }
 .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
 /* 强调数字/标签的等宽感 */
 .overline {
@@ -166,6 +265,28 @@ body::before {
 @keyframes dot-wave {
   0%, 100% { transform: translateY(0); }
   50%      { transform: translateY(-3px); }
+}
+
+/* ============================================================
+   STUDIO 动效（安静 + 物理感，时长 180–500ms，只动 transform/opacity）
+   ============================================================ */
+@keyframes riseIn   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideIn  { from{opacity:0;transform:translateX(14px)} to{opacity:1;transform:translateX(0)} }
+@keyframes recPulse { 0%,100%{box-shadow:0 0 0 0 rgba(252,1,26,.5)} 50%{box-shadow:0 0 0 5px rgba(252,1,26,0)} }
+@keyframes flashCap { 0%{opacity:0} 12%{opacity:.85} 100%{opacity:0} }
+@keyframes floatY   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+/* STUDIO 实用类 */
+.studio-rise { animation: riseIn .5s var(--ease-out-expo) both; }
+.studio-slide { animation: slideIn .4s var(--ease-out-expo) both; }
+/* 卡片悬浮：hover 上浮 + 软阴影 */
+.studio-lift { transition: transform var(--dur-fast) var(--ease-out-expo), box-shadow var(--dur-fast) var(--ease-out-expo), border-color var(--dur-fast) var(--ease-out-expo); }
+.studio-lift:hover { transform: translateY(-3px); box-shadow: var(--lift); }
+/* 按压反馈 */
+.studio-press:active { transform: scale(.97); }
+@media (prefers-reduced-motion: reduce) {
+  .studio-rise, .studio-slide { animation: none !important; }
+  .studio-lift:hover { transform: none !important; }
 }
 
 /* 网格状有机渐变背景（mesh，非 lila） */

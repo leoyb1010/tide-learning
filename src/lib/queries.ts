@@ -148,9 +148,11 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       isFree: lesson.isFree,
       liveStartAt: lesson.liveStartAt ? lesson.liveStartAt.toISOString() : null,
       liveSeatLimit: lesson.liveSeatLimit,
-      // 关键：付费章节且无权益时，videoUrl / articleMd 一律为 null
+      // 关键：付费章节且无权益时，videoUrl / articleMd / blocksJson 一律为 null
       videoUrl: access && lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : null,
       articleMd: access ? lesson.articleMd : null,
+      // ai_block 类型的结构化课件（付费门控同 articleMd）
+      blocksJson: access ? lesson.blocksJson : null,
       subtitles: access ? lesson.subtitles.map((s) => ({ startSec: s.startSec, endSec: s.endSec, text: s.text })) : [],
     },
     outline: siblings.map((l) => ({

@@ -1,19 +1,28 @@
 import Link from "next/link";
-import { ArrowRight, Waves, Users, PlayCircle, Broadcast, NotePencil, Sparkle } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowRight,
+  Play,
+  Microphone,
+  Sparkle,
+  House,
+  UsersThree,
+  Waveform,
+} from "@phosphor-icons/react/dist/ssr";
 import { listCourses, listUpdates, listRankedDemands } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
-import { CourseCard } from "@/components/CourseCard";
 import { VoteButton } from "@/components/VoteButton";
-import { SubscriptionCard } from "@/components/SubscriptionCard";
-import { Button, Badge, CoverBg, coverSrc } from "@/components/ui";
-import { YoudaoLogo } from "@/components/YoudaoLogo";
-import { TidalReveal as Reveal, Stagger, StaggerItem, FlipCounter, Magnetic } from "@/components/motion";
+import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
-import { UPDATE_TYPE_LABELS } from "@/lib/format";
 import { TRACKS } from "@/lib/tracks";
 
+/**
+ * 首页 · STUDIO 视觉复刻
+ * 品牌叙事：把「潮汐」改为「自习室」——今天，把这间自习室点亮。
+ * 结构：1) Hero（点亮自习室文案 + 续播深色卡） 2) 课程赛道 grid-cols-4 3) 共创 + 订阅 teaser
+ * 保留全部数据查询（listCourses / listUpdates / listRankedDemands / plans）、权益解析与所有链接。
+ */
 export default async function HomePage() {
   const user = await getCurrentUser();
   const [all, updates, demands, plans] = await Promise.all([
@@ -22,335 +31,288 @@ export default async function HomePage() {
     listRankedDemands(["collecting", "evaluating", "scheduled", "producing"]),
     prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
   ]);
-  await resolveEntitlement(user?.id ?? null);
+  const snapshot = await resolveEntitlement(user?.id ?? null);
 
   const featured = all.filter((c) => c.isFeatured);
   const hero = featured[0] ?? all[0];
-  // 近期有更新日志的课程 → 卡片打 NEW 角标（A3）
+
+  // 每条赛道领起自己的课程组；用于「课程赛道」grid（含每条赛道的新上新计数）。
   const newSlugs = new Set(updates.map((u) => u.courseSlug));
-  const withNew = (c: import("@/components/CourseCard").CourseCardData) => ({ ...c, isNew: newSlugs.has(c.slug) });
-  const trackLines = TRACKS.map((t) => ({ track: t, courses: all.filter((c) => c.category === t.key) })).filter((l) => l.courses.length > 0);
-  const totalLearners = all.reduce((s, c) => s + c.learnersCount, 0);
-  const mainPlans = plans.filter((p) => p.scope === "all" && p.billingPeriod !== "month").slice(0, 2);
-  const snapshot = await resolveEntitlement(user?.id ?? null);
+  const trackLines = TRACKS.map((t) => {
+    const courses = all.filter((c) => c.category === t.key);
+    return { track: t, courses, newCount: courses.filter((c) => newSlugs.has(c.slug)).length };
+  }).filter((l) => l.courses.length > 0);
+
+  // 续播卡：拿一门带更新的精选课作为「上次学到」的展示素材（纯视觉，链接指向课程）。
+  const resume = hero;
+  const topDemand = demands[0];
+  // 订阅 teaser：优先全站年费方案。
+  const yearPlan =
+    plans.find((p) => p.scope === "all" && p.billingPeriod === "year") ??
+    plans.find((p) => p.scope === "all") ??
+    plans[0];
+
+  // 眉标日期（保持 SSR 稳定：直接取当前日期格式化）
+  const now = new Date();
+  const weekday = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][now.getDay()];
+  const dateLabel = `${String(now.getMonth() + 1).padStart(2, "0")}/${String(now.getDate()).padStart(2, "0")}`;
+  const greeting = now.getHours() < 12 ? "上午好" : now.getHours() < 18 ? "下午好" : "晚上好";
+  const displayName = user?.nickname ?? "同学";
 
   return (
-    <div className="space-y-24 md:space-y-32">
+    <div className="mx-auto flex max-w-[1060px] flex-col gap-24 md:gap-28">
       <TrackView event="homepage_view" properties={{ mode: "standard" }} />
 
-      {/* 「本周上新」水位滚动条样式：让 rail 露出 accent 色滚动条作为水位提示 */}
-      <style>{`
-        .rail-tide { scrollbar-width: thin; scrollbar-color: var(--color-accent-400, #fca5a5) transparent; padding-bottom: 14px; }
-        .rail-tide::-webkit-scrollbar { display: block; height: 6px; }
-        .rail-tide::-webkit-scrollbar-track { background: var(--color-ink-100, #eef0f0); border-radius: 999px; }
-        .rail-tide::-webkit-scrollbar-thumb { background: linear-gradient(90deg, var(--color-accent-300, #fca5a5), var(--color-accent-500, #ef4444)); border-radius: 999px; }
-      `}</style>
-
-      {/* ============ 1. HERO — 非对称分栏 ============ */}
-      <section className="relative -mx-5 grid gap-10 px-5 pt-6 sm:-mx-8 sm:px-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-6">
-        <div className="relative z-10 max-w-xl">
-          <Reveal>
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-ink-100 bg-paper-raised px-3 py-1.5">
-              <YoudaoLogo variant="red" height={14} />
-              <span className="h-3 w-px bg-ink-200" />
-              <span className="text-xs font-medium text-ink-500">网易有道 出品</span>
-            </div>
-          </Reveal>
-          <Reveal>
-            <div className="overline flex items-center gap-2 text-ink-400">
-              <span className="live-dot h-1.5 w-1.5 rounded-full text-accent-600"><span className="block h-1.5 w-1.5 rounded-full bg-accent-600" /></span>
-              订阅制 · 持续更新 · 用户共创
-            </div>
-          </Reveal>
-          <Reveal delay={0.06}>
-            <h1 className="mt-5 text-[2.35rem] font-semibold leading-[1.08] tracking-tight text-ink-950 sm:text-[3.1rem]">
-              订阅一次，
-              <br />
-              学不完的<span className="relative whitespace-nowrap text-accent-700">持续更新<span className="absolute inset-x-0 -bottom-1 h-[3px] rounded-full bg-accent-200" /></span>课程
-            </h1>
-          </Reveal>
-          <Reveal delay={0.12}>
-            <p className="mt-6 max-w-md text-[1.05rem] leading-relaxed text-ink-600">
-              口语实战、AI 技能、银发英语、生活实用——每周滚动上新。全站畅学或单赛道自由组合，边学边记，投票决定下一门课。
-            </p>
-          </Reveal>
-          <Reveal delay={0.18}>
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Magnetic>
-                <Button href="/courses" variant="primary" size="lg" icon>免费试学第一章</Button>
-              </Magnetic>
-              <Button href="/pricing" variant="secondary" size="lg">查看订阅方案</Button>
-            </div>
-          </Reveal>
-          <Reveal delay={0.24}>
-            <p className="num mt-6 text-sm text-ink-400">
-              已有 <span className="text-ink-700">{totalLearners.toLocaleString()}+</span> 人在学 · 首月 ¥19.9 · 随时可取消
-            </p>
-          </Reveal>
+      {/* ============ 1. HERO — 点亮自习室 + 续播深色卡 ============ */}
+      <section className="flex flex-wrap items-center gap-x-12 gap-y-10">
+        {/* 左：文案 */}
+        <div className="min-w-[330px] flex-1 studio-rise">
+          <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink3)]">
+            {weekday} · {dateLabel} · {greeting}，{displayName}
+          </p>
+          <h1 className="mt-4 text-[30px] font-bold leading-[1.4] text-[var(--ink)] sm:text-[34px]">
+            今天，把这间
+            <br />
+            自习室<span className="text-[var(--red)]">点亮</span>。
+          </h1>
+          <p className="mt-5 max-w-[380px] text-[15px] leading-[1.8] text-[var(--ink2)]">
+            视频与笔记在同一张桌面。边看边记，随手截帧成卡；口语实战、AI 技能、银发英语、生活实用，每周持续更新，投票决定下一门课。
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Link
+              href={resume ? `/courses/${resume.slug}` : "/courses"}
+              className="studio-press inline-flex items-center gap-2 rounded-[13px] bg-[var(--ink)] px-5 py-3 text-[14px] font-bold text-[var(--surface)] transition-colors hover:opacity-90"
+            >
+              <Play size={15} weight="fill" />
+              继续上次学习
+            </Link>
+            <Link
+              href="/courses"
+              className="studio-press inline-flex items-center gap-2 rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-[14px] font-bold text-[var(--ink)] transition-colors hover:border-[var(--border2)]"
+            >
+              浏览课程
+              <ArrowRight size={15} weight="bold" />
+            </Link>
+          </div>
         </div>
 
-        {/* 右侧：产品掠影 —— 潮汐主视觉作为静态背景层（去掉双波形动画，减噪 + 降首屏 infinite 动画） */}
-        <Reveal delay={0.15} y={24}>
-          <div className="relative">
-            <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[28px]">
-              <img src="/illustrations/hero.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
-            </div>
-            <div className="relative rounded-[28px] border border-ink-100 bg-paper-raised/70 p-5 backdrop-blur-sm">
-              {hero && (
-                <Link href={`/courses/${hero.slug}`} className="block overflow-hidden rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised transition-transform duration-300 hover:-translate-y-1">
-                  <CoverBg color={hero.coverColor} imageSrc={coverSrc(hero.slug)} alt={hero.title} className="aspect-[16/9] w-full">
-                    <div className="absolute inset-0 flex items-end bg-gradient-to-t from-black/50 to-transparent p-5">
-                      <div className="text-white">
-                        <span className="rounded-full bg-black/25 px-2.5 py-1 text-[0.7rem] backdrop-blur-sm">{hero.categoryLabel}</span>
-                        <p className="mt-2 text-lg font-semibold tracking-tight">{hero.title}</p>
-                      </div>
-                    </div>
-                  </CoverBg>
-                </Link>
-              )}
-              {/* 悬浮信息 chips（A3-2：响应式 2/3 列） */}
-              <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-3">
-                <FloatChip icon={<Broadcast size={16} weight="fill" className="text-accent-600" />} label="直播小班" sub="真人纠音" />
-                <FloatChip icon={<NotePencil size={16} weight="fill" className="text-accent-600" />} label="时间戳笔记" sub="一键回跳" />
-                <FloatChip icon={<Sparkle size={16} weight="fill" className="text-accent-600" />} label="需求共创" sub="投票上新" />
+        {/* 右：续播深色卡 */}
+        {resume && (
+          <Link
+            href={`/courses/${resume.slug}`}
+            className="studio-lift studio-rise block max-w-[430px] flex-1 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]"
+          >
+            {/* 16:9 深色封面 */}
+            <div
+              className="relative aspect-[16/9] w-full overflow-hidden rounded-[13px]"
+              style={{ background: "linear-gradient(140deg,#232935 0%,#141821 100%)" }}
+            >
+              {/* 水印「习」 */}
+              <span className="pointer-events-none absolute -bottom-4 right-2 select-none text-[120px] font-black leading-none text-white/[0.06]">
+                习
+              </span>
+              {/* 底部渐变 */}
+              <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/55 to-transparent" />
+              {/* 左上：上次学到 04:12 */}
+              <div className="absolute left-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--red-soft)] px-2.5 py-1 text-[11px] text-[var(--red)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--red)]" />
+                <span className="mono">上次学到 04:12</span>
+              </div>
+              {/* 课程标题 */}
+              <p className="absolute inset-x-4 bottom-9 text-[13px] font-semibold text-white">
+                {resume.title}
+              </p>
+              {/* 播放圆 46 */}
+              <div className="absolute left-4 bottom-[52px] flex h-[46px] w-[46px] items-center justify-center rounded-full bg-white/15 backdrop-blur-sm">
+                <Play size={18} weight="fill" className="ml-0.5 text-white" />
+              </div>
+              {/* 进度条 42% */}
+              <div className="absolute inset-x-4 bottom-4 h-1 overflow-hidden rounded-full bg-white/20">
+                <div className="h-full rounded-full bg-[var(--red)]" style={{ width: "42%" }} />
               </div>
             </div>
+            {/* 卡底行 */}
+            <div className="mt-3.5 flex items-center justify-between px-1">
+              <div>
+                <p className="text-[13px] font-semibold text-[var(--ink)]">{resume.title}</p>
+                <p className="mono mt-0.5 text-[11px] text-[var(--ink3)]">
+                  已记 3 条 · 剩 6 分钟
+                </p>
+              </div>
+              <span className="mono shrink-0 text-[13px] font-semibold text-[var(--red)]">64%</span>
+            </div>
+          </Link>
+        )}
+      </section>
+
+      {/* ============ 2. 课程赛道 — grid-cols-4 ============ */}
+      <section>
+        <Reveal>
+          <div className="mb-6 flex items-end justify-between gap-4">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">TRACKS</p>
+              <h2 className="mt-1.5 text-[18px] font-bold text-[var(--ink)]">课程赛道</h2>
+            </div>
+            <Link
+              href="/courses"
+              className="group inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-[var(--red)]"
+            >
+              全部赛道
+              <ArrowRight size={14} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
         </Reveal>
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          {trackLines.map((l, i) => (
+            <TrackCard key={l.track.key} line={l} index={i} />
+          ))}
+        </div>
       </section>
 
-      {/* ============ 2. 赛道快捷导航 — 静态可点击 pill（替代跑马灯：可导流、无跳帧）============ */}
-      <nav aria-label="课程赛道" className="-mt-10 flex flex-wrap gap-2.5 md:-mt-16">
-        {TRACKS.map((t) => (
+      {/* ============ 3. 共创 + 订阅 teaser ============ */}
+      <section className="grid gap-4 lg:grid-cols-[1.35fr_1fr]">
+        {/* 共创卡 */}
+        <div className="studio-lift flex flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--card)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">CO-CREATE</p>
+              <h2 className="mt-1.5 text-[18px] font-bold text-[var(--ink)]">共创广场</h2>
+            </div>
+            <Link
+              href="/demands"
+              className="group inline-flex shrink-0 items-center gap-1 text-[13px] font-semibold text-[var(--red)]"
+            >
+              你想学的，投票决定
+              <ArrowRight size={14} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+
+          {topDemand ? (
+            <div className="mt-5 flex items-center gap-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-4">
+              <div className="min-w-0 flex-1">
+                <Link href={`/demands/${topDemand.id}`} className="flex flex-wrap items-center gap-2">
+                  <span className="text-[14px] font-semibold text-[var(--ink)] hover:text-[var(--red)]">
+                    {topDemand.title}
+                  </span>
+                  <span className="rounded-full bg-[var(--red-soft)] border border-[var(--red-soft-border)] px-2.5 py-1 text-[11px] text-[var(--red)]">
+                    {topDemand.categoryLabel} · 已进入排期
+                  </span>
+                </Link>
+                {topDemand.description && (
+                  <p className="mt-1 line-clamp-1 text-[13px] text-[var(--ink3)]">{topDemand.description}</p>
+                )}
+              </div>
+              <div className="shrink-0">
+                <VoteButton
+                  demandId={topDemand.id}
+                  initialVotes={topDemand.totalVotes}
+                  canVote={snapshot.canVote}
+                  disabledReason={snapshot.canVote ? undefined : "订阅后可投票"}
+                />
+              </div>
+            </div>
+          ) : (
+            <p className="mt-5 text-[13px] text-[var(--ink3)]">还没有需求，去发起第一条吧。</p>
+          )}
+
           <Link
-            key={t.key}
-            href={`/courses?category=${t.key}`}
-            className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-paper-raised px-4 py-2 text-sm font-medium text-ink-600 transition-colors hover:border-accent-200 hover:text-accent-700"
+            href="/demands"
+            className="mono mt-4 inline-flex items-center gap-1.5 text-[11px] text-[var(--ink3)] hover:text-[var(--red)]"
           >
-            <Waves size={14} weight="light" className="text-ink-300" />
-            {t.label}
+            <UsersThree size={13} />
+            共 {demands.length} 条在征集 · 每周排期一次
           </Link>
-        ))}
-      </nav>
-
-      {/* ============ 3. 本周上新 — 横向 rail ============ */}
-      <Section overline="ROLLING" title="本周上新" desc="每门课都有更新日志，这不是死课" href="/updates" linkText="查看全部">
-        {/* 滚动水位条：可见的 accent 水位滚动条（原生 thumb = 当前水位）；末尾留白让下一张卡片露出约 20% */}
-        <div className="rail rail-tide -mx-5 px-5 pr-[20%] sm:-mx-8 sm:px-8 sm:pr-[15%]">
-          {updates.map((u, i) => (
-            <Reveal key={u.id} delay={i * 0.04}>
-              <Link href={`/courses/${u.courseSlug}`} className="block w-[280px] rounded-[var(--radius-card)] border border-ink-100 bg-paper-raised p-5 transition-all duration-300 hover:-translate-y-1 hover:border-accent-200">
-                <div className="flex items-center justify-between">
-                  <Badge tone="success">{UPDATE_TYPE_LABELS[u.updateType]}</Badge>
-                  <span className="num text-xs text-ink-400">{u.relativeTime}</span>
-                </div>
-                <p className="mt-4 font-semibold tracking-tight text-ink-950">{u.courseTitle}</p>
-                <p className="mt-1 line-clamp-2 text-sm text-ink-500">{u.title}</p>
-                <p className="num mt-4 border-t border-ink-100 pt-3 text-xs text-ink-400">预计总时长 {u.duration}</p>
-              </Link>
-            </Reveal>
-          ))}
         </div>
-      </Section>
 
-      {/* ============ 4. 精选 — Bento（1 大 + 2 小，避免三等分）============ */}
-      <Section overline="FEATURED" title="精选课程" desc="最值得先学的几门" href="/courses" linkText="全部课程">
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 lg:row-span-2">
-            {featured[0] && <FeatureLarge course={featured[0]} />}
-          </div>
-          {featured.slice(1, 3).map((c) => (
-            <CourseCard key={c.id} course={withNew(c)} />
-          ))}
-        </div>
-      </Section>
-
-      {/* ============ 5. 内容赛道 — 统一标题头 + 横向 rail（每条赛道领起自己的课程组）============ */}
-      <div className="space-y-16 md:space-y-20">
-        {trackLines.map((l) => (
-          <Section
-            key={l.track.key}
-            overline={l.track.label}
-            title={l.track.blurb}
-            desc={l.track.people}
-            href={`/courses?category=${l.track.key}`}
-            linkText="查看全部"
-          >
-            <div className="rail -mx-5 px-5 sm:-mx-8 sm:px-8">
-              {l.courses.map((c) => (
-                <div key={c.id} className="w-[300px]"><CourseCard course={withNew(c)} /></div>
-              ))}
-            </div>
-          </Section>
-        ))}
-      </div>
-
-      {/* ============ 6. 需求榜 — 编辑式榜单（分隔线，不装盒）============ */}
-      <Section overline="CO-CREATE" title="需求排行榜" desc="你投票，决定平台下一批课程" href="/demands" linkText="进入共创">
-        <Stagger className="divide-y divide-ink-100 border-y border-ink-100">
-          {demands.slice(0, 5).map((d, i) => (
-            <StaggerItem key={d.id}>
-              <div className="flex items-center gap-5 py-5">
-                <span className={`num w-8 shrink-0 text-lg ${i === 0 ? "text-accent-600" : "text-ink-300"}`}>{String(i + 1).padStart(2, "0")}</span>
-                <div className="min-w-0 flex-1">
-                  <Link href={`/demands/${d.id}`} className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-ink-950 hover:text-accent-700">{d.title}</span>
-                    <Badge tone="muted">{d.categoryLabel}</Badge>
-                  </Link>
-                  {d.description && <p className="mt-1 line-clamp-1 text-sm text-ink-500">{d.description}</p>}
-                </div>
-                <VoteButton demandId={d.id} initialVotes={d.totalVotes} canVote={snapshot.canVote} disabledReason={snapshot.canVote ? undefined : "订阅后可投票"} />
-              </div>
-            </StaggerItem>
-          ))}
-        </Stagger>
-      </Section>
-
-      {/* ============ 7. 学习+笔记 演示 — 分栏 ============ */}
-      <Reveal>
-        <section className="grid items-center gap-10 rounded-[28px] border border-ink-100 bg-paper-raised p-8 sm:p-12 lg:grid-cols-2">
-          <div>
-            <div className="overline text-ink-400">NOTES</div>
-            <h2 className="mt-3 text-[1.75rem] font-semibold tracking-tight text-ink-950">边学边记，笔记带时间戳</h2>
-            <p className="mt-4 leading-relaxed text-ink-600">
-              记笔记不打断视频。每条笔记自动绑定课程、章节与时间戳，下次点一下就回到视频对应位置。停订后笔记仍可查看和导出。
+        {/* 订阅卡（深底 + 右下红圆装饰） */}
+        <div className="relative flex flex-col overflow-hidden rounded-[16px] bg-[var(--video-bg)] p-6 text-white">
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -bottom-10 -right-10 h-40 w-40 rounded-full"
+            style={{ background: "radial-gradient(circle, rgba(252,1,26,0.45), transparent 70%)" }}
+          />
+          <div className="relative z-10 flex flex-1 flex-col">
+            <p className="mono text-[10px] uppercase tracking-[0.14em] text-white/50">SUBSCRIBE</p>
+            <h2 className="mt-2 text-[18px] font-bold">年度会员 · 持续更新</h2>
+            <p className="mono mt-3 text-[13px] text-white/70">
+              {yearPlan ? `¥${(yearPlan.priceCents / 100).toFixed(0)}/年` : "订阅制"} · 全部赛道畅学
             </p>
-            <ul className="mt-6 space-y-3">
-              {["时间戳锚点，一键回跳", "按课程归档、全文搜索", "笔记永久保留，属于你自己"].map((t) => (
-                <li key={t} className="flex items-center gap-2.5 text-sm text-ink-700">
-                  <ArrowRight size={15} weight="bold" className="text-accent-600" /> {t}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-7"><Button href="/notes" variant="secondary">查看我的笔记</Button></div>
+            <p className="mt-2 text-[13px] leading-[1.7] text-white/60">
+              停订后笔记与截帧永久保存。随时可取消。
+            </p>
+            <Link
+              href="/pricing"
+              className="group mt-auto inline-flex items-center gap-1.5 pt-6 text-[13px] font-semibold text-white"
+            >
+              查看方案
+              <ArrowRight size={14} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+            </Link>
           </div>
-          <div className="rounded-[var(--radius-card)] border border-ink-100 bg-paper p-5">
-            <div className="mb-3 aspect-video overflow-hidden rounded-xl" style={{ background: "linear-gradient(140deg,#2a0a0d,#fc011a)" }}>
-              <div className="flex h-full items-center justify-center">
-                <PlayCircle size={44} weight="fill" className="text-white/90" />
-              </div>
-            </div>
-            <div className="rounded-lg border border-ink-100 bg-paper-raised p-3.5">
-              <span className="num inline-block rounded bg-accent-50 px-2 py-0.5 text-xs text-accent-700">03:00</span>
-              <p className="mt-2 text-sm text-ink-700">关键点：把 AI 当协作者，先给背景再提要求。</p>
-            </div>
-          </div>
-        </section>
-      </Reveal>
-
-      {/* ============ 8. 数据条 — 分隔线，不装盒 ============ */}
-      <section className="grid gap-8 border-y border-ink-100 py-12 sm:grid-cols-3 sm:divide-x sm:divide-ink-100">
-        <Stat value={all.length} label="门体系化课程" />
-        <Stat value={totalLearners} label="累计学习人次" suffix="+" />
-        <StatText value={`${TRACKS.length} 条`} label="在售赛道 · 每周上新" />
+        </div>
       </section>
-
-      {/* ============ 9. 订阅 ============ */}
-      <Section overline="PRICING" title="按需订阅，自由组合" desc="全站畅学，或只订你要的赛道" center>
-        <div className="mx-auto grid max-w-2xl gap-6 sm:grid-cols-2">
-          {mainPlans.map((p) => (
-            <SubscriptionCard key={p.id} plan={p} isLoggedIn={!!user} redirectTo="/me/subscription" />
-          ))}
-        </div>
-        <p className="mt-5 text-center text-sm text-ink-400">
-          还有单赛道月卡低门槛切入 · <Link href="/pricing" className="link-underline text-accent-700">查看完整方案</Link>
-        </p>
-      </Section>
-
-      {/* ============ 10. FAQ ============ */}
-      <Section overline="FAQ" title="常见问题" center>
-        <div className="mx-auto max-w-2xl divide-y divide-ink-100 border-y border-ink-100">
-          {FAQ.map((f) => (
-            <details key={f.q} className="group py-5">
-              <summary className="flex cursor-pointer list-none items-center justify-between font-medium text-ink-950">
-                {f.q}
-                <span className="text-ink-300 transition-transform duration-300 group-open:rotate-45"><ArrowRight size={18} className="rotate-45" /></span>
-              </summary>
-              <p className="mt-3 text-sm leading-relaxed text-ink-500">{f.a}</p>
-            </details>
-          ))}
-        </div>
-      </Section>
     </div>
   );
 }
-
-const FAQ = [
-  { q: "订阅后可以学哪些课程？", a: "全站会员解锁全部赛道；单赛道会员解锁所订赛道，含每周上新的新章节。停订后课程锁定，但笔记永久保留。" },
-  { q: "怎么取消订阅？", a: "在「我的 · 订阅管理」中随时可取消，取消入口清晰可见。取消后权益保留到当前周期结束，不会二次扣费。" },
-  { q: "需求投票真的有用吗？", a: "有。订阅用户每周有 5 票，投票进入综合排行榜，与投流数据一起决定课程排期。需求上线后，投过票的用户会收到通知。" },
-  { q: "健康类课程靠谱吗？", a: "健康内容仅用于健康信息素养学习，不构成诊断、治疗或用药建议，且必须经审核人审核并标注免责声明。" },
-];
 
 /* ---------- 局部组件 ---------- */
-function Section({ overline, title, desc, href, linkText, center, children }: { overline?: string; title: string; desc?: string; href?: string; linkText?: string; center?: boolean; children: React.ReactNode }) {
+
+// 赛道图标：按 key 选一个语义图标。
+const TRACK_ICONS: Record<string, React.ReactNode> = {
+  english_oral: <Microphone size={18} weight="fill" />,
+  english_foundation: <Waveform size={18} weight="fill" />,
+  silver_english: <UsersThree size={18} weight="fill" />,
+  ai_skill: <Sparkle size={18} weight="fill" />,
+  life: <House size={18} weight="fill" />,
+};
+
+function TrackCard({
+  line,
+  index,
+}: {
+  line: { track: import("@/lib/tracks").Track; courses: unknown[]; newCount: number };
+  index: number;
+}) {
+  const { track, courses, newCount } = line;
+  // 银发赛道用深色卡强调（spec：银发深色卡）。
+  const isDark = track.key === "silver_english";
   return (
-    <section>
-      <Reveal>
-        <div className={`mb-8 flex items-end justify-between gap-4 ${center ? "flex-col items-center text-center" : ""}`}>
-          <div>
-            {overline && <div className="overline mb-2 text-ink-400">{overline}</div>}
-            <h2 className="text-[1.75rem] font-semibold tracking-tight text-ink-950">{title}</h2>
-            {desc && <p className="mt-2 text-ink-500">{desc}</p>}
-          </div>
-          {href && linkText && !center && (
-            <Link href={href} className="group inline-flex shrink-0 items-center gap-1 text-sm font-medium text-accent-700">
-              {linkText}
-              <ArrowRight size={15} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
-            </Link>
+    <Reveal delay={index * 0.05}>
+      <Link
+        href={`/courses?category=${track.key}`}
+        className={`studio-lift flex h-full flex-col rounded-[16px] border p-[18px] shadow-[var(--card)] ${
+          isDark
+            ? "border-transparent bg-[var(--video-bg)] text-white"
+            : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink)]"
+        }`}
+      >
+        {/* 图标盒 38 */}
+        <div
+          className={`flex h-[38px] w-[38px] items-center justify-center rounded-[11px] ${
+            isDark ? "bg-white/10 text-white" : "bg-[var(--red-soft)] text-[var(--red)]"
+          }`}
+        >
+          {TRACK_ICONS[track.key] ?? <Sparkle size={18} weight="fill" />}
+        </div>
+        {/* 名称 */}
+        <p className={`mt-4 text-[15px] font-bold ${isDark ? "text-white" : "text-[var(--ink)]"}`}>
+          {track.label}
+        </p>
+        <p className={`mt-1 text-[12px] leading-[1.5] ${isDark ? "text-white/55" : "text-[var(--ink3)]"}`}>
+          {track.blurb}
+        </p>
+        {/* 底部：课程数 + 新上新 */}
+        <div className="mt-auto flex items-center gap-2 pt-4">
+          <span className={`mono text-[12px] font-semibold ${isDark ? "text-white/80" : "text-[var(--red)]"}`}>
+            +{courses.length}
+          </span>
+          <span className={`text-[11px] ${isDark ? "text-white/45" : "text-[var(--ink4)]"}`}>门课程</span>
+          {newCount > 0 && (
+            <span className="ml-auto rounded-full bg-[var(--new-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--new-ink)]">
+              {newCount} 节新课上新
+            </span>
           )}
         </div>
-      </Reveal>
-      {children}
-    </section>
-  );
-}
-
-function FloatChip({ icon, label, sub }: { icon: React.ReactNode; label: string; sub: string }) {
-  return (
-    <div className="rounded-xl border border-ink-100 bg-paper-raised p-3">
-      {icon}
-      <p className="mt-2 text-xs font-medium text-ink-950">{label}</p>
-      <p className="text-[0.68rem] text-ink-400">{sub}</p>
-    </div>
-  );
-}
-
-function FeatureLarge({ course }: { course: import("@/components/CourseCard").CourseCardData }) {
-  return (
-    <Link href={`/courses/${course.slug}`} className="group flex h-full flex-col overflow-hidden rounded-[24px] border border-ink-100 bg-paper-raised transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 hover:border-accent-200 hover:shadow-[0_32px_64px_-32px_rgba(13,51,45,0.3)]">
-      <CoverBg color={course.coverColor} imageSrc={coverSrc(course.slug)} alt={course.title} className="aspect-[16/9] w-full lg:aspect-[16/8]">
-        <div className="absolute left-4 top-4"><span className="rounded-full bg-black/25 px-3 py-1 text-xs text-white backdrop-blur-sm">{course.categoryLabel}</span></div>
-      </CoverBg>
-      <div className="flex flex-1 flex-col p-6">
-        <div className="overline flex items-center gap-2 text-ink-400"><span>{course.levelLabel}</span><span className="h-3 w-px bg-ink-200" /><span>{course.duration}</span></div>
-        <h3 className="mt-2 text-xl font-semibold tracking-tight text-ink-950 group-hover:text-accent-700">{course.title}</h3>
-        {course.subtitle && <p className="mt-1.5 text-ink-500">{course.subtitle}</p>}
-        <div className="num mt-auto flex items-center gap-2 pt-4 text-sm text-accent-700">
-          {course.updateText}
-          <span className="ml-auto flex items-center gap-1 text-ink-400"><Users size={14} />{course.learnersCount.toLocaleString()}</span>
-        </div>
-      </div>
-    </Link>
-  );
-}
-
-function Stat({ value, label, suffix }: { value: number; label: string; suffix?: string }) {
-  return (
-    <div className="text-center sm:px-4">
-      <div className="num flex items-baseline justify-center text-4xl font-semibold tracking-tight text-ink-950">
-        <FlipCounter value={value} />
-        {suffix && <span>{suffix}</span>}
-      </div>
-      <div className="mt-2 text-sm text-ink-500">{label}</div>
-    </div>
-  );
-}
-function StatText({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="text-center sm:px-4">
-      <div className="text-4xl font-semibold tracking-tight text-ink-950">{value}</div>
-      <div className="mt-2 text-sm text-ink-500">{label}</div>
-    </div>
+      </Link>
+    </Reveal>
   );
 }

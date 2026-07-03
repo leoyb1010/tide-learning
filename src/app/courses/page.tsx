@@ -21,11 +21,18 @@ export default async function CoursesPage({
   const courses = await listCourses({ category, sort, q: searchTerms });
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-ink-950">课程库</h1>
-        <p className="mt-1 text-ink-500">订阅解锁全站 · 每门课都在持续更新</p>
-      </div>
+    <div className="studio-rise flex flex-col gap-6">
+      <header className="flex flex-col gap-1.5">
+        <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">
+          COURSE LIBRARY
+        </span>
+        <h1 className="text-[28px] font-bold leading-tight tracking-tight text-[var(--ink)]">
+          课程库
+        </h1>
+        <p className="text-[15px] leading-relaxed text-[var(--ink2)]">
+          订阅解锁全站 · 每门课都在持续更新
+        </p>
+      </header>
 
       <Suspense fallback={<div className="h-24" />}>
         <CourseFilterBar category={category} sort={sort} q={q} />
@@ -38,9 +45,18 @@ export default async function CoursesPage({
           action={<Button href="/courses">查看全部课程</Button>}
         />
       ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((c) => <CourseCard key={c.id} course={c} />)}
-        </div>
+        <>
+          <div className="flex items-center justify-between">
+            <span className="mono text-[12px] text-[var(--ink3)]">
+              共 {courses.length} 门课程
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {courses.map((c) => (
+              <CourseCard key={c.id} course={c} />
+            ))}
+          </div>
+        </>
       )}
     </div>
   );

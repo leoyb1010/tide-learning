@@ -1,0 +1,95 @@
+/**
+ * 有道自习室 STUDIO · 设计 Token（可直接用）
+ * 从 STUDIO v2 原型精确提取。重构 tide-work 时替换 globals.css 的 token 层。
+ * 配套规范见 docs/设计系统-STUDIO-v2.md
+ */
+
+:root {
+  /* ── 背景层（冷灰蓝，外→内递进）── */
+  --bg:            #E7EAF0;
+  --bg2:           #EDEFF3;
+  --surface:       #FFFFFF;
+  --surface2:      #F4F6F9;
+  --surface-inset: #EAEDF2;
+  --border:        #E2E6EC;
+  --border2:       #D3D9E2;
+
+  /* ── 文字（冷灰蓝墨色四阶）── */
+  --ink:  #232935;
+  --ink2: #5B6474;
+  --ink3: #8790A0;
+  --ink4: #AEB6C2;
+
+  /* ── 品牌红（唯一强调色，全局 ~7% 占比，只作"专注信号"）── */
+  --red:             #FC011A;
+  --red-soft:        #FFF1F2;
+  --red-soft-border: #FFD9DD;
+  --red-ink:         #C8000F;
+  --red-400:         #FF5462;
+
+  /* ── 深色区 / NEW 徽章 / 辅助 ── */
+  --video-bg:    #232935;
+  --new-bg:      #FFF3D0;   /* 米黄，刻意非红 */
+  --new-ink:     #8A6A00;
+  --accent-blue: #2E6BE6;
+  --scrim:       rgba(20,23,28,.55);
+
+  /* ── 字体 ── */
+  --font-ui:   'Plus Jakarta Sans', 'Noto Sans SC', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  /* ── 字号阶梯 ── */
+  --fs-display-lg: 40px;
+  --fs-display:    32px;
+  --fs-heading:    24px;
+  --fs-heading-sm: 22px;
+  --fs-sub:        18px;
+  --fs-body:       15px;
+  --fs-small:      13px;
+  --fs-data:       12px;
+  --fs-caption:    11px;
+
+  /* ── 圆角 ── */
+  --radius-sm:   8px;
+  --radius-md:   12px;
+  --radius-lg:   16px;
+  --radius-xl:   18px;
+  --radius-pill: 999px;
+
+  /* ── 阴影（软深度：双层柔投影，阴影基色 = ink 的 RGB）── */
+  --shadow-card: 0 2px 6px -2px rgba(35,41,53,.12);
+  --shadow-lift: 0 10px 26px -12px rgba(35,41,53,.28), 0 1px 0 rgba(255,255,255,.7) inset;
+
+  /* ── 过渡 ── */
+  --ease-out:   cubic-bezier(.2,.7,.2,1);
+  --t-fast:     .12s;
+  --t-base:     .18s;
+  --t-slow:     .2s;
+  --t-progress: .4s;
+}
+
+[data-theme="dark"] {
+  --bg:            #0E1116;
+  --bg2:           #12151B;
+  --surface:       #191D25;
+  --surface2:      #20252F;
+  --surface-inset: #20252F;
+  --border:        #2B3350;
+  --border2:       #39415E;
+  --ink:  #EDEFF3;
+  --ink2: #AEB6C2;
+  --ink3: #9AA3B2;   /* 已从原型 #8790A0 略提亮，改善暗色对比度（见规范 §7） */
+  --ink4: #5B6474;
+  --video-bg: #12151B;
+}
+
+/* ── 动效关键帧（安静 + 物理感，时长 180–500ms）── */
+@keyframes riseIn   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes slideIn  { from{opacity:0;transform:translateX(14px)} to{opacity:1;transform:translateX(0)} }
+@keyframes recPulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(252,1,26,.5)} 50%{opacity:.75;box-shadow:0 0 0 5px rgba(252,1,26,0)} }
+@keyframes flashCap { 0%{opacity:0} 12%{opacity:.85} 100%{opacity:0} }
+@keyframes floatY   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}

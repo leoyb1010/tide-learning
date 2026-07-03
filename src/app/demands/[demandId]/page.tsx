@@ -223,7 +223,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
                 >
                   {u.nickname}
                   {launched && i === 0 && (
-                    <span className="rounded-full bg-white/20 px-1.5 py-0.5 text-[0.65rem] font-medium">首潮</span>
+                    <span className="rounded-full bg-[var(--surface)]/20 px-1.5 py-0.5 text-[0.65rem] font-medium">首潮</span>
                   )}
                   <span className="num text-xs opacity-70">{u.votes}票</span>
                 </span>

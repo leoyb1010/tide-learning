@@ -4,7 +4,6 @@ import { resolveEntitlement } from "@/lib/entitlement";
 import { PricingPlans } from "@/components/PricingPlans";
 import { TrackView } from "@/components/TrackView";
 import { trackLabel, FUTURE_TRACKS } from "@/lib/tracks";
-import { Badge } from "@/components/ui";
 
 export const metadata = { title: "订阅方案" };
 
@@ -29,27 +28,35 @@ export default async function PricingPage() {
   const trackPlans = plans.filter((p) => p.scope !== "all");
 
   return (
-    <div className="space-y-14 py-4">
+    <div className="mx-auto max-w-[940px] space-y-16 py-4">
       <TrackView event="paywall_view" properties={{ trigger: "pricing_page" }} />
-      <div className="text-center">
-        <h1 className="text-3xl font-semibold tracking-tight text-ink-950">按需订阅，自由组合</h1>
-        <p className="mt-2 text-ink-500">全站畅学，或只订你要的赛道 · 笔记永久保留 · 随时可取消</p>
+
+      {/* 居中头 */}
+      <header className="studio-rise text-center">
+        <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">SUBSCRIBE · 订阅方案</p>
+        <h1 className="mt-2 text-[28px] font-bold leading-[1.25] tracking-tight text-[var(--ink)]">
+          一个订阅，畅学不停
+        </h1>
+        <p className="mx-auto mt-3 max-w-[520px] text-[15px] leading-[1.7] text-[var(--ink2)]">
+          全部赛道、持续更新、笔记与截帧永久保存。随时可取消。
+        </p>
         {snapshot.isSubscriber && (
-          <p className="mt-3 inline-block rounded-full bg-success/10 px-4 py-1.5 text-sm text-success">
+          <p className="mono mt-4 inline-flex items-center gap-1.5 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1.5 text-[12px] text-[var(--red-ink)]">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-[var(--red)]" />
             你已订阅（{snapshot.accessibleTracks === "all" ? "全站" : snapshot.accessibleTracks.map(trackLabel).join("、")}），有效至 {snapshot.validUntil ? new Date(snapshot.validUntil).toLocaleDateString("zh-CN") : ""}
           </p>
         )}
-      </div>
+      </header>
 
-      {/* 全站会员 + 单赛道会员（优惠券预览 + 折后价）*/}
+      {/* 全站会员 + 单赛道会员（优惠券预览 + 折后价 + 三档卡，含 hot 卡选中态）*/}
       <section>
-        <div className="mb-5 text-center">
-          <h2 className="text-xl font-semibold text-ink-950">全站会员</h2>
-          <p className="mt-1 text-sm text-ink-500">一次订阅，解锁全部赛道</p>
+        <div className="mb-6 text-center">
+          <h2 className="text-[18px] font-bold text-[var(--ink)]">全站会员</h2>
+          <p className="mt-1 text-[13px] text-[var(--ink3)]">一次订阅，解锁全部赛道</p>
         </div>
         <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} />
         {anchor && (
-          <p className="mt-4 text-center text-sm text-ink-400">
+          <p className="mono mt-5 text-center text-[13px] text-[var(--ink4)]">
             也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首月优惠）
           </p>
         )}
@@ -57,41 +64,54 @@ export default async function PricingPage() {
 
       {/* 未来赛道 */}
       <section className="text-center">
-        <p className="text-sm text-ink-400">即将上线更多赛道：</p>
+        <p className="text-[13px] text-[var(--ink4)]">即将上线更多赛道：</p>
         <div className="mt-3 flex flex-wrap justify-center gap-2">
-          {FUTURE_TRACKS.map((t) => <Badge key={t.key} tone="muted">{t.label}</Badge>)}
+          {FUTURE_TRACKS.map((t) => (
+            <span
+              key={t.key}
+              className="rounded-full border border-[var(--border)] bg-[var(--surface2)] px-3 py-1 text-[12px] text-[var(--ink3)]"
+            >
+              {t.label}
+            </span>
+          ))}
         </div>
       </section>
 
       {/* 权益对比 */}
-      <section className="mx-auto max-w-2xl">
-        <h2 className="mb-4 text-center text-xl font-semibold text-ink-950">权益对比</h2>
-        <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-paper-raised">
-          <table className="w-full text-sm">
+      <section className="mx-auto max-w-[620px]">
+        <h2 className="mb-4 text-center text-[18px] font-bold text-[var(--ink)]">权益对比</h2>
+        <div className="overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
+          <table className="w-full text-[13px]">
             <thead>
-              <tr className="border-b border-ink-100 text-ink-500">
+              <tr className="border-b border-[var(--border)] text-[var(--ink3)]">
                 <th className="px-4 py-3 text-left font-medium">权益</th>
                 <th className="px-4 py-3 text-center font-medium">免费</th>
-                <th className="px-4 py-3 text-center font-medium text-accent-700">订阅</th>
+                <th className="px-4 py-3 text-center font-semibold text-[var(--red-ink)]">订阅</th>
                 <th className="px-4 py-3 text-center font-medium">到期</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-ink-100">
-              {RIGHTS.map((r) => (
-                <tr key={r.name}>
-                  <td className="px-4 py-3 text-ink-800">{r.name}</td>
-                  <td className="px-4 py-3 text-center text-ink-400">{r.free}</td>
-                  <td className="px-4 py-3 text-center font-medium text-accent-700">{r.premium}</td>
-                  <td className="px-4 py-3 text-center text-ink-400">{r.expired}</td>
+            <tbody>
+              {RIGHTS.map((r, i) => (
+                <tr key={r.name} className={i > 0 ? "border-t border-[var(--border)]" : ""}>
+                  <td className="px-4 py-3 text-[var(--ink)]">{r.name}</td>
+                  <td className="mono px-4 py-3 text-center text-[var(--ink4)]">{r.free}</td>
+                  <td className="mono px-4 py-3 text-center font-semibold text-[var(--red-ink)]">{r.premium}</td>
+                  <td className="mono px-4 py-3 text-center text-[var(--ink4)]">{r.expired}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <p className="mt-3 text-center text-xs text-ink-400">
+        <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">
           停订后课程锁定，但笔记永久保留、可查看。健康类内容仅供健康信息素养学习。
         </p>
       </section>
+
+      {/* 底部已选回执 */}
+      <div className="mono mx-auto flex max-w-[620px] flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-[13px] border border-[var(--border)] bg-[var(--surface2)] px-5 py-3.5 text-center text-[12px] text-[var(--ink3)]">
+        <span className="font-semibold text-[var(--ink)]">已选：</span>
+        <span>全站会员 · 支持支付宝/微信 · 学生认证再享 8 折</span>
+      </div>
     </div>
   );
 }

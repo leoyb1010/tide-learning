@@ -31,7 +31,8 @@ interface TimelineProps {
 }
 
 /**
- * 时间轴视图（B4）：按日期分组，左侧一条波形潮汐线穿起每天的笔记。
+ * 时间轴视图（B4）：按日期分组，左侧一条潮汐线穿起每天的笔记。
+ * 视觉换 STUDIO：白卡 + 软阴影 + 冷灰蓝墨色 + 品牌红节点。
  */
 export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
   // 已按 updatedAt desc 到达；这里按 createdAt 分组以呈现"记录的那天"
@@ -48,29 +49,31 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
       {Array.from(groups.entries()).map(([k, { label, items }]) => (
         <section key={k}>
           <div className="mb-4 flex items-center gap-2">
-            <h2 className="text-sm font-semibold text-ink-800">{label}</h2>
-            <span className="text-xs text-ink-400">{items.length} 条</span>
+            <h2 className="text-[14px] font-bold text-[var(--ink)]">{label}</h2>
+            <span className="mono text-[12px] text-[var(--ink4)]">{items.length} 条</span>
           </div>
-          {/* 左侧波形潮汐线 */}
+          {/* 左侧潮汐线 */}
           <div className="relative pl-6">
-            <span className="pointer-events-none absolute left-[7px] top-1 bottom-1 w-px bg-gradient-to-b from-accent-200 via-accent-300 to-transparent" />
-            <Stagger className="space-y-3">
+            <span className="pointer-events-none absolute left-[7px] bottom-1 top-1 w-px bg-gradient-to-b from-[var(--red)] via-[var(--red-soft-border)] to-transparent" />
+            <Stagger className="space-y-3.5">
               {items.map((n) => {
                 const meta = KIND_META[n.kind];
                 const Icon = meta?.icon;
+                const isCapture = n.kind === "capture";
                 return (
                   <StaggerItem key={n.id}>
                     <div className="relative">
-                      {/* 潮汐节点 */}
+                      {/* 潮汐节点：截帧橙 / 其余红 */}
                       <motion.span
-                        className="absolute -left-[22px] top-4 h-2.5 w-2.5 rounded-full bg-accent-400 ring-2 ring-paper"
+                        className="absolute -left-[22px] top-[18px] h-2.5 w-2.5 rounded-full ring-2 ring-[var(--bg)]"
+                        style={{ background: isCapture ? "#f59e0b" : "var(--red)" }}
                         initial={{ scale: 0 }}
                         animate={{ scale: 1 }}
                         transition={{ duration: 0.4, ease: EASE }}
                       />
-                      <div className="group rounded-2xl border border-ink-100 bg-paper-raised p-4 transition-all hover:border-accent-400">
-                        <div className="mb-1.5 flex items-center gap-2 text-xs text-ink-400">
-                          <Link href={`/courses/${n.course.slug}`} className="truncate hover:text-accent-700">
+                      <div className="studio-lift group rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]">
+                        <div className="mb-1.5 flex items-center gap-2 text-[12px] text-[var(--ink4)]">
+                          <Link href={`/courses/${n.course.slug}`} className="truncate transition-colors hover:text-[var(--red)]">
                             {n.course.title}
                           </Link>
                           <span aria-hidden>·</span>
@@ -78,7 +81,7 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
                           {n.timestampSec != null && (
                             <Link
                               href={`/courses/${n.courseId}/learn/${n.lessonId}?t=${n.timestampSec}`}
-                              className="num ml-auto inline-flex shrink-0 items-center gap-1 rounded bg-accent-50 px-1.5 text-accent-700 hover:bg-accent-100"
+                              className="mono ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2 py-0.5 text-[var(--red)] transition-colors"
                             >
                               <Clock size={11} weight="fill" /> {mmss(n.timestampSec)}
                             </Link>
@@ -86,32 +89,32 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
                         </div>
 
                         <div className="flex items-start gap-3">
-                          {n.kind === "capture" && n.captureUrl && (
+                          {isCapture && n.captureUrl && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={n.captureUrl}
                               alt={n.title ?? "截帧"}
                               loading="lazy"
-                              className="h-16 w-24 shrink-0 rounded-lg object-cover"
+                              className="h-16 w-24 shrink-0 rounded-[10px] object-cover"
                             />
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5">
                               {meta && Icon && (
-                                <span className="inline-flex items-center gap-0.5 rounded bg-ink-50 px-1.5 py-0.5 text-[10px] font-medium text-ink-500">
+                                <span className="inline-flex items-center gap-0.5 rounded-full bg-[var(--surface-inset)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink3)]">
                                   <Icon size={11} weight="fill" /> {meta.label}
                                 </span>
                               )}
-                              {n.title && <p className="truncate font-medium text-ink-950">{n.title}</p>}
+                              {n.title && <p className="truncate font-semibold text-[var(--ink)]">{n.title}</p>}
                             </div>
                             {n.kind === "clip" && n.sourceText && (
-                              <blockquote className="mt-1 border-l-2 border-accent-200 pl-2 text-sm italic text-ink-600">
+                              <blockquote className="mt-1.5 border-l-2 border-[var(--red-soft-border)] pl-2.5 text-[13px] italic leading-[1.6] text-[var(--ink3)]">
                                 {n.sourceText}
                               </blockquote>
                             )}
                             {n.contentMd?.trim() && (
                               <div
-                                className="tide-md mt-1 line-clamp-4 text-sm text-ink-800"
+                                className="tide-md mt-1 line-clamp-4 text-[14px] leading-[1.65] text-[var(--ink2)]"
                                 dangerouslySetInnerHTML={{ __html: renderMarkdown(n.contentMd) }}
                               />
                             )}
@@ -132,15 +135,15 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
                               type="button"
                               onClick={() => onToggleStar(n)}
                               aria-label={n.starred ? "取消收藏" : "收藏"}
-                              className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-50 hover:text-accent-600"
+                              className="rounded-[9px] p-1.5 text-[var(--ink4)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--red)]"
                             >
-                              <Star size={16} weight={n.starred ? "fill" : "regular"} className={n.starred ? "text-accent-500" : ""} />
+                              <Star size={16} weight={n.starred ? "fill" : "regular"} className={n.starred ? "text-[var(--red)]" : ""} />
                             </button>
                             <button
                               type="button"
                               onClick={() => onDelete(n)}
                               aria-label="删除"
-                              className="rounded-lg p-1.5 text-ink-400 hover:bg-error/10 hover:text-error"
+                              className="rounded-[9px] p-1.5 text-[var(--ink4)] transition-colors hover:bg-[var(--red-soft)] hover:text-[var(--red)]"
                             >
                               <Trash size={16} />
                             </button>
