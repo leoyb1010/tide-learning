@@ -34,7 +34,7 @@ export function TidalReveal({
       initial={{ opacity: 0, y, scale: 0.98 }}
       whileInView={{ opacity: 1, y: 0, scale: 1 }}
       viewport={{ once: true, margin: "-80px" }}
-      transition={{ duration: 0.7, ease: EASE_TIDE, delay }}
+      transition={{ duration: 0.7, ease: EASE, delay }}
     >
       {children}
     </motion.div>
@@ -79,25 +79,33 @@ export function StaggerItem({ children, className }: { children: ReactNode; clas
 /** 指针跟随的高光边框卡片（spotlight）。 */
 export function Spotlight({ children, className }: { children: ReactNode; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
-  const mx = useMotionValue(-200);
-  const my = useMotionValue(-200);
-  const bg = useTransform(
-    [mx, my],
-    ([x, y]) => `radial-gradient(220px circle at ${x}px ${y}px, rgba(252,1,26,0.08), transparent 60%)`,
-  );
+  const glowRef = useRef<HTMLDivElement>(null);
 
   function onMove(e: React.MouseEvent<HTMLDivElement>) {
     const el = ref.current;
-    if (!el) return;
+    const glow = glowRef.current;
+    if (!el || !glow) return;
     if (window.matchMedia("(pointer: coarse)").matches) return; // 触屏禁用高光
     const r = el.getBoundingClientRect();
-    mx.set(e.clientX - r.left);
-    my.set(e.clientY - r.top);
+    // 只改 CSS 变量，避免每帧重算 gradient 字符串触发 paint
+    glow.style.setProperty("--mx", `${e.clientX - r.left}px`);
+    glow.style.setProperty("--my", `${e.clientY - r.top}px`);
   }
 
   return (
     <div ref={ref} onMouseMove={onMove} className={`group relative ${className ?? ""}`}>
-      <motion.div style={{ background: bg }} className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+      <div
+        ref={glowRef}
+        className="pointer-events-none absolute inset-0 rounded-[inherit] opacity-0 transition-opacity duration-300 group-hover:opacity-100"
+        style={{
+          // 初始 --mx/--my 置于视口外，避免首帧闪烁
+          ["--mx" as string]: "-200px",
+          ["--my" as string]: "-200px",
+          background:
+            "radial-gradient(220px circle at var(--mx) var(--my), rgba(252,1,26,0.08), transparent 60%)",
+          willChange: "background",
+        }}
+      />
       {children}
     </div>
   );
@@ -162,20 +170,36 @@ export function Ripple({ children, className, color = "rgba(252,1,26,0.35)" }: {
 /** 水位波形进度：SVG 波浪填充，波幅随进度衰减（快完成时水面渐平）。 */
 export function WaveProgress({ value, height = 8, className }: { value: number; height?: number; className?: string }) {
   const clamped = Math.max(0, Math.min(1, value));
-  const amp = 2 + (1 - clamped) * 3; // 波幅：进度越高越平
+  const amp = 2 + (1 - clamped) * 3; // 波幅：进度越高越平（静态波形，不再逐帧改 path）
+  // 两段等宽波形拼接，配合 wave-x 关键帧 translateX(-50%) 实现无缝漂移
+  const wavePath = `M0,12 Q6,${12 - amp} 12,12 T24,12 T36,12 T48,12 V24 H0 Z`;
   return (
     <div className={`relative overflow-hidden rounded-full bg-ink-100 ${className ?? ""}`} style={{ height }} role="progressbar" aria-valuenow={Math.round(clamped * 100)} aria-valuemin={0} aria-valuemax={100}>
+      {/* 进度填充层：scaleX 走合成层，不触发重排。transformOrigin:left 从左生长 */}
       <motion.div
-        className="absolute inset-y-0 left-0 bg-accent-600/85"
-        initial={{ width: 0 }}
-        animate={{ width: `${clamped * 100}%` }}
+        className="absolute inset-y-0 left-0 w-full origin-left bg-accent-600/85"
+        style={{ transformOrigin: "left", willChange: "transform" }}
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: clamped }}
+        transition={{ ...SPRING_GENTLE, type: "spring" }}
+      />
+      {/* 波形层：与填充层分离，避免被 scaleX 横向拉伸。CSS translateX 漂移 */}
+      <motion.div
+        className="pointer-events-none absolute inset-y-0 left-0 w-full origin-left overflow-hidden"
+        style={{ transformOrigin: "left" }}
+        initial={{ scaleX: 0 }}
+        animate={{ scaleX: clamped }}
         transition={{ ...SPRING_GENTLE, type: "spring" }}
       >
-        <svg className="absolute right-0 top-0 h-full" width="24" viewBox="0 0 24 24" preserveAspectRatio="none" aria-hidden>
-          <path d={`M0,12 Q6,${12 - amp} 12,12 T24,12 V24 H0 Z`} fill="currentColor" className="text-accent-600/85">
-            <animate attributeName="d" dur="2.2s" repeatCount="indefinite"
-              values={`M0,12 Q6,${12 - amp} 12,12 T24,12 V24 H0 Z;M0,12 Q6,${12 + amp} 12,12 T24,12 V24 H0 Z;M0,12 Q6,${12 - amp} 12,12 T24,12 V24 H0 Z`} />
-          </path>
+        <svg
+          className="absolute right-0 top-0 h-full text-accent-600/85"
+          width="48"
+          viewBox="0 0 24 24"
+          preserveAspectRatio="none"
+          aria-hidden
+          style={{ animation: "wave-x 2.2s linear infinite", willChange: "transform" }}
+        >
+          <path d={wavePath} fill="currentColor" />
         </svg>
       </motion.div>
     </div>
@@ -270,7 +294,7 @@ export function PageTide({ children, keyId }: { children: ReactNode; keyId: stri
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0.6, y: -8 }}
-        transition={{ duration: 0.42, ease: EASE_TIDE }}
+        transition={{ duration: 0.42, ease: EASE }}
       >
         {children}
       </motion.div>

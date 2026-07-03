@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { listCourses } from "@/lib/queries";
+import { expandSearchKeywords } from "@/lib/llm";
 import { CourseCard } from "@/components/CourseCard";
 import { CourseFilterBar } from "@/components/CourseFilterBar";
 import { EmptyState, Button } from "@/components/ui";
@@ -15,7 +16,9 @@ export default async function CoursesPage({
   const category = sp.category ?? "all";
   const sort = sp.sort ?? "recommended";
   const q = sp.q ?? "";
-  const courses = await listCourses({ category, sort, q });
+  // 语义搜索（场景4）：有关键词时用 LLM 扩展同义词再检索；失败/未配置自动降级为原词（不阻塞）
+  const searchTerms = q ? await expandSearchKeywords(q) : undefined;
+  const courses = await listCourses({ category, sort, q: searchTerms });
 
   return (
     <div className="space-y-6">

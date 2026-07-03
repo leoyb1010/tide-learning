@@ -57,7 +57,7 @@ export default async function HomePage() {
             </div>
           </Reveal>
           <Reveal>
-            <div className="overline flex items-center gap-2 text-accent-600">
+            <div className="overline flex items-center gap-2 text-ink-400">
               <span className="live-dot h-1.5 w-1.5 rounded-full text-accent-600"><span className="block h-1.5 w-1.5 rounded-full bg-accent-600" /></span>
               订阅制 · 持续更新 · 用户共创
             </div>
@@ -89,27 +89,11 @@ export default async function HomePage() {
           </Reveal>
         </div>
 
-        {/* 右侧：编辑式产品掠影 */}
+        {/* 右侧：产品掠影 —— 潮汐主视觉作为静态背景层（去掉双波形动画，减噪 + 降首屏 infinite 动画） */}
         <Reveal delay={0.15} y={24}>
           <div className="relative">
-            {/* 主视觉潮汐插画作为右侧背景层；叠一层缓动正弦波形保留动感（reduced-motion 下静止） */}
             <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[28px]">
               <img src="/illustrations/hero.jpg" alt="" className="absolute inset-0 h-full w-full object-cover opacity-90" />
-              {[
-                { fill: "rgba(252,1,26,0.05)", dur: "13s", top: "18%", rev: false },
-                { fill: "rgba(252,1,26,0.08)", dur: "9s", top: "34%", rev: true },
-              ].map((w, i) => (
-                <svg
-                  key={i}
-                  className={`absolute left-0 h-[46%] w-[200%] motion-reduce:animate-none`}
-                  style={{ top: w.top, animation: `wave-x ${w.dur} linear infinite${w.rev ? " reverse" : ""}` }}
-                  viewBox="0 0 1440 160"
-                  preserveAspectRatio="none"
-                  fill="none"
-                >
-                  <path d="M0 80 Q180 20 360 80 T720 80 T1080 80 T1440 80 V160 H0 Z" fill={w.fill} />
-                </svg>
-              ))}
             </div>
             <div className="relative rounded-[28px] border border-ink-100 bg-paper-raised/70 p-5 backdrop-blur-sm">
               {hero && (
@@ -135,17 +119,19 @@ export default async function HomePage() {
         </Reveal>
       </section>
 
-      {/* ============ 2. 赛道跑马灯 ============ */}
-      <section className="marquee -mx-5 overflow-hidden border-y border-ink-100 py-5 sm:-mx-8">
-        <div className="marquee-track">
-          {[...TRACKS, ...TRACKS, ...TRACKS].map((t, i) => (
-            <span key={i} className="mx-6 inline-flex items-center gap-3 text-[1.35rem] font-medium tracking-tight text-ink-300">
-              {t.label}
-              <Waves size={16} weight="light" className="text-accent-400" />
-            </span>
-          ))}
-        </div>
-      </section>
+      {/* ============ 2. 赛道快捷导航 — 静态可点击 pill（替代跑马灯：可导流、无跳帧）============ */}
+      <nav aria-label="课程赛道" className="-mt-10 flex flex-wrap gap-2.5 md:-mt-16">
+        {TRACKS.map((t) => (
+          <Link
+            key={t.key}
+            href={`/courses?category=${t.key}`}
+            className="inline-flex items-center gap-1.5 rounded-full border border-ink-100 bg-paper-raised px-4 py-2 text-sm font-medium text-ink-600 transition-colors hover:border-accent-200 hover:text-accent-700"
+          >
+            <Waves size={14} weight="light" className="text-ink-300" />
+            {t.label}
+          </Link>
+        ))}
+      </nav>
 
       {/* ============ 3. 本周上新 — 横向 rail ============ */}
       <Section overline="ROLLING" title="本周上新" desc="每门课都有更新日志，这不是死课" href="/updates" linkText="查看全部">
@@ -179,23 +165,23 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      {/* ============ 5. 内容赛道 — zig-zag ============ */}
-      <div className="space-y-20">
-        {trackLines.map((l, i) => (
-          <Reveal key={l.track.key}>
-            <div className={`grid gap-6 lg:grid-cols-[0.8fr_2.2fr] lg:items-center ${i % 2 === 1 ? "lg:[&>*:first-child]:order-2" : ""}`}>
-              <div className={i % 2 === 1 ? "lg:pl-8 lg:text-right" : ""}>
-                <div className="overline text-accent-600">TRACK</div>
-                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-ink-950">{l.track.label}</h3>
-                <p className="mt-2 text-sm leading-relaxed text-ink-500">{l.track.people} · {l.track.blurb}</p>
-              </div>
-              <div className="rail">
-                {l.courses.map((c) => (
-                  <div key={c.id} className="w-[300px]"><CourseCard course={withNew(c)} /></div>
-                ))}
-              </div>
+      {/* ============ 5. 内容赛道 — 统一标题头 + 横向 rail（每条赛道领起自己的课程组）============ */}
+      <div className="space-y-16 md:space-y-20">
+        {trackLines.map((l) => (
+          <Section
+            key={l.track.key}
+            overline={l.track.label}
+            title={l.track.blurb}
+            desc={l.track.people}
+            href={`/courses?category=${l.track.key}`}
+            linkText="查看全部"
+          >
+            <div className="rail -mx-5 px-5 sm:-mx-8 sm:px-8">
+              {l.courses.map((c) => (
+                <div key={c.id} className="w-[300px]"><CourseCard course={withNew(c)} /></div>
+              ))}
             </div>
-          </Reveal>
+          </Section>
         ))}
       </div>
 
@@ -224,7 +210,7 @@ export default async function HomePage() {
       <Reveal>
         <section className="grid items-center gap-10 rounded-[28px] border border-ink-100 bg-paper-raised p-8 sm:p-12 lg:grid-cols-2">
           <div>
-            <div className="overline text-accent-600">NOTES</div>
+            <div className="overline text-ink-400">NOTES</div>
             <h2 className="mt-3 text-[1.75rem] font-semibold tracking-tight text-ink-950">边学边记，笔记带时间戳</h2>
             <p className="mt-4 leading-relaxed text-ink-600">
               记笔记不打断视频。每条笔记自动绑定课程、章节与时间戳，下次点一下就回到视频对应位置。停订后笔记仍可查看和导出。
@@ -303,7 +289,7 @@ function Section({ overline, title, desc, href, linkText, center, children }: { 
       <Reveal>
         <div className={`mb-8 flex items-end justify-between gap-4 ${center ? "flex-col items-center text-center" : ""}`}>
           <div>
-            {overline && <div className="overline mb-2 text-accent-600">{overline}</div>}
+            {overline && <div className="overline mb-2 text-ink-400">{overline}</div>}
             <h2 className="text-[1.75rem] font-semibold tracking-tight text-ink-950">{title}</h2>
             {desc && <p className="mt-2 text-ink-500">{desc}</p>}
           </div>

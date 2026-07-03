@@ -66,7 +66,7 @@ export default async function PricingPage() {
       {/* 权益对比 */}
       <section className="mx-auto max-w-2xl">
         <h2 className="mb-4 text-center text-xl font-semibold text-ink-950">权益对比</h2>
-        <div className="overflow-hidden rounded-2xl border border-ink-100 bg-paper-raised">
+        <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-paper-raised">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-ink-100 text-ink-500">

@@ -75,3 +75,13 @@ export function assertRateLimit(req: NextRequest, scope: string, limit: number, 
   if (!res.ok) throw new RateLimitError(res.retryAfterSec);
   return res;
 }
+
+/**
+ * 按用户维度限流：key 用 userId 而非 IP。
+ * 用于 AI 等高成本操作 —— 按 IP 限流会误伤同 NAT/校园网用户，按账号更精准且不可通过换 IP 绕过。
+ */
+export function assertUserRateLimit(userId: string, scope: string, limit: number, windowMs: number) {
+  const res = rateLimit(`${scope}:user:${userId}`, limit, windowMs);
+  if (!res.ok) throw new RateLimitError(res.retryAfterSec);
+  return res;
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LoadingSkeleton, ErrorState, Badge } from "@/components/ui";
+import { useToast } from "@/components/Toast";
 import { DEMAND_STATUS } from "@/lib/format";
 
 interface AdminDemand {
@@ -59,13 +60,35 @@ export function AdminDemandManager() {
 }
 
 function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand; allDemands: AdminDemand[]; onDone: () => void }) {
+  const { toast } = useToast();
   const [status, setStatus] = useState(demand.status);
   const [reply, setReply] = useState(demand.officialReply ?? "");
   const [reason, setReason] = useState("");
   const [risk, setRisk] = useState(demand.riskLevel);
   const [mergeTarget, setMergeTarget] = useState("");
   const [busy, setBusy] = useState(false);
+  const [drafting, setDrafting] = useState(false);
   const options = NEXT_STATUS[demand.status] ?? Object.keys(DEMAND_STATUS);
+
+  // AI 起草官方回复：调 LLM 生成回复文案，覆盖填入 reply 输入框（运营可再改）。
+  // AI 可能返回错误（402/503 等），一律 toast 提示、不崩溃。
+  async function aiDraftReply() {
+    setDrafting(true);
+    try {
+      const json = await fetch("/api/admin/ai/demand-draft-reply", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ demandId: demand.id }),
+      }).then((r) => r.json());
+      if (!json.ok) { toast(json.error ?? "AI 起草失败", { tone: "warn" }); return; }
+      setReply(json.data.reply ?? "");
+      toast("已填入 AI 起草的回复", { tone: "success" });
+    } catch {
+      toast("AI 起草失败，请稍后重试", { tone: "warn" });
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   async function saveStatus() {
     if (status === "rejected" && !reason.trim()) { alert("未采纳必须填写原因"); return; }
@@ -101,6 +124,11 @@ function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand
             <option value="low">低</option><option value="medium">中</option><option value="high">高</option>
           </select>
         </label>
+      </div>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm text-ink-500">官方反馈（展示给用户）</span>
+        {/* AI 起草回复：按需求内容生成官方回复草稿并覆盖填入下方输入框 */}
+        <button type="button" onClick={aiDraftReply} disabled={drafting} className="rounded-lg border border-ink-200 px-3 py-1.5 text-xs font-medium text-ink-700 hover:border-accent-400 disabled:opacity-50">{drafting ? "AI 起草中…" : "AI 起草回复"}</button>
       </div>
       <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="官方反馈（展示给用户）" className="w-full rounded-lg border border-ink-200 px-3 py-2 text-sm outline-none focus:border-accent-400" />
       {status === "rejected" && (

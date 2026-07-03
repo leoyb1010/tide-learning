@@ -7,6 +7,7 @@ import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, LoadingSkeleton, CardSkeleton, Button, Badge } from "@/components/ui";
 import { TidalReveal } from "@/components/motion";
 import { useToast } from "@/components/Toast";
+import { Dialog } from "@/components/Dialog";
 import { NoteTimeline } from "@/components/NoteTimeline";
 import { NoteGallery } from "@/components/NoteGallery";
 import { track } from "@/lib/analytics-client";
@@ -295,31 +296,92 @@ function CourseView({ notes }: { notes: NoteRow[] }) {
   return (
     <div className="space-y-8">
       {groups.map(([courseId, { course, items }]) => (
-        <section key={courseId}>
-          <div className="mb-3 flex items-center justify-between">
-            <Link href={`/courses/${course.slug}`} className="font-medium text-ink-950 hover:text-accent-700">
-              {course.title}
-            </Link>
-            <span className="text-xs text-ink-400">{items.length} 条</span>
-          </div>
-          <div className="space-y-2">
-            {items.map((n) => (
-              <Link
-                key={n.id}
-                href={`/courses/${n.courseId}/learn/${n.lessonId}${n.timestampSec != null ? `?t=${n.timestampSec}` : ""}`}
-                className="block rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-accent-400"
-              >
-                <div className="mb-1 flex items-center gap-2 text-xs text-ink-400">
-                  <span className="truncate">{n.lesson.title}</span>
-                  {n.starred && <Star size={12} weight="fill" className="text-accent-500" />}
-                </div>
-                {n.title && <p className="font-medium text-ink-950">{n.title}</p>}
-                {n.contentMd?.trim() && <p className="line-clamp-2 text-sm text-ink-800">{n.contentMd}</p>}
-              </Link>
-            ))}
-          </div>
-        </section>
+        <CourseNoteGroup key={courseId} courseId={courseId} course={course} items={items} />
       ))}
     </div>
+  );
+}
+
+/** 单个课程分组：标题 + AI 总结按钮 + 该课笔记列表；总结结果用 Dialog 展示要点 */
+function CourseNoteGroup({
+  courseId,
+  course,
+  items,
+}: {
+  courseId: string;
+  course: NoteRow["course"];
+  items: NoteRow[];
+}) {
+  const { toast } = useToast();
+  const [summarizing, setSummarizing] = useState(false);
+  const [summary, setSummary] = useState<string[] | null>(null);
+  const [open, setOpen] = useState(false);
+
+  // AI 总结本课笔记：调 /api/ai/note-summary，成功后弹 Dialog 展示要点。
+  // 未订阅用户返回 402（“AI 总结为订阅会员权益”），直接 toast 该 error；其余错误亦优雅提示、不崩溃。
+  async function summarize() {
+    setSummarizing(true);
+    try {
+      const json = await fetch("/api/ai/note-summary", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, mode: "summary" }),
+      }).then((r) => r.json());
+      if (!json.ok) { toast(json.error ?? "AI 总结失败", { tone: "warn" }); return; }
+      const points = (json.data?.summary ?? []) as string[];
+      if (points.length === 0) { toast("没有可总结的要点", { tone: "info" }); return; }
+      setSummary(points);
+      setOpen(true);
+    } catch {
+      toast("AI 总结失败，请稍后重试", { tone: "warn" });
+    } finally {
+      setSummarizing(false);
+    }
+  }
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <Link href={`/courses/${course.slug}`} className="font-medium text-ink-950 hover:text-accent-700">
+          {course.title}
+        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button variant="secondary" size="sm" onClick={summarize} disabled={summarizing} loading={summarizing}>
+            {summarizing ? "总结中…" : "AI 总结本课笔记"}
+          </Button>
+          <span className="text-xs text-ink-400">{items.length} 条</span>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {items.map((n) => (
+          <Link
+            key={n.id}
+            href={`/courses/${n.courseId}/learn/${n.lessonId}${n.timestampSec != null ? `?t=${n.timestampSec}` : ""}`}
+            className="block rounded-xl border border-ink-100 bg-paper-raised p-4 hover:border-accent-400"
+          >
+            <div className="mb-1 flex items-center gap-2 text-xs text-ink-400">
+              <span className="truncate">{n.lesson.title}</span>
+              {n.starred && <Star size={12} weight="fill" className="text-accent-500" />}
+            </div>
+            {n.title && <p className="font-medium text-ink-950">{n.title}</p>}
+            {n.contentMd?.trim() && <p className="line-clamp-2 text-sm text-ink-800">{n.contentMd}</p>}
+          </Link>
+        ))}
+      </div>
+
+      {/* AI 总结要点弹窗：每条要点一行 */}
+      <Dialog open={open} onClose={() => setOpen(false)} title={`「${course.title}」笔记要点`}>
+        {summary && (
+          <ul className="space-y-2.5">
+            {summary.map((point, i) => (
+              <li key={i} className="flex gap-2.5 text-sm text-ink-800">
+                <span className="num mt-0.5 shrink-0 font-medium text-accent-600">{i + 1}.</span>
+                <span>{point}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Dialog>
+    </section>
   );
 }

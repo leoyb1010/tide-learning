@@ -47,8 +47,8 @@ export default async function MePage() {
         <Badge tone={meta.tone === "ok" ? "success" : meta.tone === "warn" ? "warning" : "muted"}>{meta.label}</Badge>
       </section>
 
-      {/* 学习数据 */}
-      <section className="grid grid-cols-3 gap-4">
+      {/* 学习数据：窄屏收窄 gap，避免 375px 手机上三格挤压/数值溢出 */}
+      <section className="grid grid-cols-3 gap-2 sm:gap-4">
         <StatBox value={formatDurationSec(progressAgg._sum.progressSec ?? 0)} label="累计学习" />
         <StatBox value={`${notesCount}`} label="笔记" />
         <StatBox value={`${votesAgg._sum.voteCount ?? 0}`} label="投票" />
@@ -153,7 +153,7 @@ export default async function MePage() {
 
 function StatBox({ value, label }: { value: string; label: string }) {
   return (
-    <div className="rounded-2xl border border-ink-100 bg-paper-raised p-4 text-center">
+    <div className="rounded-2xl border border-ink-100 bg-paper-raised px-2 py-4 text-center sm:p-4">
       <div className="text-lg font-semibold text-ink-950 tabular">{value}</div>
       <div className="mt-0.5 text-xs text-ink-400">{label}</div>
     </div>

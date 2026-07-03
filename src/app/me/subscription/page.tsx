@@ -112,7 +112,7 @@ export default async function SubscriptionPage() {
         {orders.length === 0 ? (
           <p className="rounded-xl border border-ink-100 bg-paper-raised p-4 text-sm text-ink-400">暂无订单</p>
         ) : (
-          <div className="overflow-hidden rounded-2xl border border-ink-100 bg-paper-raised">
+          <div className="overflow-x-auto rounded-2xl border border-ink-100 bg-paper-raised">
             <table className="w-full text-sm">
               <tbody className="divide-y divide-ink-100">
                 {orders.map((o) => (

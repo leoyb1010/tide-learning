@@ -16,19 +16,26 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       durationSec?: number;
       isFree?: boolean;
       articleMd?: string;
+      videoAssetId?: string;
     };
     if (!body.title?.trim()) return fail("请填写章节标题");
+    const contentType = body.contentType ?? "video";
+    // 非图文章节需要视频资源：优先用前端上传拿到的 videoAssetId，没有才生成占位。
+    const videoAssetId =
+      contentType !== "article"
+        ? (body.videoAssetId?.trim() || `asset_${courseId}_${Date.now()}`)
+        : null;
     const maxOrder = await prisma.lesson.aggregate({ where: { courseId }, _max: { sortOrder: true } });
     const lesson = await prisma.lesson.create({
       data: {
         courseId,
         title: body.title.trim(),
         summary: body.summary,
-        contentType: body.contentType ?? "video",
+        contentType,
         durationSec: body.durationSec ?? 0,
         isFree: body.isFree ?? false,
         articleMd: body.articleMd,
-        videoAssetId: (body.contentType ?? "video") !== "article" ? `asset_${courseId}_${Date.now()}` : null,
+        videoAssetId,
         sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
         status: "published",
         publishedAt: new Date(),

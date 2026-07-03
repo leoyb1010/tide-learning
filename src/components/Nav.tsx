@@ -8,6 +8,10 @@ import { CommandK } from "./CommandK";
 import { useMode } from "./ModeProvider";
 import { track } from "@/lib/analytics-client";
 
+// 后台角色白名单：与 src/app/admin/layout.tsx 的 adminRoles 对齐。
+// session.ts 未导出该数组，故此处内联同一份，任一后台角色即显示后台入口。
+const ADMIN_ROLES = ["admin", "content_manager", "demand_moderator", "support", "finance", "reviewer"];
+
 const TABS = [
   { href: "/", label: "发现", Icon: Compass },
   { href: "/courses", label: "学习", Icon: BookOpen },
@@ -84,8 +88,8 @@ export function Nav({ user }: { user: { nickname: string; role: string } | null 
               <Waves size={18} weight={theme === "deep" ? "fill" : "regular"} />
             </button>
 
-            {user?.role && user.role !== "user" && (
-              <Link href="/admin" className="hidden items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-ink-500 transition-colors hover:text-ink-950 sm:flex">
+            {user?.role && ADMIN_ROLES.includes(user.role) && (
+              <Link href="/admin" className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-ink-500 transition-colors hover:text-ink-950">
                 <GearSix size={16} /> 后台
               </Link>
             )}

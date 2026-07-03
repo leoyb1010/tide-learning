@@ -27,13 +27,15 @@ export function formatDuration(sec: number): string {
 }
 
 /** 课程卡数据（§6.2 字段）。 */
-export async function listCourses(opts?: { category?: string; sort?: string; q?: string }) {
+export async function listCourses(opts?: { category?: string; sort?: string; q?: string | string[] }) {
+  // q 支持单串或多关键词（语义搜索场景4：LLM 扩展的同义词组）——任一词命中 title/subtitle 即召回
+  const terms = Array.isArray(opts?.q) ? opts.q.filter(Boolean) : opts?.q ? [opts.q] : [];
   const courses = await prisma.course.findMany({
     where: {
       status: "published",
       ...(opts?.category && opts.category !== "all" ? { category: opts.category } : {}),
-      ...(opts?.q
-        ? { OR: [{ title: { contains: opts.q } }, { subtitle: { contains: opts.q } }] }
+      ...(terms.length
+        ? { OR: terms.flatMap((t) => [{ title: { contains: t } }, { subtitle: { contains: t } }]) }
         : {}),
     },
     include: {

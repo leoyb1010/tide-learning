@@ -39,6 +39,7 @@ export interface EntitlementSnapshot {
   canVote: boolean;
   canCreateNoteUnlimited: boolean;
   noteFreeLimit: number;
+  canUseLLM: boolean;                          // AI 能力权益（当前 = isSubscriber，未来可细分套餐）
 }
 
 export const FREE_SNAPSHOT: EntitlementSnapshot = {
@@ -52,6 +53,7 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   canVote: false,
   canCreateNoteUnlimited: false,
   noteFreeLimit: 3,
+  canUseLLM: false,
 };
 
 export async function resolveEntitlement(userId: string | null | undefined): Promise<EntitlementSnapshot> {
@@ -92,6 +94,7 @@ export async function resolveEntitlement(userId: string | null | undefined): Pro
       canVote: true,
       canCreateNoteUnlimited: true,
       noteFreeLimit: 3,
+      canUseLLM: true,
     };
     await persistSnapshot(userId, primary.id, "active", snapshot);
     return snapshot;
