@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
@@ -19,7 +20,10 @@ export default async function CreatePage() {
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-160px)] w-full max-w-[1040px] flex-col justify-center py-8 sm:py-12">
-      <CreateStudio canUseLLM={snapshot.canUseLLM} />
+      {/* CreateStudio 用 useSearchParams 读 ?prompt，Next15 需 Suspense 边界 */}
+      <Suspense fallback={null}>
+        <CreateStudio canUseLLM={snapshot.canUseLLM} />
+      </Suspense>
     </div>
   );
 }

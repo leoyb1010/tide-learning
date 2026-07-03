@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
         system,
         user: userMsg,
         temperature: 0.3,
-        maxTokens: 1500,
+        maxTokens: 6000,
       });
       const raw = Array.isArray(result?.outline) ? result.outline : [];
       outline = raw

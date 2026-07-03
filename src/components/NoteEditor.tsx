@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, useCallback, useImperativeHandle, forwardRef } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, Camera, TextT, Trash, Star, PencilSimple, Check } from "@phosphor-icons/react";
+import {
+  Clock, Camera, TextT, Trash, Star, PencilSimple, Check,
+  TextB, TextItalic, ListBullets, Code, Quotes, TextHOne, Cards,
+} from "@phosphor-icons/react";
 import { mmss } from "@/lib/format";
 import { renderMarkdown } from "@/lib/markdown";
 import { useToast } from "./Toast";
@@ -27,6 +30,105 @@ export interface NoteEditorHandle {
   addClip: (sourceText: string, ts: number) => void;
   /** 快速批注：聚焦输入框并锚定当前时间。 */
   focusQuick: () => void;
+}
+
+// —— §5.1 Markdown 快捷工具栏配置 ——
+// mode: "wrap" 用 before/after 包裹选中文本；"line" 在行首插入前缀；"insert" 直接插入占位骨架。
+type MdTool = {
+  key: string;
+  label: string;
+  Icon: typeof TextB;
+  mode: "wrap" | "line";
+  before: string;
+  after?: string;
+  placeholder: string;
+};
+
+const MD_TOOLS: MdTool[] = [
+  { key: "bold", label: "加粗", Icon: TextB, mode: "wrap", before: "**", after: "**", placeholder: "加粗文字" },
+  { key: "italic", label: "斜体", Icon: TextItalic, mode: "wrap", before: "*", after: "*", placeholder: "斜体文字" },
+  { key: "h", label: "标题", Icon: TextHOne, mode: "line", before: "## ", placeholder: "标题" },
+  { key: "list", label: "列表", Icon: ListBullets, mode: "line", before: "- ", placeholder: "列表项" },
+  { key: "quote", label: "引用", Icon: Quotes, mode: "line", before: "> ", placeholder: "引用内容" },
+  { key: "code", label: "代码", Icon: Code, mode: "wrap", before: "`", after: "`", placeholder: "代码" },
+];
+
+// —— §5.1 三种笔记模板骨架（点击直接填入草稿）——
+const NOTE_TEMPLATES: { key: string; label: string; body: string }[] = [
+  {
+    key: "cornell",
+    label: "康奈尔笔记",
+    body: `## 主题
+
+### 线索 / 关键词
+-
+
+### 笔记
+-
+
+### 总结
+> 用一两句话概括本节要点。
+`,
+  },
+  {
+    key: "concept",
+    label: "概念卡",
+    body: `## 概念：
+
+**定义**：
+
+**关键要点**
+-
+
+**举例**
+-
+
+**易混淆**
+-
+`,
+  },
+  {
+    key: "mistake",
+    label: "错题卡",
+    body: `## 错题
+
+**题目 / 场景**：
+
+**我的答案**：
+
+**正确答案**：
+
+**错因分析**
+-
+
+**订正与规律**
+>
+`,
+  },
+];
+
+/**
+ * 在 textarea 当前选区应用一个 Markdown 工具，返回新文本与新光标位置。
+ * 纯函数便于复用；不直接触碰 DOM。
+ */
+function applyMdTool(text: string, selStart: number, selEnd: number, tool: MdTool) {
+  const selected = text.slice(selStart, selEnd);
+  if (tool.mode === "wrap") {
+    const inner = selected || tool.placeholder;
+    const before = tool.before;
+    const after = tool.after ?? "";
+    const next = text.slice(0, selStart) + before + inner + after + text.slice(selEnd);
+    // 无选区时选中占位符，方便直接改写
+    const start = selStart + before.length;
+    const end = start + inner.length;
+    return { next, start: selected ? next.length : start, end: selected ? next.length : end };
+  }
+  // line 模式：定位到选区所在行首，插入前缀
+  const lineStart = text.lastIndexOf("\n", selStart - 1) + 1;
+  const prefix = tool.before;
+  const next = text.slice(0, lineStart) + prefix + text.slice(lineStart);
+  const caret = selEnd + prefix.length;
+  return { next, start: caret, end: caret };
 }
 
 /**
@@ -94,6 +196,26 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
     const ts = attachTs ?? Math.floor(getCurrentTime());
     const created = await post({ timestampSec: ts, contentMd: draft.trim(), kind: "text" });
     if (created) { setDraft(""); setAttachTs(null); }
+  }
+
+  // §5.1：点击工具栏按钮，在草稿 textarea 当前选区应用 Markdown 语法
+  function runMdTool(tool: MdTool) {
+    const el = draftRef.current;
+    const selStart = el?.selectionStart ?? draft.length;
+    const selEnd = el?.selectionEnd ?? draft.length;
+    const { next, start, end } = applyMdTool(draft, selStart, selEnd, tool);
+    setDraft(next);
+    // 下一帧恢复焦点与光标位置
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(start, end);
+    });
+  }
+
+  // §5.1：插入模板骨架。已有草稿时追加，避免误删用户已写内容。
+  function insertTemplate(body: string) {
+    setDraft((d) => (d.trim() ? `${d.trimEnd()}\n\n${body}` : body));
+    requestAnimationFrame(() => draftRef.current?.focus());
   }
 
   const autosave = useCallback((id: string, content: string) => {
@@ -179,6 +301,38 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
           </p>
         ) : (
           <>
+            {/* §5.1 Markdown 快捷工具栏 */}
+            <div className="mb-1.5 flex flex-wrap items-center gap-0.5">
+              {MD_TOOLS.map((t) => {
+                const Icon = t.Icon;
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    title={t.label}
+                    aria-label={t.label}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => runMdTool(t)}
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+                  >
+                    <Icon size={15} />
+                  </button>
+                );
+              })}
+              <span className="mx-1 h-4 w-px bg-ink-200" />
+              {/* §5.1 三种笔记模板 */}
+              {NOTE_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.key}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertTemplate(tpl.body)}
+                  className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-900"
+                >
+                  <Cards size={12} /> {tpl.label}
+                </button>
+              ))}
+            </div>
             <textarea
               ref={draftRef}
               value={draft}

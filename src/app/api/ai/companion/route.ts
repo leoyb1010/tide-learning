@@ -170,7 +170,7 @@ export async function POST(req: NextRequest) {
       system,
       user: userMsg,
       temperature: 0.5,
-      maxTokens: 1200,
+      maxTokens: 4000,
     });
 
     // —— 落库：无 thread 则创建；写入 user + assistant 两条消息 ——

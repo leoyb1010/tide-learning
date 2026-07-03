@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
           system,
           user: userMsg,
           temperature: 0.3,
-          maxTokens: 2500,
+          maxTokens: 6000,
         });
         const validated = validateBlocks(result?.blocks ?? result);
         if (validated.length > 0) {

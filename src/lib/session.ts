@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
 import { cookies } from "next/headers";
 import { prisma } from "./db";
@@ -71,8 +72,12 @@ export async function destroySession(): Promise<void> {
   }
 }
 
-/** 服务端读取当前用户，null 表示游客。所有权益判断以此为准。 */
-export async function getCurrentUser(): Promise<User | null> {
+/**
+ * 服务端读取当前用户，null 表示游客。所有权益判断以此为准。
+ * 用 React cache() 包裹：同一次请求内 layout 与各 page 多次调用只查一次库
+ * （去重按参数计算，此处无参数 → 每请求命中同一缓存）。cache 仅在服务端生效。
+ */
+export const getCurrentUser = cache(async (): Promise<User | null> => {
   const cookieStore = await cookies();
   const sid = cookieStore.get(SESSION_COOKIE)?.value;
   if (!sid) return null;
@@ -83,7 +88,7 @@ export async function getCurrentUser(): Promise<User | null> {
   if (!session || session.expiresAt < new Date()) return null;
   if (session.user.deletedAt) return null;
   return session.user;
-}
+});
 
 export async function requireUser(): Promise<User> {
   const user = await getCurrentUser();

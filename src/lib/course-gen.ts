@@ -38,7 +38,7 @@ export async function generateCourseOutline(prompt: string): Promise<OutlineChap
       system,
       user,
       temperature: 0.5,
-      maxTokens: 1500,
+      maxTokens: 6000,
     });
     const raw = Array.isArray(result?.outline) ? result.outline : [];
     return raw

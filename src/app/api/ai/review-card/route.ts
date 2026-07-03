@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
         system,
         user: userMsg,
         temperature: 0.4,
-        maxTokens: 1500,
+        maxTokens: 6000,
       });
 
       const cards = (Array.isArray(result?.flashcards) ? result.flashcards : [])
@@ -152,5 +152,98 @@ export async function POST(req: NextRequest) {
     });
 
     return ok({ cards: [card], count: 1 });
+  });
+}
+
+/**
+ * GET /api/ai/review-card —— §5.4 复习队列。
+ * 返回当前用户「到期待复习」的卡（dueAt <= now），按 dueAt 升序，附带来源课程标题。
+ * 无需 LLM 权益（读取本人卡片）。越权铁律：where 强制 userId。
+ */
+export async function GET() {
+  return handle(async () => {
+    const user = await requireUser();
+    const now = new Date();
+
+    const cards = await prisma.reviewCard.findMany({
+      where: { userId: user.id, dueAt: { lte: now } },
+      orderBy: { dueAt: "asc" },
+      take: 60,
+      select: { id: true, front: true, back: true, dueAt: true, intervalDays: true, ease: true, courseId: true },
+    });
+
+    // 补充课程标题（用于卡片来源展示）；只查涉及到的课程，避免 N+1。
+    const courseIds = Array.from(new Set(cards.map((c) => c.courseId).filter((x): x is string => Boolean(x))));
+    const courses = courseIds.length
+      ? await prisma.course.findMany({ where: { id: { in: courseIds } }, select: { id: true, title: true } })
+      : [];
+    const titleOf = new Map(courses.map((c) => [c.id, c.title]));
+
+    // 今日应复习总量（含未来到期不计）——用于空态与进度显示
+    const total = cards.length;
+
+    return ok({
+      cards: cards.map((c) => ({
+        id: c.id,
+        front: c.front,
+        back: c.back,
+        courseTitle: c.courseId ? titleOf.get(c.courseId) ?? null : null,
+      })),
+      total,
+    });
+  });
+}
+
+/**
+ * PATCH /api/ai/review-card —— §5.4 提交复习结果，更新调度（简化 SM-2）。
+ * 入参：{ cardId, remembered: boolean }
+ *   - 记得：intervalDays 翻倍（首次记得为 1 天），ease 略升，dueAt = now + 新间隔。
+ *   - 忘了：间隔重置为 1 天，ease 略降（不低于 1.3），dueAt = now + 1 天。
+ * 越权铁律：updateMany + where 强制 userId，命中 0 视为无权限/不存在。
+ */
+export async function PATCH(req: NextRequest) {
+  return handle(async () => {
+    assertSameOrigin(req);
+    const user = await requireUser();
+
+    const body = (await req.json().catch(() => null)) as {
+      cardId?: string;
+      remembered?: boolean;
+    } | null;
+    const cardId = body?.cardId?.trim();
+    if (!cardId || typeof body?.remembered !== "boolean") return fail("请提供 cardId 与 remembered");
+
+    // 只取本人卡片
+    const card = await prisma.reviewCard.findFirst({
+      where: { id: cardId, userId: user.id },
+      select: { id: true, intervalDays: true, ease: true },
+    });
+    if (!card) return fail("复习卡不存在", 404);
+
+    const remembered = body.remembered;
+    let ease = card.ease ?? 2.5;
+    let intervalDays: number;
+    if (remembered) {
+      ease = Math.min(2.8, ease + 0.1);
+      // 首次（间隔 0）记得 → 1 天；之后翻倍并乘以 ease 系数（简化 SM-2）
+      intervalDays = card.intervalDays > 0 ? Math.max(1, Math.round(card.intervalDays * ease)) : 1;
+    } else {
+      ease = Math.max(1.3, ease - 0.2);
+      intervalDays = 1; // 忘了 → 重置为 1 天
+    }
+    const dueAt = new Date(Date.now() + intervalDays * DAY_MS);
+
+    await prisma.reviewCard.updateMany({
+      where: { id: cardId, userId: user.id },
+      data: { intervalDays, ease, dueAt },
+    });
+
+    await track({
+      eventName: "review_card_grade",
+      userId: user.id,
+      properties: { cardId, remembered, intervalDays, ease },
+    });
+
+    return ok({ id: cardId, intervalDays, ease, dueAt });
   });
 }

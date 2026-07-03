@@ -43,6 +43,10 @@ model User {
   generationJobs GenerationJob[]
   chatThreads    ChatThread[]
   reviewCards    ReviewCard[]
+  notebooks      Notebook[]
+  posts          Post[]
+  postLikes      PostLike[]
+  focusSessions  FocusSession[]
 
   @@index([role])
 }
@@ -652,4 +656,86 @@ model ReviewCard {
   createdAt    DateTime @default(now())
 
   @@index([userId, dueAt])
+}
+
+// ============================================================
+// v2.1：笔记知识库 / 自习室社区 / 专注会话
+// ============================================================
+
+// §5.3 知识库 Notebook：跨课程聚合笔记+资料+复习卡的主题空间
+model Notebook {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  description String?
+  icon        String?  // emoji 或图标 key
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  entries NotebookEntry[]
+
+  @@index([userId, updatedAt])
+}
+
+// 知识库条目（多态：笔记/导入资料/复习卡/AI生成的洞察）
+model NotebookEntry {
+  id         String   @id @default(cuid())
+  notebookId String
+  notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
+  kind       String   // note / source / card / insight
+  refId      String?  // 关联的 Note/ImportedSource/ReviewCard id
+  title      String?
+  contentMd  String?
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([notebookId, sortOrder])
+}
+
+// §7 自习室社区帖子（严格管控）
+model Post {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // insight(学习心得) / checkin(打卡) / question(求助)
+  content      String
+  refJson      String   @default("{}") // 引用的笔记/成就/streak 卡片数据
+  status       String   @default("pending") // pending / approved / rejected
+  rejectReason String?
+  likeCount    Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  likes PostLike[]
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+model PostLike {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+}
+
+// §9 专注会话（入席仪式）
+model FocusSession {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId   String?
+  courseId   String?
+  goal       String?   // 本次专注目标
+  startAt    DateTime  @default(now())
+  endAt      DateTime?
+  minutes    Int       @default(0)
+  summary    String?   // 离席 AI 小结
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, startAt])
 }

@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
       system,
       user,
       temperature: 0.6,
-      maxTokens: 1500,
+      maxTokens: 6000,
     });
 
     await track({ eventName: "ai_course_draft", properties: { category: body?.category ?? null, has_hint: Boolean(hint) } });

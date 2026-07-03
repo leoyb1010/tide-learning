@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       system,
       user: user_prompt,
       temperature: 0.4,
-      maxTokens: 1200,
+      maxTokens: 4000,
     });
 
     await track({ eventName: "ai_note_summary", userId: user.id, properties: { mode, note_count: notes.length } });

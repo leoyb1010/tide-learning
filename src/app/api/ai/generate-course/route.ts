@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       system,
       user: userMsg,
       temperature: 0.5,
-      maxTokens: 1500,
+      maxTokens: 6000,
     });
 
     // —— 规范化 LLM 产出，兜底非法结构 ——

@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       (body?.tone ? `语气要求：${body.tone}\n` : "") +
       `请起草一段官方回复。`;
 
-    const reply = await chat({ system, user, temperature: 0.6, maxTokens: 400 });
+    const reply = await chat({ system, user, temperature: 0.6, maxTokens: 2500 });
 
     await track({ eventName: "ai_demand_reply", properties: { demand_id: demandId, status: demand.status } });
     return ok({ reply });

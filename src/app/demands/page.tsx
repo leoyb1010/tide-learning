@@ -3,9 +3,10 @@ import { listRankedDemands } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { VoteButton } from "@/components/VoteButton";
+import { CommunityTabs } from "@/components/CommunityTabs";
 import { DEMAND_STATUS } from "@/lib/format";
 
-export const metadata = { title: "共创广场" };
+export const metadata = { title: "社区广场" };
 
 const FILTERS = ["热门", "最新", "已排期"];
 
@@ -22,38 +23,9 @@ export default async function DemandsPage() {
 
   const topVotes = demands.reduce((m, d) => Math.max(m, d.totalVotes), 0) || 1;
 
-  return (
-    <div className="mx-auto max-w-[1000px] space-y-6">
-      {/* 深色 Banner */}
-      <section className="studio-rise relative overflow-hidden rounded-[20px] bg-[var(--video-bg)] p-[26px] text-white shadow-[var(--lift)]">
-        {/* 右上红圆装饰 */}
-        <div
-          className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[var(--red)] opacity-30 blur-[2px]"
-          aria-hidden
-        />
-        <div className="relative grid grid-cols-1 items-center gap-6 md:grid-cols-[1fr_.8fr]">
-          <div>
-            <div className="mono text-[10px] uppercase tracking-[0.14em] text-white/55">
-              CO-CREATE · 需求共创
-            </div>
-            <h1 className="mt-2 text-[25px] font-bold leading-[1.25]">
-              你想学的课，投票决定
-            </h1>
-            <p className="mt-2 max-w-[420px] text-[14px] leading-[1.7] text-white/70">
-              把想学的内容提出来，让社区一起投票。票数越高越靠前，排期后你能一路追进度。
-            </p>
-          </div>
-          <div className="flex md:justify-end">
-            <Link
-              href="/demands/new"
-              className="studio-press inline-flex items-center gap-2 rounded-[12px] bg-[var(--red)] px-5 py-3 text-[14px] font-bold text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] transition-all hover:brightness-105"
-            >
-              ＋ 发起新需求
-            </Link>
-          </div>
-        </div>
-      </section>
-
+  // 课程共创排行榜（现有内容原样封装）——作为 Tab「课程共创」的内容注入 CommunityTabs。
+  const leaderboard = (
+    <div className="space-y-6">
       {!snapshot.canVote && (
         <div className="rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[13px] text-[var(--red)]">
           订阅用户每周有 5 票，可对同一需求最多投 3 票。
@@ -181,6 +153,47 @@ export default async function DemandsPage() {
           })}
         </div>
       )}
+    </div>
+  );
+
+  return (
+    <div className="mx-auto max-w-[1000px] space-y-6">
+      {/* 深色 Banner */}
+      <section className="studio-rise relative overflow-hidden rounded-[20px] bg-[var(--video-bg)] p-[26px] text-white shadow-[var(--lift)]">
+        {/* 右上红圆装饰 */}
+        <div
+          className="pointer-events-none absolute -right-14 -top-14 h-44 w-44 rounded-full bg-[var(--red)] opacity-30 blur-[2px]"
+          aria-hidden
+        />
+        <div className="relative grid grid-cols-1 items-center gap-6 md:grid-cols-[1fr_.8fr]">
+          <div>
+            <div className="mono text-[10px] uppercase tracking-[0.14em] text-white/55">
+              CO-CREATE · 需求共创
+            </div>
+            <h1 className="mt-2 text-[25px] font-bold leading-[1.25]">
+              你想学的课，投票决定
+            </h1>
+            <p className="mt-2 max-w-[420px] text-[14px] leading-[1.7] text-white/70">
+              把想学的内容提出来，让社区一起投票。票数越高越靠前，排期后你能一路追进度。
+            </p>
+          </div>
+          <div className="flex md:justify-end">
+            <Link
+              href="/demands/new"
+              className="studio-press inline-flex items-center gap-2 rounded-[12px] bg-[var(--red)] px-5 py-3 text-[14px] font-bold text-white shadow-[0_2px_10px_rgba(0,0,0,0.25)] transition-all hover:brightness-105"
+            >
+              ＋ 发起新需求
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* §7 社区广场双 Tab：课程共创（排行榜）/ 自习室广场（轻社区） */}
+      <CommunityTabs
+        leaderboard={leaderboard}
+        canPost={snapshot.canUseLLM || snapshot.isSubscriber}
+        isLoggedIn={Boolean(user)}
+      />
     </div>
   );
 }

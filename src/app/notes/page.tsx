@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { MagnifyingGlass, DownloadSimple, Waves, GridFour, BookOpen, Star } from "@phosphor-icons/react";
+import {
+  MagnifyingGlass, DownloadSimple, Waves, GridFour, BookOpen, Star,
+  Sparkle, CaretDown, ListBullets, ListChecks, Translate, Cards, Copy, Check,
+} from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, LoadingSkeleton, CardSkeleton, Button, Badge } from "@/components/ui";
 import { TidalReveal } from "@/components/motion";
@@ -11,6 +14,7 @@ import { Dialog } from "@/components/Dialog";
 import { NoteTimeline } from "@/components/NoteTimeline";
 import { NoteGallery } from "@/components/NoteGallery";
 import { track } from "@/lib/analytics-client";
+import { renderMarkdown } from "@/lib/markdown";
 
 // 供 NoteTimeline / NoteGallery 复用的行类型（唯一真相源）
 export interface NoteTagLite {
@@ -157,13 +161,20 @@ export default function NotesPage() {
             </p>
           </div>
           {hasNotes && (
-            <button
-              type="button"
-              onClick={exportNotes}
-              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
-            >
-              <DownloadSimple size={15} weight="bold" /> 导出 Markdown
-            </button>
+            <div className="flex items-center gap-2.5">
+              {/* 全局 AI 整理：对当前筛选出的笔记（noteIds）做转换 */}
+              <AiTidyMenu
+                scope={{ noteIds: (notes ?? []).slice(0, 80).map((n) => n.id) }}
+                title="当前笔记"
+              />
+              <button
+                type="button"
+                onClick={exportNotes}
+                className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+              >
+                <DownloadSimple size={15} weight="bold" /> 导出 Markdown
+              </button>
+            </div>
           )}
         </div>
       </TidalReveal>
@@ -298,6 +309,213 @@ export default function NotesPage() {
   );
 }
 
+// —— §5.2 消化层：AI 整理下拉菜单动作定义 ——
+type TidyAction = "summary" | "flashcards" | "outline" | "actions" | "translate";
+const TIDY_ITEMS: { key: TidyAction; label: string; Icon: typeof Sparkle }[] = [
+  { key: "summary", label: "AI 总结", Icon: Sparkle },
+  { key: "flashcards", label: "生成复习卡", Icon: Cards },
+  { key: "outline", label: "改写大纲", Icon: ListBullets },
+  { key: "actions", label: "提炼行动项", Icon: ListChecks },
+  { key: "translate", label: "翻译（英）", Icon: Translate },
+];
+
+// AI 整理结果的统一形态：either 要点/行动项列表 or Markdown 文本 or 复习卡张数提示
+interface TidyResult {
+  title: string;
+  kind: "list" | "markdown" | "cards";
+  points?: string[];
+  markdown?: string;
+  count?: number;
+}
+
+/**
+ * §5.2 AiTidyMenu —— 笔记「AI 整理」下拉。
+ * scope 决定拉取范围：按课（courseId）或按选中笔记（noteIds）。
+ * summary 走 /api/ai/note-summary；flashcards 走 /api/ai/review-card（落库）；
+ * outline/actions/translate 走 /api/ai/note-transform。结果统一用 Dialog 展示。
+ */
+function AiTidyMenu({
+  scope,
+  title,
+  compact,
+}: {
+  scope: { courseId: string } | { noteIds: string[] };
+  title: string;
+  compact?: boolean;
+}) {
+  const { toast } = useToast();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState<TidyAction | null>(null);
+  const [result, setResult] = useState<TidyResult | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  // 点击外部关闭下拉
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const payload = "courseId" in scope ? { courseId: scope.courseId } : { noteIds: scope.noteIds };
+
+  async function run(action: TidyAction) {
+    setOpen(false);
+    setBusy(action);
+    try {
+      if (action === "summary") {
+        const json = await fetch("/api/ai/note-summary", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, mode: "summary" }),
+        }).then((r) => r.json());
+        if (!json.ok) return toast(json.error ?? "AI 总结失败", { tone: "warn" });
+        const points = (json.data?.summary ?? []) as string[];
+        if (points.length === 0) return toast("没有可总结的要点", { tone: "info" });
+        setResult({ title: `${title} · 复习要点`, kind: "list", points });
+        setDialogOpen(true);
+      } else if (action === "flashcards") {
+        // 生成复习卡直接落库（/api/ai/review-card 批量分支）
+        const json = await fetch("/api/ai/review-card", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(payload),
+        }).then((r) => r.json());
+        if (!json.ok) return toast(json.error ?? "复习卡生成失败", { tone: "warn" });
+        const count = (json.data?.count ?? 0) as number;
+        setResult({ title: `${title} · 复习卡`, kind: "cards", count });
+        setDialogOpen(true);
+        toast(`已生成 ${count} 张复习卡，去复习页开始练习`, { tone: "success" });
+      } else {
+        // outline / actions / translate → note-transform
+        const json = await fetch("/api/ai/note-transform", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ...payload, action }),
+        }).then((r) => r.json());
+        if (!json.ok) return toast(json.error ?? "AI 整理失败", { tone: "warn" });
+        if (action === "actions") {
+          const items = (json.data?.items ?? []) as string[];
+          if (items.length === 0) return toast("没有可提炼的行动项", { tone: "info" });
+          setResult({ title: `${title} · 行动项`, kind: "list", points: items });
+        } else {
+          const md = (json.data?.markdown ?? "") as string;
+          if (!md) return toast("AI 未返回内容", { tone: "info" });
+          const label = action === "outline" ? "知识大纲" : "英文翻译";
+          setResult({ title: `${title} · ${label}`, kind: "markdown", markdown: md });
+        }
+        setDialogOpen(true);
+      }
+      track("ai_note_tidy", { action, scope: "courseId" in scope ? "course" : "notes" });
+    } catch {
+      toast("AI 整理失败，请稍后重试", { tone: "warn" });
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function copyResult() {
+    const text = result?.kind === "markdown" ? result.markdown ?? "" : (result?.points ?? []).join("\n");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      toast("复制失败", { tone: "warn" });
+    }
+  }
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        disabled={busy !== null}
+        className={`studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45 ${
+          compact ? "px-3 py-1.5 text-[12px]" : "px-3.5 py-2 text-[12.5px]"
+        }`}
+      >
+        <Sparkle size={14} weight="fill" className="text-[var(--red)]" />
+        {busy ? "整理中…" : "AI 整理"}
+        <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="studio-rise absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--lift)]">
+          {TIDY_ITEMS.map((it) => {
+            const Icon = it.Icon;
+            return (
+              <button
+                key={it.key}
+                type="button"
+                onClick={() => run(it.key)}
+                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
+              >
+                <Icon size={15} className="text-[var(--ink3)]" /> {it.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* 结果弹窗 */}
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={result?.title}>
+        {result?.kind === "cards" ? (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--red-soft)] text-[var(--red)]">
+              <Cards size={26} weight="fill" />
+            </div>
+            <p className="text-[15px] text-[var(--ink)]">
+              已生成 <span className="mono font-bold text-[var(--red)]">{result.count}</span> 张复习卡
+            </p>
+            <Button href="/review">去复习页开始练习</Button>
+          </div>
+        ) : result?.kind === "list" ? (
+          <>
+            <ul className="space-y-2.5">
+              {(result.points ?? []).map((point, i) => (
+                <li key={i} className="flex gap-2.5 text-[14px] leading-[1.7] text-[var(--ink2)]">
+                  <span className="mono mt-0.5 shrink-0 font-semibold text-[var(--red)]">{i + 1}.</span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ul>
+            <CopyRow copied={copied} onCopy={copyResult} />
+          </>
+        ) : result?.kind === "markdown" ? (
+          <>
+            <div
+              className="tide-md max-h-[52vh] overflow-y-auto text-[14px] leading-[1.7] text-[var(--ink)]"
+              dangerouslySetInnerHTML={{ __html: renderMarkdown(result.markdown ?? "") }}
+            />
+            <CopyRow copied={copied} onCopy={copyResult} />
+          </>
+        ) : null}
+      </Dialog>
+    </div>
+  );
+}
+
+// 复制条：结果弹窗底部的「复制」操作
+function CopyRow({ copied, onCopy }: { copied: boolean; onCopy: () => void }) {
+  return (
+    <div className="mt-4 flex justify-end border-t border-[var(--border)] pt-3">
+      <button
+        type="button"
+        onClick={onCopy}
+        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+      >
+        {copied ? <Check size={13} weight="bold" className="text-[var(--red)]" /> : <Copy size={13} />}
+        {copied ? "已复制" : "复制"}
+      </button>
+    </div>
+  );
+}
+
 /** 课程视图：按课程归档，复用旧版归组样式 */
 function CourseView({ notes }: { notes: NoteRow[] }) {
   const groups = useMemo(() => {
@@ -329,33 +547,6 @@ function CourseNoteGroup({
   course: NoteRow["course"];
   items: NoteRow[];
 }) {
-  const { toast } = useToast();
-  const [summarizing, setSummarizing] = useState(false);
-  const [summary, setSummary] = useState<string[] | null>(null);
-  const [open, setOpen] = useState(false);
-
-  // AI 总结本课笔记：调 /api/ai/note-summary，成功后弹 Dialog 展示要点。
-  // 未订阅用户返回 402（“AI 总结为订阅会员权益”），直接 toast 该 error；其余错误亦优雅提示、不崩溃。
-  async function summarize() {
-    setSummarizing(true);
-    try {
-      const json = await fetch("/api/ai/note-summary", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ courseId, mode: "summary" }),
-      }).then((r) => r.json());
-      if (!json.ok) { toast(json.error ?? "AI 总结失败", { tone: "warn" }); return; }
-      const points = (json.data?.summary ?? []) as string[];
-      if (points.length === 0) { toast("没有可总结的要点", { tone: "info" }); return; }
-      setSummary(points);
-      setOpen(true);
-    } catch {
-      toast("AI 总结失败，请稍后重试", { tone: "warn" });
-    } finally {
-      setSummarizing(false);
-    }
-  }
-
   return (
     <section className="studio-rise">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -366,14 +557,7 @@ function CourseNoteGroup({
           {course.title}
         </Link>
         <div className="flex shrink-0 items-center gap-3">
-          <button
-            type="button"
-            onClick={summarize}
-            disabled={summarizing}
-            className="studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45"
-          >
-            {summarizing ? "总结中…" : "AI 总结本课笔记"}
-          </button>
+          <AiTidyMenu scope={{ courseId }} title={course.title} />
           <span className="mono text-[12px] text-[var(--ink4)]">{items.length} 条</span>
         </div>
       </div>
@@ -395,20 +579,6 @@ function CourseNoteGroup({
           </Link>
         ))}
       </div>
-
-      {/* AI 总结要点弹窗：每条要点一行 */}
-      <Dialog open={open} onClose={() => setOpen(false)} title={`「${course.title}」笔记要点`}>
-        {summary && (
-          <ul className="space-y-2.5">
-            {summary.map((point, i) => (
-              <li key={i} className="flex gap-2.5 text-[14px] text-[var(--ink2)]">
-                <span className="mono mt-0.5 shrink-0 font-semibold text-[var(--red)]">{i + 1}.</span>
-                <span>{point}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </Dialog>
     </section>
   );
 }

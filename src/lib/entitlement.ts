@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { prisma } from "./db";
 
 /**
@@ -56,21 +57,57 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   canUseLLM: false,
 };
 
-export async function resolveEntitlement(userId: string | null | undefined): Promise<EntitlementSnapshot> {
+/**
+ * 过期订阅落库的「节流」表：userId → 上次 sweep 时间戳（毫秒）。
+ * 同一用户 5 分钟内不重复写库；快照正确性不依赖此写（读时在内存判断过期），
+ * 写库只是为了让持久化状态最终一致（DB status 收敛到 expired）。
+ */
+const SWEEP_THROTTLE_MS = 5 * 60 * 1000;
+const lastSweepAt = new Map<string, number>();
+
+/** 已过期但 DB 仍标为「有效态」的付费状态 —— 内存判断过期时视为 expired。 */
+const SWEEPABLE_STATUSES = ["active", "grace_period", "billing_retry", "canceled_but_active", "trial"];
+
+/**
+ * 节流地把过期订阅落库为 expired。不 await 也不阻塞快照返回；
+ * 5 分钟内同一用户只写一次，失败静默（下次请求再试）。
+ */
+function throttledSweepExpired(userId: string, now: Date): void {
+  const nowMs = now.getTime();
+  const last = lastSweepAt.get(userId) ?? 0;
+  if (nowMs - last < SWEEP_THROTTLE_MS) return;
+  lastSweepAt.set(userId, nowMs);
+  prisma.subscription
+    .updateMany({
+      where: {
+        userId,
+        status: { in: SWEEPABLE_STATUSES },
+        currentPeriodEnd: { lt: now },
+      },
+      data: { status: "expired" },
+    })
+    .catch(() => {
+      // 落库失败不影响本次快照；重置节流让下次请求重试
+      lastSweepAt.delete(userId);
+    });
+}
+
+/**
+ * 权益快照解析。用 React cache() 去重：同一请求内 layout 与 page 各调一次时只查一次库。
+ * 关键：不再每次调用都写库 —— 过期判断在内存完成（currentPeriodEnd < now 即视为 expired），
+ * 持久化落库改为节流（见 throttledSweepExpired）。canAccessLesson/snapshot 行为保持不变。
+ */
+export const resolveEntitlement = cache(async (userId: string | null | undefined): Promise<EntitlementSnapshot> => {
   if (!userId) return FREE_SNAPSHOT;
   const now = new Date();
 
-  await prisma.subscription.updateMany({
-    where: {
-      userId,
-      status: { in: ["active", "grace_period", "billing_retry", "canceled_but_active", "trial"] },
-      currentPeriodEnd: { lt: now },
-    },
-    data: { status: "expired" },
-  });
-
   const subs = await prisma.subscription.findMany({ where: { userId }, orderBy: { currentPeriodEnd: "desc" } });
+
+  // 读时内存判断：付费态且未过期才算有效；过期的付费态在下方 latest 分支按 expired 呈现。
   const activeSubs = subs.filter((s) => PREMIUM_STATUSES.has(s.status) && s.currentPeriodEnd >= now);
+
+  // 节流落库（不阻塞返回）：把 DB 里过期的有效态收敛为 expired。
+  throttledSweepExpired(userId, now);
 
   if (activeSubs.length > 0) {
     // 覆盖赛道：任一全站订阅 → "all"，否则为各单赛道 scope 的并集
@@ -102,7 +139,12 @@ export async function resolveEntitlement(userId: string | null | undefined): Pro
 
   const latest = subs[0];
   if (latest) {
-    const status = latest.status;
+    // 读时内存判断：DB 里仍是「有效付费态」但已过期的，对外呈现为 expired
+    // （等价于旧逻辑先 updateMany 再读回的效果，但不写库）。
+    const status =
+      SWEEPABLE_STATUSES.includes(latest.status) && latest.currentPeriodEnd < now
+        ? "expired"
+        : latest.status;
     const meta = STATUS_LABELS[status] ?? STATUS_LABELS.expired;
     const snapshot: EntitlementSnapshot = {
       ...FREE_SNAPSHOT,
@@ -116,7 +158,7 @@ export async function resolveEntitlement(userId: string | null | undefined): Pro
   }
 
   return FREE_SNAPSHOT;
-}
+});
 
 async function persistSnapshot(userId: string, subscriptionId: string, status: string, snapshot: EntitlementSnapshot) {
   const existing = await prisma.entitlement.findFirst({ where: { userId, sourceSubscriptionId: subscriptionId } });

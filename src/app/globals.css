@@ -276,9 +276,27 @@ body::before {
 @keyframes flashCap { 0%{opacity:0} 12%{opacity:.85} 100%{opacity:0} }
 @keyframes floatY   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
 
-/* STUDIO 实用类 */
-.studio-rise { animation: riseIn .5s var(--ease-out-expo) both; }
-.studio-slide { animation: slideIn .4s var(--ease-out-expo) both; }
+/* STUDIO 实用类（动画减负：入场 .5s→.28s，消除"慢感"） */
+.studio-rise { animation: riseIn .28s var(--ease-out-expo) both; }
+.studio-slide { animation: slideIn .3s var(--ease-out-expo) both; }
+
+/* §10.1 签名动效「点亮 Light-Up」——自习室隐喻的动效化，全站唯一记忆点 */
+@keyframes lightUp { 0%{opacity:.4;filter:brightness(.7)} 60%{opacity:1;filter:brightness(1.12)} 100%{opacity:1;filter:brightness(1)} }
+@keyframes lightSweep { 0%{transform:translateX(-120%)} 100%{transform:translateX(220%)} }
+@keyframes cardPowerOn { 0%{opacity:0;transform:scale(.98)} 55%{opacity:1;filter:brightness(1.1)} 100%{opacity:1;transform:scale(1);filter:brightness(1)} }
+.studio-lightup { animation: lightUp .5s var(--ease-out-expo) both; }
+.studio-poweron { animation: cardPowerOn .45s var(--ease-out-expo) both; }
+/* 开灯扫光：叠在容器上的一道柔光横扫（配 overflow-hidden 使用） */
+.studio-sweep::after {
+  content:""; position:absolute; inset:0; pointer-events:none;
+  background: linear-gradient(105deg, transparent 30%, rgba(255,255,255,.14) 48%, transparent 66%);
+  transform: translateX(-120%);
+  animation: lightSweep 1.1s var(--ease-out-expo) .15s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .studio-lightup, .studio-poweron { animation: none !important; }
+  .studio-sweep::after { animation: none !important; display: none; }
+}
 /* 卡片悬浮：hover 上浮 + 软阴影 */
 .studio-lift { transition: transform var(--dur-fast) var(--ease-out-expo), box-shadow var(--dur-fast) var(--ease-out-expo), border-color var(--dur-fast) var(--ease-out-expo); }
 .studio-lift:hover { transform: translateY(-3px); box-shadow: var(--lift); }
@@ -287,6 +305,32 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   .studio-rise, .studio-slide { animation: none !important; }
   .studio-lift:hover { transform: none !important; }
+}
+
+/* 复习卡 3D 翻牌：signature 翻面动效（问题→答案绕 Y 轴翻转）。
+   结构：.flip3d(透视容器) > .flip3d-inner(旋转层，.is-flipped 时 rotateY(180deg))
+        > .flip3d-face / .flip3d-back(两面，back 预旋 180° 并 backface 隐藏) */
+.flip3d { perspective: 1400px; }
+.flip3d-inner {
+  display: grid; width: 100%;
+  transform-style: preserve-3d;
+  transition: transform .52s var(--ease-tide);
+}
+.flip3d-inner.is-flipped { transform: rotateY(180deg); }
+/* 两面叠到同一 grid 格：容器自然取两面中较高者，翻到长文本面也不溢出 */
+.flip3d-face, .flip3d-back {
+  grid-area: 1 / 1;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+}
+.flip3d-back { transform: rotateY(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .flip3d-inner { transition: none !important; transform: none !important; }
+  .flip3d-inner.is-flipped { transform: none !important; }
+  /* 降级为直接切换：无 3D 旋转，靠 opacity 显隐正反面 */
+  .flip3d-face, .flip3d-back { backface-visibility: visible; -webkit-backface-visibility: visible; transform: none !important; transition: opacity .18s var(--ease-out-expo); }
+  .flip3d-back { opacity: 0; pointer-events: none; }
+  .flip3d-inner.is-flipped .flip3d-face { opacity: 0; pointer-events: none; }
+  .flip3d-inner.is-flipped .flip3d-back { opacity: 1; pointer-events: auto; }
 }
 
 /* 网格状有机渐变背景（mesh，非 lila） */

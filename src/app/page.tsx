@@ -8,23 +8,219 @@ import {
   UsersThree,
   Waveform,
 } from "@phosphor-icons/react/dist/ssr";
-import { listCourses, listUpdates, listRankedDemands } from "@/lib/queries";
+import type { User } from "@prisma/client";
+import { listCourses, listUpdates, listRankedDemands, formatDuration, relativeTime } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
+import { shanghaiDayKey } from "@/lib/week";
 import { VoteButton } from "@/components/VoteButton";
 import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
+import { StudyDesk, type DeskResume, type DeskNote } from "@/components/StudyDesk";
 import { TRACKS } from "@/lib/tracks";
 
 /**
- * 首页 · STUDIO 视觉复刻
- * 品牌叙事：把「潮汐」改为「自习室」——今天，把这间自习室点亮。
- * 结构：1) Hero（点亮自习室文案 + 续播深色卡） 2) 课程赛道 grid-cols-4 3) 共创 + 订阅 teaser
- * 保留全部数据查询（listCourses / listUpdates / listRankedDemands / plans）、权益解析与所有链接。
+ * 首页 · 双态。
+ * - 未登录：保留原有营销结构（Hero 点亮文案 + 课程赛道 + 共创/订阅 teaser）。
+ * - 登录后：全新「自习桌 dashboard」，抽到 <StudyDesk />；所有派生数据服务端计算（SSR 稳定），
+ *   一律以 where userId 强制隔离（越权铁律：服务端按 userId 重拉数据）。
+ * 仅本文件 + StudyDesk.tsx 改动；保留全部原有查询与链接。
  */
 export default async function HomePage() {
   const user = await getCurrentUser();
+
+  // 登录后 → 自习桌 dashboard
+  if (user) {
+    return <StudyDeskHome user={user} />;
+  }
+
+  // 未登录 → 营销版
+  return <MarketingHome />;
+}
+
+/* ============================================================
+   登录后：自习桌 Dashboard（服务端组装数据 → 传给 client StudyDesk）
+   ============================================================ */
+async function StudyDeskHome({ user }: { user: User }) {
+  const userId = user.id; // 越权铁律：所有查询强制 where userId
+
+  const today = shanghaiDayKey();
+  const now = new Date();
+
+  const [streak, streakDayToday, lastProgress, myCourseCount, recentNoteRows, dueReviewCount] =
+    await Promise.all([
+      // 连续天数
+      prisma.streak.findUnique({ where: { userId } }),
+      // 今天是否已点亮（当日有学习分钟即算点亮）
+      prisma.streakDay.findUnique({ where: { userId_day: { userId, day: today } } }),
+      // 断点续学：最近一条学习进度（未完成优先，仍取最近）
+      prisma.learningProgress.findFirst({
+        where: { userId },
+        orderBy: { lastPlayedAt: "desc" },
+        include: {
+          course: { select: { slug: true, title: true, totalDurationSec: true } },
+          lesson: { select: { id: true, title: true, durationSec: true } },
+        },
+      }),
+      // 我的课数量（AI 造课 / 导入课，归属当前用户）
+      prisma.course.count({
+        where: { authorUserId: userId, origin: { in: ["ai_generated", "user_imported"] } },
+      }),
+      // 最近笔记 3 条
+      prisma.note.findMany({
+        where: { userId, deletedAt: null },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        include: { course: { select: { slug: true } }, lesson: { select: { id: true } } },
+      }),
+      // 待复习卡数（到期）
+      prisma.reviewCard.count({ where: { userId, dueAt: { lte: now } } }),
+    ]);
+
+  // —— 派生：问候 + 今日状态 ——
+  const hours = now.getHours();
+  const greeting = hours < 12 ? "上午好" : hours < 18 ? "下午好" : "晚上好";
+  const streakCount = streak?.currentStreak ?? 0;
+  const litToday = (streakDayToday?.minutes ?? 0) > 0;
+
+  // —— 派生：继续学习卡 ——
+  let resume: DeskResume | null = null;
+  if (lastProgress && lastProgress.course && lastProgress.lesson) {
+    const lessonDur = lastProgress.lesson.durationSec || 0;
+    const pct = lessonDur > 0 ? Math.min(100, Math.round((lastProgress.progressSec / lessonDur) * 100)) : 0;
+    const remainSec = Math.max(0, lessonDur - lastProgress.progressSec);
+    resume = {
+      courseSlug: lastProgress.course.slug,
+      lessonId: lastProgress.lesson.id,
+      courseTitle: lastProgress.course.title,
+      lessonTitle: lastProgress.lesson.title,
+      progressPct: pct,
+      remainText: remainSec > 0 ? `剩 ${formatDuration(remainSec)}` : "本节已看完",
+    };
+  }
+
+  // —— 派生：最近笔记 ——
+  const recentNotes: DeskNote[] = recentNoteRows.map((n) => ({
+    id: n.id,
+    courseSlug: n.course?.slug ?? "",
+    lessonId: n.lesson?.id ?? "",
+    title: n.title?.trim() || n.contentMd.slice(0, 24) || "未命名笔记",
+    relativeTime: relativeTime(n.createdAt),
+  }));
+
+  // —— 派生：AI 今日建议（静态智能文案，基于 streak/进度/复习派生，不调 LLM）——
+  const advice = buildAdvice({
+    litToday,
+    streakCount,
+    resumeTitle: resume?.courseTitle ?? null,
+    dueReviewCount,
+    myCourseCount,
+  });
+
+  // —— 自习室在线人数（静态数，按当日稳定伪随机，避免 hydration 抖动）——
+  const onlineCount = deriveOnlineCount(today);
+
+  // 进入专注：有续学则回到该课，否则去个人页
+  const focusHref = resume ? `/courses/${resume.courseSlug}/learn/${resume.lessonId}` : "/me";
+
+  return (
+    <>
+      <TrackView event="homepage_view" properties={{ mode: "desk" }} />
+      <StudyDesk
+        nickname={user.nickname}
+        greeting={greeting}
+        streak={streakCount}
+        litToday={litToday}
+        resume={resume}
+        myCourseCount={myCourseCount}
+        recentNotes={recentNotes}
+        dueReviewCount={dueReviewCount}
+        advice={advice}
+        onlineCount={onlineCount}
+        focusHref={focusHref}
+      />
+      {/* 底部：书架上新（降权展示，复用 listUpdates）*/}
+      <ShelfNew />
+    </>
+  );
+}
+
+/** AI 今日建议文案：纯规则派生，读起来像智能助手，SSR 稳定。 */
+function buildAdvice(o: {
+  litToday: boolean;
+  streakCount: number;
+  resumeTitle: string | null;
+  dueReviewCount: number;
+  myCourseCount: number;
+}): string {
+  const parts: string[] = [];
+  if (o.resumeTitle) {
+    parts.push(`继续《${o.resumeTitle}》`);
+  } else if (o.myCourseCount > 0) {
+    parts.push("挑一门你的课接着学");
+  } else {
+    parts.push("说出你想学的，先造一门课");
+  }
+  if (o.dueReviewCount > 0) parts.push(`复习 ${o.dueReviewCount} 张卡`);
+  const body = parts.join(" · ");
+  if (!o.litToday) return `今天还没点亮 —— ${body}，10 分钟就够。`;
+  if (o.streakCount >= 3) return `连续 ${o.streakCount} 天，状态在线。${body}，保持节奏。`;
+  return `今天已点亮，${body}。`;
+}
+
+/** 在线人数：按「当日」派生一个稳定的四位数（1,2xx 量级），保证 SSR/hydration 一致。 */
+function deriveOnlineCount(dayKey: string): number {
+  let h = 0;
+  for (let i = 0; i < dayKey.length; i++) h = (h * 31 + dayKey.charCodeAt(i)) >>> 0;
+  return 1180 + (h % 140); // 1180–1319
+}
+
+/* 底部一小节「书架上新」——降权展示最新更新日志 */
+async function ShelfNew() {
+  const updates = await listUpdates(4);
+  if (updates.length === 0) return null;
+  return (
+    <section className="mx-auto mt-14 max-w-[1060px] md:mt-16">
+      <div className="mb-4 flex items-end justify-between">
+        <div>
+          <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">SHELF · NEW</p>
+          <h2 className="mt-1.5 text-[16px] font-bold text-[var(--ink)]">书架上新</h2>
+        </div>
+        <Link
+          href="/courses?sort=newest"
+          className="group inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-[var(--red)]"
+        >
+          全部
+          <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+        </Link>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {updates.map((u) => (
+          <Link
+            key={u.id}
+            href={`/courses/${u.courseSlug}`}
+            className="studio-lift flex flex-col rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]"
+          >
+            <span className="rounded-full bg-[var(--new-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--new-ink)] self-start">
+              上新
+            </span>
+            <p className="mt-2.5 line-clamp-2 text-[13px] font-semibold text-[var(--ink)]">{u.title}</p>
+            <p className="mono mt-auto pt-2.5 text-[11px] text-[var(--ink4)]">
+              {u.courseTitle} · {u.relativeTime}
+            </p>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ============================================================
+   未登录：营销版首页（保留原有结构与全部查询）
+   ============================================================ */
+async function MarketingHome() {
+  const user = await getCurrentUser(); // 此分支下必为 null，保留以维持权益解析签名一致
   const [all, updates, demands, plans] = await Promise.all([
     listCourses({ sort: "recommended" }),
     listUpdates(8),
