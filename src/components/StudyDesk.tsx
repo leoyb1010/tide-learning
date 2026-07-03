@@ -31,6 +31,7 @@ export interface DeskResume {
   lessonTitle: string;
   progressPct: number; // 0-100
   remainText: string; // "剩 6 分钟"
+  resumeSec?: number; // v2.2：断点秒数，用于 ?t= 精确续播
 }
 export interface DeskNote {
   id: string;
@@ -45,6 +46,7 @@ export interface StudyDeskProps {
   streak: number; // 连续天数
   litToday: boolean; // 今天是否已点亮
   resume: DeskResume | null;
+  resumeList?: DeskResume[]; // v2.2：学习中（最多 3 门），第一门为主卡，其余为降权行
   myCourseCount: number;
   recentNotes: DeskNote[];
   dueReviewCount: number;
@@ -59,6 +61,7 @@ export function StudyDesk({
   streak,
   litToday,
   resume,
+  resumeList,
   myCourseCount,
   recentNotes,
   dueReviewCount,
@@ -85,6 +88,12 @@ export function StudyDesk({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     go();
+  }
+
+  // 断点续播链接：学习页按 userId+lessonId 查该章节已存的 progressSec 自动定位，
+  // 所以链接到章节即回到断点，无需 ?t=（进度已在 DB，不做冗余参数）。
+  function continueHref(r: DeskResume): string {
+    return `/courses/${r.courseSlug}/learn/${r.lessonId}`;
   }
 
   return (
@@ -127,7 +136,7 @@ export function StudyDesk({
 
         <form
           onSubmit={onSubmit}
-          className="studio-sweep group relative mt-6 w-full max-w-[620px] overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-2 shadow-[var(--card)] transition-colors focus-within:border-[var(--red-soft-border)] focus-within:shadow-[var(--lift)]"
+          className="studio-sweep group relative mt-6 w-full max-w-[620px] overflow-hidden rounded-[18px] border border-[var(--border2)] bg-[var(--surface)] p-2 shadow-[var(--card)] outline-none transition-colors focus-within:border-[var(--ink3)] focus-within:shadow-[var(--lift)] focus-within:outline-none"
         >
           <div className="flex items-center gap-2">
             <Sparkle
@@ -170,17 +179,15 @@ export function StudyDesk({
         </div>
       </section>
 
-      {/* ============ 3. 继续学习卡（断点续学）============ */}
+      {/* ============ 3. 学习中（断点续学，最多 3 门：主卡 + 降权行）============ */}
       {resume && (
-        <section className="studio-rise">
-          <p className="mono mb-3 text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">
-            CONTINUE
-          </p>
+        <section className="studio-rise space-y-3">
+          <h2 className="text-[16px] font-bold text-[var(--ink)]">学习中</h2>
+          {/* 主卡：最近一门，精确续播（带 ?t=） */}
           <Link
-            href={`/courses/${resume.courseSlug}/learn/${resume.lessonId}`}
+            href={continueHref(resume)}
             className="studio-lift group flex items-center gap-4 rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
           >
-            {/* 深色续播缩略 */}
             <div
               className="relative flex h-[64px] w-[112px] shrink-0 items-center justify-center overflow-hidden rounded-[11px]"
               style={{ background: "linear-gradient(140deg,#232935 0%,#141821 100%)" }}
@@ -189,14 +196,11 @@ export function StudyDesk({
                 <Play size={15} weight="fill" className="ml-0.5 text-white" />
               </div>
               <div className="absolute inset-x-0 bottom-0 h-1 bg-white/15">
-                <div
-                  className="h-full bg-[var(--red)]"
-                  style={{ width: `${resume.progressPct}%` }}
-                />
+                <div className="h-full bg-[var(--red)]" style={{ width: `${resume.progressPct}%` }} />
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="mono text-[11px] text-[var(--ink3)]">继续学习 · {resume.courseTitle}</p>
+              <p className="mono text-[11px] text-[var(--ink3)]">从上次继续 · {resume.courseTitle}</p>
               <p className="mt-1 truncate text-[14px] font-semibold text-[var(--ink)]">
                 {resume.lessonTitle}
               </p>
@@ -211,14 +215,38 @@ export function StudyDesk({
               className="shrink-0 text-[var(--ink4)] transition-transform group-hover:translate-x-0.5"
             />
           </Link>
+          {/* 降权行：其余学习中课程 */}
+          {(resumeList ?? []).slice(1).map((r) => (
+            <Link
+              key={r.lessonId}
+              href={continueHref(r)}
+              className="studio-lift group flex items-center gap-3 rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--card)]"
+            >
+              <span className="relative grid h-8 w-8 shrink-0 place-items-center">
+                <svg viewBox="0 0 36 36" className="h-8 w-8 -rotate-90">
+                  <circle cx="18" cy="18" r="15" fill="none" stroke="var(--surface-inset)" strokeWidth="4" />
+                  <circle
+                    cx="18" cy="18" r="15" fill="none" stroke="var(--red)" strokeWidth="4" strokeLinecap="round"
+                    strokeDasharray={`${(r.progressPct / 100) * 94.2} 94.2`}
+                  />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-semibold text-[var(--ink)]">{r.lessonTitle}</p>
+                <p className="mono text-[11px] text-[var(--ink4)]">{r.courseTitle} · {r.remainText}</p>
+              </div>
+              <ArrowRight
+                size={14} weight="bold"
+                className="shrink-0 text-[var(--ink4)] transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+          ))}
         </section>
       )}
 
       {/* ============ 4. 我的书桌（横排 3 卡）============ */}
       <section>
-        <p className="mono mb-3 text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">
-          MY DESK · 我的书桌
-        </p>
+        <h2 className="mb-3 text-[16px] font-bold text-[var(--ink)]">我的书桌</h2>
         <div className="grid gap-4 md:grid-cols-3">
           {/* 我的课 */}
           <Link
@@ -250,7 +278,7 @@ export function StudyDesk({
               <ul className="mt-2 flex flex-col gap-1.5">
                 {recentNotes.map((n) => (
                   <li key={n.id} className="flex items-center gap-2">
-                    <span className="h-1 w-1 shrink-0 rounded-full bg-[var(--red)]" />
+                    <span className="h-1 w-1 shrink-0 rounded-full bg-[var(--ink4)]" />
                     <span className="truncate text-[12px] text-[var(--ink2)]">{n.title}</span>
                     <span className="mono ml-auto shrink-0 text-[10px] text-[var(--ink4)]">
                       {n.relativeTime}
@@ -263,9 +291,9 @@ export function StudyDesk({
             )}
           </Link>
 
-          {/* 待复习卡 */}
+          {/* 待复习卡 → 复习室 */}
           <Link
-            href="/notes"
+            href="/review"
             className="studio-lift flex flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]"
           >
             <div className="flex h-[38px] w-[38px] items-center justify-center rounded-[11px] bg-[var(--red-soft)] text-[var(--red)]">

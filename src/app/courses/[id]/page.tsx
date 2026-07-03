@@ -235,7 +235,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       {related.length > 0 && (
         <section>
           <h2 className="mb-4 text-[18px] font-bold text-[var(--ink)]">相关课程</h2>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {related.map((c) => <CourseCard key={c.id} course={c} />)}
           </div>
         </section>

@@ -197,18 +197,25 @@ model Note {
   id           String    @id @default(cuid())
   userId       String
   user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  courseId     String
-  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessonId     String
-  lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  // courseId/lessonId 可空：v2.2 起支持「独立笔记」(source=manual) 与 AI 整理产物(source=ai_transform)，
+  // 它们不绑定任何课程/章节；课程内记的笔记(source=lesson)继续填这两个字段。
+  courseId     String?
+  course       Course?   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId     String?
+  lesson       Lesson?   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   timestampSec Int?
   anchorRef    String? // 块课件锚点 "block:<id>" / "chapter:<n>"（视频课继续用 timestampSec）
   title        String?
   contentMd    String
+  excerpt      String? // v2.2：列表预览摘要（写入时由 contentMd 生成，≤120 字，避免列表动态截断，借鉴 LeoJarvis）
+  source       String    @default("lesson") // v2.2：lesson(课程内记) / manual(独立笔记) / ai_transform(AI整理产物)
   sourceText   String? // C1：字幕划线引用的原文
   kind         String    @default("text") // text / capture(截帧) / clip(字幕剪藏)
   captureUrl   String? // 截帧图 data-url 或对象存储 key
   starred      Boolean   @default(false) // 收藏/星标
+  pinned       Boolean   @default(false) // v2.2：置顶（列表 pinned DESC 优先，借鉴 LeoJarvis）
+  notebookId   String? // v2.2：归属笔记本（可空）
+  notebook     Notebook? @relation(fields: [notebookId], references: [id], onDelete: SetNull)
   visibility   String    @default("private") // private / shared_later
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -218,6 +225,8 @@ model Note {
 
   @@index([userId, createdAt])
   @@index([userId, lessonId])
+  @@index([userId, pinned, updatedAt]) // v2.2：笔记馆「全部」列表默认排序（置顶优先 + 最近更新）
+  @@index([notebookId])
 }
 
 // ---------- 笔记标签（C1：标签系统）----------
@@ -674,6 +683,7 @@ model Notebook {
   updatedAt   DateTime @updatedAt
 
   entries NotebookEntry[]
+  notes   Note[] // v2.2：归入本笔记本的笔记（Note.notebookId）
 
   @@index([userId, updatedAt])
 }

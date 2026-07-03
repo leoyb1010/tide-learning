@@ -6,13 +6,9 @@ import { assertUserRateLimit } from "@/lib/rate-limit";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { chatJson } from "@/lib/llm";
 import { track } from "@/lib/analytics";
+import { slugify } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
-
-/** 与 admin/courses route 同款 slugify（复用同一实现，保持 slug 规则一致）。 */
-function slugify(s: string) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || `course-${Date.now()}`;
-}
 
 interface OutlineItem {
   title: string;

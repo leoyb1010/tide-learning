@@ -123,7 +123,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
         maxLength={800}
         rows={4}
         placeholder={TYPES.find((t) => t.key === type)?.placeholder}
-        className="mt-3 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[14px] leading-[1.65] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red-soft-border)]"
+        className="mt-3 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[14px] leading-[1.65] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
       />
 
       {/* 审核结果提示 */}

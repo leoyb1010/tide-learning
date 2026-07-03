@@ -36,12 +36,15 @@ export async function GET(req: NextRequest) {
     const truncated = rows.length > MAX_EXPORT;
     const notes = truncated ? rows.slice(0, MAX_EXPORT) : rows;
 
-    // 按课程分组拼装 Markdown
+    // 按课程分组拼装 Markdown。v2.2：独立笔记(courseId=null)归入「未分类笔记」组。
+    const STANDALONE_KEY = "__standalone__";
     const byCourse = new Map<string, { title: string; items: typeof notes }>();
     for (const n of notes) {
-      const g = byCourse.get(n.courseId) ?? { title: n.course.title, items: [] };
+      const key = n.courseId ?? STANDALONE_KEY;
+      const title = n.course?.title ?? "未分类笔记";
+      const g = byCourse.get(key) ?? { title, items: [] };
       g.items.push(n);
-      byCourse.set(n.courseId, g);
+      byCourse.set(key, g);
     }
 
     const lines: string[] = [];
@@ -60,10 +63,10 @@ export async function GET(req: NextRequest) {
       for (const n of items) {
         const stamp = n.timestampSec != null ? ` \`${mmss(n.timestampSec)}\`` : "";
         const kindTag = n.kind === "capture" ? " 📸" : n.kind === "clip" ? " ✂️" : "";
-        const heading = n.title?.trim() || n.lesson.title;
+        const heading = n.title?.trim() || n.lesson?.title || "随手记";
         lines.push(`### ${heading}${stamp}${kindTag}`);
         lines.push("");
-        lines.push(`_${n.lesson.title}_`);
+        if (n.lesson?.title) lines.push(`_${n.lesson.title}_`);
         const tagNames = n.tags.map((t) => `#${t.tag.name}`).join(" ");
         if (tagNames) lines.push(tagNames);
         lines.push("");

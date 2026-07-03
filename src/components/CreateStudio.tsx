@@ -437,7 +437,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
                   rows={5}
                   maxLength={500}
                   placeholder="描述你想学的，比如：讲讲 Python 装饰器，我是初学者"
-                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3.5 text-[16px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)]"
+                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3.5 text-[16px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus:bg-[var(--surface)]"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
                   {prompt.length}/500
@@ -501,7 +501,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
                 onChange={(e) => setImportTitle(e.target.value)}
                 maxLength={60}
                 placeholder="课程标题（可留空，AI 帮你起）"
-                className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3 text-[15px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)]"
+                className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3 text-[15px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus:bg-[var(--surface)]"
               />
               <div className="relative">
                 <textarea
@@ -510,7 +510,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
                   rows={8}
                   maxLength={50000}
                   placeholder="把你的学习资料 / PDF 内容 / 文章粘贴进来，AI 帮你整理成可学的课"
-                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)]"
+                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus:bg-[var(--surface)]"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
                   {importText.length}/50000

@@ -6,6 +6,8 @@ import { ToastProvider } from "@/components/Toast";
 import { Sidebar } from "@/components/Sidebar";
 import { Topbar } from "@/components/Topbar";
 import { getCurrentUser } from "@/lib/session";
+import { resolveEntitlement } from "@/lib/entitlement";
+import { prisma } from "@/lib/db";
 
 // STUDIO 字体系统：Plus Jakarta（UI/数字）+ Noto Sans SC（中文）+ IBM Plex Mono（数据）
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-jakarta", display: "swap" });
@@ -39,9 +41,49 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+/** 学号：userId 派生一个稳定的 5 位 base32 短码，如 STU-8F3K2（展示用，非安全标识）。 */
+function shortStudentId(userId: string): string {
+  let h = 0;
+  for (let i = 0; i < userId.length; i++) h = (h * 33 + userId.charCodeAt(i)) >>> 0;
+  const base32 = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // 去掉易混 I/L/O/U
+  let code = "";
+  for (let i = 0; i < 5; i++) {
+    code = base32[h % 32] + code;
+    h = Math.floor(h / 32);
+  }
+  return `STU-${code}`;
+}
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
-  const navUser = user ? { nickname: user.nickname, role: user.role } : null;
+
+  // v2.2 学生证：Sidebar 底部展示真实身份卡（学号/入学时间/连续天数/会员）。
+  // streak + entitlement 都被 React cache 去重，不会重复查库。
+  let navUser: {
+    nickname: string;
+    role: string;
+    avatarUrl: string | null;
+    studentId: string; // 学号（userId 短哈希）
+    joinedLabel: string; // 入学 2026.05
+    streak: number;
+    isSubscriber: boolean;
+  } | null = null;
+  if (user) {
+    const [streak, snapshot] = await Promise.all([
+      prisma.streak.findUnique({ where: { userId: user.id }, select: { currentStreak: true } }),
+      resolveEntitlement(user.id),
+    ]);
+    const j = user.createdAt;
+    navUser = {
+      nickname: user.nickname,
+      role: user.role,
+      avatarUrl: user.avatarUrl,
+      studentId: shortStudentId(user.id),
+      joinedLabel: `入学 ${j.getFullYear()}.${String(j.getMonth() + 1).padStart(2, "0")}`,
+      streak: streak?.currentStreak ?? 0,
+      isSubscriber: snapshot.isSubscriber,
+    };
+  }
   return (
     <html lang="zh-CN" className={`${jakarta.variable} ${notoSC.variable} ${plexMono.variable}`}>
       <body>

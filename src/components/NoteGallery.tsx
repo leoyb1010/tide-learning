@@ -22,7 +22,9 @@ export function NoteGallery({ notes }: { notes: NoteRow[] }) {
       {captures.map((n) => (
         <StaggerItem key={n.id} className="mb-3.5 inline-block w-full break-inside-avoid">
           <Link
-            href={`/courses/${n.courseId}/learn/${n.lessonId}${n.timestampSec != null ? `?t=${n.timestampSec}` : ""}`}
+            href={n.courseId && n.lessonId
+              ? `/courses/${n.courseId}/learn/${n.lessonId}${n.timestampSec != null ? `?t=${n.timestampSec}` : ""}`
+              : `/notes/${n.id}`}
             className="studio-lift group block overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]"
           >
             {/* 顶部标记点：截帧橙 */}
@@ -36,7 +38,7 @@ export function NoteGallery({ notes }: { notes: NoteRow[] }) {
             <div className="space-y-1.5 p-3.5">
               <div className="flex items-center gap-2 text-[12px] text-[var(--ink4)]">
                 <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#f59e0b" }} />
-                <span className="truncate">{n.lesson.title}</span>
+                <span className="truncate">{n.lesson?.title ?? "截帧笔记"}</span>
                 {n.timestampSec != null && (
                   <span className="mono ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2 py-0.5 text-[var(--red)]">
                     <Clock size={11} weight="fill" /> {mmss(n.timestampSec)}

@@ -56,3 +56,27 @@ export const LEAD_STATUS: Record<string, { label: string; tone: string }> = {
   converted: { label: "已转化", tone: "success" },
   lost: { label: "已流失", tone: "muted" },
 };
+
+/**
+ * 笔记摘要：从 Markdown 正文生成纯文本预览（≤maxLen 字）。
+ * v2.2：写入时落库到 Note.excerpt，列表直接读，避免每次渲染动态截断（借鉴 LeoJarvis excerpt）。
+ * 去掉常见 markdown 标记（#、*、`、>、-、图片/链接语法），压缩空白。
+ */
+export function buildExcerpt(md: string, maxLen = 120): string {
+  const plain = md
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // 图片
+    .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1") // 链接保留文字
+    .replace(/[#>*_`~-]/g, " ") // markdown 符号
+    .replace(/\s+/g, " ")
+    .trim();
+  return plain.length > maxLen ? plain.slice(0, maxLen) + "…" : plain;
+}
+
+/**
+ * URL slug：小写化、非字母数字转连字符、去首尾连字符、截断 40 字符。
+ * 空输入返回 "course"（调用方通常再拼一段随机后缀保证唯一）。
+ * v2.2：合并 generate-course / import-source 两处逐字重复的实现。
+ */
+export function slugify(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || "course";
+}

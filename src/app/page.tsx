@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowRight,
   Play,
@@ -8,214 +9,25 @@ import {
   UsersThree,
   Waveform,
 } from "@phosphor-icons/react/dist/ssr";
-import type { User } from "@prisma/client";
-import { listCourses, listUpdates, listRankedDemands, formatDuration, relativeTime } from "@/lib/queries";
+import { listCourses, listUpdates, listRankedDemands, formatDuration } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
-import { shanghaiDayKey } from "@/lib/week";
 import { VoteButton } from "@/components/VoteButton";
 import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
-import { StudyDesk, type DeskResume, type DeskNote } from "@/components/StudyDesk";
 import { TRACKS } from "@/lib/tracks";
 
 /**
- * 首页 · 双态。
- * - 未登录：保留原有营销结构（Hero 点亮文案 + 课程赛道 + 共创/订阅 teaser）。
- * - 登录后：全新「自习桌 dashboard」，抽到 <StudyDesk />；所有派生数据服务端计算（SSR 稳定），
- *   一律以 where userId 强制隔离（越权铁律：服务端按 userId 重拉数据）。
- * 仅本文件 + StudyDesk.tsx 改动；保留全部原有查询与链接。
+ * 首页 · 双态（v2.2）。
+ * - 未登录：营销首页（Hero 点亮文案 + 三引擎 + 学习闭环 + 课程赛道 + 共创/订阅 teaser）。
+ * - 登录后：书桌已独立成 /desk，这里直接 redirect 过去（书桌是登录用户的「家」）。
  */
 export default async function HomePage() {
   const user = await getCurrentUser();
-
-  // 登录后 → 自习桌 dashboard
-  if (user) {
-    return <StudyDeskHome user={user} />;
-  }
-
-  // 未登录 → 营销版
+  if (user) redirect("/desk"); // 登录 → 书桌
   return <MarketingHome />;
 }
-
-/* ============================================================
-   登录后：自习桌 Dashboard（服务端组装数据 → 传给 client StudyDesk）
-   ============================================================ */
-async function StudyDeskHome({ user }: { user: User }) {
-  const userId = user.id; // 越权铁律：所有查询强制 where userId
-
-  const today = shanghaiDayKey();
-  const now = new Date();
-
-  const [streak, streakDayToday, lastProgress, myCourseCount, recentNoteRows, dueReviewCount] =
-    await Promise.all([
-      // 连续天数
-      prisma.streak.findUnique({ where: { userId } }),
-      // 今天是否已点亮（当日有学习分钟即算点亮）
-      prisma.streakDay.findUnique({ where: { userId_day: { userId, day: today } } }),
-      // 断点续学：最近一条学习进度（未完成优先，仍取最近）
-      prisma.learningProgress.findFirst({
-        where: { userId },
-        orderBy: { lastPlayedAt: "desc" },
-        include: {
-          course: { select: { slug: true, title: true, totalDurationSec: true } },
-          lesson: { select: { id: true, title: true, durationSec: true } },
-        },
-      }),
-      // 我的课数量（AI 造课 / 导入课，归属当前用户）
-      prisma.course.count({
-        where: { authorUserId: userId, origin: { in: ["ai_generated", "user_imported"] } },
-      }),
-      // 最近笔记 3 条
-      prisma.note.findMany({
-        where: { userId, deletedAt: null },
-        orderBy: { createdAt: "desc" },
-        take: 3,
-        include: { course: { select: { slug: true } }, lesson: { select: { id: true } } },
-      }),
-      // 待复习卡数（到期）
-      prisma.reviewCard.count({ where: { userId, dueAt: { lte: now } } }),
-    ]);
-
-  // —— 派生：问候 + 今日状态 ——
-  const hours = now.getHours();
-  const greeting = hours < 12 ? "上午好" : hours < 18 ? "下午好" : "晚上好";
-  const streakCount = streak?.currentStreak ?? 0;
-  const litToday = (streakDayToday?.minutes ?? 0) > 0;
-
-  // —— 派生：继续学习卡 ——
-  let resume: DeskResume | null = null;
-  if (lastProgress && lastProgress.course && lastProgress.lesson) {
-    const lessonDur = lastProgress.lesson.durationSec || 0;
-    const pct = lessonDur > 0 ? Math.min(100, Math.round((lastProgress.progressSec / lessonDur) * 100)) : 0;
-    const remainSec = Math.max(0, lessonDur - lastProgress.progressSec);
-    resume = {
-      courseSlug: lastProgress.course.slug,
-      lessonId: lastProgress.lesson.id,
-      courseTitle: lastProgress.course.title,
-      lessonTitle: lastProgress.lesson.title,
-      progressPct: pct,
-      remainText: remainSec > 0 ? `剩 ${formatDuration(remainSec)}` : "本节已看完",
-    };
-  }
-
-  // —— 派生：最近笔记 ——
-  const recentNotes: DeskNote[] = recentNoteRows.map((n) => ({
-    id: n.id,
-    courseSlug: n.course?.slug ?? "",
-    lessonId: n.lesson?.id ?? "",
-    title: n.title?.trim() || n.contentMd.slice(0, 24) || "未命名笔记",
-    relativeTime: relativeTime(n.createdAt),
-  }));
-
-  // —— 派生：AI 今日建议（静态智能文案，基于 streak/进度/复习派生，不调 LLM）——
-  const advice = buildAdvice({
-    litToday,
-    streakCount,
-    resumeTitle: resume?.courseTitle ?? null,
-    dueReviewCount,
-    myCourseCount,
-  });
-
-  // —— 自习室在线人数（静态数，按当日稳定伪随机，避免 hydration 抖动）——
-  const onlineCount = deriveOnlineCount(today);
-
-  // 进入专注：有续学则回到该课，否则去个人页
-  const focusHref = resume ? `/courses/${resume.courseSlug}/learn/${resume.lessonId}` : "/me";
-
-  return (
-    <>
-      <TrackView event="homepage_view" properties={{ mode: "desk" }} />
-      <StudyDesk
-        nickname={user.nickname}
-        greeting={greeting}
-        streak={streakCount}
-        litToday={litToday}
-        resume={resume}
-        myCourseCount={myCourseCount}
-        recentNotes={recentNotes}
-        dueReviewCount={dueReviewCount}
-        advice={advice}
-        onlineCount={onlineCount}
-        focusHref={focusHref}
-      />
-      {/* 底部：书架上新（降权展示，复用 listUpdates）*/}
-      <ShelfNew />
-    </>
-  );
-}
-
-/** AI 今日建议文案：纯规则派生，读起来像智能助手，SSR 稳定。 */
-function buildAdvice(o: {
-  litToday: boolean;
-  streakCount: number;
-  resumeTitle: string | null;
-  dueReviewCount: number;
-  myCourseCount: number;
-}): string {
-  const parts: string[] = [];
-  if (o.resumeTitle) {
-    parts.push(`继续《${o.resumeTitle}》`);
-  } else if (o.myCourseCount > 0) {
-    parts.push("挑一门你的课接着学");
-  } else {
-    parts.push("说出你想学的，先造一门课");
-  }
-  if (o.dueReviewCount > 0) parts.push(`复习 ${o.dueReviewCount} 张卡`);
-  const body = parts.join(" · ");
-  if (!o.litToday) return `今天还没点亮 —— ${body}，10 分钟就够。`;
-  if (o.streakCount >= 3) return `连续 ${o.streakCount} 天，状态在线。${body}，保持节奏。`;
-  return `今天已点亮，${body}。`;
-}
-
-/** 在线人数：按「当日」派生一个稳定的四位数（1,2xx 量级），保证 SSR/hydration 一致。 */
-function deriveOnlineCount(dayKey: string): number {
-  let h = 0;
-  for (let i = 0; i < dayKey.length; i++) h = (h * 31 + dayKey.charCodeAt(i)) >>> 0;
-  return 1180 + (h % 140); // 1180–1319
-}
-
-/* 底部一小节「书架上新」——降权展示最新更新日志 */
-async function ShelfNew() {
-  const updates = await listUpdates(4);
-  if (updates.length === 0) return null;
-  return (
-    <section className="mx-auto mt-14 max-w-[1060px] md:mt-16">
-      <div className="mb-4 flex items-end justify-between">
-        <div>
-          <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">SHELF · NEW</p>
-          <h2 className="mt-1.5 text-[16px] font-bold text-[var(--ink)]">书架上新</h2>
-        </div>
-        <Link
-          href="/courses?sort=newest"
-          className="group inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-[var(--red)]"
-        >
-          全部
-          <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {updates.map((u) => (
-          <Link
-            key={u.id}
-            href={`/courses/${u.courseSlug}`}
-            className="studio-lift flex flex-col rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]"
-          >
-            <span className="rounded-full bg-[var(--new-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--new-ink)] self-start">
-              上新
-            </span>
-            <p className="mt-2.5 line-clamp-2 text-[13px] font-semibold text-[var(--ink)]">{u.title}</p>
-            <p className="mono mt-auto pt-2.5 text-[11px] text-[var(--ink4)]">
-              {u.courseTitle} · {u.relativeTime}
-            </p>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 /* ============================================================
    未登录：营销版首页（保留原有结构与全部查询）
    ============================================================ */
@@ -261,32 +73,32 @@ async function MarketingHome() {
 
       {/* ============ 1. HERO — 点亮自习室 + 续播深色卡 ============ */}
       <section className="flex flex-wrap items-center gap-x-12 gap-y-10">
-        {/* 左：文案 */}
+        {/* 左：文案 —— AI 自习室叙事（未登录营销主线） */}
         <div className="min-w-[330px] flex-1 studio-rise">
           <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink3)]">
-            {weekday} · {dateLabel} · {greeting}，{displayName}
+            YOUDAO STUDIO · AI 虚拟自习室
           </p>
           <h1 className="mt-4 text-[30px] font-bold leading-[1.4] text-[var(--ink)] sm:text-[34px]">
-            今天，把这间
+            说出你想学的，
             <br />
-            自习室<span className="text-[var(--red)]">点亮</span>。
+            AI 帮你<span className="text-[var(--red)]">造一门课</span>。
           </h1>
-          <p className="mt-5 max-w-[380px] text-[15px] leading-[1.8] text-[var(--ink2)]">
-            视频与笔记在同一张桌面。边看边记，随手截帧成卡；口语实战、AI 技能、银发英语、生活实用，每周持续更新，投票决定下一门课。
+          <p className="mt-5 max-w-[400px] text-[15px] leading-[1.8] text-[var(--ink2)]">
+            不只是看课。在这里，一句话生成属于你的课程，导入资料升维成带测验与 AI 伴侣的课，边学边记、到点复习。一张书桌，装下你的整个学习。
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              href={resume ? `/courses/${resume.slug}` : "/courses"}
-              className="studio-press inline-flex items-center gap-2 rounded-[13px] bg-[var(--ink)] px-5 py-3 text-[14px] font-bold text-[var(--surface)] transition-colors hover:opacity-90"
+              href="/create"
+              className="studio-press inline-flex items-center gap-2 rounded-[13px] bg-[var(--red)] px-5 py-3 text-[14px] font-bold text-white transition-colors hover:brightness-105"
             >
-              <Play size={15} weight="fill" />
-              继续上次学习
+              <Sparkle size={15} weight="fill" />
+              免费体验 AI 造课
             </Link>
             <Link
               href="/courses"
               className="studio-press inline-flex items-center gap-2 rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-5 py-3 text-[14px] font-bold text-[var(--ink)] transition-colors hover:border-[var(--border2)]"
             >
-              浏览课程
+              浏览课程库
               <ArrowRight size={15} weight="bold" />
             </Link>
           </div>
@@ -341,13 +153,72 @@ async function MarketingHome() {
         )}
       </section>
 
+      {/* ============ 1.5 三引擎 — AI 自习室的核心能力 ============ */}
+      <section>
+        <Reveal>
+          <div className="mb-6">
+            <h2 className="text-[20px] font-bold text-[var(--ink)]">不止是网课，是一间会造课的自习室</h2>
+            <p className="mt-1.5 max-w-[560px] text-[14px] leading-[1.7] text-[var(--ink2)]">
+              三个引擎，把「想学」变成「学会」。
+            </p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            {[
+              { Icon: Sparkle, title: "AI 造课", desc: "一句话说出想学的，AI 当场搭大纲、逐节写课件，还配好测验与要点卡。", href: "/create", cta: "去造一门课" },
+              { Icon: Waveform, title: "资料升维", desc: "把文档、笔记、任何资料丢进来，升维成带章节、测验、AI 伴侣的一门课。", href: "/create", cta: "导入资料" },
+              { Icon: Microphone, title: "AI 学习伴侣", desc: "学到哪问到哪。伴侣读完了你的整门课，随时答疑、带你复盘。", href: "/courses", cta: "看看课程" },
+            ].map((e) => (
+              <div
+                key={e.title}
+                className="studio-lift flex flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]"
+              >
+                <div className="flex h-[40px] w-[40px] items-center justify-center rounded-[12px] bg-[var(--red-soft)] text-[var(--red)]">
+                  <e.Icon size={20} weight="fill" />
+                </div>
+                <h3 className="mt-4 text-[15px] font-bold text-[var(--ink)]">{e.title}</h3>
+                <p className="mt-1.5 flex-1 text-[13px] leading-[1.7] text-[var(--ink2)]">{e.desc}</p>
+                <Link
+                  href={e.href}
+                  className="group mt-4 inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--red)]"
+                >
+                  {e.cta}
+                  <ArrowRight size={12} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+                </Link>
+              </div>
+            ))}
+          </div>
+        </Reveal>
+      </section>
+
+      {/* ============ 1.6 学习闭环 — 学·记·复习·共创 ============ */}
+      <section>
+        <Reveal>
+          <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface2)] p-6">
+            <h2 className="text-[18px] font-bold text-[var(--ink)]">一张书桌，装下完整的学习闭环</h2>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { step: "学", title: "边看边学", desc: "视频与课件在同一张桌面" },
+                { step: "记", title: "随手成笔记", desc: "截帧、划线、AI 整理" },
+                { step: "习", title: "到点复习", desc: "间隔重复，把知识记牢" },
+                { step: "创", title: "共创下一门", desc: "投票决定平台造什么课" },
+              ].map((s, i) => (
+                <div key={s.step} className="rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]">
+                  <span className="mono text-[11px] font-bold text-[var(--red)]">0{i + 1}</span>
+                  <p className="mt-1.5 text-[14px] font-bold text-[var(--ink)]">{s.title}</p>
+                  <p className="mt-1 text-[12px] leading-[1.6] text-[var(--ink3)]">{s.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
       {/* ============ 2. 课程赛道 — grid-cols-4 ============ */}
       <section>
         <Reveal>
           <div className="mb-6 flex items-end justify-between gap-4">
             <div>
-              <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">TRACKS</p>
-              <h2 className="mt-1.5 text-[18px] font-bold text-[var(--ink)]">课程赛道</h2>
+              <h2 className="text-[18px] font-bold text-[var(--ink)]">课程赛道</h2>
             </div>
             <Link
               href="/courses"

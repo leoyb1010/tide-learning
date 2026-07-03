@@ -6,6 +6,7 @@ import { resolveEntitlement, canAccessLesson } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
 import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { buildExcerpt } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -64,12 +65,13 @@ export async function GET(req: NextRequest) {
       tags: n.tags.map((t) => t.tag),
     }));
 
-    // 按课程归组（课程视图直接消费）
+    // 按课程归组（课程视图直接消费）。v2.2：独立笔记(courseId=null)不进课程组，仅在「全部」视图出现。
     const groupMap = new Map<
       string,
       { courseId: string; course: { title: string; slug: string }; items: typeof flat }
     >();
     for (const n of flat) {
+      if (!n.courseId || !n.course) continue; // 独立笔记跳过课程归组
       const g = groupMap.get(n.courseId) ?? { courseId: n.courseId, course: n.course, items: [] };
       g.items.push(n);
       groupMap.set(n.courseId, g);
@@ -100,35 +102,54 @@ export async function POST(req: NextRequest) {
       kind?: string;
       captureUrl?: string;
       sourceText?: string;
+      source?: string; // v2.2：manual(独立笔记) / ai_transform(AI整理落库)；缺省按有无 lesson 推断
+      notebookId?: string; // v2.2：归入笔记本（可空）
     };
 
     const kind: NoteKind =
       body.kind && (NOTE_KINDS as readonly string[]).includes(body.kind) ? (body.kind as NoteKind) : "text";
 
-    if (!body.courseId || !body.lessonId) return fail("缺少课程或章节");
+    // v2.2：courseId/lessonId 可缺省 → 独立笔记(manual)。二者要么都给(课程内记)，要么都不给(独立)。
+    const isStandalone = !body.courseId && !body.lessonId;
+    if (!isStandalone && (!body.courseId || !body.lessonId)) return fail("课程与章节需同时提供");
+
     // 文本笔记必须有正文；截帧/剪藏可只带图或原文
     const hasContent = !!body.contentMd?.trim();
     if (kind === "text" && !hasContent) return fail("笔记内容不能为空");
     if (kind === "capture" && !body.captureUrl && !hasContent) return fail("截帧笔记缺少内容");
     if (kind === "clip" && !body.sourceText?.trim() && !hasContent) return fail("剪藏笔记缺少原文");
 
-    // 校验章节存在且用户有权访问（付费章节需订阅覆盖赛道）
-    const lesson = await prisma.lesson.findUnique({
-      where: { id: body.lessonId },
-      select: { id: true, courseId: true, isFree: true, course: { select: { category: true } } },
-    });
-    if (!lesson || lesson.courseId !== body.courseId) return fail("章节不存在", 404);
-
     const snapshot = await resolveEntitlement(user.id);
-    if (!canAccessLesson(lesson.course.category, lesson.isFree, snapshot)) {
-      throw new AppError("该章节需订阅后才能记录笔记", 403);
+
+    // 课程内笔记：校验章节存在 + 用户有权访问（付费章节需订阅覆盖赛道）。独立笔记跳过。
+    let courseId: string | null = null;
+    let lessonId: string | null = null;
+    if (!isStandalone) {
+      const lesson = await prisma.lesson.findUnique({
+        where: { id: body.lessonId },
+        select: { id: true, courseId: true, isFree: true, course: { select: { category: true } } },
+      });
+      if (!lesson || lesson.courseId !== body.courseId) return fail("章节不存在", 404);
+      if (!canAccessLesson(lesson.course.category, lesson.isFree, snapshot)) {
+        throw new AppError("该章节需订阅后才能记录笔记", 403);
+      }
+      courseId = body.courseId!;
+      lessonId = body.lessonId!;
     }
 
-    const courseId = body.courseId;
-    const lessonId = body.lessonId;
+    // 越权铁律：归入笔记本前校验该本属于当前用户
+    let notebookId: string | null = null;
+    if (body.notebookId) {
+      const nb = await prisma.notebook.findFirst({ where: { id: body.notebookId, userId: user.id }, select: { id: true } });
+      if (!nb) return fail("笔记本不存在", 404);
+      notebookId = nb.id;
+    }
+
+    const source = body.source === "ai_transform" ? "ai_transform" : isStandalone ? "manual" : "lesson";
     const timestampSec = body.timestampSec ?? null;
     const title = body.title?.trim() || null;
     const sourceText = body.sourceText?.trim() || null;
+    const excerpt = buildExcerpt(body.contentMd ?? sourceText ?? "");
 
     // §7.2：配额校验 + 创建放同一事务，避免并发下越过免费上限
     const note = await prisma.$transaction(async (tx) => {
@@ -146,6 +167,9 @@ export async function POST(req: NextRequest) {
           timestampSec,
           title,
           contentMd: body.contentMd ?? "",
+          excerpt,
+          source,
+          notebookId,
           kind,
           captureUrl: kind === "capture" ? body.captureUrl ?? null : null,
           sourceText,
@@ -158,7 +182,7 @@ export async function POST(req: NextRequest) {
     await track({
       eventName,
       userId: user.id,
-      properties: { course_id: courseId, lesson_id: lessonId, kind, has_timestamp: timestampSec != null },
+      properties: { course_id: courseId, lesson_id: lessonId, kind, source, has_timestamp: timestampSec != null },
     });
 
     return ok(note);

@@ -414,7 +414,7 @@ export function Player({
               onChange={(e) => setFocusGoal(e.target.value)}
               maxLength={200}
               placeholder="例如：看完本节并整理 3 条笔记"
-              className="mt-1.5 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-2.5 text-[14px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red-soft-border)]"
+              className="mt-1.5 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-2.5 text-[14px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
             />
 
             {/* 番茄钟时长 */}

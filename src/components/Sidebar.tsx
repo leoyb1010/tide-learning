@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   House, GraduationCap, Monitor, NotePencil, PaperPlaneTilt, Medal, Crown,
-  Compass, User, Flame, Sparkle, Cards,
+  Compass, User, Flame, Sparkle, Cards, CardsThree, IdentificationCard, SignIn,
 } from "@phosphor-icons/react/dist/ssr";
 import { YoudaoLogo } from "./YoudaoLogo";
 import { CommandK } from "./CommandK";
@@ -12,42 +12,68 @@ import { CommandK } from "./CommandK";
 // 后台角色白名单（与 admin/layout.tsx 对齐）
 const ADMIN_ROLES = ["admin", "content_manager", "demand_moderator", "support", "finance", "reviewer"];
 
-/** 侧边导航分组（STUDIO：学习 / 社区 / 我的） */
-const GROUPS: { label: string; en: string; items: { href: string; label: string; Icon: typeof House; badge?: boolean }[] }[] = [
-  {
-    label: "学习", en: "LEARN",
-    items: [
-      { href: "/", label: "首页", Icon: House },
-      { href: "/courses", label: "课程库", Icon: GraduationCap },
-      { href: "/create", label: "AI 造课", Icon: Sparkle },
-      { href: "/me/courses", label: "我的课", Icon: Cards },
-      { href: "/notes", label: "笔记馆", Icon: NotePencil },
-    ],
-  },
-  {
-    label: "社区", en: "COMMUNITY",
-    items: [
-      { href: "/demands", label: "共创广场", Icon: PaperPlaneTilt },
-      { href: "/me", label: "成长激励", Icon: Medal },
-      { href: "/pricing", label: "订阅方案", Icon: Crown },
-    ],
-  },
-];
+/** v2.2 学生证数据（layout 服务端组装）。 */
+export interface NavUser {
+  nickname: string;
+  role: string;
+  avatarUrl: string | null;
+  studentId: string;
+  joinedLabel: string;
+  streak: number;
+  isSubscriber: boolean;
+}
 
-// 移动端底部 5 Tab —— 造课居中凸起（核心卖点）
-const MOBILE_TABS = [
-  { href: "/", label: "首页", Icon: House, IconFill: House, raised: false },
-  { href: "/courses", label: "课程", Icon: Compass, IconFill: Compass, raised: false },
-  { href: "/create", label: "造课", Icon: Sparkle, IconFill: Sparkle, raised: true },
-  { href: "/notes", label: "笔记", Icon: NotePencil, IconFill: NotePencil, raised: false },
-  { href: "/me", label: "我的", Icon: User, IconFill: User, raised: false },
-];
+interface NavItem { href: string; label: string; Icon: typeof House; badge?: boolean }
+interface NavGroup { label: string; en: string; items: NavItem[] }
 
-export function Sidebar({ user }: { user: { nickname: string; role: string } | null }) {
+/** 侧边导航分组（STUDIO：学习 / 社区）。首页/书桌项按登录态动态生成，见 buildGroups。 */
+function buildGroups(loggedIn: boolean): NavGroup[] {
+  return [
+    {
+      label: "学习", en: "LEARN",
+      items: [
+        // 登录后「首页」= 书桌 /desk（登录用户的家）；未登录 = 营销首页 /
+        loggedIn
+          ? { href: "/desk", label: "书桌", Icon: House }
+          : { href: "/", label: "首页", Icon: House },
+        { href: "/courses", label: "课程库", Icon: GraduationCap },
+        { href: "/create", label: "AI 造课", Icon: Sparkle },
+        { href: "/me/courses", label: "我的课", Icon: Cards },
+        { href: "/notes", label: "笔记馆", Icon: NotePencil },
+        { href: "/review", label: "复习室", Icon: CardsThree },
+      ],
+    },
+    {
+      label: "社区", en: "COMMUNITY",
+      items: [
+        { href: "/demands", label: "共创广场", Icon: PaperPlaneTilt },
+        { href: "/me", label: "成长档案", Icon: Medal },
+        { href: "/pricing", label: "订阅方案", Icon: Crown },
+      ],
+    },
+  ];
+}
+
+// 移动端底部 5 Tab —— 造课居中凸起（核心卖点）。首页 Tab 登录后指向书桌。
+function buildMobileTabs(loggedIn: boolean) {
+  return [
+    loggedIn
+      ? { href: "/desk", label: "书桌", Icon: House, IconFill: House, raised: false }
+      : { href: "/", label: "首页", Icon: House, IconFill: House, raised: false },
+    { href: "/courses", label: "课程", Icon: Compass, IconFill: Compass, raised: false },
+    { href: "/create", label: "造课", Icon: Sparkle, IconFill: Sparkle, raised: true },
+    { href: "/notes", label: "笔记", Icon: NotePencil, IconFill: NotePencil, raised: false },
+    { href: "/me", label: "我的", Icon: User, IconFill: User, raised: false },
+  ];
+}
+
+export function Sidebar({ user }: { user: NavUser | null }) {
   const pathname = usePathname();
+  const GROUPS = buildGroups(Boolean(user));
+  const MOBILE_TABS = buildMobileTabs(Boolean(user));
   const isActive = (href: string) => {
-    if (href === "/") return pathname === "/";
-    // /me（成长激励）需精确匹配，否则 /me/courses、/me/settings 会连带点亮它
+    if (href === "/" || href === "/desk") return pathname === href;
+    // /me（成长档案）需精确匹配，否则 /me/courses、/me/settings 会连带点亮它
     if (href === "/me") return pathname === "/me";
     return pathname.startsWith(href);
   };
@@ -113,20 +139,55 @@ export function Sidebar({ user }: { user: { nickname: string; role: string } | n
           </nav>
         )}
 
-        {/* 底部：连续学习卡 */}
-        <div className="mt-auto rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-medium text-[var(--ink2)]">连续学习</span>
-            <Flame size={13} weight="fill" className="text-[var(--red)]" />
-          </div>
-          <div className="mt-0.5 font-[var(--font-jakarta)] text-[26px] font-extrabold leading-none text-[var(--ink)]">
-            28<span className="ml-1 text-[15px] font-normal text-[var(--ink3)]">天</span>
-          </div>
-          <div className="mt-2 flex gap-[3px]">
-            {Array.from({ length: 14 }).map((_, i) => (
-              <span key={i} className={`h-1.5 flex-1 rounded-[2px] ${i > 1 ? "bg-[var(--red)]" : "bg-[var(--border2)]"}`} />
-            ))}
-          </div>
+        {/* 底部：学生证（v2.2）—— 真实身份卡，点击进成长档案 */}
+        <div className="mt-auto">
+          {user ? (
+            <Link
+              href="/me"
+              className="studio-lift group relative block overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3.5 pl-4 shadow-[var(--card)]"
+            >
+              {/* 左缘红色校条 */}
+              <span className="absolute inset-y-0 left-0 w-[3px] bg-[var(--red)]" aria-hidden />
+              <div className="flex items-center gap-2.5">
+                {/* 头像徽 */}
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--video-bg)] text-[13px] font-bold text-white">
+                  {user.nickname.slice(0, 1)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-[13px] font-semibold text-[var(--ink)]">{user.nickname}</span>
+                    {user.isSubscriber && <Crown size={12} weight="fill" className="shrink-0 text-[var(--red)]" />}
+                  </div>
+                  <span className="mono block truncate text-[10px] text-[var(--ink4)]">{user.studentId}</span>
+                </div>
+              </div>
+              {/* 底部信息行：入学时间 + 连续天数 */}
+              <div className="mt-2.5 flex items-center justify-between border-t border-[var(--border)] pt-2">
+                <span className="mono text-[10px] text-[var(--ink4)]">{user.joinedLabel}</span>
+                <span className="flex items-center gap-1 text-[11px] font-semibold text-[var(--ink2)]">
+                  <Flame size={11} weight="fill" className="text-[var(--red)]" />
+                  <span className="mono">{user.streak}</span> 天
+                </span>
+              </div>
+              <span className="mono mt-1.5 block text-[8px] font-bold uppercase tracking-[0.18em] text-[var(--ink4)]">
+                YOUDAO STUDIO · STUDENT ID
+              </span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="studio-lift group flex items-center gap-2.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]"
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--surface-inset)] text-[var(--ink3)]">
+                <IdentificationCard size={18} weight="fill" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[12.5px] font-semibold text-[var(--ink)]">领取你的学生证</p>
+                <p className="text-[11px] text-[var(--ink3)]">登录后开始记录学习</p>
+              </div>
+              <SignIn size={15} weight="bold" className="shrink-0 text-[var(--ink4)] transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
         </div>
       </aside>
 

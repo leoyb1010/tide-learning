@@ -73,12 +73,23 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
                       />
                       <div className="studio-lift group rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]">
                         <div className="mb-1.5 flex items-center gap-2 text-[12px] text-[var(--ink4)]">
-                          <Link href={`/courses/${n.course.slug}`} className="truncate transition-colors hover:text-[var(--red)]">
-                            {n.course.title}
-                          </Link>
-                          <span aria-hidden>·</span>
-                          <span className="truncate">{n.lesson.title}</span>
-                          {n.timestampSec != null && (
+                          {/* 独立笔记(无课程)显示来源标识；课程内笔记可点跳课程 */}
+                          {n.course ? (
+                            <>
+                              <Link href={`/courses/${n.course.slug}`} className="truncate transition-colors hover:text-[var(--red)]">
+                                {n.course.title}
+                              </Link>
+                              {n.lesson && (
+                                <>
+                                  <span aria-hidden>·</span>
+                                  <span className="truncate">{n.lesson.title}</span>
+                                </>
+                              )}
+                            </>
+                          ) : (
+                            <span className="truncate">{n.source === "ai_transform" ? "AI 整理" : "独立笔记"}</span>
+                          )}
+                          {n.timestampSec != null && n.courseId && n.lessonId && (
                             <Link
                               href={`/courses/${n.courseId}/learn/${n.lessonId}?t=${n.timestampSec}`}
                               className="mono ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2 py-0.5 text-[var(--red)] transition-colors"
