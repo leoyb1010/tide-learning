@@ -22,11 +22,16 @@ export async function POST(req: NextRequest) {
 
     await track({ eventName: "signup_start", properties: { method: isEmail ? "email" : "phone" } });
 
+    // 昵称净化：去控制字符/换行 + trim + 截断，防止拼进通知标题投放骚扰。
+    const cleanNickname = (nickname ?? "").replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, 20);
+    const finalNickname =
+      cleanNickname || (isEmail ? identifier.split("@")[0] : `用户${identifier.slice(-4)}`);
+
     const user = await prisma.user.create({
       data: {
         email: isEmail ? identifier : null,
         phone: isEmail ? null : identifier,
-        nickname: nickname || (isEmail ? identifier.split("@")[0] : `用户${identifier.slice(-4)}`),
+        nickname: finalNickname,
         passwordHash: hashPassword(password),
         profile: { create: {} },
       },

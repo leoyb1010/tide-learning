@@ -47,6 +47,13 @@ model User {
   posts          Post[]
   postLikes      PostLike[]
   focusSessions  FocusSession[]
+  creditAccount  CreditAccount?
+  creditLedger   CreditLedger[]
+  llmUsage       LlmUsage[]
+  postComments   PostComment[]
+  exams          Exam[]
+  examAttempts   ExamAttempt[]
+  notifications  Notification[]
 
   @@index([role])
 }
@@ -60,6 +67,7 @@ model UserProfile {
   preferredMode           String  @default("standard") // standard / elder
   fontScale               Float   @default(1.0)
   notificationPreferences String  @default("{}")
+  motto                   String? // v2.3：学生证个性格言
 }
 
 model Session {
@@ -101,6 +109,8 @@ model Course {
   origin           String    @default("official") // official / ai_generated / user_imported
   authorUserId     String?   // AI生成课/导入课的归属用户；官方课为 null
   visibility       String    @default("public")   // public / private / unlisted
+  // —— 课程集市：分享到社区的审核状态 ——
+  sharedStatus     String    @default("private")  // private / pending / shared / rejected
   genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
   sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
   instructorName   String?
@@ -121,6 +131,8 @@ model Course {
   progress   LearningProgress[]
   notes      Note[]
   calendar   ContentCalendar[]
+
+  @@index([sharedStatus, lastUpdatedAt]) // 课程集市列表：按分享状态过滤 + 时间排序
 }
 
 model Lesson {
@@ -208,7 +220,8 @@ model Note {
   title        String?
   contentMd    String
   excerpt      String? // v2.2：列表预览摘要（写入时由 contentMd 生成，≤120 字，避免列表动态截断，借鉴 LeoJarvis）
-  source       String    @default("lesson") // v2.2：lesson(课程内记) / manual(独立笔记) / ai_transform(AI整理产物)
+  source       String    @default("lesson") // v2.2：lesson / manual / ai_transform / link_import(链接导入)
+  sourceUrl    String? // v2.3：链接导入的原始网址（source=link_import 时）
   sourceText   String? // C1：字幕划线引用的原文
   kind         String    @default("text") // text / capture(截帧) / clip(字幕剪藏)
   captureUrl   String? // 截帧图 data-url 或对象存储 key
@@ -221,7 +234,8 @@ model Note {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  tags NoteTagOnNote[]
+  tags        NoteTagOnNote[]
+  attachments NoteAttachment[]
 
   @@index([userId, createdAt])
   @@index([userId, lessonId])
@@ -703,7 +717,7 @@ model NotebookEntry {
   @@index([notebookId, sortOrder])
 }
 
-// §7 自习室社区帖子（严格管控）
+// §7 自习室社区帖子（严格管控）—— 微博/X 式微内容流
 model Post {
   id           String   @id @default(cuid())
   userId       String
@@ -711,15 +725,24 @@ model Post {
   type         String   // insight(学习心得) / checkin(打卡) / question(求助)
   content      String
   refJson      String   @default("{}") // 引用的笔记/成就/streak 卡片数据
+  images       String   @default("[]") // JSON 字符串数组：1-4 张图片 url（SQLite 无原生数组）
+  topicTags    String   @default("[]") // JSON 字符串数组：话题标签（不含 # 前缀）
   status       String   @default("pending") // pending / approved / rejected
   rejectReason String?
   likeCount    Int      @default(0)
+  commentCount Int      @default(0) // 评论数（发评论时 +1，与 PostComment 同事务维护）
+  repostCount  Int      @default(0) // 转发数（被转发时 +1）
+  repostOfId   String?  // 转发指向的原帖 id（null=原创帖）
+  repostOf     Post?    @relation("PostRepost", fields: [repostOfId], references: [id], onDelete: SetNull)
+  reposts      Post[]   @relation("PostRepost")
   createdAt    DateTime @default(now())
 
-  likes PostLike[]
+  likes    PostLike[]
+  comments PostComment[]
 
   @@index([status, createdAt])
   @@index([userId, createdAt])
+  @@index([repostOfId])
 }
 
 model PostLike {
@@ -748,4 +771,178 @@ model FocusSession {
   createdAt  DateTime  @default(now())
 
   @@index([userId, startAt])
+}
+
+// ==================== v2.3 积分经济系统 ====================
+
+/** 积分账户：每用户一个，balance 由 CreditLedger 流水派生（写时同步更新）。 */
+model CreditAccount {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  balance         Int      @default(0) // 当前余额（积分）
+  totalEarned     Int      @default(0) // 累计入账（统计用）
+  totalSpent      Int      @default(0) // 累计消耗（统计用）
+  monthlyGrantKey String?  // 上次月度赠送的月份 key "2026-07"，防重复发放
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+/** 积分流水（不可变，审计与对账的根）。 */
+model CreditLedger {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  delta        Int      // 正=入账 负=消耗
+  type         String   // monthly_grant / recharge / share_reward / llm_spend / admin_adjust / signup_bonus
+  refId        String?  // 关联 Order/LlmUsage/CourseAccessRequest id
+  reason       String?  // 展示文案 / admin 调账备注
+  balanceAfter Int      // 记账后余额快照（对账用）
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/** LLM Token 用量原始记录（积分折算依据）。 */
+model LlmUsage {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scene            String   // generate_course / generate_lesson / companion / note_transform / note_summary / import_source / generate_exam / search_expand
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  creditCost       Int      @default(0) // 本次折算并扣除的积分
+  createdAt        DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([scene])
+}
+
+/** 角色权限矩阵（从代码常量 ROLE_PERMISSIONS 升级为 DB，admin 可调，代码保留默认兜底）。 */
+model RolePermission {
+  role       String
+  permission String
+  createdAt  DateTime @default(now())
+
+  @@id([role, permission])
+  @@index([role])
+}
+
+// (v2.3 AuditLog 复用已有定义于上方，operatorId 即操作者)
+
+// ==================== v2.3 §1 课程集市（课程共享 + 申请学习）====================
+
+/** 课程访问申请：他人申请学习某分享课程；作者批准后申请者获学习权。 */
+model CourseAccessRequest {
+  id          String   @id @default(cuid())
+  courseId    String
+  requesterId String   // 申请人 userId
+  ownerId     String   // 课程作者 userId（冗余便于查"我的分享"）
+  status      String   @default("pending") // pending / approved / rejected
+  message     String?  // 申请留言
+  decidedAt   DateTime?
+  createdAt   DateTime @default(now())
+
+  @@unique([courseId, requesterId]) // 同一人对同一课只能申请一次
+  @@index([ownerId, status])
+  @@index([requesterId, status])
+}
+
+// ==================== v2.3 §1 自习室广场升级（评论/转发）====================
+
+/** 帖子评论（一级盖楼）。 */
+model PostComment {
+  id        String   @id @default(cuid())
+  postId    String
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  status    String   @default("approved") // approved / pending / rejected
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+// ==================== v2.3 §3 笔记采集（附件）====================
+
+/** 笔记附件：图片/PDF/文档，mock 存储于 public/uploads/，留对象存储接口。 */
+model NoteAttachment {
+  id        String   @id @default(cuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  fileName  String
+  mimeType  String
+  size      Int
+  path      String   // /uploads/xxx 或对象存储 key
+  summary   String?  // 文本类附件的 AI 摘要
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+}
+
+// ==================== v2.3 §8 模拟考试 ====================
+
+model Exam {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  scopeType  String   // course / notebook / all
+  scopeId    String?  // courseId / notebookId（all 时空）
+  difficulty String   @default("basic") // basic / advanced
+  status     String   @default("ready") // generating / ready / failed
+  createdAt  DateTime @default(now())
+
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+
+  @@index([userId, createdAt])
+}
+
+model ExamQuestion {
+  id          String  @id @default(cuid())
+  examId      String
+  exam        Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
+  type        String  // single(单选) / judge(判断) / short(简答)
+  stem        String
+  optionsJson String? // 单选：["A","B",...]（judge/short 为空）
+  answer      String  // 单选=选项索引；判断=true/false；简答=参考答案
+  explanation String?
+  sourceRef   String? // "第 N 讲" / 笔记标题，溯源
+  sortOrder   Int     @default(0)
+
+  @@index([examId, sortOrder])
+}
+
+model ExamAttempt {
+  id          String   @id @default(cuid())
+  examId      String
+  exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  answersJson String   // 用户作答 {questionId: answer}
+  score       Int      @default(0)
+  total       Int      @default(0)
+  detailJson  String?  // 判卷详情（每题对错+简答评语）
+  finishedAt  DateTime @default(now())
+
+  @@index([userId, finishedAt])
+}
+
+// ==================== v2.3 §9 站内通知 ====================
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String    // 接收者
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String    // access_request / access_approved / post_comment / post_like / course_update / credit_grant / system
+  title     String
+  body      String?
+  refType   String?   // course / post / request / exam
+  refId     String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt, createdAt])
 }

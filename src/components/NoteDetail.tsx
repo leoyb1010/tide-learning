@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, PencilSimple, MapPin, ArrowUpRight, Quotes, CalendarBlank, Clock,
+  DownloadSimple, CaretDown, FileMd, FileHtml, FileText,
 } from "@phosphor-icons/react";
 import { renderMarkdown } from "@/lib/markdown";
 import { mmss } from "@/lib/format";
@@ -41,6 +42,88 @@ function fmtDate(iso: string): string {
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
   return `${y}-${m}-${day} ${hh}:${mm}`;
+}
+
+/**
+ * 单条笔记「导出」下拉：md / html 调后端 route（?noteId=&format=）下载；
+ * 纯文本在前端由当前标题+正文即时生成，避免多一趟请求。
+ */
+function ExportMenu({ noteId, title, contentMd }: { noteId: string; title: string | null; contentMd: string }) {
+  const [open, setOpen] = useState(false);
+  const boxRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e: MouseEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  function download(format: "md" | "html") {
+    window.location.href = `/api/notes/export?noteId=${encodeURIComponent(noteId)}&format=${format}`;
+    setOpen(false);
+  }
+
+  function downloadTxt() {
+    const heading = title?.trim() || "未命名笔记";
+    const text = `${heading}\n\n${contentMd}`.trim() + "\n";
+    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `tide-note-${new Date().toISOString().slice(0, 10)}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    setOpen(false);
+  }
+
+  const items: { key: string; label: string; Icon: typeof FileMd; run: () => void }[] = [
+    { key: "md", label: "Markdown (.md)", Icon: FileMd, run: () => download("md") },
+    { key: "html", label: "网页 (.html)", Icon: FileHtml, run: () => download("html") },
+    { key: "txt", label: "纯文本 (.txt)", Icon: FileText, run: downloadTxt },
+  ];
+
+  return (
+    <div ref={boxRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <DownloadSimple size={14} weight="bold" /> 导出
+        <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className="studio-rise absolute right-0 z-20 mt-1.5 w-[172px] overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--lift)]"
+        >
+          {items.map(({ key, label, Icon, run }) => (
+            <button
+              key={key}
+              type="button"
+              role="menuitem"
+              onClick={run}
+              className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface-inset)] hover:text-[var(--ink)]"
+            >
+              <Icon size={15} weight="regular" className="text-[var(--ink3)]" /> {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -96,13 +179,16 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
             <h1 className="text-[26px] font-bold leading-tight text-[var(--ink)]">
               {title?.trim() || "未命名笔记"}
             </h1>
-            <button
-              type="button"
-              onClick={() => setEditing(true)}
-              className="studio-press mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
-            >
-              <PencilSimple size={14} weight="bold" /> 编辑
-            </button>
+            <div className="mt-1 flex shrink-0 items-center gap-2">
+              <ExportMenu noteId={note.id} title={title} contentMd={contentMd} />
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+              >
+                <PencilSimple size={14} weight="bold" /> 编辑
+              </button>
+            </div>
           </div>
 
           {/* 元信息：创建 / 更新时间（mono） */}

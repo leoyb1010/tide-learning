@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,8 @@ export async function POST(req: NextRequest) {
 
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 总结为订阅会员权益，订阅后即可使用", 402);
+
+    await assertCanSpend(user.id);
 
     assertUserRateLimit(user.id, "ai_note_summary", 10, 60_000);
 
@@ -74,6 +77,7 @@ export async function POST(req: NextRequest) {
       user: user_prompt,
       temperature: 0.4,
       maxTokens: 4000,
+      onUsage: creditingOnUsage(user.id, "note_summary"),
     });
 
     await track({ eventName: "ai_note_summary", userId: user.id, properties: { mode, note_count: notes.length } });

@@ -6,6 +6,7 @@ import {
   MagnifyingGlass, DownloadSimple, Waves, GridFour, BookOpen, Star,
   Sparkle, CaretDown, ListBullets, ListChecks, Translate, Cards, Copy, Check,
   ListDashes, Notebook as NotebookIcon, PushPin, Plus, FloppyDisk, Camera, Scissors,
+  PencilSimple, LinkSimple, Image as ImageIcon, Paperclip, ArrowLeft, CircleNotch,
 } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, LoadingSkeleton, CardSkeleton, Button, Badge } from "@/components/ui";
@@ -734,9 +735,26 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
   );
 }
 
+// —— 采集面板：四入口 ——
+type CaptureEntry = "menu" | "write" | "link" | "image" | "attach";
+
+const ENTRY_META: {
+  key: Exclude<CaptureEntry, "menu">;
+  label: string;
+  hint: string;
+  Icon: typeof PencilSimple;
+}[] = [
+  { key: "write", label: "随手写", hint: "写点想法，支持 Markdown", Icon: PencilSimple },
+  { key: "link", label: "链接导入", hint: "粘贴网址，自动抓取正文", Icon: LinkSimple },
+  { key: "image", label: "图片", hint: "上传截图或图片，挂成笔记", Icon: ImageIcon },
+  { key: "attach", label: "附件", hint: "PDF / DOCX / TXT 等文件", Icon: Paperclip },
+];
+
 /**
- * 记一条：独立笔记编辑弹窗。title + contentMd textarea + 保存。
- * POST /api/notes 不传 courseId/lessonId → source=manual。
+ * 采集面板：四入口 [随手写][链接导入][图片][附件]。
+ * - 随手写：POST /api/notes source=manual（保留原逻辑）。
+ * - 链接导入：POST /api/notes/import-url，服务端抓取正文落库。
+ * - 图片 / 附件：POST /api/notes/attachments（multipart），存 public/uploads 并挂/建笔记。
  */
 function ComposeDialog({
   open,
@@ -745,21 +763,64 @@ function ComposeDialog({
 }: {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  onCreated: (noteId?: string) => void;
 }) {
+  const [entry, setEntry] = useState<CaptureEntry>("menu");
+
+  // 打开时回到入口选择面板
+  useEffect(() => {
+    if (open) setEntry("menu");
+  }, [open]);
+
+  const activeMeta = ENTRY_META.find((e) => e.key === entry);
+  const dialogTitle = entry === "menu" ? "记一条" : activeMeta?.label ?? "记一条";
+
+  return (
+    <Dialog open={open} onClose={onClose} title={dialogTitle}>
+      {/* 非入口页顶部：返回选择 */}
+      {entry !== "menu" && (
+        <button
+          type="button"
+          onClick={() => setEntry("menu")}
+          className="mb-3 inline-flex items-center gap-1 text-[12px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+        >
+          <ArrowLeft size={13} weight="bold" /> 换个方式
+        </button>
+      )}
+
+      {entry === "menu" && (
+        <div className="grid grid-cols-2 gap-2.5">
+          {ENTRY_META.map(({ key, label, hint, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setEntry(key)}
+              className="studio-lift flex flex-col items-start gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 text-left shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+            >
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--surface-inset)] text-[var(--ink2)]">
+                <Icon size={18} weight="bold" />
+              </span>
+              <span className="text-[14px] font-semibold text-[var(--ink)]">{label}</span>
+              <span className="text-[12px] leading-[1.5] text-[var(--ink4)]">{hint}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {entry === "write" && <WritePanel onCreated={onCreated} />}
+      {entry === "link" && <LinkImportPanel onCreated={onCreated} />}
+      {entry === "image" && <UploadPanel kind="image" onCreated={onCreated} />}
+      {entry === "attach" && <UploadPanel kind="attach" onCreated={onCreated} />}
+    </Dialog>
+  );
+}
+
+/** 随手写：title + contentMd → POST /api/notes（source=manual）。 */
+function WritePanel({ onCreated }: { onCreated: (id?: string) => void }) {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [contentMd, setContentMd] = useState("");
   const [saving, setSaving] = useState(false);
-
-  // 打开时清空表单
-  useEffect(() => {
-    if (open) {
-      setTitle("");
-      setContentMd("");
-      setSaving(false);
-    }
-  }, [open]);
 
   async function submit() {
     if (!contentMd.trim()) return toast("笔记内容不能为空", { tone: "warn" });
@@ -768,13 +829,12 @@ function ComposeDialog({
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        // 不传 courseId/lessonId → 后端判定为独立笔记 source=manual
         body: JSON.stringify({ title: title.trim() || undefined, contentMd: contentMd.trim() }),
       }).then((r) => r.json());
       if (!res.ok) return toast(res.error ?? "保存失败", { tone: "warn" });
       track("note_create", { source: "manual" });
       toast("已记下", { tone: "success" });
-      onCreated();
+      onCreated(res.data?.id);
     } catch {
       toast("保存失败，请稍后重试", { tone: "warn" });
     } finally {
@@ -783,40 +843,163 @@ function ComposeDialog({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} title="记一条">
-      <div className="space-y-3">
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="标题（可留空）"
-          className="w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] font-semibold text-[var(--ink)] outline-none transition-colors placeholder:font-normal placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
-        />
-        <textarea
-          value={contentMd}
-          onChange={(e) => setContentMd(e.target.value)}
-          placeholder="随手写点什么…支持 Markdown"
-          rows={7}
-          className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] leading-[1.7] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
-        />
-        <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="studio-press rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
-          >
-            取消
-          </button>
-          <button
-            type="button"
-            onClick={submit}
-            disabled={saving || !contentMd.trim()}
-            className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
-          >
-            <FloppyDisk size={14} weight="bold" /> {saving ? "保存中…" : "保存"}
-          </button>
-        </div>
+    <div className="space-y-3">
+      <input
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="标题（可留空）"
+        className="w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] font-semibold text-[var(--ink)] outline-none transition-colors placeholder:font-normal placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+      />
+      <textarea
+        value={contentMd}
+        onChange={(e) => setContentMd(e.target.value)}
+        placeholder="随手写点什么…支持 Markdown"
+        rows={7}
+        className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] leading-[1.7] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+      />
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={saving || !contentMd.trim()}
+          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
+        >
+          <FloppyDisk size={14} weight="bold" /> {saving ? "保存中…" : "保存"}
+        </button>
       </div>
-    </Dialog>
+    </div>
+  );
+}
+
+/** 链接导入：url → POST /api/notes/import-url，服务端抓取正文。 */
+function LinkImportPanel({ onCreated }: { onCreated: (id?: string) => void }) {
+  const { toast } = useToast();
+  const [url, setUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  async function submit() {
+    const v = url.trim();
+    if (!v) return toast("请输入链接", { tone: "warn" });
+    setBusy(true);
+    try {
+      const res = await fetch("/api/notes/import-url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: v }),
+      }).then((r) => r.json());
+      if (!res.ok) return toast(res.error ?? "导入失败", { tone: "warn" });
+      track("note_import_url", {});
+      toast("已导入网页正文", { tone: "success" });
+      onCreated(res.data?.id);
+    } catch {
+      toast("导入失败，请稍后重试", { tone: "warn" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      <input
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        onKeyDown={(e) => e.key === "Enter" && !busy && submit()}
+        placeholder="https://…"
+        type="url"
+        inputMode="url"
+        className="mono w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+      />
+      <p className="text-[12px] leading-[1.6] text-[var(--ink4)]">
+        仅支持 http/https 公网链接，自动提取标题与正文（约 10 秒内完成）。
+      </p>
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !url.trim()}
+          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
+        >
+          {busy ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : <LinkSimple size={14} weight="bold" />}
+          {busy ? "抓取中…" : "导入"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 图片 / 附件：本地选文件 → POST /api/notes/attachments（multipart）。 */
+function UploadPanel({ kind, onCreated }: { kind: "image" | "attach"; onCreated: (id?: string) => void }) {
+  const { toast } = useToast();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const accept = kind === "image" ? "image/png,image/jpeg,image/webp,image/gif" : ".pdf,.docx,.doc,.txt,.md";
+  const hint =
+    kind === "image"
+      ? "PNG / JPG / WEBP / GIF，≤10MB，将自动挂成一条笔记。"
+      : "PDF / DOCX / TXT / MD，≤10MB。文本类会自动抽取前 2000 字预览。";
+
+  function pick(f: File | null) {
+    if (!f) return;
+    if (f.size > 10 * 1024 * 1024) return toast("文件不能超过 10MB", { tone: "warn" });
+    setFile(f);
+  }
+
+  async function submit() {
+    if (!file) return toast("请先选择文件", { tone: "warn" });
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/notes/attachments", { method: "POST", body: fd }).then((r) => r.json());
+      if (!res.ok) return toast(res.error ?? "上传失败", { tone: "warn" });
+      track("note_attachment", { is_image: kind === "image" });
+      toast("已上传并保存", { tone: "success" });
+      onCreated(res.data?.noteId);
+    } catch {
+      toast("上传失败，请稍后重试", { tone: "warn" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const Icon = kind === "image" ? ImageIcon : Paperclip;
+
+  return (
+    <div className="space-y-3">
+      <input
+        ref={inputRef}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => pick(e.target.files?.[0] ?? null)}
+      />
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        className="flex w-full flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-8 text-center transition-colors hover:border-[var(--ink3)]"
+      >
+        <Icon size={26} weight="bold" className="text-[var(--ink3)]" />
+        {file ? (
+          <span className="mono max-w-full truncate text-[13px] text-[var(--ink)]">{file.name}</span>
+        ) : (
+          <span className="text-[13px] font-semibold text-[var(--ink2)]">点击选择文件</span>
+        )}
+        <span className="text-[12px] leading-[1.5] text-[var(--ink4)]">{hint}</span>
+      </button>
+      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+        <button
+          type="button"
+          onClick={submit}
+          disabled={busy || !file}
+          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
+        >
+          {busy ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : <FloppyDisk size={14} weight="bold" />}
+          {busy ? "上传中…" : "上传"}
+        </button>
+      </div>
+    </div>
   );
 }
 

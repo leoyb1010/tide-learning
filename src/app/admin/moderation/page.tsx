@@ -1,0 +1,93 @@
+import { prisma } from "@/lib/db";
+import { requirePermission } from "@/lib/session";
+import { ModerationConsole, type ModPost, type ModCourse } from "@/components/admin/ModerationConsole";
+
+export const metadata = { title: "内容审核台" };
+
+// 内容审核台：帖子 + 课程集市待审。入口权限 content:review（健康/财务/防诈骗内容审核）。
+// 课程集市审批的写操作在 /api/admin/moderation/course 内以 demand:moderate 再校验。
+export default async function AdminModerationPage() {
+  await requirePermission("content:review");
+
+  const [posts, courses] = await Promise.all([
+    prisma.post.findMany({
+      where: { status: "pending" },
+      orderBy: { createdAt: "asc" },
+      take: 100,
+      select: {
+        id: true,
+        type: true,
+        content: true,
+        images: true,
+        topicTags: true,
+        createdAt: true,
+        user: { select: { id: true, nickname: true } },
+      },
+    }),
+    prisma.course.findMany({
+      where: { sharedStatus: "pending" },
+      orderBy: { lastUpdatedAt: "asc" },
+      take: 100,
+      select: {
+        id: true,
+        title: true,
+        subtitle: true,
+        category: true,
+        level: true,
+        authorUserId: true,
+        lastUpdatedAt: true,
+        _count: { select: { lessons: true } },
+      },
+    }),
+  ]);
+
+  const modPosts: ModPost[] = posts.map((p) => ({
+    id: p.id,
+    type: p.type,
+    content: p.content,
+    imageCount: safeLen(p.images),
+    tags: safeTags(p.topicTags),
+    authorName: p.user.nickname,
+    createdAt: p.createdAt.toISOString(),
+  }));
+
+  const modCourses: ModCourse[] = courses.map((c) => ({
+    id: c.id,
+    title: c.title,
+    subtitle: c.subtitle,
+    category: c.category,
+    level: c.level,
+    lessonCount: c._count.lessons,
+    updatedAt: c.lastUpdatedAt.toISOString(),
+  }));
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-1.5">
+        <h1 className="text-[22px] font-bold text-[var(--ink)]">内容审核台</h1>
+        <p className="text-[13px] text-[var(--ink3)]">
+          处理 LLM 拿不准的待审帖子与课程集市分享申请。拒绝需选择或填写理由。
+        </p>
+      </header>
+      <ModerationConsole posts={modPosts} courses={modCourses} />
+    </div>
+  );
+}
+
+function safeLen(raw: string): number {
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function safeTags(raw: string): string[] {
+  try {
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.filter((t): t is string => typeof t === "string") : [];
+  } catch {
+    return [];
+  }
+}

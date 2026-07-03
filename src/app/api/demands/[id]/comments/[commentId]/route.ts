@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireUser, hasPermission } from "@/lib/session";
+import { requireUser, hasPermission, primePermissionCache } from "@/lib/session";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,7 @@ export async function DELETE(
     if (!comment || comment.demandId !== id) return fail("评论不存在", 404);
     if (comment.deletedAt) return ok({ deleted: true }); // 幂等
 
+    await primePermissionCache();
     const isModerator = hasPermission(user.role, "demand:moderate");
     if (comment.userId !== user.id && !isModerator) {
       return fail("无权删除该评论", 403);

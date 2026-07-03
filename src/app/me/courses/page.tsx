@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkle, FilePlus, Plus, CircleNotch } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { CoverBg, coverSrc } from "@/components/ui";
 import { trackLabel } from "@/lib/tracks";
+import { ShareToMarketButton, type ShareState } from "@/components/ShareToMarketButton";
+import { AccessRequestActions } from "@/components/AccessRequestActions";
 
 export const metadata = { title: "我的课" };
 
 /**
  * /me/courses —— 我的课（server）。
  * 越权铁律：where 强制 authorUserId = user.id，只列当前用户 origin ∈ {ai_generated, user_imported} 的课，
- * 按 createdAt desc。展示来源标签 / 生成态 / 学习进度。空态引导去 /create。未登录跳登录。
+ * 按 createdAt desc。展示来源标签 / 生成态 / 学习进度 / 分享到社区按钮。
+ * 「我的分享」区：列出他人对我课程的待批准申请（ownerId=user.id, status=pending），批准/拒绝。
+ * 空态引导去 /create。未登录跳登录。
  */
 export default async function MyCoursesPage() {
   const user = await getCurrentUser();
@@ -32,6 +36,7 @@ export default async function MyCoursesPage() {
       coverColor: true,
       origin: true,
       genStatus: true,
+      sharedStatus: true, // 分享态：private / pending / shared / rejected
       createdAt: true,
       // 全部章节数 + 首节（作为进入学习入口）
       lessons: {
@@ -53,6 +58,27 @@ export default async function MyCoursesPage() {
       : [];
   const completedMap = new Map(completed.map((r) => [r.courseId, r._count._all]));
 
+  // —— 我的分享：他人对我课程的待批准申请（越权铁律：where ownerId=user.id）——
+  const pendingRequests = await prisma.courseAccessRequest.findMany({
+    where: { ownerId: user.id, status: "pending" },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+    select: { id: true, courseId: true, requesterId: true, message: true, createdAt: true },
+  });
+  // 申请人昵称 + 课程标题（各一次查完）。
+  const requesterIds = Array.from(new Set(pendingRequests.map((r) => r.requesterId)));
+  const reqCourseIds = Array.from(new Set(pendingRequests.map((r) => r.courseId)));
+  const [requesters, reqCourses] = await Promise.all([
+    requesterIds.length > 0
+      ? prisma.user.findMany({ where: { id: { in: requesterIds } }, select: { id: true, nickname: true } })
+      : Promise.resolve([]),
+    reqCourseIds.length > 0
+      ? prisma.course.findMany({ where: { id: { in: reqCourseIds } }, select: { id: true, title: true } })
+      : Promise.resolve([]),
+  ]);
+  const requesterMap = new Map(requesters.map((u) => [u.id, u.nickname]));
+  const reqCourseMap = new Map(reqCourses.map((c) => [c.id, c.title]));
+
   const cards = courses.map((c) => {
     const total = c.lessons.length;
     // 生成中的章节 = blocksJson 尚为空
@@ -72,7 +98,7 @@ export default async function MyCoursesPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-8">
       {/* 头部 */}
       <header className="flex items-end justify-between gap-4">
         <div>
@@ -80,13 +106,22 @@ export default async function MyCoursesPage() {
           <h1 className="mt-1 text-[26px] font-extrabold tracking-tight text-[var(--ink)]">我的课</h1>
           <p className="mt-1 text-[14px] text-[var(--ink2)]">你用 AI 生成或导入资料整理出的专属课程。</p>
         </div>
-        <Link
-          href="/create"
-          className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[var(--red)] px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 hover:brightness-105 active:translate-y-px sm:inline-flex"
-        >
-          <Plus size={15} weight="bold" />
-          造一门新课
-        </Link>
+        <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <Link
+            href="/market"
+            className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+          >
+            <Storefront size={15} weight="fill" />
+            逛集市
+          </Link>
+          <Link
+            href="/create"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--red)] px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 hover:brightness-105 active:translate-y-px"
+          >
+            <Plus size={15} weight="bold" />
+            造一门新课
+          </Link>
+        </div>
       </header>
 
       {cards.length === 0 ? (
@@ -113,54 +148,115 @@ export default async function MyCoursesPage() {
           {cards.map((c) => {
             const href = c.firstLessonId ? `/courses/${c.slug}/learn/${c.firstLessonId}` : `/courses/${c.slug}`;
             const isAi = c.origin === "ai_generated";
+            // 仅生成就绪的课可分享（生成中禁用分享按钮，避免半成品上架）。
+            const canShare = !c.isGenerating;
             return (
-              <Link
+              <div
                 key={c.id}
-                href={href}
                 className="studio-lift group flex flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)] hover:border-[var(--border2)]"
               >
-                <CoverBg color={c.coverColor} imageSrc={coverSrc(c.slug)} alt={c.title} className="aspect-[16/9] w-full">
-                  {/* 来源标签 */}
-                  <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
-                    {isAi ? <Sparkle size={11} weight="fill" /> : <FilePlus size={11} weight="fill" />}
-                    {isAi ? "AI 生成" : "我的导入"}
-                  </div>
-                  {/* 生成态标签 */}
-                  {c.isGenerating ? (
-                    <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--red)] backdrop-blur-sm">
-                      <CircleNotch size={11} weight="bold" className="animate-spin" />
-                      生成中 {c.total - c.pending}/{c.total}
+                {/* 封面 + 标题为链接主体 */}
+                <Link href={href} className="flex flex-col">
+                  <CoverBg color={c.coverColor} imageSrc={coverSrc(c.slug)} alt={c.title} className="aspect-[16/9] w-full">
+                    {/* 来源标签 */}
+                    <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+                      {isAi ? <Sparkle size={11} weight="fill" /> : <FilePlus size={11} weight="fill" />}
+                      {isAi ? "AI 生成" : "我的导入"}
                     </div>
+                    {/* 生成态标签 */}
+                    {c.isGenerating ? (
+                      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--red)] backdrop-blur-sm">
+                        <CircleNotch size={11} weight="bold" className="animate-spin" />
+                        生成中 {c.total - c.pending}/{c.total}
+                      </div>
+                    ) : (
+                      <div className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
+                        就绪 · {c.total} 节
+                      </div>
+                    )}
+                  </CoverBg>
+
+                  <div className="flex flex-col px-4 pt-4">
+                    <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">{trackLabel(c.category)}</div>
+                    <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">
+                      {c.title}
+                    </h3>
+                    {c.subtitle && <p className="mt-1 line-clamp-1 text-[13px] text-[var(--ink2)]">{c.subtitle}</p>}
+
+                    {/* 学习进度 */}
+                    <div className="pt-3.5">
+                      <div className="flex items-center justify-between text-[11px] text-[var(--ink3)]">
+                        <span className="mono">{c.done}/{c.total} 节已学</span>
+                        <span className="mono">{c.pct}%</span>
+                      </div>
+                      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border2)]">
+                        <div className="h-full rounded-full bg-[var(--red)] transition-all duration-300" style={{ width: `${c.pct}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+
+                {/* 分享到社区（脱离 Link，避免嵌套交互） */}
+                <div className="mt-auto flex items-center justify-end border-t border-[var(--border)] px-4 py-3">
+                  {canShare ? (
+                    <ShareToMarketButton courseId={c.id} initialStatus={c.sharedStatus as ShareState} />
                   ) : (
-                    <div className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
-                      就绪 · {c.total} 节
-                    </div>
+                    <span className="inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ink4)]">
+                      <CircleNotch size={12} weight="bold" className="animate-spin" />
+                      生成完成后可分享
+                    </span>
                   )}
-                </CoverBg>
-
-                <div className="flex flex-1 flex-col p-4">
-                  <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">{trackLabel(c.category)}</div>
-                  <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">
-                    {c.title}
-                  </h3>
-                  {c.subtitle && <p className="mt-1 line-clamp-1 text-[13px] text-[var(--ink2)]">{c.subtitle}</p>}
-
-                  {/* 学习进度 */}
-                  <div className="mt-auto pt-3.5">
-                    <div className="flex items-center justify-between text-[11px] text-[var(--ink3)]">
-                      <span className="mono">{c.done}/{c.total} 节已学</span>
-                      <span className="mono">{c.pct}%</span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border2)]">
-                      <div className="h-full rounded-full bg-[var(--red)] transition-all duration-300" style={{ width: `${c.pct}%` }} />
-                    </div>
-                  </div>
                 </div>
-              </Link>
+              </div>
             );
           })}
         </div>
       )}
+
+      {/* ===== 我的分享：待批准的学习申请 ===== */}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 place-items-center rounded-[10px] bg-[var(--red-soft)]">
+            <Storefront size={16} weight="fill" className="text-[var(--red)]" />
+          </span>
+          <div>
+            <h2 className="text-[18px] font-extrabold tracking-tight text-[var(--ink)]">我的分享</h2>
+            <p className="text-[13px] text-[var(--ink3)]">他人对你分享课程的学习申请，批准后你将获得积分奖励。</p>
+          </div>
+        </div>
+
+        {pendingRequests.length === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-10 text-center">
+            <HourglassMedium size={22} weight="regular" className="text-[var(--ink4)]" />
+            <p className="text-[13.5px] font-semibold text-[var(--ink2)]">暂无待批准的申请</p>
+            <p className="text-[12.5px] text-[var(--ink3)]">把你的课分享到集市，就有机会收到同学的学习申请。</p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {pendingRequests.map((r) => (
+              <li
+                key={r.id}
+                className="studio-rise flex flex-col gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 shadow-[var(--card)] sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="flex min-w-0 flex-col gap-1">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                    <span className="flex items-center gap-1.5 text-[14px] font-bold text-[var(--ink)]">
+                      <GraduationCap size={14} weight="fill" className="text-[var(--ink4)]" />
+                      {requesterMap.get(r.requesterId) ?? "某位同学"}
+                    </span>
+                    <span className="text-[13px] text-[var(--ink3)]">申请学习</span>
+                    <span className="truncate text-[13px] font-semibold text-[var(--ink2)]">《{reqCourseMap.get(r.courseId) ?? "课程"}》</span>
+                  </div>
+                  {r.message && <p className="line-clamp-2 text-[12.5px] leading-[1.55] text-[var(--ink3)]">“{r.message}”</p>}
+                </div>
+                <div className="shrink-0">
+                  <AccessRequestActions requestId={r.id} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

@@ -333,6 +333,47 @@ body::before {
   .flip3d-inner.is-flipped .flip3d-back { opacity: 1; pointer-events: auto; }
 }
 
+/* ============================================================
+   复习室体验（v2.3 §4）：卡堆 / 飞出 / 连击微光 / 结算 confetti
+   ============================================================ */
+
+/* 连击微光：×3/×5 时卡片外沿柔光脉冲一次（信号=品牌红，克制） */
+@keyframes comboGlow {
+  0%   { box-shadow: var(--card); }
+  40%  { box-shadow: var(--card), 0 0 0 3px var(--red-soft-border), 0 0 22px -2px rgba(252,1,26,.34); }
+  100% { box-shadow: var(--card); }
+}
+.review-combo-glow { animation: comboGlow .7s var(--ease-out-expo) both; }
+
+/* 连击数字跳动 */
+@keyframes comboPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.32); }
+  100% { transform: scale(1); }
+}
+.review-combo-pop { animation: comboPop .45s var(--ease-spring) both; }
+
+/* 结算 confetti：一次性抛洒。粒子用 STUDIO 中性墨 + 品牌红 + 成功绿信号，非彩虹 */
+@keyframes confettiFall {
+  0%   { transform: translate3d(0,-8px,0) rotate(0deg); opacity: 0; }
+  8%   { opacity: 1; }
+  100% { transform: translate3d(var(--cx, 0), 320px, 0) rotate(var(--cr, 360deg)); opacity: 0; }
+}
+.confetti-layer {
+  position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 2;
+}
+.confetti-piece {
+  position: absolute; top: -10px; width: 7px; height: 11px; border-radius: 2px;
+  will-change: transform, opacity;
+  animation: confettiFall var(--cd, 1.5s) var(--ease-out-expo) var(--cdelay, 0s) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .review-combo-glow, .review-combo-pop { animation: none !important; }
+  /* confetti 降级：完全不渲染（组件层也会跳过挂载） */
+  .confetti-layer { display: none !important; }
+}
+
 /* 网格状有机渐变背景（mesh，非 lila） */
 .mesh-bg {
   position: absolute; inset: 0; overflow: hidden;
@@ -390,9 +431,10 @@ body::before {
 .rail::-webkit-scrollbar { display: none; }
 .rail > * { scroll-snap-align: start; flex: 0 0 auto; }
 
-/* 焦点环 */
+/* 焦点环（无障碍键盘导航）：用中性 ink3，不用品牌红 —— 红框视觉过重且稀释红的信号语义。
+   保留 outline 本身以守住键盘用户的可见焦点（a11y 不回退）。 */
 :focus-visible {
-  outline: 2px solid var(--color-accent-600);
+  outline: 2px solid var(--ink3);
   outline-offset: 2px;
   border-radius: 4px;
 }

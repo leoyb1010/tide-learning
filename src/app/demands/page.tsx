@@ -2,9 +2,8 @@ import Link from "next/link";
 import { listRankedDemands } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
-import { VoteButton } from "@/components/VoteButton";
+import { VoteLeaderboard } from "@/components/VoteLeaderboard";
 import { CommunityTabs } from "@/components/CommunityTabs";
-import { DEMAND_STATUS } from "@/lib/format";
 
 export const metadata = { title: "社区广场" };
 
@@ -21,9 +20,7 @@ export default async function DemandsPage() {
     "launched",
   ]);
 
-  const topVotes = demands.reduce((m, d) => Math.max(m, d.totalVotes), 0) || 1;
-
-  // 课程共创排行榜（现有内容原样封装）——作为 Tab「课程共创」的内容注入 CommunityTabs。
+  // 课程共创投票 Tab：本周之星大卡 + 生命周期轨 + 增强需求卡列表。
   const leaderboard = (
     <div className="space-y-6">
       {!snapshot.canVote && (
@@ -51,7 +48,6 @@ export default async function DemandsPage() {
         ))}
       </div>
 
-      {/* 列表 */}
       {demands.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-20 text-center">
           <p className="font-semibold text-[var(--ink)]">还没有需求</p>
@@ -66,92 +62,11 @@ export default async function DemandsPage() {
           </Link>
         </div>
       ) : (
-        <div className="flex flex-col gap-3">
-          {demands.map((d, i) => {
-            const rank = i + 1;
-            const isTop = rank === 1;
-            const status = DEMAND_STATUS[d.status] ?? { label: d.status, tone: "muted" };
-            const scheduled = ["scheduled", "producing"].includes(d.status);
-            const pct = Math.round((d.totalVotes / topVotes) * 100);
-            return (
-              <div
-                key={d.id}
-                className="studio-lift flex items-center gap-5 rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
-              >
-                {/* 排名 */}
-                <div
-                  className={`mono w-7 shrink-0 text-center text-[20px] font-extrabold ${
-                    isTop ? "text-[var(--red)]" : "text-[var(--ink4)]"
-                  }`}
-                >
-                  {String(rank).padStart(2, "0")}
-                </div>
-
-                {/* 中间内容 */}
-                <div className="min-w-0 flex-1">
-                  <Link href={`/demands/${d.id}`} className="block">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="truncate text-[15px] font-bold text-[var(--ink)]">
-                        {d.title}
-                      </h3>
-                      <span className="rounded-full border border-[var(--border)] bg-[var(--surface-inset)] px-2.5 py-0.5 text-[11px] text-[var(--ink3)]">
-                        {d.categoryLabel}
-                      </span>
-                      {scheduled && (
-                        <span className="rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--red)]">
-                          {status.label}
-                        </span>
-                      )}
-                      {d.status === "launched" && (
-                        <span className="rounded-full border border-[var(--border)] bg-[var(--new-bg)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--new-ink)]">
-                          {status.label}
-                        </span>
-                      )}
-                    </div>
-                    {d.description && (
-                      <p className="mt-1 line-clamp-1 text-[13px] leading-[1.55] text-[var(--ink3)]">
-                        {d.description}
-                      </p>
-                    )}
-                  </Link>
-
-                  {/* 票占比进度条 red */}
-                  <div className="mt-2.5 flex items-center gap-2.5">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-inset)]">
-                      <div
-                        className="h-full rounded-full bg-[var(--red)] transition-all duration-500"
-                        style={{ width: `${Math.max(4, pct)}%` }}
-                        aria-hidden
-                      />
-                    </div>
-                    <span className="mono shrink-0 text-[11px] text-[var(--ink4)]">
-                      {d.totalVotes} 票
-                    </span>
-                  </div>
-
-                  {d.status === "launched" && d.launchedCourseId && (
-                    <Link
-                      href={`/courses/${d.launchedCourseId}`}
-                      className="mt-2 inline-block text-[12px] font-medium text-[var(--red)] hover:underline"
-                    >
-                      该需求已上线 → 查看课程
-                    </Link>
-                  )}
-                </div>
-
-                {/* 右侧投票按钮 */}
-                <div className="shrink-0">
-                  <VoteButton
-                    demandId={d.id}
-                    initialVotes={d.totalVotes}
-                    canVote={snapshot.canVote}
-                    disabledReason={snapshot.canVote ? undefined : "订阅后可投票"}
-                  />
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <VoteLeaderboard
+          demands={demands}
+          canVote={snapshot.canVote}
+          disabledReason={snapshot.canVote ? undefined : "订阅后可投票"}
+        />
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { chatJson } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 
@@ -37,6 +38,8 @@ export async function POST(req: NextRequest) {
 
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 导入为订阅会员权益，订阅后即可使用", 402);
+
+    await assertCanSpend(user.id);
 
     assertUserRateLimit(user.id, "ai_import", 5, 86_400_000);
 
@@ -83,6 +86,7 @@ export async function POST(req: NextRequest) {
         user: userMsg,
         temperature: 0.3,
         maxTokens: 6000,
+        onUsage: creditingOnUsage(user.id, "import_source"),
       });
       const raw = Array.isArray(result?.outline) ? result.outline : [];
       outline = raw

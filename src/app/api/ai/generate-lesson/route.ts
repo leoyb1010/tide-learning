@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { chatJson } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 import { validateBlocks, type Block } from "@/lib/blocks";
 
@@ -31,6 +32,8 @@ export async function POST(req: NextRequest) {
 
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
+
+    await assertCanSpend(user.id);
 
     assertUserRateLimit(user.id, "ai_gen_lesson", 60, 3_600_000);
 
@@ -83,6 +86,7 @@ export async function POST(req: NextRequest) {
           user: userMsg,
           temperature: 0.3,
           maxTokens: 6000,
+          onUsage: creditingOnUsage(user.id, "generate_lesson"),
         });
         const validated = validateBlocks(result?.blocks ?? result);
         if (validated.length > 0) {

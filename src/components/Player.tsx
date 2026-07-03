@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { NoteEditor, type NoteItem, type NoteEditorHandle } from "./NoteEditor";
 import { Paywall } from "./Paywall";
 import { Badge } from "./ui";
@@ -31,7 +32,7 @@ interface LessonData {
 }
 
 /**
- * Player 2.0 —「学习工作台」。
+ * Player 2.0 —「学习台」。
  * 桌面：视频 + 笔记面板(360px) + 目录，可折叠 + 焦点模式；移动：视频吸顶 + 可拖拽笔记 Sheet。
  * 支持真实 <video>（有 videoUrl 时）与模拟兜底；捕捉条：截帧 / 快速批注 / 字幕划线剪藏。
  */
@@ -46,6 +47,7 @@ export function Player({
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
+  const router = useRouter();
   const [time, setTime] = useState(initialProgress);
   const [playing, setPlaying] = useState(false);
   const [rate, setRate] = useState(1);
@@ -54,6 +56,13 @@ export function Player({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [focus, setFocus] = useState(false);
   const [seekPulse, setSeekPulse] = useState<number | null>(null);
+
+  // —— 下一节卡：学完一节后弹出，3 秒倒计时自动跳（可手动/可关）——
+  const [showNextCard, setShowNextCard] = useState(false);
+  const [nextCountdown, setNextCountdown] = useState(3);
+  const nextDismissedRef = useRef(false); // 本节内已关过就不再弹
+  const nextHref = nextLessonId ? `/courses/${courseSlug}/learn/${nextLessonId}` : null;
+  const nextLessonTitle = nextLessonId ? outline.find((o) => o.id === nextLessonId)?.title ?? null : null;
 
   // —— §9 专注 2.0：入席仪式 + 番茄钟 + 会话记录 ——
   const [focusStage, setFocusStage] = useState<"idle" | "prep" | "active" | "review">("idle"); // 入席流程阶段
@@ -134,6 +143,33 @@ export function Player({
     if (time >= lesson.durationSec && lesson.durationSec > 0) saveProgress(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time]);
+
+  // 学完本节（且有下一节、未手动关过、非块课）→ 弹出下一节卡并重置倒计时
+  useEffect(() => {
+    if (lesson.contentType === "ai_block" || !nextHref || nextDismissedRef.current) return;
+    if (time >= lesson.durationSec && lesson.durationSec > 0 && !showNextCard) {
+      setNextCountdown(3);
+      setShowNextCard(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [time]);
+
+  // 下一节卡倒计时：每秒递减，到 0 自动跳转
+  useEffect(() => {
+    if (!showNextCard || !nextHref) return;
+    if (nextCountdown <= 0) {
+      router.push(nextHref);
+      return;
+    }
+    const id = setTimeout(() => setNextCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(id);
+  }, [showNextCard, nextCountdown, nextHref, router]);
+
+  // 关闭下一节卡（本节内不再弹）
+  const dismissNextCard = useCallback(() => {
+    nextDismissedRef.current = true;
+    setShowNextCard(false);
+  }, []);
 
   const getCurrentTime = useCallback(() => timeRef.current, []);
   const seek = useCallback((sec: number) => {
@@ -539,6 +575,46 @@ export function Player({
             <button onClick={() => setFocusStage("idle")} className="studio-press mt-4 inline-flex w-full items-center justify-center rounded-[12px] bg-[var(--ink)] px-4 py-2.5 text-[14px] font-bold text-[var(--surface)]">
               完成
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 下一节卡：学完本节后右下角弹出，3 秒倒计时自动跳，可手动/可关 */}
+      {showNextCard && nextHref && (
+        <div className="fixed bottom-5 right-5 z-[75] w-full max-w-[320px] px-4 sm:px-0">
+          <div className="studio-rise rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--lift)]">
+            <div className="flex items-start justify-between gap-2">
+              <div className="mono flex items-center gap-1.5 text-[11px] uppercase tracking-[0.12em] text-[var(--red)]">
+                <Check size={13} weight="bold" /> 本节完成
+              </div>
+              <button
+                onClick={dismissNextCard}
+                className="studio-press -mr-1 -mt-1 grid h-6 w-6 place-items-center rounded-full text-[var(--ink4)] transition-colors hover:text-[var(--ink2)]"
+                aria-label="关闭"
+              >
+                <X size={14} weight="bold" />
+              </button>
+            </div>
+            <p className="mt-2 text-[12px] text-[var(--ink3)]">即将进入下一节</p>
+            <p className="mt-0.5 truncate text-[15px] font-bold text-[var(--ink)]" title={nextLessonTitle ?? undefined}>
+              {nextLessonTitle ?? "下一节"}
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <Link
+                href={nextHref}
+                onClick={() => { saveProgress(); track("next_lesson_advance", { lesson_id: lesson.id, mode: "manual" }); }}
+                className="studio-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
+              >
+                <Play size={13} weight="fill" /> 立即学下一节
+                <span className="mono ml-0.5 tabular-nums opacity-80">{nextCountdown}s</span>
+              </Link>
+              <button
+                onClick={dismissNextCard}
+                className="studio-press rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+              >
+                留在本节
+              </button>
+            </div>
           </div>
         </div>
       )}

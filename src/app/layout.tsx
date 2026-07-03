@@ -3,11 +3,13 @@ import { Plus_Jakarta_Sans, Noto_Sans_SC, IBM_Plex_Mono } from "next/font/google
 import "./globals.css";
 import { ModeProvider } from "@/components/ModeProvider";
 import { ToastProvider } from "@/components/Toast";
-import { Sidebar } from "@/components/Sidebar";
-import { Topbar } from "@/components/Topbar";
+import { TopNav } from "@/components/TopNav";
+import { MobileTabs } from "@/components/MobileTabs";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
+import { getBalance, ensureMonthlyGrant } from "@/lib/credits";
+import { shanghaiDayKey } from "@/lib/week";
 
 // STUDIO 字体系统：Plus Jakarta（UI/数字）+ Noto Sans SC（中文）+ IBM Plex Mono（数据）
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-jakarta", display: "swap" });
@@ -57,31 +59,54 @@ function shortStudentId(userId: string): string {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
-  // v2.2 学生证：Sidebar 底部展示真实身份卡（学号/入学时间/连续天数/会员）。
-  // streak + entitlement 都被 React cache 去重，不会重复查库。
+  // TopNav 顶栏所需的用户数据（学号/积分/续学）。entitlement 被 React cache 去重，不会重复查库。
   let navUser: {
     nickname: string;
     role: string;
-    avatarUrl: string | null;
     studentId: string; // 学号（userId 短哈希）
-    joinedLabel: string; // 入学 2026.05
-    streak: number;
-    isSubscriber: boolean;
+    credits: number; // v2.3 积分余额
+    // v2.3 §5 全局续学：最近在学的一节，供 TopNav 续学胶囊直达。无进度则为 null。
+    resumeInfo: { courseSlug: string; courseTitle: string; lessonId: string; lessonTitle: string; pct: number } | null;
   } | null = null;
   if (user) {
-    const [streak, snapshot] = await Promise.all([
-      prisma.streak.findUnique({ where: { userId: user.id }, select: { currentStreak: true } }),
+    const [snapshot, lastProgress] = await Promise.all([
       resolveEntitlement(user.id),
+      // 最近一次播放的进度，带课程/章节；React cache 去重，无额外成本
+      prisma.learningProgress.findFirst({
+        where: { userId: user.id },
+        orderBy: { lastPlayedAt: "desc" },
+        select: {
+          lessonId: true,
+          progressSec: true,
+          course: { select: { slug: true, title: true } },
+          lesson: { select: { id: true, title: true, durationSec: true } },
+        },
+      }),
     ]);
-    const j = user.createdAt;
+    // v2.3：订阅用户月度积分惰性赠送（本月未发则发，事务内防并发）。不阻塞渲染。
+    const monthKey = shanghaiDayKey().slice(0, 7); // "2026-07"
+    await ensureMonthlyGrant(user.id, monthKey, snapshot.isSubscriber).catch(() => {});
+    const credits = await getBalance(user.id);
+    // 进度% = progressSec / durationSec，钳到 0~100；时长缺失时按 0 处理
+    const resumeInfo =
+      lastProgress && lastProgress.course && lastProgress.lesson
+        ? {
+            courseSlug: lastProgress.course.slug,
+            courseTitle: lastProgress.course.title,
+            lessonId: lastProgress.lesson.id,
+            lessonTitle: lastProgress.lesson.title,
+            pct:
+              lastProgress.lesson.durationSec > 0
+                ? Math.min(100, Math.max(0, Math.round((lastProgress.progressSec / lastProgress.lesson.durationSec) * 100)))
+                : 0,
+          }
+        : null;
     navUser = {
       nickname: user.nickname,
       role: user.role,
-      avatarUrl: user.avatarUrl,
       studentId: shortStudentId(user.id),
-      joinedLabel: `入学 ${j.getFullYear()}.${String(j.getMonth() + 1).padStart(2, "0")}`,
-      streak: streak?.currentStreak ?? 0,
-      isSubscriber: snapshot.isSubscriber,
+      credits,
+      resumeInfo,
     };
   }
   return (
@@ -89,15 +114,13 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <ModeProvider>
           <ToastProvider>
-            {/* STUDIO 外壳：左侧 Sidebar(桌面固定236px / 移动底部Tab) + 主内容列(顶栏+内容) */}
-            <div className="flex min-h-screen bg-[var(--bg)] text-[var(--ink)]">
-              <Sidebar user={navUser} />
-              <div className="flex min-w-0 flex-1 flex-col">
-                <Topbar user={navUser} />
-                <main className="mx-auto w-full max-w-[1160px] flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-10">
-                  {children}
-                </main>
-              </div>
+            {/* STUDIO v2.3 外壳：现代顶部导航 + 全宽内容 + 移动底部 Tab */}
+            <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--ink)]">
+              <TopNav user={navUser} />
+              <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 pb-28 pt-7 sm:px-6 md:pb-12">
+                {children}
+              </main>
+              <MobileTabs loggedIn={Boolean(navUser)} />
             </div>
           </ToastProvider>
         </ModeProvider>

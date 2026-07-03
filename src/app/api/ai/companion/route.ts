@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chat } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 import { validateBlocks, blocksToPlainText } from "@/lib/blocks";
 
@@ -114,6 +115,8 @@ export async function POST(req: NextRequest) {
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 学习伴侣为订阅会员权益，订阅后即可使用", 402);
 
+    await assertCanSpend(user.id);
+
     assertUserRateLimit(user.id, "ai_companion", 30, 3_600_000);
 
     const body = (await req.json().catch(() => null)) as {
@@ -171,6 +174,7 @@ export async function POST(req: NextRequest) {
       user: userMsg,
       temperature: 0.5,
       maxTokens: 4000,
+      onUsage: creditingOnUsage(user.id, "companion"),
     });
 
     // —— 落库：无 thread 则创建；写入 user + assistant 两条消息 ——

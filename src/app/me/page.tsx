@@ -1,29 +1,24 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Crown, CaretRight, Cards, Play, Flame, Medal } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Cards, Play, Flame, Medal } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { getGamificationSummary } from "@/lib/gamification";
 import { prisma } from "@/lib/db";
-import { LogoutButton } from "@/components/AccountActions";
 import { TideCalendar } from "@/components/TideCalendar";
+import { StudentCard, type StudentCardData } from "@/components/StudentCard";
+import { CreditCard } from "@/components/CreditCard";
 import { formatDurationSec } from "@/lib/format";
 import { relativeTime } from "@/lib/queries";
 import { shanghaiDayKey } from "@/lib/week";
 
-export const metadata = { title: "我的" };
+export const metadata = { title: "成长档案" };
 
-// 学号：userId 短哈希（与 layout.tsx 的 shortStudentId 同算法，就地内联，不共享 import）
-function shortStudentId(id: string): string {
+/** 证件编号：YD·{入学年}·{userId 派生 4 位序号}（比 hash 更像证件语法）。 */
+function studentNo(id: string, year: number): string {
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 33 + id.charCodeAt(i)) >>> 0;
-  const b = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"; // 去掉易混 I/L/O/U
-  let c = "";
-  for (let i = 0; i < 5; i++) {
-    c = b[h % 32] + c;
-    h = Math.floor(h / 32);
-  }
-  return `STU-${c}`;
+  return `YD·${year}·${String(h % 10000).padStart(4, "0")}`;
 }
 
 export default async function MePage() {
@@ -31,7 +26,7 @@ export default async function MePage() {
   if (!user) redirect("/login?next=/me");
 
   const now = new Date();
-  const [snapshot, progressAgg, completedCount, notesCount, learning, dueCount, gamification] =
+  const [snapshot, progressAgg, completedCount, notesCount, learning, dueCount, gamification, profile] =
     await Promise.all([
       resolveEntitlement(user.id),
       prisma.learningProgress.aggregate({ where: { userId: user.id }, _sum: { progressSec: true } }),
@@ -51,11 +46,26 @@ export default async function MePage() {
       // 我的复习：到期待复习卡数
       prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: now } } }),
       getGamificationSummary(user.id),
+      prisma.userProfile.findUnique({ where: { userId: user.id }, select: { motto: true } }),
     ]);
 
   const meta = STATUS_LABELS[snapshot.subscriptionStatus] ?? STATUS_LABELS.free;
-  const studentId = shortStudentId(user.id);
-  const joinedLabel = `入学 ${user.createdAt.getFullYear()}.${String(user.createdAt.getMonth() + 1).padStart(2, "0")}`;
+  const j = user.createdAt;
+  // 学生证数据（v2.3 §2）
+  const cardData: StudentCardData = {
+    userId: user.id,
+    nickname: user.nickname,
+    pinyin: null, // 拼音 P1（可接拼音库或存储字段）
+    studentNo: studentNo(user.id, j.getFullYear()),
+    joinedYear: j.getFullYear(),
+    joinedMonth: j.getMonth() + 1,
+    totalSeconds: progressAgg._sum.progressSec ?? 0,
+    streak: gamification.currentStreak,
+    isSubscriber: snapshot.isSubscriber,
+    validLabel: snapshot.isSubscriber ? (snapshot.validUntil ? `VALID ${snapshot.validUntil.slice(0, 7).replace("-", ".")}` : "VALID FOREVER") : "免费学员",
+    motto: profile?.motto ?? "日拱一卒，功不唐捐",
+    avatarUrl: user.avatarUrl,
+  };
 
   // 本周节奏 / 本周数据：从潮汐日历(近90天)推导，最近 7 天（周一→周日）
   const todayKey = shanghaiDayKey();
@@ -81,70 +91,11 @@ export default async function MePage() {
 
   return (
     <div className="mx-auto flex max-w-[1040px] flex-col gap-6">
-      {/* ============ 第一段 · 学生证 Plus（证件质感：深蓝黑渐变 + 柔光 + 芯片）============ */}
-      <section
-        className="studio-rise relative overflow-hidden rounded-[20px] p-6 text-white shadow-[var(--lift)] sm:p-7"
-        style={{
-          background:
-            "linear-gradient(135deg, #1c2432 0%, #141a24 46%, #0f141c 100%)",
-        }}
-      >
-        {/* 右上柔光：给纯深底加材质层次，避免死黑 */}
-        <div
-          className="pointer-events-none absolute -right-16 -top-20 h-56 w-56 rounded-full opacity-[0.5] blur-[60px]"
-          style={{ background: "radial-gradient(circle, rgba(252,1,26,0.28) 0%, transparent 70%)" }}
-          aria-hidden
-        />
-        {/* 细网格纹理：极淡，增加"证件"精密感 */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.04]"
-          style={{
-            backgroundImage:
-              "linear-gradient(to right, #fff 1px, transparent 1px), linear-gradient(to bottom, #fff 1px, transparent 1px)",
-            backgroundSize: "22px 22px",
-          }}
-          aria-hidden
-        />
-        {/* 左缘红校条 */}
-        <div className="absolute inset-y-0 left-0 w-[3px] bg-[var(--red)]" aria-hidden />
-
-        <div className="relative flex flex-col gap-7 md:flex-row md:items-center md:justify-between">
-          {/* 左侧：头像 + 身份 */}
-          <div className="flex items-center gap-4">
-            <div className="relative flex h-[60px] w-[60px] shrink-0 items-center justify-center rounded-2xl bg-white/[0.08] text-[24px] font-bold ring-1 ring-white/10">
-              {user.nickname.slice(0, 1)}
-              {snapshot.isSubscriber && (
-                <span className="absolute -right-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-[var(--red)] text-white shadow-[0_2px_8px_-1px_rgba(252,1,26,0.6)]">
-                  <Crown size={12} weight="fill" />
-                </span>
-              )}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[20px] font-bold leading-tight">{user.nickname}</p>
-              <p className="mono mt-1 text-[12px] tracking-[0.12em] text-white/50">{studentId}</p>
-              <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11.5px] text-white/45">
-                <span className="mono">{joinedLabel}</span>
-                <span className="h-[3px] w-[3px] rounded-full bg-white/25" aria-hidden />
-                <span className="text-white/60">{meta.label}</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 右侧：三个核心数（芯片分隔） */}
-          <div className="flex items-center gap-6 sm:gap-9">
-            <IdStat value={formatDurationSec(progressAgg._sum.progressSec ?? 0)} label="累计学习" />
-            <span className="h-9 w-px bg-white/10" aria-hidden />
-            <IdStat value={`${completedCount}`} label="完课" />
-            <span className="h-9 w-px bg-white/10" aria-hidden />
-            <IdStat value={`${notesCount}`} label="笔记" />
-          </div>
-        </div>
-
-        {/* 底部极小字 */}
-        <p className="mono relative mt-6 text-[9.5px] uppercase tracking-[0.22em] text-white/30">
-          YOUDAO STUDIO · STUDENT ID · {studentId}
-        </p>
-      </section>
+      {/* ============ 第一段 · 学生证（v2.3 纸质证件）+ 积分卡 ============ */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
+        <StudentCard data={cardData} />
+        <CreditCard />
+      </div>
 
       {/* ============ 第二段 · 学习进度（主体）============ */}
       <section className="studio-rise flex flex-col gap-4">
@@ -345,35 +296,17 @@ export default async function MePage() {
         )}
       </section>
 
-      {/* ============ 菜单 + 设置 + 退出 ============ */}
-      <section className="studio-rise flex flex-col gap-2.5">
-        <MenuLink href="/me/subscription" label="订阅管理" hint={meta.label} />
-        <MenuLink href="/notes" label="我的笔记" hint={`${notesCount} 条`} />
-        <MenuLink href="/me/settings" label="设置（长辈模式 / 字号）" />
-        <MenuLink href="/demands" label="我的共创需求" />
-        {user.role !== "user" && <MenuLink href="/admin" label="运营后台" hint="管理" />}
-      </section>
-
-      <section className="flex flex-col gap-2.5 pt-2">
-        <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-4 text-[13px] text-[var(--ink2)]">
-          <p className="font-bold text-[var(--ink)]">客服与反馈</p>
-          <p className="mt-1">遇到问题？发送邮件到 support@tide.learning，或在需求广场留言。</p>
+      {/* ============ 设置入口（§7：杂项已拆到设置中心，这里只留一个入口）============ */}
+      <Link
+        href="/me/settings"
+        className="studio-lift flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+      >
+        <div>
+          <p className="text-[14px] font-bold text-[var(--ink)]">设置</p>
+          <p className="text-[12px] text-[var(--ink3)]">账号安全 · 订阅与积分 · 偏好 · 隐私 · 帮助</p>
         </div>
-        <LogoutButton />
-        <button className="w-full rounded-[13px] px-4 py-3 text-left text-[13px] text-[var(--ink4)] transition-colors hover:text-[var(--red)]">
-          注销账号
-        </button>
-      </section>
-    </div>
-  );
-}
-
-// 学生证核心数（深色卡上，白字）
-function IdStat({ value, label }: { value: string; label: string }) {
-  return (
-    <div className="text-center md:text-right">
-      <div className="mono text-[22px] font-bold leading-none text-white">{value}</div>
-      <div className="mt-1.5 text-[11px] text-white/50">{label}</div>
+        <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
+      </Link>
     </div>
   );
 }
@@ -387,17 +320,3 @@ function WeekStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MenuLink({ href, label, hint }: { href: string; label: string; hint?: string }) {
-  return (
-    <Link
-      href={href}
-      className="studio-lift flex items-center justify-between rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 shadow-[var(--card)]"
-    >
-      <span className="text-[14px] font-semibold text-[var(--ink)]">{label}</span>
-      <span className="flex items-center gap-2 text-[13px] text-[var(--ink3)]">
-        {hint}
-        <span className="text-[var(--ink4)]">›</span>
-      </span>
-    </Link>
-  );
-}

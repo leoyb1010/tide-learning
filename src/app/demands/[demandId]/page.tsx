@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { getCurrentUser, hasPermission } from "@/lib/session";
+import { getCurrentUser, hasPermission, primePermissionCache } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { CATEGORY_LABELS, relativeTime } from "@/lib/queries";
 import { WEEKLY_VOTE_BUDGET, weekKey } from "@/lib/week";
@@ -135,6 +135,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
     note: s.note,
     updatedAt: s.updatedAt.toISOString(),
   }));
+  if (user) await primePermissionCache();
   const canModerate = user ? hasPermission(user.role, "demand:moderate") : false;
   const launched = demand.status === "launched";
 

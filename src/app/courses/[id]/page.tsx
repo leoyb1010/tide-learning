@@ -189,7 +189,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             {/* CTA */}
             <div className="mt-4 space-y-2.5">
               {hasAccess ? (
-                <Button href={continueHref} full size="lg">进入工作台学习</Button>
+                <Button href={continueHref} full size="lg">进入学习台</Button>
               ) : (
                 <>
                   {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg">免费试学第一章</Button>}

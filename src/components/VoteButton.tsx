@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { CaretUp, Bell, BellRinging } from "@phosphor-icons/react/dist/ssr";
-import { Ripple, FlipCounter } from "./motion";
+import { Ripple, FlipCounter, SPRING_TIDE } from "./motion";
 import { useToast } from "./Toast";
 import { track } from "@/lib/analytics-client";
 import { msUntilWeekReset } from "@/lib/week";
@@ -21,6 +22,7 @@ export function VoteButton({
   weeklyRemaining,
   weeklyBudget = 5,
   showReset = false,
+  onVotesChange,
 }: {
   demandId: string;
   initialVotes: number;
@@ -29,6 +31,8 @@ export function VoteButton({
   weeklyRemaining?: number;
   weeklyBudget?: number;
   showReset?: boolean;
+  /** 票数变化回调（乐观 + 服务端确认）——用于让外层进度条弹性增长。不改动投票 API/逻辑。 */
+  onVotesChange?: (total: number) => void;
 }) {
   const { toast } = useToast();
   const [votes, setVotes] = useState(initialVotes);
@@ -62,6 +66,7 @@ export function VoteButton({
     setLoading(true);
     const prev = votes;
     setVotes((v) => v + 1); // 乐观
+    onVotesChange?.(prev + 1); // 外层进度条随乐观值弹性增长
     try {
       const res = await fetch(`/api/demands/${demandId}/vote`, {
         method: "POST",
@@ -73,9 +78,11 @@ export function VoteButton({
         | { ok: false; error: string };
       if (!json.ok) {
         setVotes(prev);
+        onVotesChange?.(prev); // 回滚外层进度条
         toast(json.error, { tone: "warn" });
       } else {
         setVotes(json.data.totalVotes);
+        onVotesChange?.(json.data.totalVotes); // 以服务端权威值校正进度条
         setRemaining(json.data.remainingThisWeek);
         setJustVoted(true);
         setTimeout(() => setJustVoted(false), 900);
@@ -83,6 +90,7 @@ export function VoteButton({
       }
     } catch {
       setVotes(prev);
+      onVotesChange?.(prev); // 网络异常回滚
       toast("网络异常，请重试", { tone: "warn" });
     } finally {
       setLoading(false);
@@ -110,7 +118,14 @@ export function VoteButton({
             weight="bold"
             className={`transition-transform duration-[var(--dur-fast)] ${justVoted ? "-translate-y-0.5" : ""}`}
           />
-          <FlipCounter value={votes} className="text-[0.9rem]" />
+          {/* 票数跳动反馈：投票成功时数字弹一下（滚动由 FlipCounter 承担） */}
+          <motion.span
+            animate={justVoted ? { scale: [1, 1.35, 1] } : { scale: 1 }}
+            transition={{ ...SPRING_TIDE, type: "spring" }}
+            className="inline-flex"
+          >
+            <FlipCounter value={votes} className="text-[0.9rem]" />
+          </motion.span>
         </button>
       </Ripple>
 

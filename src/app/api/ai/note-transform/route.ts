@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +78,9 @@ export async function POST(req: NextRequest) {
     // 高成本 AI 按用户限流
     assertUserRateLimit(user.id, "ai_note_transform", 20, 3_600_000);
 
+    // 积分预检：余额不足抛 402
+    await assertCanSpend(user.id);
+
     const body = (await req.json().catch(() => null)) as {
       noteIds?: string[];
       courseId?: string;
@@ -122,6 +126,7 @@ export async function POST(req: NextRequest) {
       user: userMsg,
       temperature: 0.4,
       maxTokens: 5000,
+      onUsage: creditingOnUsage(user.id, "note_transform"),
     });
 
     // 规整输出：行动项类返回 items，其余返回 markdown

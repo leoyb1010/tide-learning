@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
@@ -69,11 +70,14 @@ export async function POST(req: NextRequest) {
         `以下是用户的学习笔记，请提炼成 5-8 张问答复习卡片（问题在正面，答案在背面）。\n笔记：\n${noteText}\n\n` +
         `输出 JSON：{flashcards:[{q:问题, a:答案}]}`;
 
+      await assertCanSpend(user.id);
+
       const result = await chatJson<FlashcardsResult>({
         system,
         user: userMsg,
         temperature: 0.4,
         maxTokens: 6000,
+        onUsage: creditingOnUsage(user.id, "note_transform"),
       });
 
       const cards = (Array.isArray(result?.flashcards) ? result.flashcards : [])
@@ -155,22 +159,72 @@ export async function POST(req: NextRequest) {
   });
 }
 
+/** 用「已复习评分事件」推算连续复习天数（无需新表）。
+ *  规则：取最近若干条 review_card_grade 的日期集合，从今天（或昨天，宽限当日未复习）起向前逐日回溯，
+ *  相邻两天都有复习记录才继续累加。返回连续天数（今天已复习则含今天）。 */
+function computeStreak(dates: Date[]): number {
+  if (dates.length === 0) return 0;
+  // 归一到「本地日」的 00:00 时间戳去重
+  const dayMs = DAY_MS;
+  const dayKey = (d: Date) => Math.floor(d.getTime() / dayMs);
+  const days = new Set(dates.map(dayKey));
+  const todayKey = dayKey(new Date());
+  // 起点：今天有则从今天起，否则从昨天起（当天还没复习不算断）
+  let cursor = days.has(todayKey) ? todayKey : todayKey - 1;
+  if (!days.has(cursor)) return 0;
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak += 1;
+    cursor -= 1;
+  }
+  return streak;
+}
+
 /**
  * GET /api/ai/review-card —— §5.4 复习队列。
- * 返回当前用户「到期待复习」的卡（dueAt <= now），按 dueAt 升序，附带来源课程标题。
+ * 默认返回当前用户「到期待复习」的卡（dueAt <= now），按 dueAt 升序，附带来源课程标题。
+ * ?practice=1：无到期卡时「加练」——拉未到期最早 10 张（dueAt > now，按 dueAt 升序），本轮不改调度语义。
+ * 附带任务卡数据：dueToday（今日到期数）、streakDays（连续复习天数）。
  * 无需 LLM 权益（读取本人卡片）。越权铁律：where 强制 userId。
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await requireUser();
     const now = new Date();
+    const practice = new URL(req.url).searchParams.get("practice") === "1";
 
-    const cards = await prisma.reviewCard.findMany({
-      where: { userId: user.id, dueAt: { lte: now } },
-      orderBy: { dueAt: "asc" },
-      take: 60,
-      select: { id: true, front: true, back: true, dueAt: true, intervalDays: true, ease: true, courseId: true },
+    // 加练模式：从未到期卡里抽最早的 10 张（提前复习，dueAt > now）
+    const cards = practice
+      ? await prisma.reviewCard.findMany({
+          where: { userId: user.id, dueAt: { gt: now } },
+          orderBy: { dueAt: "asc" },
+          take: 10,
+          select: { id: true, front: true, back: true, dueAt: true, intervalDays: true, ease: true, courseId: true },
+        })
+      : await prisma.reviewCard.findMany({
+          where: { userId: user.id, dueAt: { lte: now } },
+          orderBy: { dueAt: "asc" },
+          take: 60,
+          select: { id: true, front: true, back: true, dueAt: true, intervalDays: true, ease: true, courseId: true },
+        });
+
+    // 今日到期总数（任务卡用；加练时也真实反映到期量，通常为 0）
+    const dueToday = practice
+      ? await prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: now } } })
+      : cards.length;
+
+    // 连续复习天数：从最近的评分事件推算（近 90 天足够）
+    const recentGrades = await prisma.analyticsEvent.findMany({
+      where: {
+        userId: user.id,
+        eventName: "review_card_grade",
+        createdAt: { gte: new Date(now.getTime() - 90 * DAY_MS) },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 400,
+      select: { createdAt: true },
     });
+    const streakDays = computeStreak(recentGrades.map((e) => e.createdAt));
 
     // 补充课程标题（用于卡片来源展示）；只查涉及到的课程，避免 N+1。
     const courseIds = Array.from(new Set(cards.map((c) => c.courseId).filter((x): x is string => Boolean(x))));
@@ -179,7 +233,6 @@ export async function GET() {
       : [];
     const titleOf = new Map(courses.map((c) => [c.id, c.title]));
 
-    // 今日应复习总量（含未来到期不计）——用于空态与进度显示
     const total = cards.length;
 
     return ok({
@@ -190,6 +243,9 @@ export async function GET() {
         courseTitle: c.courseId ? titleOf.get(c.courseId) ?? null : null,
       })),
       total,
+      dueToday,
+      streakDays,
+      practice,
     });
   });
 }

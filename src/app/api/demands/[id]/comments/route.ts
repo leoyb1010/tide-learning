@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
-import { requireUser, hasPermission } from "@/lib/session";
+import { requireUser, hasPermission, primePermissionCache } from "@/lib/session";
 import { track } from "@/lib/analytics";
 import { renderMarkdown } from "@/lib/markdown";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
@@ -117,7 +117,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    // 版主发帖标记为官方并置顶。
+    // 版主发帖标记为官方并置顶。（先刷新 DB 权限覆盖再同步判定）
+    await primePermissionCache();
     const isOfficial = hasPermission(user.role, "demand:moderate");
 
     const created = await prisma.comment.create({

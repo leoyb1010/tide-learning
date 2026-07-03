@@ -14,6 +14,13 @@ const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 // 可用 DEEPSEEK_MODEL 环境变量覆盖（如切 deepseek-v4-pro 做更复杂推理）。
 const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
 
+/** LLM Token 用量（v2.3 积分经济计量）。DeepSeek 响应的 usage 字段。 */
+export interface LlmUsageInfo {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
 export interface ChatOptions {
   system: string;
   user: string;
@@ -22,11 +29,13 @@ export interface ChatOptions {
   json?: boolean; // true → response_format json_object
   timeoutMs?: number; // 默认 45s（推理模型延迟更高）
   retries?: number; // 默认 1（仅 5xx/网络/超时重试）
+  onUsage?: (usage: LlmUsageInfo) => void; // v2.3：成功返回后回调实际 Token 用量（供积分记账）
 }
 
 interface DeepSeekResponse {
   // v4-flash 是推理模型：message 除 content 外还带 reasoning_content（思维链）
   choices?: { message?: { content?: string; reasoning_content?: string }; finish_reason?: string }[];
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
 }
 
 /** 是否已配置 AI —— 供 UI/降级判断，未配置时 AI 功能优雅缺席而非崩溃。 */
@@ -47,6 +56,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     json = false,
     timeoutMs = 45_000,
     retries = 1,
+    onUsage,
   } = opts;
   // 空正文自动放大重试：v4-flash 思维链耗尽预算时 content 为空且 finish_reason=length。
   let effectiveMaxTokens = maxTokens;
@@ -109,6 +119,18 @@ export async function chat(opts: ChatOptions): Promise<string> {
           continue;
         }
         throw new AppError("AI 返回为空", 502);
+      }
+      // v2.3：上报实际 Token 用量供积分记账（失败不影响正文返回）
+      if (onUsage && data.usage) {
+        try {
+          onUsage({
+            promptTokens: data.usage.prompt_tokens ?? 0,
+            completionTokens: data.usage.completion_tokens ?? 0,
+            totalTokens: data.usage.total_tokens ?? 0,
+          });
+        } catch {
+          /* 记账回调异常不影响 AI 返回 */
+        }
       }
       return content.trim();
     } catch (e) {

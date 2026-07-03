@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { chatJson } from "@/lib/llm";
+import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest) {
     // 高成本 AI：按用户限流，每天 5 门
     assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
 
+    // 积分预检：余额不足抛 402
+    await assertCanSpend(user.id);
+
     const body = (await req.json().catch(() => null)) as {
       prompt?: string;
       category?: string;
@@ -70,6 +74,7 @@ export async function POST(req: NextRequest) {
       user: userMsg,
       temperature: 0.5,
       maxTokens: 6000,
+      onUsage: creditingOnUsage(user.id, "generate_course"),
     });
 
     // —— 规范化 LLM 产出，兜底非法结构 ——

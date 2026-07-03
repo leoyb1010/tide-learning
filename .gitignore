@@ -13,3 +13,6 @@ tsconfig.tsbuildinfo
 .claude
 dev.db
 dev.db-journal
+
+# 采集面板 mock 上传目录（图片/附件落盘，不入库）
+public/uploads/

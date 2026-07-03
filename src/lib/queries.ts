@@ -201,8 +201,74 @@ export async function listUpdates(limit = 12) {
 }
 
 /** 需求广场排序列表（§6.6 综合分）。 */
-export async function listRankedDemands(statuses?: string[]) {
+/** 单条榜单需求的展示形状（含共创投票所需的社交信号）。 */
+export interface RankedDemandView {
+  id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  categoryLabel: string;
+  status: string;
+  totalVotes: number;
+  /** 本周新增票数（↑N 信号） */
+  recentVotes: number;
+  officialReply: string | null;
+  launchedCourseId: string | null;
+  /** 讨论（评论）数 */
+  commentCount: number;
+  /** 关注进度人数 */
+  followerCount: number;
+  /** 前 5 位支持者头像（按最近投票排序） */
+  supporters: { id: string; nickname: string; avatarUrl: string | null }[];
+  /** 发起人昵称（用于「发起人一句话理由」署名） */
+  authorNickname: string | null;
+}
+
+export async function listRankedDemands(statuses?: string[]): Promise<RankedDemandView[]> {
   const ranked = await rankDemands(statuses);
+  if (ranked.length === 0) return [];
+  const ids = ranked.map((d) => d.id);
+
+  // 并行聚合社交信号：讨论数、关注数、支持者头像（前 5，按最近投票）、发起人昵称。
+  const [commentGroups, followGroups, recentVotes, authors] = await Promise.all([
+    prisma.comment.groupBy({
+      by: ["demandId"],
+      where: { demandId: { in: ids }, deletedAt: null },
+      _count: { _all: true },
+    }),
+    prisma.demandFollow.groupBy({
+      by: ["demandId"],
+      where: { demandId: { in: ids } },
+      _count: { _all: true },
+    }),
+    prisma.demandVote.findMany({
+      where: { demandId: { in: ids } },
+      orderBy: { createdAt: "desc" },
+      select: {
+        demandId: true,
+        user: { select: { id: true, nickname: true, avatarUrl: true } },
+      },
+    }),
+    prisma.demand.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, user: { select: { nickname: true } } },
+    }),
+  ]);
+
+  const commentMap = new Map(commentGroups.map((c) => [c.demandId, c._count._all]));
+  const followMap = new Map(followGroups.map((f) => [f.demandId, f._count._all]));
+  const authorMap = new Map(authors.map((a) => [a.id, a.user?.nickname ?? null]));
+
+  // 每条需求取前 5 位不重复支持者（vote 已按时间倒序）。
+  const supporterMap = new Map<string, RankedDemandView["supporters"]>();
+  for (const v of recentVotes) {
+    if (!v.demandId) continue;
+    const arr = supporterMap.get(v.demandId) ?? [];
+    if (arr.length >= 5 || arr.some((s) => s.id === v.user.id)) continue;
+    arr.push(v.user);
+    supporterMap.set(v.demandId, arr);
+  }
+
   return ranked.map((d) => ({
     id: d.id,
     title: d.title,
@@ -211,8 +277,13 @@ export async function listRankedDemands(statuses?: string[]) {
     categoryLabel: CATEGORY_LABELS[d.category] ?? d.category,
     status: d.status,
     totalVotes: d.totalVotes,
+    recentVotes: d.recentVotes,
     officialReply: d.officialReply,
     launchedCourseId: d.launchedCourseId,
+    commentCount: commentMap.get(d.id) ?? 0,
+    followerCount: followMap.get(d.id) ?? 0,
+    supporters: supporterMap.get(d.id) ?? [],
+    authorNickname: authorMap.get(d.id) ?? null,
   }));
 }
 

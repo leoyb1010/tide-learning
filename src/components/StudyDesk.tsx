@@ -145,7 +145,6 @@ export function StudyDesk({
               className="ml-3 shrink-0 text-[var(--red)]"
             />
             <input
-              autoFocus
               value={value}
               onChange={(e) => setValue(e.target.value)}
               placeholder="例如：想练面试英语口语 / 30 分钟学会做番茄炒蛋"
