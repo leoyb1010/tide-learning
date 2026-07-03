@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
     if (!user || user.deletedAt || !verifyPassword(password, user.passwordHash)) {
       return fail("账号或密码不正确", 401);
     }
-    await createSession(user.id);
-    return ok({ id: user.id, nickname: user.nickname, role: user.role });
+    const sessionToken = await createSession(user.id);
+    // sessionToken 供原生 App 用 Authorization: Bearer 携带（Web 用 httpOnly cookie，不读此字段）。
+    return ok({ id: user.id, nickname: user.nickname, role: user.role, sessionToken });
   });
 }

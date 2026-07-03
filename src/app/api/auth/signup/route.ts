@@ -36,8 +36,8 @@ export async function POST(req: NextRequest) {
         profile: { create: {} },
       },
     });
-    await createSession(user.id);
+    const sessionToken = await createSession(user.id);
     await track({ eventName: "signup_success", userId: user.id });
-    return ok({ id: user.id, nickname: user.nickname });
+    return ok({ id: user.id, nickname: user.nickname, sessionToken });
   });
 }

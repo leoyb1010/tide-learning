@@ -54,6 +54,7 @@ model User {
   exams          Exam[]
   examAttempts   ExamAttempt[]
   notifications  Notification[]
+  devices        Device[]
 
   @@index([role])
 }
@@ -945,4 +946,18 @@ model Notification {
   createdAt DateTime  @default(now())
 
   @@index([userId, readAt, createdAt])
+}
+
+// ==================== iOS APNs 推送设备注册 ====================
+
+model Device {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique // APNs device token（去重键）
+  platform  String   @default("ios") // ios（后续可扩展 android）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
 }

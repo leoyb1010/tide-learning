@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { prisma } from "./db";
 import type { User } from "@prisma/client";
 
@@ -77,9 +77,23 @@ export async function destroySession(): Promise<void> {
  * 用 React cache() 包裹：同一次请求内 layout 与各 page 多次调用只查一次库
  * （去重按参数计算，此处无参数 → 每请求命中同一缓存）。cache 仅在服务端生效。
  */
-export const getCurrentUser = cache(async (): Promise<User | null> => {
+/**
+ * 取当前会话 id：优先 Authorization: Bearer <sid>（iOS/原生 App），回退 cookie（Web）。
+ * sessionId 本身即不透明随机 token，双通道复用同一张 session 表，无需另签发。
+ */
+async function currentSessionId(): Promise<string | null> {
+  const h = await headers();
+  const auth = h.get("authorization");
+  if (auth?.startsWith("Bearer ")) {
+    const t = auth.slice(7).trim();
+    if (t) return t;
+  }
   const cookieStore = await cookies();
-  const sid = cookieStore.get(SESSION_COOKIE)?.value;
+  return cookieStore.get(SESSION_COOKIE)?.value ?? null;
+}
+
+export const getCurrentUser = cache(async (): Promise<User | null> => {
+  const sid = await currentSessionId();
   if (!sid) return null;
   const session = await prisma.session.findUnique({
     where: { id: sid },

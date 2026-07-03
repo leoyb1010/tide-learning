@@ -43,6 +43,9 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
  * 校验 Origin/Referer 与目标 Host 一致；不一致直接拒绝。
  */
 export function assertSameOrigin(req: NextRequest) {
+  // 原生 App：携带 Authorization: Bearer 的请求天然防 CSRF（token 不会被浏览器自动附带），放行。
+  const auth = req.headers.get("authorization");
+  if (auth?.startsWith("Bearer ")) return;
   const origin = req.headers.get("origin");
   const host = req.headers.get("host");
   if (!origin) return; // 同源导航式请求可能无 origin，放行（GET 已被路由方法限制）
