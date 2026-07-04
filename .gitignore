@@ -16,3 +16,10 @@ dev.db-journal
 
 # 采集面板 mock 上传目录（图片/附件落盘，不入库）
 public/uploads/
+
+# iOS / Xcode (ios/ 子工程，xcodegen 生成 xcodeproj，产物不入库)
+ios/**/build/
+ios/**/DerivedData/
+ios/**/*.xcodeproj/
+ios/**/xcuserdata/
+ios/**/.DS_Store
