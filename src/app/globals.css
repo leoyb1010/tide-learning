@@ -445,6 +445,41 @@ body::before {
   .dialog-scrim-in, .dialog-panel-in { animation: none !important; }
 }
 
+/* ============================================================
+   Lightbox 灯箱（广场缩略图放大）—— 同 Dialog 走纯 CSS 进场（Portal-to-body 稳定）。
+   深色 scrim 淡入 + 图片轻缩放涌入。切图时用 .lightbox-img-in 重放缩放。
+   forwards 静息即可见（同 Dialog 铁律：动画时钟冻结也退回可见态）。
+   reduce-motion 下一律直显，零位移零缩放。
+   ============================================================ */
+@keyframes lightboxScrimIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes lightboxImgIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.lightbox-scrim-in { opacity: 1; animation: lightboxScrimIn .2s var(--ease-out-expo) forwards; }
+.lightbox-img-in { opacity: 1; animation: lightboxImgIn .28s var(--ease-tide) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .lightbox-scrim-in, .lightbox-img-in { animation: none !important; }
+}
+/* 灯箱控件：切换/关闭按钮命中区 ≥44px，深色浮层上的白控件。 */
+.lb-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px; border-radius: 9999px;
+  color: #fff; background: rgba(0, 0, 0, .42);
+  backdrop-filter: blur(6px);
+  transition: background var(--dur-fast) var(--ease-out-expo), transform var(--dur-instant) var(--ease-out-expo);
+}
+.lb-btn:hover { background: rgba(0, 0, 0, .62); }
+.lb-btn:active { transform: scale(.94); }
+/* 圆点指示器命中区兜到 44px（视觉点小、可点区大）。 */
+.lb-dot-hit {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 44px; min-height: 44px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .lb-btn:active { transform: none !important; }
+}
+
 /* 关键 CTA 柔光（红按钮的品牌光晕，克制使用） */
 .cta-glow { box-shadow: var(--red-glow); transition: box-shadow var(--dur-fast) var(--ease-out-expo), transform var(--dur-fast) var(--ease-out-expo); }
 .cta-glow:hover { box-shadow: 0 6px 28px -4px rgba(252,1,26,.5); transform: translateY(-1px); }
@@ -1183,4 +1218,72 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   /* 降级：无逐字、无闪烁——TypewriterText 直接渲染整句，光标不再出现。 */
   .tw-caret { animation: none !important; display: none !important; }
+}
+
+/* ============================================================
+   投票「点火 / 助推」按钮（VoteButton v4）—— 课程共创助推仪式
+   隐喻：未投=静默火种(引信)，投票=点燃火苗(火力值窜起)，红作暖色能量点睛。
+   四态：未投(ready) / 已投(lit) / 票额耗尽(depleted) / 冷却中(cooldown)。
+   全部 transform/opacity/filter 合成友好；文件末统一 reduce-motion 降级为静态直显。
+   ============================================================ */
+
+/* 静默待点火：引信火种极缓呼吸（低对比，暗示「可点燃」的活性，不喧宾夺主）。 */
+@keyframes emberBreathe {
+  0%, 100% { opacity: .55; transform: scale(1); }
+  50%      { opacity: .9;  transform: scale(1.08); }
+}
+.vote-ember { animation: emberBreathe 2.6s ease-in-out infinite; transform-origin: center bottom; }
+
+/* 点火迸发：投票瞬间火苗窜起——从火种位置蹿高一下再落定（一次性庆祝，非循环）。 */
+@keyframes igniteBurst {
+  0%   { opacity: 0; transform: translateY(3px) scale(.5); }
+  35%  { opacity: 1; transform: translateY(-3px) scale(1.25); }
+  70%  { opacity: 1; transform: translateY(-1px) scale(.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+.vote-ignite { animation: igniteBurst .62s var(--ease-spring) both; transform-origin: center bottom; }
+
+/* 已点燃的稳态火苗：投票后火苗持续轻微摇曳（幅度极小，表「已在助推」的确定感）。 */
+@keyframes flameFlicker {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30%      { transform: scale(1.06) rotate(-1.5deg); }
+  60%      { transform: scale(.97) rotate(1.5deg); }
+}
+.vote-flame-lit { animation: flameFlicker 1.8s ease-in-out infinite; transform-origin: center bottom; }
+
+/* 火星迸溅：点火瞬间从火种位向上飞散的两三点火星（各自 --sx/--sy 方向，一次性）。 */
+@keyframes sparkFly {
+  0%   { opacity: 0; transform: translate(0, 0) scale(.4); }
+  25%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--sx, 0), var(--sy, -14px)) scale(.9); }
+}
+.vote-spark { animation: sparkFly .66s var(--ease-out-expo) both; }
+
+/* 冷却余温：冷却中(票额耗尽/周界未到)按钮暖底极缓明灭，暗示「热度仍在，稍后再助推」。 */
+@keyframes emberCooldown {
+  0%, 100% { opacity: .5; }
+  50%      { opacity: .82; }
+}
+.vote-cooldown-glow { animation: emberCooldown 2.4s ease-in-out infinite; }
+
+/* 火力值上跳：投票成功票数(火力值)轻弹强调（与 FlipCounter 翻滚叠加）。 */
+@keyframes fuelPop {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.28); }
+  100% { transform: scale(1); }
+}
+.vote-fuel-pop { animation: fuelPop .44s var(--ease-spring) both; }
+
+/* 火种格点亮/熄灭：余量指示格状态切换的柔和缩放（filled 常显，spent 缩暗）。 */
+.vote-tinder { transition: transform var(--dur-normal) var(--ease-tide), opacity var(--dur-normal) var(--ease-tide), background-color var(--dur-normal) var(--ease-tide); }
+
+@media (prefers-reduced-motion: reduce) {
+  .vote-ember,
+  .vote-ignite,
+  .vote-flame-lit,
+  .vote-spark,
+  .vote-cooldown-glow,
+  .vote-fuel-pop { animation: none !important; transform: none !important; opacity: 1 !important; }
+  .vote-spark { display: none !important; }   /* 无动效时不显示飞散火星，避免静态残留 */
+  .vote-tinder { transition: none !important; }
 }

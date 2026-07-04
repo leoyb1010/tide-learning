@@ -1,19 +1,21 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, BookBookmark, PushPin, Sparkle, PencilSimpleLine, NotePencil } from "@phosphor-icons/react/dist/ssr";
+import { ArrowLeft, BookBookmark, PushPin, Sparkle, PencilSimpleLine, NotePencil, LinkSimple, Books } from "@phosphor-icons/react/dist/ssr";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { TidalReveal } from "@/components/motion";
 import { EmptyTide } from "@/components/TideIllustration";
 import NotebookAiTidy from "@/components/NotebookAiTidy";
+import { ExportMenu } from "@/components/ExportMenu";
 
 export const dynamic = "force-dynamic";
 
-// 笔记来源标识（与 Note.source 一致）
-const SOURCE_LABELS: Record<string, { label: string; Icon: typeof NotePencil }> = {
-  lesson: { label: "课程内记", Icon: PencilSimpleLine },
-  manual: { label: "独立笔记", Icon: NotePencil },
-  ai_transform: { label: "AI 整理", Icon: Sparkle },
+// 笔记来源标识（知识脉络第一层，与 Note.source 一致）；tint 用语义色区分来路。
+const SOURCE_LABELS: Record<string, { label: string; Icon: typeof NotePencil; tint: string }> = {
+  lesson: { label: "课程内记", Icon: PencilSimpleLine, tint: "var(--info)" },
+  manual: { label: "手记", Icon: NotePencil, tint: "var(--ink3)" },
+  ai_transform: { label: "AI 整理", Icon: Sparkle, tint: "var(--info)" },
+  link_import: { label: "链接采集", Icon: LinkSimple, tint: "var(--ok)" },
 };
 
 /**
@@ -32,14 +34,22 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
   });
   if (!notebook) notFound();
 
-  // 二次强制 userId：仅本人未删除笔记，pinned 优先 + 最近更新
+  // 二次强制 userId：仅本人未删除笔记，pinned 优先 + 最近更新。
+  // 带上课程/章节，供「知识脉络」呈现（本笔记本收纳自哪几门课）。
   const notes = await prisma.note.findMany({
     where: { notebookId: id, userId: user.id, deletedAt: null },
-    select: { id: true, title: true, excerpt: true, source: true, pinned: true, updatedAt: true },
+    select: {
+      id: true, title: true, excerpt: true, source: true, pinned: true, updatedAt: true,
+      courseId: true,
+      course: { select: { title: true } },
+      lesson: { select: { title: true } },
+    },
     orderBy: [{ pinned: "desc" }, { updatedAt: "desc" }],
   });
 
   const noteIds = notes.map((n) => n.id);
+  // 归属汇总：本笔记本收纳了 N 条笔记，来自 M 门课（去重非空 courseId）。
+  const courseCount = new Set(notes.filter((n) => n.courseId).map((n) => n.courseId)).size;
 
   return (
     <div className="space-y-7">
@@ -68,12 +78,25 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
                   {notebook.description}
                 </p>
               )}
-              <p className="mono mt-2 text-[11px] text-[var(--ink4)]">{notes.length} 条笔记</p>
+              {/* 归属汇总（知识脉络容器层）：本笔记本收纳了 N 条 · 来自 M 门课，让归属一目了然 */}
+              <p className="mt-2 inline-flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-[var(--ink4)]">
+                <span className="mono">{notes.length} 条笔记</span>
+                {courseCount > 0 && (
+                  <span className="inline-flex items-center gap-1 text-[var(--ink3)]">
+                    <Books size={12} weight="regular" />
+                    来自 <span className="mono text-[var(--ink2)]">{courseCount}</span> 门课
+                  </span>
+                )}
+              </p>
             </div>
           </div>
 
-          {/* AI 整理本笔记本：透传本笔记本下笔记 id，走 /api/ai/note-transform（noteIds 范围） */}
-          <NotebookAiTidy noteIds={noteIds} title={notebook.title} />
+          <div className="flex items-center gap-2.5">
+            {/* 导出中心：md / html / txt / json / 打印版，导出的是「本笔记本」范围 */}
+            {notes.length > 0 && <ExportMenu scope={{ kind: "notebook", notebookId: notebook.id }} label="导出" />}
+            {/* AI 整理本笔记本：透传本笔记本下笔记 id，走 /api/ai/note-transform（noteIds 范围） */}
+            <NotebookAiTidy noteIds={noteIds} title={notebook.title} />
+          </div>
         </div>
       </TidalReveal>
 
@@ -83,22 +106,31 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
           description="这个笔记本还是空的。在笔记馆里把笔记归入本笔记本，它们就会出现在这里。"
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {notes.map((n) => {
+        <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2">
+          {notes.map((n, i) => {
             const src = SOURCE_LABELS[n.source] ?? SOURCE_LABELS.manual;
             const SrcIcon = src.Icon;
             return (
               <Link
                 key={n.id}
                 href={`/notes/${n.id}`}
-                className="studio-lift studio-rise block rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+                style={{ "--i": Math.min(i, 12) } as React.CSSProperties}
+                className="studio-lift block min-h-[44px] rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
               >
+                {/* 知识脉络 · 来源层：来源徽章（语义色）+ 置顶 */}
                 <div className="mb-1.5 flex items-center gap-1.5 text-[11px] text-[var(--ink4)]">
-                  {n.pinned && <PushPin size={12} weight="fill" className="text-[var(--red)]" />}
-                  <SrcIcon size={12} weight="regular" />
-                  <span>{src.label}</span>
+                  {n.pinned && <PushPin size={12} weight="fill" className="shrink-0 text-[var(--red)]" />}
+                  <SrcIcon size={12} weight="fill" style={{ color: src.tint }} className="shrink-0" />
+                  <span style={{ color: src.tint }} className="font-medium">{src.label}</span>
                 </div>
                 <p className="truncate font-semibold text-[var(--ink)]">{n.title?.trim() || "无标题笔记"}</p>
+                {/* 知识脉络 · 血缘：若来自课程，标明出处课/节 */}
+                {n.course && (
+                  <p className="mt-1 truncate text-[11px] text-[var(--ink3)]">
+                    <span className="text-[var(--ink4)]">来自</span> 《{n.course.title}》
+                    {n.lesson && <span className="text-[var(--ink4)]"> · {n.lesson.title}</span>}
+                  </p>
+                )}
                 {n.excerpt && (
                   <p className="mt-1 line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink2)]">{n.excerpt}</p>
                 )}

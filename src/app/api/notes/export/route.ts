@@ -20,14 +20,21 @@ function esc(s: string): string {
 }
 
 type ExportNote = {
+  id: string;
   title: string | null;
   contentMd: string;
   kind: string;
+  source: string;
   sourceText: string | null;
   sourceUrl: string | null;
   captureUrl: string | null;
   timestampSec: number | null;
+  anchorRef: string | null;
+  notebookId: string | null;
+  courseId: string | null;
+  lessonId: string | null;
   createdAt: Date;
+  updatedAt: Date;
   course: { title: string } | null;
   lesson: { title: string } | null;
   tags: { tag: { name: string } }[];
@@ -194,16 +201,231 @@ ${sections.join("\n")}
 </html>`;
 }
 
+/** 去 Markdown 语法，得到可读纯文本行（用于 .txt 导出）。仅做常见语法剥离，够读即可。 */
+function stripMarkdown(md: string): string {
+  return md
+    .replace(/^```.*$/gm, "") // 代码围栏行
+    .replace(/`([^`]+)`/g, "$1") // 行内代码
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, "") // 图片
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, "$1（$2）") // 链接 → 文字（网址）
+    .replace(/^#{1,6}\s+/gm, "") // 标题井号
+    .replace(/^\s{0,3}>\s?/gm, "") // 引用前缀
+    .replace(/^\s*[-*+]\s+/gm, "· ") // 无序列表 → 中点
+    .replace(/(\*\*|__)(.*?)\1/g, "$2") // 粗体
+    .replace(/(\*|_)(.*?)\1/g, "$2") // 斜体
+    .replace(/\n{3,}/g, "\n\n") // 收敛多空行
+    .trim();
+}
+
+/** 组装一组笔记为去语法的可读纯文本（.txt）。 */
+function buildText(notes: ExportNote[], opts: { header: string; truncatedNote?: string }): string {
+  const lines: string[] = [opts.header, ""];
+  if (opts.truncatedNote) {
+    lines.push(`⚠️ ${opts.truncatedNote}`, "");
+  }
+  for (const n of notes) {
+    const heading = n.title?.trim() || n.lesson?.title || "随手记";
+    const stamp = n.timestampSec != null ? ` [${mmss(n.timestampSec)}]` : "";
+    lines.push(`【${heading}】${stamp}`);
+    // 知识脉络：来源（课程/AI/手记）> 归属（笔记本/课节）> 内容
+    const meta: string[] = [];
+    if (n.course?.title) meta.push(`来自《${n.course.title}》`);
+    if (n.lesson?.title) meta.push(n.lesson.title);
+    meta.push(new Date(n.createdAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }));
+    lines.push(meta.join(" · "));
+    if (n.sourceUrl) lines.push(`来源：${n.sourceUrl}`);
+    const tagNames = n.tags.map((t) => `#${t.tag.name}`).join(" ");
+    if (tagNames) lines.push(tagNames);
+    lines.push("");
+    if (n.kind === "clip" && n.sourceText?.trim()) {
+      for (const seg of n.sourceText.split("\n")) lines.push(`  “${seg}”`);
+      lines.push("");
+    }
+    if (n.contentMd?.trim()) {
+      lines.push(stripMarkdown(n.contentMd));
+      lines.push("");
+    }
+    lines.push("· · · · · · · · · ·", "");
+  }
+  return lines.join("\n");
+}
+
+/**
+ * 组装一组笔记为结构化 JSON（.json）。
+ * 含知识脉络全字段：notebookId/courseId/lessonId/anchorRef/source/timestampSec/createdAt/updatedAt，
+ * 供迁移 / 再导入使用（未来导入端可按 schemaVersion 兼容处理）。
+ */
+function buildJson(notes: ExportNote[], meta: { scope: "single" | "all"; truncated?: boolean }): string {
+  const payload = {
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    scope: meta.scope,
+    truncated: meta.truncated ?? false,
+    count: notes.length,
+    notes: notes.map((n) => ({
+      id: n.id,
+      title: n.title,
+      contentMd: n.contentMd,
+      kind: n.kind,
+      source: n.source,
+      sourceText: n.sourceText,
+      sourceUrl: n.sourceUrl,
+      captureUrl: n.captureUrl,
+      timestampSec: n.timestampSec,
+      anchorRef: n.anchorRef,
+      notebookId: n.notebookId,
+      courseId: n.courseId,
+      lessonId: n.lessonId,
+      courseTitle: n.course?.title ?? null,
+      lessonTitle: n.lesson?.title ?? null,
+      tags: n.tags.map((t) => t.tag.name),
+      createdAt: n.createdAt.toISOString(),
+      updatedAt: n.updatedAt.toISOString(),
+    })),
+  };
+  return JSON.stringify(payload, null, 2);
+}
+
+/**
+ * 组装一组笔记为「打印友好」单文件 HTML（.html，用户在浏览器 Cmd/Ctrl+P → 另存为 PDF）。
+ * 零依赖 PDF 方案：不引 puppeteer/pdfkit 等重型库，改用带 @media print 优化的自包含 HTML —
+ * 屏幕上有一条「按 Cmd/Ctrl+P 存 PDF」提示条（打印时用 .no-print 隐藏），
+ * 打印样式去背景色、避免卡片被跨页切断（break-inside:avoid）、正文用适合纸张的字号行距。
+ */
+function buildPrintHtml(notes: ExportNote[], opts: { pageTitle: string; subtitle: string; truncatedNote?: string }): string {
+  const sections: string[] = [];
+  for (const n of notes) {
+    const heading = esc(n.title?.trim() || n.lesson?.title || "随手记");
+    const stamp = n.timestampSec != null ? `<span class="stamp">${esc(mmss(n.timestampSec))}</span>` : "";
+    // 知识脉络：来源 > 归属 > 内容
+    const lineage: string[] = [];
+    if (n.course?.title) lineage.push(`来自《${esc(n.course.title)}》`);
+    if (n.lesson?.title) lineage.push(esc(n.lesson.title));
+    lineage.push(new Date(n.createdAt).toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" }));
+    const tags = n.tags.map((t) => `<span class="tag">#${esc(t.tag.name)}</span>`).join("");
+    const src = n.sourceUrl
+      ? `<p class="src">来源：${esc(n.sourceUrl)}</p>`
+      : "";
+    const clip =
+      n.kind === "clip" && n.sourceText?.trim()
+        ? `<blockquote>${esc(n.sourceText).replace(/\n/g, "<br>")}</blockquote>`
+        : "";
+    const capture =
+      n.kind === "capture" && n.captureUrl
+        ? `<img class="capture" src="${esc(n.captureUrl)}" alt="截帧">`
+        : "";
+    const body = n.contentMd?.trim() ? `<div class="body">${renderMarkdown(n.contentMd)}</div>` : "";
+    sections.push(
+      `<article>
+  <h2>${heading} ${stamp}</h2>
+  <p class="lineage">${lineage.join(" · ")}</p>
+  ${tags ? `<p class="tags">${tags}</p>` : ""}
+  ${src}
+  ${clip}
+  ${capture}
+  ${body}
+</article>`,
+    );
+  }
+
+  const warn = opts.truncatedNote ? `<p class="warn no-print">⚠️ ${esc(opts.truncatedNote)}</p>` : "";
+  // 打印版：屏幕上用中性纸感底色 + 提示条；打印时切白底、避免卡片跨页切断。
+  return `<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${esc(opts.pageTitle)}</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#f4f3f0;color:#1a1a1a;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+  line-height:1.8;-webkit-font-smoothing:antialiased}
+.hint{position:sticky;top:0;z-index:1;background:#1a1a1a;color:#fff;
+  padding:12px 20px;font-size:13px;text-align:center;letter-spacing:.01em}
+.hint kbd{background:#333;border:1px solid #555;border-radius:5px;padding:1px 7px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px}
+.wrap{max-width:760px;margin:0 auto;padding:36px 24px 80px}
+header{margin-bottom:28px;padding-bottom:20px;border-bottom:2px solid #1a1a1a}
+header .kicker{font-family:ui-monospace,monospace;font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:#9a9a9a}
+header h1{font-size:26px;margin:8px 0 6px;font-weight:700}
+header .sub{color:#6b6b6b;font-size:14px}
+.warn{background:#fbeae6;color:#c8000f;border-radius:8px;padding:10px 14px;font-size:13px;margin:16px 0}
+article{background:#fff;border:1px solid #e6e4e0;border-radius:14px;
+  padding:22px 24px;margin-bottom:18px;break-inside:avoid;page-break-inside:avoid}
+article h2{font-size:19px;margin:0 0 6px;font-weight:700}
+.stamp{font-size:13px;color:#9a9a9a;margin-left:6px;font-family:ui-monospace,monospace}
+.lineage{color:#6b6b6b;font-size:12px;margin:0 0 10px}
+.tags{margin:0 0 12px}
+.tag{display:inline-block;background:#f0efec;color:#6b6b6b;border-radius:999px;
+  padding:2px 10px;font-size:12px;margin-right:6px}
+.src{font-size:12px;color:#6b6b6b;margin:0 0 12px;word-break:break-all}
+blockquote{border-left:3px solid #d6d4cf;background:#f7f7f5;margin:0 0 14px;
+  padding:10px 16px;border-radius:0 10px 10px 0;color:#454545;font-style:italic;font-size:14px}
+.capture{max-width:100%;border-radius:10px;border:1px solid #e6e4e0;margin:0 0 14px}
+.body{font-size:15px}
+.body img{max-width:100%;border-radius:8px}
+.body pre{background:#f0efec;padding:14px;border-radius:8px;overflow:auto}
+.body code{font-family:ui-monospace,monospace;font-size:.9em}
+.body h1,.body h2,.body h3{font-weight:700}
+@media print{
+  /* 打印：去屏幕底色/提示条，卡片扁平化避免油墨浪费与跨页切断 */
+  .no-print,.hint{display:none !important}
+  body{background:#fff}
+  .wrap{max-width:none;padding:0}
+  article{border:none;border-bottom:1px solid #ccc;border-radius:0;padding:14px 0;margin-bottom:0}
+  blockquote,.tag,.body pre{background:transparent}
+  @page{margin:16mm}
+}
+</style>
+</head>
+<body>
+<div class="hint no-print">这是打印友好版 · 按 <kbd>Cmd/Ctrl + P</kbd> → 目标选「另存为 PDF」即可导出 PDF</div>
+<div class="wrap">
+<header>
+  <div class="kicker">TIDE · 笔记打印版</div>
+  <h1>${esc(opts.pageTitle)}</h1>
+  <p class="sub">${esc(opts.subtitle)}</p>
+</header>
+${warn}
+${sections.join("\n")}
+</div>
+</body>
+</html>`;
+}
+
 const INCLUDE = {
   course: { select: { title: true } },
   lesson: { select: { title: true } },
   tags: { include: { tag: { select: { name: true } } } },
 } as const;
 
+// 导出格式白名单：扩展名 + Content-Type（单一真相源，新增格式只改这里）。
+// print 复用 .html 扩展名（本质就是一份为打印优化的 HTML，用户浏览器 Cmd/Ctrl+P 存 PDF）。
+const FORMATS = {
+  md: { ext: "md", type: "text/markdown; charset=utf-8" },
+  html: { ext: "html", type: "text/html; charset=utf-8" },
+  txt: { ext: "txt", type: "text/plain; charset=utf-8" },
+  json: { ext: "json", type: "application/json; charset=utf-8" },
+  print: { ext: "html", type: "text/html; charset=utf-8" },
+} as const;
+type ExportFormat = keyof typeof FORMATS;
+
+function isFormat(f: string): f is ExportFormat {
+  return f in FORMATS;
+}
+
 /**
  * GET /api/notes/export
- *   ?format=md|html      导出格式（md=纯 Markdown 附件；html=带样式单文件）
+ *   ?format=md|html|txt|json|print   导出格式：
+ *     md   = 纯 Markdown 附件
+ *     html = 带样式单文件网页（亮暗跟随）
+ *     txt  = 去 Markdown 语法的可读纯文本
+ *     json = 结构化全字段（含知识脉络 notebookId/courseId/lessonId/anchorRef/source/时间），供再导入/迁移
+ *     print= 打印友好单文件 HTML（浏览器 Cmd/Ctrl+P 另存 PDF，零 PDF 依赖）
  *   ?noteId=<id>         仅导出单条笔记（越权 where userId 兜底，找不到 404）
+ *   ?notebookId=<id>     仅导出某笔记本内的笔记（同样强制 where userId，越权返回空集）
  * 全量导出仍受 MAX_EXPORT 上限保护，超出时头部提示截断。
  */
 export async function GET(req: NextRequest) {
@@ -212,13 +434,12 @@ export async function GET(req: NextRequest) {
     assertRateLimit(req, "note_export", 12, 60_000);
 
     const format = req.nextUrl.searchParams.get("format") ?? "md";
-    if (format !== "md" && format !== "html") return fail("暂不支持该导出格式");
+    if (!isFormat(format)) return fail("暂不支持该导出格式");
     const noteId = req.nextUrl.searchParams.get("noteId")?.trim();
+    const notebookId = req.nextUrl.searchParams.get("notebookId")?.trim();
 
     const dateSlug = new Date().toISOString().slice(0, 10);
-    const ext = format === "html" ? "html" : "md";
-    const contentType =
-      format === "html" ? "text/html; charset=utf-8" : "text/markdown; charset=utf-8";
+    const { ext, type: contentType } = FORMATS[format];
 
     // —— 单条导出 ——
     if (noteId) {
@@ -229,13 +450,24 @@ export async function GET(req: NextRequest) {
       if (!n) return fail("笔记不存在", 404);
 
       const heading = n.title?.trim() || n.lesson?.title || "随手记";
-      const body =
-        format === "html"
-          ? buildHtml([n], {
-              pageTitle: heading,
-              subtitle: `导出于 ${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
-            })
-          : buildMarkdown([n], { header: `# ${heading}` });
+      const subtitle = `导出于 ${new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}`;
+      let body: string;
+      switch (format) {
+        case "html":
+          body = buildHtml([n], { pageTitle: heading, subtitle });
+          break;
+        case "print":
+          body = buildPrintHtml([n], { pageTitle: heading, subtitle });
+          break;
+        case "txt":
+          body = buildText([n], { header: heading });
+          break;
+        case "json":
+          body = buildJson([n], { scope: "single" });
+          break;
+        default:
+          body = buildMarkdown([n], { header: `# ${heading}` });
+      }
 
       await track({ eventName: "note_export", userId: user.id, properties: { format, scope: "single" } });
       return new NextResponse(body, {
@@ -247,10 +479,25 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // —— 全量导出 ——
+    // —— 全量 / 笔记本范围导出 ——
+    // notebookId 时先取本人该笔记本（越权返回 null → 空集，不泄露存在性），拿标题做导出标题。
+    let notebookTitle: string | null = null;
+    if (notebookId) {
+      const nb = await prisma.notebook.findFirst({
+        where: { id: notebookId, userId: user.id },
+        select: { title: true },
+      });
+      notebookTitle = nb?.title ?? null;
+    }
+
     const MAX_EXPORT = 1000;
     const rows = await prisma.note.findMany({
-      where: { userId: user.id, deletedAt: null },
+      // 强制 where userId；notebookId 存在时再叠加范围（越权笔记本 → 空集）
+      where: {
+        userId: user.id,
+        deletedAt: null,
+        ...(notebookId ? { notebookId } : {}),
+      },
       include: INCLUDE,
       orderBy: [{ courseId: "asc" }, { createdAt: "asc" }],
       take: MAX_EXPORT + 1,
@@ -261,25 +508,44 @@ export async function GET(req: NextRequest) {
       ? `笔记数量超过单次导出上限（${MAX_EXPORT} 篇），本次仅导出最早的 ${MAX_EXPORT} 篇。`
       : undefined;
     const stamp = new Date().toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" });
+    const pageTitle = notebookId ? notebookTitle?.trim() || "笔记本" : "我的潮汐笔记";
+    const subtitle = `导出于 ${stamp} · 共 ${notes.length} 篇`;
 
-    const body =
-      format === "html"
-        ? buildHtml(notes, {
-            pageTitle: "我的潮汐笔记",
-            subtitle: `导出于 ${stamp} · 共 ${notes.length} 篇`,
-            truncatedNote,
-          })
-        : buildMarkdown(notes, {
-            header: `# 我的潮汐笔记\n\n> 导出时间：${stamp} · 共 ${notes.length} 篇`,
-            truncatedNote,
-          });
+    let body: string;
+    switch (format) {
+      case "html":
+        body = buildHtml(notes, { pageTitle, subtitle, truncatedNote });
+        break;
+      case "print":
+        body = buildPrintHtml(notes, { pageTitle, subtitle, truncatedNote });
+        break;
+      case "txt":
+        body = buildText(notes, {
+          header: `${pageTitle}\n${subtitle}`,
+          truncatedNote,
+        });
+        break;
+      case "json":
+        body = buildJson(notes, { scope: "all", truncated });
+        break;
+      default:
+        body = buildMarkdown(notes, {
+          header: `# ${pageTitle}\n\n> 导出时间：${stamp} · 共 ${notes.length} 篇`,
+          truncatedNote,
+        });
+    }
 
-    await track({ eventName: "note_export", userId: user.id, properties: { format, count: notes.length, truncated } });
+    await track({
+      eventName: "note_export",
+      userId: user.id,
+      properties: { format, count: notes.length, truncated, scope: notebookId ? "notebook" : "all" },
+    });
+    const fileStem = notebookId ? "tide-notebook" : "tide-notes";
     return new NextResponse(body, {
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Content-Disposition": `attachment; filename="tide-notes-${dateSlug}.${ext}"`,
+        "Content-Disposition": `attachment; filename="${fileStem}-${dateSlug}.${ext}"`,
       },
     });
   });

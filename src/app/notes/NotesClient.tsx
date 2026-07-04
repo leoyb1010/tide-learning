@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
-  MagnifyingGlass, DownloadSimple, Waves, GridFour, BookOpen, Star,
+  MagnifyingGlass, Waves, GridFour, BookOpen, Star,
   Sparkle, CaretDown, ListBullets, ListChecks, Translate, Cards, Copy, Check,
   ListDashes, Notebook as NotebookIcon, PushPin, Plus, FloppyDisk, Camera, Scissors,
   PencilSimple, LinkSimple, Image as ImageIcon, Paperclip, ArrowLeft, CircleNotch,
@@ -16,6 +16,7 @@ import { Dialog } from "@/components/Dialog";
 import { NoteTimeline } from "@/components/NoteTimeline";
 import { NoteGallery } from "@/components/NoteGallery";
 import NotebookGrid from "@/components/NotebookGrid";
+import { ExportMenu } from "@/components/ExportMenu";
 import { track } from "@/lib/analytics-client";
 import { renderMarkdown } from "@/lib/markdown";
 
@@ -244,12 +245,6 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
     toast("笔记已删除", { tone: "success" });
   }
 
-  function exportNotes() {
-    track("note_export", { format: "md" });
-    // 直接触发浏览器下载（附件响应）
-    window.location.href = "/api/notes/export?format=md";
-  }
-
   const hasNotes = notes.length > 0;
 
   return (
@@ -280,13 +275,8 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
                   title="当前笔记"
                   onSaved={refreshAll}
                 />
-                <button
-                  type="button"
-                  onClick={exportNotes}
-                  className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
-                >
-                  <DownloadSimple size={15} weight="bold" /> 导出 Markdown
-                </button>
+                {/* 导出中心：md / html / txt / json / 打印版，一处显性选择 */}
+                <ExportMenu scope={{ kind: "all" }} label="导出" />
               </>
             )}
           </div>

@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, PencilSimple, MapPin, ArrowUpRight, Quotes, CalendarBlank, Clock,
-  DownloadSimple, CaretDown, FileMd, FileHtml, FileText, ShareNetwork,
+  ShareNetwork, NotePencil, Sparkle, PencilSimpleLine, LinkSimple,
 } from "@phosphor-icons/react";
 import { renderMarkdown } from "@/lib/markdown";
 import { mmss } from "@/lib/format";
 import { useToast } from "@/components/Toast";
 import { NoteEditorInline } from "@/components/NoteEditorInline";
 import { SharePanel } from "@/components/SharePanel";
+import { ExportMenu } from "@/components/ExportMenu";
 
 interface NoteTagLite {
   id: string;
@@ -45,87 +46,13 @@ function fmtDate(iso: string): string {
   return `${y}-${m}-${day} ${hh}:${mm}`;
 }
 
-/**
- * 单条笔记「导出」下拉：md / html 调后端 route（?noteId=&format=）下载；
- * 纯文本在前端由当前标题+正文即时生成，避免多一趟请求。
- */
-function ExportMenu({ noteId, title, contentMd }: { noteId: string; title: string | null; contentMd: string }) {
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  function download(format: "md" | "html") {
-    window.location.href = `/api/notes/export?noteId=${encodeURIComponent(noteId)}&format=${format}`;
-    setOpen(false);
-  }
-
-  function downloadTxt() {
-    const heading = title?.trim() || "未命名笔记";
-    const text = `${heading}\n\n${contentMd}`.trim() + "\n";
-    const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `tide-note-${new Date().toISOString().slice(0, 10)}.txt`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    setOpen(false);
-  }
-
-  const items: { key: string; label: string; Icon: typeof FileMd; run: () => void }[] = [
-    { key: "md", label: "Markdown (.md)", Icon: FileMd, run: () => download("md") },
-    { key: "html", label: "网页 (.html)", Icon: FileHtml, run: () => download("html") },
-    { key: "txt", label: "纯文本 (.txt)", Icon: FileText, run: downloadTxt },
-  ];
-
-  return (
-    <div ref={boxRef} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
-        aria-haspopup="menu"
-        aria-expanded={open}
-      >
-        <DownloadSimple size={14} weight="bold" /> 导出
-        <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
-      </button>
-      {open && (
-        <div
-          role="menu"
-          className="studio-rise absolute right-0 z-20 mt-1.5 w-[172px] overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-1 shadow-[var(--lift)]"
-        >
-          {items.map(({ key, label, Icon, run }) => (
-            <button
-              key={key}
-              type="button"
-              role="menuitem"
-              onClick={run}
-              className="flex w-full items-center gap-2 rounded-[9px] px-2.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface-inset)] hover:text-[var(--ink)]"
-            >
-              <Icon size={15} weight="regular" className="text-[var(--ink3)]" /> {label}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
+// 来源徽章元信息（知识脉络第一层：这条笔记从哪来）。与 Note.source 一致。
+const SOURCE_META: Record<string, { label: string; Icon: typeof NotePencil; tint: string }> = {
+  lesson: { label: "课程内记", Icon: PencilSimpleLine, tint: "var(--info)" },
+  manual: { label: "手记", Icon: NotePencil, tint: "var(--ink3)" },
+  ai_transform: { label: "AI 整理", Icon: Sparkle, tint: "var(--info)" },
+  link_import: { label: "链接采集", Icon: LinkSimple, tint: "var(--ok)" },
+};
 
 /**
  * NoteDetail —— 笔记详情页主体（就地编辑）。
@@ -193,7 +120,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
                   </span>
                 }
               />
-              <ExportMenu noteId={note.id} title={title} contentMd={contentMd} />
+              <ExportMenu scope={{ kind: "single", noteId: note.id }} compact />
               <button
                 type="button"
                 onClick={() => setEditing(true)}
@@ -203,6 +130,32 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
               </button>
             </div>
           </div>
+
+          {/* 知识脉络 · 来源层：这条笔记从哪来（来源徽章 + 若来自课程的血缘） */}
+          {(() => {
+            const meta = SOURCE_META[note.source] ?? SOURCE_META.manual;
+            const SrcIcon = meta.Icon;
+            return (
+              <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-1 font-semibold text-[var(--ink2)]"
+                  style={{ color: meta.tint }}
+                >
+                  <SrcIcon size={13} weight="fill" /> {meta.label}
+                </span>
+                {note.course && (
+                  <span className="inline-flex items-center gap-1 text-[var(--ink3)]">
+                    <span aria-hidden className="text-[var(--ink4)]">来自</span>
+                    <span className="font-medium text-[var(--ink2)]">《{note.course.title}》</span>
+                    {note.lesson && <span className="text-[var(--ink3)]">· {note.lesson.title}</span>}
+                    {note.timestampSec != null && (
+                      <span className="mono text-[var(--ink4)]">· {mmss(note.timestampSec)}</span>
+                    )}
+                  </span>
+                )}
+              </div>
+            );
+          })()}
 
           {/* 元信息：创建 / 更新时间（mono） */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[12px] text-[var(--ink4)]">
@@ -258,16 +211,17 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
             <p className="text-[14px] italic text-[var(--ink4)]">还没有正文，点「编辑」补充内容。</p>
           )}
 
-          {/* 来源锚点（弱化课程绑定）：仅课程内笔记显示，点击才跳 */}
+          {/* 知识脉络 · 采集锚点：课程内笔记可点回原课原节（带时间戳锚点），一路溯源到出处 */}
           {anchorHref && note.course && note.lesson && (
             <Link
               href={anchorHref}
-              className="studio-lift group mt-2 flex items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--card)]"
+              className="studio-lift group mt-2 flex min-h-[44px] items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--card)]"
             >
               <span className="flex min-w-0 items-center gap-2 text-[13px] text-[var(--ink2)]">
                 <MapPin size={15} weight="fill" className="shrink-0 text-[var(--ink3)]" />
                 <span className="truncate">
-                  来自《{note.course.title}》· {note.lesson.title}
+                  <span className="text-[var(--ink4)]">回到原文 · </span>
+                  《{note.course.title}》· {note.lesson.title}
                   {note.timestampSec != null && (
                     <span className="mono ml-1.5 text-[var(--ink4)]">{mmss(note.timestampSec)}</span>
                   )}

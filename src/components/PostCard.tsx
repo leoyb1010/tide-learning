@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { useToast } from "./Toast";
 import { Dialog } from "./Dialog";
+import { Lightbox } from "./Lightbox";
 import { track } from "@/lib/analytics-client";
 import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
@@ -443,23 +444,64 @@ function Avatar({
   );
 }
 
-/** 图片网格：1 张大图；2 张并排；3-4 张两列。统一 mock url，object-cover。 */
+/**
+ * 图片缩略图网格 + 灯箱放大。
+ * · 缩略图克制：统一小方图（≤3 列自适应），不占帖子过多高度，object-cover + 懒加载。
+ * · >4 张：第 4 格盖「+N」角标，点它同样进灯箱（灯箱内可继续翻看全部）。
+ * · 点任一缩略图 → 打开 Lightbox 并定位到该图；灯箱状态本地管理。
+ * 单/多图共用同一套（原创帖与转发引用卡均走此组件，展示统一）。
+ */
 function ImageGrid({ images }: { images: string[] }) {
+  const [lightboxAt, setLightboxAt] = useState<number | null>(null);
   const n = images.length;
-  const cols = n === 1 ? "grid-cols-1" : "grid-cols-2";
-  const aspect = n === 1 ? "aspect-[16/10]" : "aspect-square";
+  // 缩略图最多铺 4 格；单图 2 列宽度，多图三列小方图，密度克制
+  const shown = images.slice(0, 4);
+  const extra = n - shown.length; // >4 张时的溢出数
+  // 1 张：占两列（略宽的小方图）；2 张：两列；3+ 张：三列小方
+  const cols = n === 1 ? "grid-cols-2" : n === 2 ? "grid-cols-2" : "grid-cols-3";
+  const span = n === 1 ? "col-span-1" : "";
+
   return (
-    <div className={`mt-3 grid gap-1.5 ${cols}`}>
-      {images.slice(0, 4).map((src, i) => (
-        <div
-          key={i}
-          className={`overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] ${aspect}`}
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
-        </div>
-      ))}
-    </div>
+    <>
+      <div className={`mt-3 grid gap-1.5 ${cols}`}>
+        {shown.map((src, i) => {
+          const isOverflowCell = i === shown.length - 1 && extra > 0;
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setLightboxAt(i)}
+              aria-label={`查看第 ${i + 1} 张图片`}
+              className={`studio-press group relative aspect-square overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] ${span}`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={src}
+                alt=""
+                loading="lazy"
+                className="h-full w-full object-cover transition-transform duration-[var(--dur-fast)] group-hover:scale-[1.04]"
+              />
+              {/* >4 张：末格盖 +N（点它进灯箱翻看全部） */}
+              {isOverflowCell && (
+                <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[15px] font-bold text-white">
+                  +{extra}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 灯箱：定位到点击的那张，可左右翻看全部 images（含被 +N 折叠的） */}
+      {lightboxAt !== null && (
+        <Lightbox
+          images={images}
+          index={lightboxAt}
+          onIndex={setLightboxAt}
+          onClose={() => setLightboxAt(null)}
+        />
+      )}
+    </>
   );
 }
 
