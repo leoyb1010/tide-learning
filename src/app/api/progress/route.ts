@@ -8,13 +8,19 @@ import { ok, handle } from "@/lib/api";
 export async function POST(req: NextRequest) {
   return handle(async () => {
     const user = await requireUser();
-    const { lessonId, progressSec, completed } = (await req.json()) as {
+    const { lessonId, progressSec, completed, kind } = (await req.json()) as {
       lessonId: string;
       progressSec: number;
       completed?: boolean;
+      // 进度语义区分：video（默认，秒数锚点）/ slide（翻页课件的「已读到第几页」，1-indexed）。
+      // 两者落在不同字段，块课翻页与视频播放的续读锚点互不覆盖。
+      kind?: "video" | "slide";
     };
     const lesson = await prisma.lesson.findUnique({ where: { id: lessonId } });
     if (!lesson) return ok({ saved: false });
+
+    // 翻页进度写 lastSlideIndex，视频/模拟播放进度写 progressSec；二者隔离，互不污染另一视图的续读点。
+    const isSlide = kind === "slide";
 
     await prisma.learningProgress.upsert({
       where: { userId_lessonId: { userId: user.id, lessonId } },
@@ -22,11 +28,12 @@ export async function POST(req: NextRequest) {
         userId: user.id,
         courseId: lesson.courseId,
         lessonId,
-        progressSec,
+        progressSec: isSlide ? 0 : progressSec,
+        lastSlideIndex: isSlide ? progressSec : null,
         completedAt: completed ? new Date() : null,
       },
       update: {
-        progressSec,
+        ...(isSlide ? { lastSlideIndex: progressSec } : { progressSec }),
         lastPlayedAt: new Date(),
         ...(completed ? { completedAt: new Date() } : {}),
       },
@@ -34,7 +41,7 @@ export async function POST(req: NextRequest) {
     await track({
       eventName: completed ? "lesson_complete" : "lesson_progress",
       userId: user.id,
-      properties: { course_id: lesson.courseId, lesson_id: lessonId, progress_sec: progressSec },
+      properties: { course_id: lesson.courseId, lesson_id: lessonId, progress_sec: progressSec, kind: isSlide ? "slide" : "video" },
     });
     return ok({ saved: true });
   });

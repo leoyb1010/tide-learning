@@ -32,11 +32,14 @@ import { BlockSwitch } from "./BlockRenderer";
 export function BlockSlideshow({
   blocks,
   courseId,
+  initialIndex = 0,
   onSlideChange,
   onComplete,
 }: {
   blocks: BlockWithId[];
   courseId?: string;
+  /** 续读起始页（0-indexed）。恢复上次读到的位置；超界会被 clamp 到 [0, total-1]。默认 0（首页）。 */
+  initialIndex?: number;
   /** 翻页时上报（index 从 0 起，total 为总页数）。用于把「当前页 / 总页」映射成学习进度。 */
   onSlideChange?: (index: number, total: number) => void;
   /** 抵达并停留最后一页时触发一次（用于完课）。 */
@@ -46,7 +49,10 @@ export function BlockSlideshow({
   const slides = useMemo<Slide[]>(() => groupBlocksToSlides(blocks), [blocks]);
   const total = slides.length;
 
-  const [index, setIndex] = useState(0);
+  // 续读：initialIndex clamp 到 [0, total-1]（total 为 0 时归 0，下方空态提前 return）。
+  const [index, setIndex] = useState(() =>
+    Math.max(0, Math.min(initialIndex, Math.max(0, total - 1))),
+  );
   // 翻页方向：+1 下一页（新页从右滑入），-1 上一页（从左滑入）。驱动转场方向。
   const [dir, setDir] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);

@@ -93,8 +93,12 @@ export function SharePanel({
   const closePanel = useCallback(() => setOpen(false), []);
 
   // 关闭后把焦点还给触发器（无障碍：焦点不丢）。
+  // 仅在真正从「打开→关闭」跃迁时归还焦点；初次挂载（wasOpen=false）不抢焦，
+  // 否则页面加载即 focus() 触发 scrollIntoView，会滚到分享按钮并打断阅读顺序。
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (!open) triggerRef.current?.focus?.();
+    if (!open && wasOpen.current) triggerRef.current?.focus?.();
+    wasOpen.current = open;
   }, [open]);
 
   return (

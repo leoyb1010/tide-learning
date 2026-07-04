@@ -156,6 +156,7 @@ model Lesson {
   videoGenStatus  String? // 视频课件生成态（复用 videoAssetId 承载产物引用）
   videoScriptJson String? // 由 blocks 组织出的视频脚本 {version, scenes:[{narration, caption, ...}]}（生成前落库，供真实模型消费）
   videoGenClaimedAt DateTime? // 视频生成并发所有权占位：generateLessonVideo 生成前原子 claim，防两条流水双写（对齐 genClaimedAt 语义）
+  videoDurationSec Int? // v3.1 视频课件时长（秒）：与图文阅读语义的 durationSec 隔离，生成视频后写此字段，不污染块课共享的 durationSec
   durationSec   Int       @default(0)
   isFree        Boolean   @default(false)
   liveStartAt   DateTime? // 直播小班课开播时间（融合：有道口语小班课）
@@ -206,7 +207,8 @@ model LearningProgress {
   course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessonId     String
   lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  progressSec  Int       @default(0)
+  progressSec  Int       @default(0) // 视频/模拟播放的秒数进度（时间轴锚点）
+  lastSlideIndex Int?    // 翻页课件「已读到第几页」(1-indexed)：与 progressSec 的秒数语义隔离，两个视图的续读锚点互不覆盖
   completedAt  DateTime?
   lastPlayedAt DateTime  @default(now())
   updatedAt    DateTime  @updatedAt

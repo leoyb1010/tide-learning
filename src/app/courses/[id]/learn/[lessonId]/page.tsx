@@ -60,6 +60,7 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
       remainingLessons={lockedCount}
       isLoggedIn={!!user}
       initialProgress={progress?.progressSec ?? 0}
+      initialSlidePage={progress?.lastSlideIndex ?? 0}
       initialNotes={notes.map((n) => ({ ...n, updatedAt: n.updatedAt.toISOString() }))}
     />
   );

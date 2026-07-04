@@ -306,12 +306,14 @@ export async function generateLessonVideo(lessonId: string, userId: string): Pro
       script,
     });
 
-    // —— 写产物 + 收尾：videoAssetId + 时长 + ready，释放 claim ——
+    // 写产物 + 收尾：videoAssetId + 视频时长 + ready，释放 claim。
+    // 视频时长写独立字段 videoDurationSec，不覆盖块课共享的 durationSec（durationSec 是图文阅读语义，
+    // 被课程目录展示与 Player 时间轴/完课逻辑消费；若回写视频长度会让同一节在「图文课件」视图下显示视频时长，语义错位）。
     await prisma.lesson.update({
       where: { id: lesson.id },
       data: {
         videoAssetId: out.assetId,
-        durationSec: out.durationSec > 0 ? out.durationSec : lesson.durationSec,
+        videoDurationSec: out.durationSec > 0 ? out.durationSec : null,
         videoGenStatus: "ready",
         videoGenClaimedAt: null,
       },

@@ -31,6 +31,7 @@ interface LessonData {
   subtitles?: SubtitleCue[];
   blocksJson?: string | null; // ai_block 类型：结构化块课件 JSON 字符串
   videoGenStatus?: string | null; // v3.1 视频课件生成态：null / pending / generating / ready / failed
+  videoDurationSec?: number | null; // v3.1 视频课件时长（秒）：与图文阅读语义的 durationSec 隔离，仅驱动「视频」Tab 的时间轴/续播
 }
 
 /**
@@ -40,12 +41,14 @@ interface LessonData {
  */
 export function Player({
   courseId, courseSlug, courseTitle, lesson, access, canCreateNote,
-  outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialNotes,
+  outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialSlidePage, initialNotes,
 }: {
   courseId: string; courseSlug: string; courseTitle: string;
   lesson: LessonData; access: boolean; canCreateNote: boolean;
   outline: OutlineItem[]; prevLessonId: string | null; nextLessonId: string | null;
-  remainingLessons: number; isLoggedIn: boolean; initialProgress: number; initialNotes: NoteItem[];
+  remainingLessons: number; isLoggedIn: boolean; initialProgress: number;
+  /** 翻页课件上次读到的页码(1-indexed)，0 表示无记录。用于恢复续读位置，与 initialProgress(秒)互不相关。 */
+  initialSlidePage: number; initialNotes: NoteItem[];
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
@@ -88,18 +91,29 @@ export function Player({
   // MVP 的受控 mock 流（/api/stream 返回占位 JSON）继续走模拟播放器，保留品牌渐变画面，截帧走兜底帧。
   const hasRealVideo = /\.(mp4|m3u8|webm)(\?|$)/i.test(lesson.videoUrl ?? "");
 
+  // v3.1：块课的「视频课件」有独立时长（videoDurationSec），与图文阅读语义的 durationSec 隔离。
+  // 播放机（模拟推进 / seek / 时间轴 / 进度）用「有效播放时长」：块课视频视图取 videoDurationSec，
+  // 其余（普通视频节、图文节的兜底视频区）取 durationSec。块课默认看图文，切到视频 Tab 才切换。
+  const isBlockLessonEarly = lesson.contentType === "ai_block";
+  const [blockView, setBlockView] = useState<"blocks" | "video">("blocks"); // blocks(图文) / video(视频课件)
+  const showingVideoCourseware = isBlockLessonEarly && blockView === "video";
+  const playbackDurationSec =
+    showingVideoCourseware && (lesson.videoDurationSec ?? 0) > 0
+      ? (lesson.videoDurationSec as number)
+      : lesson.durationSec;
+
   // 模拟播放推进（无真实视频时）
   useEffect(() => {
     if (hasRealVideo || !playing || !access) return;
     const id = setInterval(() => {
       setTime((t) => {
-        const next = Math.min(t + rate, lesson.durationSec);
-        if (next >= lesson.durationSec) setPlaying(false);
+        const next = Math.min(t + rate, playbackDurationSec);
+        if (next >= playbackDurationSec) setPlaying(false);
         return next;
       });
     }, 1000);
     return () => clearInterval(id);
-  }, [hasRealVideo, playing, rate, access, lesson.durationSec]);
+  }, [hasRealVideo, playing, rate, access, playbackDurationSec]);
 
   // 真实视频：同步倍速与初始进度
   useEffect(() => {
@@ -145,7 +159,7 @@ export function Player({
   }, []);
 
   useEffect(() => {
-    if (time >= lesson.durationSec && lesson.durationSec > 0) saveProgress(true);
+    if (time >= playbackDurationSec && playbackDurationSec > 0) saveProgress(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time]);
 
@@ -178,12 +192,12 @@ export function Player({
 
   const getCurrentTime = useCallback(() => timeRef.current, []);
   const seek = useCallback((sec: number) => {
-    const clamped = Math.min(sec, lesson.durationSec);
+    const clamped = Math.min(sec, playbackDurationSec);
     setTime(clamped);
     if (videoRef.current) videoRef.current.currentTime = clamped;
     setSeekPulse(clamped);
     setTimeout(() => setSeekPulse(null), 700);
-  }, [lesson.durationSec]);
+  }, [playbackDurationSec]);
 
   function togglePlay() {
     if (hasRealVideo && videoRef.current) {
@@ -331,26 +345,26 @@ export function Player({
   }, [focus]);
 
   const activeCue = lesson.subtitles?.find((c) => time >= c.startSec && time < c.endSec);
-  const progress = lesson.durationSec > 0 ? time / lesson.durationSec : 0;
+  // 时间轴百分比用有效播放时长：块课视频视图取 videoDurationSec，其余取 durationSec。
+  const progress = playbackDurationSec > 0 ? time / playbackDurationSec : 0;
 
   // ai_block 块课件：解析并校验块数组（validateBlocks 永不抛错，脏数据归空数组）。
   // 块课无视频时间轴，不做截帧 / 时间进度条；MVP 笔记走普通笔记（anchorRef 可空），先保证能记能显示。
-  const isBlockLesson = lesson.contentType === "ai_block";
+  const isBlockLesson = isBlockLessonEarly;
   const blocks = isBlockLesson ? validateBlocks(safeParseJson(lesson.blocksJson)) : [];
 
   // v3.1 视频课件：块课可另有一版「视频课件」。ready 时给块课加「图文 / 视频」切换 Tab；
   // 生成中(pending/generating)显示占位；null 表示未生成视频课件。仅块课 + 有权益时相关。
+  // blockView 状态在上方（播放时长派生处）已声明。
   const videoStatus = lesson.videoGenStatus ?? null;
   const hasVideoCourseware = isBlockLesson && access && videoStatus === "ready" && !!lesson.videoUrl;
   const videoGenerating = isBlockLesson && access && (videoStatus === "pending" || videoStatus === "generating");
-  // 视图切换：块课默认看图文；有视频课件时可切到视频。非块课不涉及此切换。
-  const [blockView, setBlockView] = useState<"blocks" | "video">("blocks");
   const showVideoView = isBlockLesson && blockView === "video" && (hasVideoCourseware || videoGenerating);
 
   // 翻页课件进度上报：块课无时间轴，用「当前页 / 总页」映射为进度。
-  // progressSec 借道存「已读到第几页」(1-indexed)；completed 在末页触发，落库为完课。
-  // 复用现有 /api/progress，不改 schema。翻页去抖：仅在页码变化时上报。
-  const blockPageRef = useRef(0);
+  // 页进度落到独立的 lastSlideIndex（kind:"slide"），与视频/模拟播放的 progressSec 隔离，
+  // 两个视图的续读锚点互不覆盖。completed 在末页触发，落库为完课。翻页去抖：仅在页码变化时上报。
+  const blockPageRef = useRef(initialSlidePage);
   const reportBlockPage = useCallback((pageIndex: number, totalPages: number) => {
     if (!isLoggedIn || !access) return;
     const page = pageIndex + 1; // 1-indexed
@@ -360,7 +374,7 @@ export function Player({
     fetch("/api/progress", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson.id, progressSec: page, completed }),
+      body: JSON.stringify({ lessonId: lesson.id, progressSec: page, completed, kind: "slide" }),
     }).catch(() => {});
     track("lesson_slide_advance", { lesson_id: lesson.id, page, total: totalPages });
   }, [isLoggedIn, access, lesson.id]);
@@ -449,21 +463,21 @@ export function Player({
             </div>
             {/* 原生 range 置顶捕获拖拽，自身近乎透明只保留可拖拽热区 */}
             <input
-              type="range" min={0} max={lesson.durationSec} value={time} step={0.1}
+              type="range" min={0} max={playbackDurationSec} value={time} step={0.1}
               onChange={(e) => seek(Number(e.target.value))}
               className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
               aria-label="播放进度"
             />
-            {seekPulse != null && (
+            {seekPulse != null && playbackDurationSec > 0 && (
               <span
                 className="pointer-events-none absolute top-1/2 h-3 w-3 -translate-y-1/2 rounded-full bg-[var(--red)]/70"
-                style={{ left: `${(seekPulse / lesson.durationSec) * 100}%`, animation: "ripple 0.6s var(--ease-out-expo) forwards" }}
+                style={{ left: `${(seekPulse / playbackDurationSec) * 100}%`, animation: "ripple 0.6s var(--ease-out-expo) forwards" }}
               />
             )}
           </div>
           <div className="flex items-center gap-3">
             <button onClick={togglePlay} className="studio-press grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white" aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
-            <span className="mono text-xs tabular-nums text-white/70"><span className="text-white/90">{mmss(Math.floor(time))}</span> / {mmss(lesson.durationSec)}</span>
+            <span className="mono text-xs tabular-nums text-white/70"><span className="text-white/90">{mmss(Math.floor(time))}</span> / {mmss(playbackDurationSec)}</span>
             <div className="flex-1" />
             {CaptureBar}
             <Tooltip label={theme === "deep" ? "浅色" : "深海模式"}>
@@ -782,10 +796,12 @@ export function Player({
                     </div>
 
                     {blockLayout === "slides" ? (
-                      // 翻页课件：黑板式单屏，左右翻页 + 页序进度上报 + 末页完课
+                      // 翻页课件：黑板式单屏，左右翻页 + 页序进度上报 + 末页完课。
+                      // initialIndex 用上次读到的页码(1-indexed)-1 恢复续读位置；BlockSlideshow 内部再 clamp。
                       <BlockSlideshow
                         blocks={blocks}
                         courseId={courseId}
+                        initialIndex={initialSlidePage > 0 ? initialSlidePage - 1 : 0}
                         onSlideChange={reportBlockPage}
                         onComplete={onBlockComplete}
                       />
