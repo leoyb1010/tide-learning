@@ -14,8 +14,10 @@ import {
   Lightning,
   Flame,
   MagicWand,
+  Books,
 } from "@phosphor-icons/react/dist/ssr";
 import { WeeklyReportBanner } from "./WeeklyReportBanner";
+import { DeskShelf } from "./DeskShelf";
 import type { WeeklyReport } from "@/lib/weekly-report";
 
 /**
@@ -70,6 +72,7 @@ export interface StudyDeskProps {
   onlineCount: number; // 自习室在线人数（静态）
   focusHref: string; // 进入专注按钮目标
   weeklyReport: WeeklyReport; // 本周周报（服务端 getWeeklyReport 组装，留存回路）
+  shelfCount: number; // 书架藏书总册数（服务端 count 派生，供书架入口角标；书架明细弹层按需拉）
 }
 
 // 快捷灵感胶囊（造课主入口的示范需求）。
@@ -89,9 +92,11 @@ export function StudyDesk({
   onlineCount,
   focusHref,
   weeklyReport,
+  shelfCount,
 }: StudyDeskProps) {
   const router = useRouter();
   const [value, setValue] = useState("");
+  const [shelfOpen, setShelfOpen] = useState(false);
 
   // 中央输入框「三合一」：把需求带去 /create 造课（AI 自习室主入口）。
   // 内容较像「找现成课程」的短查询走 /courses?q=；否则默认造课意图带 prompt 过去。
@@ -276,7 +281,34 @@ export function StudyDesk({
           3. 我的书桌（横排 3 卡，材质分级 + hover 抬升 + 数字 num-pop）
           ============================================================ */}
       <section style={{ "--i": 2 } as CSSProperties}>
-        <h2 className="mb-3 text-[15px] font-bold tracking-[-0.01em] text-[var(--ink)]">我的书桌</h2>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2 className="text-[15px] font-bold tracking-[-0.01em] text-[var(--ink)]">我的书桌</h2>
+          {/* 精致「我的书架」入口：木质材质小卡 + 书本图标 + 藏书总数角标。
+              点击召唤 DeskShelf 弹层（按需拉书架明细）。克制不喧宾夺主，与三卡同一节奏。 */}
+          <button
+            type="button"
+            onClick={() => setShelfOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={shelfOpen}
+            aria-label={`打开我的书架，共 ${shelfCount} 册`}
+            className="desk-shelf-entry studio-lift group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border2)] pl-2.5 pr-3.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card),var(--inner-hi)]"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)] transition-transform group-hover:scale-105">
+              <Books size={15} weight="fill" />
+            </span>
+            <span>我的书架</span>
+            {shelfCount > 0 && (
+              <span className="mono num inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--red)] px-1.5 text-[10.5px] font-bold leading-none text-white">
+                {shelfCount > 99 ? "99+" : shelfCount}
+              </span>
+            )}
+            <ArrowRight
+              size={13}
+              weight="bold"
+              className="text-[var(--ink4)] transition-transform group-hover:translate-x-0.5"
+            />
+          </button>
+        </div>
         <div className="stagger grid gap-3.5 sm:grid-cols-3">
           {/* 我的课：红做「学习主战场」信号 */}
           <Link
@@ -415,6 +447,9 @@ export function StudyDesk({
           </Link>
         </div>
       </section>
+
+      {/* 书架弹层：受控 open；数据由弹层自身打开时 fetch /api/shelf 按需拉（首屏不拖慢书桌）。 */}
+      <DeskShelf open={shelfOpen} onClose={() => setShelfOpen(false)} />
     </div>
   );
 }

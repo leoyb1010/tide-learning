@@ -385,6 +385,43 @@ async function main() {
     });
   }
 
+  // ---------- 课程集市：置几门课为「用户造并分享」，让集市有货可验证 ----------
+  // 挑 3 门内容好的 seed 课，装作 demoUser 用 AI 造出来并分享到集市：
+  //   - sharedStatus="shared"：集市展示开关打开（market/page.tsx 只查 shared）。
+  //   - authorUserId=demoUser：collect/request 需要作者归属；demo 登录时看到「这是你分享的课」，
+  //     其它用户（oral@ / community 用户）可对其「拿走」/「申请学习」。
+  //   - origin="ai_generated"：市场卡显示「AI 生成」徽标，符合「同学用 AI 造的课」语境。
+  //   - visibility 保持默认 public 不动（shared 才是集市开关；public 让它同时可进公共课程库，
+  //     不会重新引入「私有课污染库」的 bug——那 bug 挡的是 visibility=private 的课）。
+  const MARKET_SHARED_SLUGS = ["ai-office-005", "ai-writing-006", "anti-fraud-007"];
+  for (const slug of MARKET_SHARED_SLUGS) {
+    const id = courseIds[slug];
+    if (!id) continue;
+    await prisma.course.update({
+      where: { id },
+      data: { sharedStatus: "shared", authorUserId: demoUser.id, origin: "ai_generated" },
+    });
+  }
+  // 让集市卡的「拿走数」非零：其它用户对这些分享课建起始 LearningProgress（= 拿走）。
+  // 与 /api/market/collect 的 fork 语义一致（第 1 节起始记录，progressSec=0）。
+  const collectorPool = [oralUser, ...communityUsers];
+  for (let i = 0; i < MARKET_SHARED_SLUGS.length; i++) {
+    const slug = MARKET_SHARED_SLUGS[i];
+    const courseId = courseIds[slug];
+    const firstLessonId = lessonIdMap[slug]?.[0];
+    if (!courseId || !firstLessonId) continue;
+    // 每门课取前 (2 + i) 个收藏者，制造不同的「拿走数」。
+    const takers = collectorPool.slice(0, Math.min(2 + i, collectorPool.length));
+    for (const t of takers) {
+      if (t.id === demoUser.id) continue; // 作者本人不算拿走
+      await prisma.learningProgress.upsert({
+        where: { userId_lessonId: { userId: t.id, lessonId: firstLessonId } },
+        update: {},
+        create: { userId: t.id, courseId, lessonId: firstLessonId, progressSec: 0 },
+      });
+    }
+  }
+
   // ---------- 共创需求（含 → 选题排期）----------
   const demandSeeds = [
     { title: "希望出商务邮件写作口语课", desc: "职场商务沟通场景", status: "collecting", track: "english_oral", votes: 128 },

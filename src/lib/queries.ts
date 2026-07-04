@@ -22,6 +22,9 @@ export async function listCourses(opts?: { category?: string; sort?: string; q?:
   const courses = await prisma.course.findMany({
     where: {
       status: "published",
+      // 课程库污染修复：AI 造的私有课(status=published+visibility=private)不得进公共课程库。
+      // 官方 seed 课默认 visibility="public"（schema 默认，seed 未显式覆盖），只挡住私有 AI 课。
+      visibility: "public",
       ...(opts?.category && opts.category !== "all" ? { category: opts.category } : {}),
       ...(terms.length
         ? { OR: terms.flatMap((t) => [{ title: { contains: t } }, { subtitle: { contains: t } }]) }

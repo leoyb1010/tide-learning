@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { shanghaiDayKey } from "@/lib/week";
 import { getWeeklyReport } from "@/lib/weekly-report";
+import { getShelfCount } from "@/lib/shelf";
 import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { StudyDesk, type DeskResume, type DeskNote } from "@/components/StudyDesk";
@@ -30,8 +31,16 @@ async function StudyDeskHome({ user }: { user: User }) {
   const today = shanghaiDayKey();
   const now = new Date();
 
-  const [streak, streakDayToday, resumeRows, myCourseCount, recentNoteRows, dueReviewCount, weeklyReport] =
-    await Promise.all([
+  const [
+    streak,
+    streakDayToday,
+    resumeRows,
+    myCourseCount,
+    recentNoteRows,
+    dueReviewCount,
+    weeklyReport,
+    shelfCount,
+  ] = await Promise.all([
       // 连续天数
       prisma.streak.findUnique({ where: { userId } }),
       // 今天是否已点亮（当日有学习分钟即算点亮）
@@ -61,6 +70,8 @@ async function StudyDeskHome({ user }: { user: User }) {
       prisma.reviewCard.count({ where: { userId, dueAt: { lte: now } } }),
       // 本周周报（近两周潮汐日历 + 完课数派生，vs 上周对比）
       getWeeklyReport(userId),
+      // 书架藏书总册数（书桌书架入口角标；书架明细由弹层打开时按需拉 /api/shelf）
+      getShelfCount(userId),
     ]);
 
   // —— 派生：问候 + 今日状态 ——
@@ -129,6 +140,7 @@ async function StudyDeskHome({ user }: { user: User }) {
         onlineCount={onlineCount}
         focusHref={focusHref}
         weeklyReport={weeklyReport}
+        shelfCount={shelfCount}
       />
       {/* 底部：书架上新（降权展示，复用 listUpdates）*/}
       <ShelfNew />

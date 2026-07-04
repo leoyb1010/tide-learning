@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   Sparkle,
   FilePlus,
@@ -18,6 +19,9 @@ import {
   Star,
   ArrowUUpLeft,
   Play,
+  Books,
+  Export,
+  HourglassMedium,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -90,6 +94,7 @@ interface OutlineLesson {
 
 /** 完成页汇总数据（造课 & 升维通用） */
 interface DoneSummary {
+  courseId: string; // 完成页「分享到集市」需要（/api/market/share 入参 courseId）
   slug: string;
   firstLessonId: string;
   total: number; // 节数
@@ -312,7 +317,7 @@ export function CreateStudio({
         }
         throw new Error(json?.error || "生成失败");
       }
-      const data = json.data as { slug: string; lessons: OutlineLesson[] };
+      const data = json.data as { courseId: string; slug: string; lessons: OutlineLesson[] };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("大纲为空，请调整需求重试");
 
@@ -332,6 +337,7 @@ export function CreateStudio({
 
       // 完成页
       setSummary({
+        courseId: data.courseId,
         slug: data.slug,
         firstLessonId: outline[0].id,
         total: outline.length,
@@ -403,7 +409,7 @@ export function CreateStudio({
         }
         throw new Error(json?.error || "整理失败");
       }
-      const data = json.data as { slug: string; lessons: OutlineLesson[] };
+      const data = json.data as { courseId: string; slug: string; lessons: OutlineLesson[] };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("未能从资料中拆出章节，请调整后重试");
 
@@ -416,6 +422,7 @@ export function CreateStudio({
       const succeeded = await writeLessons(initial);
 
       setSummary({
+        courseId: data.courseId,
         slug: data.slug,
         firstLessonId: outline[0].id,
         total: outline.length,
@@ -711,6 +718,7 @@ export function CreateStudio({
           summary={summary}
           lessons={lessons}
           onStart={() => router.push(`/courses/${summary.slug}/learn/${summary.firstLessonId}`)}
+          onViewShelf={() => router.push("/me/courses")}
           onRetry={retryLesson}
           onReset={resetTheater}
         />
@@ -961,13 +969,121 @@ function LessonStateIcon({ state, index }: { state?: LessonState; index: number 
 }
 
 /* ============================================================
+   ShareToMarketInline —— 完成页内联「分享到集市」按钮
+   ------------------------------------------------------------
+   调现有 /api/market/share（入参 courseId）。分享前服务端 LLM 审核课程标题+简介：
+     shared → 已上架；pending → 转人工；rejected → 返回 fail 文案。
+   已上架/审核中显示只读态。纯 client fetch，不引任何 server 链。
+   ============================================================ */
+type ShareStatus = "idle" | "pending" | "shared" | "rejected";
+
+function ShareToMarketInline({ courseId }: { courseId: string }) {
+  const { toast } = useToast();
+  const [status, setStatus] = useState<ShareStatus>("idle");
+  const [loading, setLoading] = useState(false);
+
+  async function share() {
+    if (loading || status === "shared" || status === "pending") return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/market/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId }),
+      });
+      const json = (await res.json().catch(() => null)) as
+        | { ok: true; data: { status: string; message: string } }
+        | { ok: false; error: string }
+        | null;
+      if (!json?.ok) {
+        // 审核不通过（rejected）或其他错误：标红提示，本地切到 rejected 可重试
+        setStatus("rejected");
+        toast(json?.error ?? "分享失败，请稍后再试", { tone: "warn" });
+        return;
+      }
+      const next = json.data.status as ShareStatus;
+      setStatus(next === "shared" ? "shared" : next === "pending" ? "pending" : "rejected");
+      toast(json.data.message, { tone: next === "shared" ? "success" : "info" });
+      track("market_share", { course_id: courseId, status: next });
+    } catch {
+      toast("网络异常，请重试", { tone: "warn" });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  if (status === "shared") {
+    return (
+      <span className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--inner-hi)]">
+        <CheckCircle size={16} weight="fill" className="text-[var(--red)]" />
+        已在集市
+      </span>
+    );
+  }
+  if (status === "pending") {
+    return (
+      <span className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink3)] shadow-[var(--inner-hi)]">
+        <HourglassMedium size={16} weight="fill" />
+        审核中
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={share}
+      disabled={loading}
+      className="studio-press inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] disabled:opacity-50"
+    >
+      <Export size={16} weight="bold" />
+      {loading ? "审核中…" : status === "rejected" ? "重新分享" : "分享到集市"}
+    </button>
+  );
+}
+
+/* ============================================================
+   FlyToShelf —— 完成签名动效：课本从剧场「飞入」书架方向（一次性庆祝）
+   ------------------------------------------------------------
+   一枚课本图标从卡片中心起飞、向右上「书架」方向缩小淡出，落定后自然消失。
+   framer-motion 驱动；reduce-motion 直接不渲染（完成态本身即静态可用，零位移零闪现）。
+   纯装饰（aria-hidden），pointer-events-none 不挡任何按钮点击。
+   ============================================================ */
+function FlyToShelf() {
+  const reduce = useReducedMotion();
+  // reduce-motion：直接跳过，完成态静态显示，不做任何位移/缩放。
+  if (reduce) return null;
+  return (
+    <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+      <motion.span
+        className="absolute left-1/2 top-1/2 flex h-11 w-11 items-center justify-center rounded-[12px] bg-[var(--red)] shadow-[var(--red-glow)]"
+        initial={{ x: "-50%", y: "-50%", scale: 0.6, opacity: 0 }}
+        animate={{
+          x: ["-50%", "-50%", "calc(-50% + 180px)"],
+          y: ["-50%", "-60%", "calc(-50% - 150px)"],
+          scale: [0.6, 1, 0.35],
+          opacity: [0, 1, 0],
+          rotate: [0, -8, 12],
+        }}
+        transition={{ duration: 1.1, ease: [0.16, 1, 0.3, 1], times: [0, 0.35, 1] }}
+      >
+        <BookOpen size={22} weight="fill" className="text-white" />
+      </motion.span>
+    </div>
+  );
+}
+
+/* ============================================================
    完成面板：造课「这门课包含」清单 / 导入「升维报告」+ 通电点亮课程卡
+   闭环：顶部「已放入你的书架」确定感 + 签名飞书动效 + 三按钮去向引导
+        （立即开始学 / 查看我的书架 / 分享到集市）。
    ============================================================ */
 function DonePanel({
   source,
   summary,
   lessons,
   onStart,
+  onViewShelf,
   onRetry,
   onReset,
 }: {
@@ -975,6 +1091,7 @@ function DonePanel({
   summary: DoneSummary;
   lessons: OutlineLesson[];
   onStart: () => void;
+  onViewShelf: () => void;
   onRetry: (lessonId: string) => void;
   onReset: () => void;
 }) {
@@ -1005,6 +1122,9 @@ function DonePanel({
 
   return (
     <div className="studio-poweron studio-sweep relative mt-5 w-full overflow-hidden rounded-[18px] border border-[var(--red-soft-border)] bg-[var(--surface)] shadow-[var(--lift)]">
+      {/* 签名飞书动效：课本飞向书架方向（一次性庆祝，reduce-motion 不渲染） */}
+      <FlyToShelf />
+
       {/* 顶部：深色通电展示带（--video-grad 渐变，弃死黑平面），成功徽标点亮 */}
       <div
         className="relative flex items-center gap-3 overflow-hidden px-5 py-4 sm:px-6"
@@ -1023,6 +1143,13 @@ function DonePanel({
             {isImport ? "你的资料已经变成一门可学的课" : "大纲、讲解、测验、伴侣，全部准备好了"}
           </div>
         </div>
+      </div>
+
+      {/* 「课有家了」确定感条：明确告知这门课已归入书架，去向不再模糊 */}
+      <div className="relative flex items-center gap-2 border-b border-[var(--red-soft-border)] bg-[var(--red-soft)] px-5 py-2.5 sm:px-6">
+        <Books size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
+        <span className="text-[12.5px] font-semibold text-[var(--red-ink)]">已放入你的书架</span>
+        <span className="text-[11px] font-semibold text-[var(--red)]/70">· {isImport ? "资料升维" : "AI 造课"}</span>
       </div>
 
       <div className="p-5 sm:p-6">
@@ -1086,21 +1213,37 @@ function DonePanel({
         </div>
       )}
 
-      {/* 主行动 */}
-      <div className="mt-5 flex items-center gap-2.5">
+      {/* 主行动 —— 造课完成闭环三去向：立即开始学 / 查看我的书架 / 分享到集市 */}
+      <div className="mt-5 flex flex-col gap-2.5">
+        {/* 首选：立即开始学（红 CTA，最强引导） */}
         <button
           type="button"
           onClick={onStart}
-          className="cta-glow studio-press group inline-flex flex-1 items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
+          className="cta-glow studio-press group inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
         >
           <BookOpen size={17} weight="fill" />
-          开始学习
+          立即开始学
           <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
         </button>
+
+        {/* 次选一行：查看我的书架 + 分享到集市（同权重，克制不抢红） */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={onViewShelf}
+            className="studio-press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+          >
+            <Books size={16} weight="fill" />
+            查看我的书架
+          </button>
+          <ShareToMarketInline courseId={summary.courseId} />
+        </div>
+
+        {/* 再来一门：弱化为文字入口，不与三去向争夺注意力 */}
         <button
           type="button"
           onClick={onReset}
-          className="studio-press shrink-0 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+          className="studio-press mx-auto mt-0.5 inline-flex min-h-[44px] items-center justify-center px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
         >
           再来一门
         </button>

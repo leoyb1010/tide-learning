@@ -68,7 +68,7 @@ export default async function CoursesPage({
           </div>
         </div>
       ) : (
-        // 视图切换外壳（client）：网格（server 卡片作 children）↔ 书架（client）。
+        // 课程库网格外壳（client）：v4.0 移除书架视图切换，课程库只做纯网格。
         // 网格在 server 渲染好后作为 grid prop 传入，守住 client/server 边界。
         <CourseLibraryView
           courses={courses}
