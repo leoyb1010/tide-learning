@@ -60,9 +60,9 @@ struct LoginView: View {
             let u: AuthUser
             if isSignup {
                 let nickname = identifier.contains("@") ? String(identifier.split(separator: "@").first ?? "同学") : "同学"
-                u = try await API.shared.post("/auth/signup", body: SignupBody(nickname: nickname, identifier: identifier, password: password), as: AuthUser.self)
+                u = try await API.shared.post("/api/auth/signup", body: SignupBody(nickname: nickname, identifier: identifier, password: password), as: AuthUser.self)
             } else {
-                u = try await API.shared.post("/auth/login", body: LoginBody(identifier: identifier, password: password), as: AuthUser.self)
+                u = try await API.shared.post("/api/auth/login", body: LoginBody(identifier: identifier, password: password), as: AuthUser.self)
             }
             auth.handleLoginSuccess(u)
         } catch {
