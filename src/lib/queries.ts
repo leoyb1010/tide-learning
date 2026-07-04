@@ -251,7 +251,9 @@ export async function listRankedDemands(statuses?: string[]): Promise<RankedDema
   const ids = ranked.map((d) => d.id);
 
   // 并行聚合社交信号：讨论数、关注数、支持者头像（前 5，按最近投票）、发起人昵称。
-  const [commentGroups, followGroups, recentVotes, authors] = await Promise.all([
+  // 支持者头像改为「按 demandId 分组的有界取数」：每条需求仅拉最近 5 条投票，
+  // 避免旧实现无 take 上限把该批需求的全部投票行拉进内存（票多时内存/传输放大）。
+  const [commentGroups, followGroups, supporterRows, authors] = await Promise.all([
     prisma.comment.groupBy({
       by: ["demandId"],
       where: { demandId: { in: ids }, deletedAt: null },
@@ -262,14 +264,23 @@ export async function listRankedDemands(statuses?: string[]): Promise<RankedDema
       where: { demandId: { in: ids } },
       _count: { _all: true },
     }),
-    prisma.demandVote.findMany({
-      where: { demandId: { in: ids } },
-      orderBy: { createdAt: "desc" },
-      select: {
-        demandId: true,
-        user: { select: { id: true, nickname: true, avatarUrl: true } },
-      },
-    }),
+    Promise.all(
+      ids.map((demandId) =>
+        prisma.demandVote
+          .findMany({
+            where: { demandId },
+            orderBy: { createdAt: "desc" },
+            // 有界且去重：按 userId distinct + take 5，同人跨周多行投票只取最近一行，
+            // DB 侧即限量 5，避免旧实现无上限把全部投票行拉进内存再在 JS 去重。
+            distinct: ["userId"],
+            take: 5,
+            select: {
+              user: { select: { id: true, nickname: true, avatarUrl: true } },
+            },
+          })
+          .then((rows) => ({ demandId, rows })),
+      ),
+    ),
     prisma.demand.findMany({
       where: { id: { in: ids } },
       select: { id: true, user: { select: { nickname: true } } },
@@ -280,15 +291,10 @@ export async function listRankedDemands(statuses?: string[]): Promise<RankedDema
   const followMap = new Map(followGroups.map((f) => [f.demandId, f._count._all]));
   const authorMap = new Map(authors.map((a) => [a.id, a.user?.nickname ?? null]));
 
-  // 每条需求取前 5 位不重复支持者（vote 已按时间倒序）。
-  const supporterMap = new Map<string, RankedDemandView["supporters"]>();
-  for (const v of recentVotes) {
-    if (!v.demandId) continue;
-    const arr = supporterMap.get(v.demandId) ?? [];
-    if (arr.length >= 5 || arr.some((s) => s.id === v.user.id)) continue;
-    arr.push(v.user);
-    supporterMap.set(v.demandId, arr);
-  }
+  // 每条需求的支持者已在 DB 侧 distinct+take5 限量并按时间倒序，直接映射。
+  const supporterMap = new Map<string, RankedDemandView["supporters"]>(
+    supporterRows.map(({ demandId, rows }) => [demandId, rows.map((v) => v.user)]),
+  );
 
   return ranked.map((d) => ({
     id: d.id,
@@ -306,6 +312,44 @@ export async function listRankedDemands(statuses?: string[]): Promise<RankedDema
     supporters: supporterMap.get(d.id) ?? [],
     authorNickname: authorMap.get(d.id) ?? null,
   }));
+}
+
+/** 首页第三幕共创 teaser 的最小字段（与 ActThree 的 DemandTeaser prop 形状一致）。 */
+export interface DemandTeaser {
+  id: string;
+  title: string;
+  description: string | null;
+  categoryLabel: string;
+  totalVotes: number;
+}
+
+/**
+ * 首页轻查询：只取共创榜首一条 teaser + 征集总数。
+ *
+ * 关键路径瘦身：首页第三幕只用「榜首一条 + 计数」，不需要 listRankedDemands 的
+ * 社交信号（讨论数/关注数/前 5 支持者头像/发起人昵称，共 4 个额外并行查询）。
+ * 这里复用 rankDemands（仅 2 个 groupBy 聚合）拿到与榜单完全一致的排序，
+ * 取第一名映射为最小 teaser 字段，再单独 count。避免首字节被最慢的社交聚合查询阻塞。
+ *
+ * 排序口径与 /demands、/api/demands 上的 listRankedDemands 完全一致（同一 rankDemands），
+ * 因此首页 teaser 展示的「榜首」与需求广场榜首同一条，不产生视觉/数据分叉。
+ */
+export async function getHomeDemandTeaser(
+  statuses?: string[],
+): Promise<{ teaser: DemandTeaser | null; count: number }> {
+  const ranked = await rankDemands(statuses);
+  const count = ranked.length;
+  const top = ranked[0];
+  const teaser: DemandTeaser | null = top
+    ? {
+        id: top.id,
+        title: top.title,
+        description: top.description,
+        categoryLabel: CATEGORY_LABELS[top.category] ?? top.category,
+        totalVotes: top.totalVotes,
+      }
+    : null;
+  return { teaser, count };
 }
 
 export type { EntitlementSnapshot };

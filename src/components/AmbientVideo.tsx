@@ -36,6 +36,10 @@ export function AmbientVideo({
   const videoRef = useRef<HTMLVideoElement>(null);
   // 动效门：默认 false（先不自动播放），挂载后按用户偏好放行，避免 reduce 用户抢跑首帧。
   const [motionOk, setMotionOk] = useState(false);
+  // 视口门：默认 false（进视口前不拉流），IntersectionObserver 观测容器进/出视口。
+  // 首屏 hero 视频常在文案下方需下滑才可见，避免其全段拉流抢首屏 LCP 带宽。
+  const [inView, setInView] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
@@ -51,20 +55,41 @@ export function AmbientVideo({
     return () => mq.removeListener(apply);
   }, []);
 
-  // motionOk 变化时主动 play/pause（autoPlay 属性只在初次生效，切换偏好需手动兜住）。
+  // 懒播：仅当容器进入视口才允许播放；IO 不可用（老环境）时保守放行为 true（回退旧行为）。
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setInView(true);
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) setInView(entry.isIntersecting);
+      },
+      // 提前 200px 预热，滚到时视频已就位；阈值 0 = 沾边即算进视口。
+      { rootMargin: "200px 0px", threshold: 0 },
+    );
+    io.observe(wrap);
+    return () => io.disconnect();
+  }, []);
+
+  // 动效允许 且 进视口 时才 play；否则 pause。
+  // （autoPlay 属性只在初次生效，且不受视口约束，故完全交由本 effect 手动驱动。）
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (motionOk) {
+    if (motionOk && inView) {
       // play() 返回的 promise 在自动播放被拒时会 reject，静默吞掉（poster 已兜底）。
       void v.play().catch(() => {});
     } else {
       v.pause();
     }
-  }, [motionOk]);
+  }, [motionOk, inView]);
 
   return (
     <div
+      ref={wrapRef}
       aria-hidden
       className={`pointer-events-none absolute inset-0 ${className}`}
       style={{ background: gradient }}
@@ -76,7 +101,6 @@ export function AmbientVideo({
         muted
         loop
         playsInline
-        autoPlay={motionOk}
         preload="metadata"
         className="h-full w-full object-cover"
         style={objectPosition ? { objectPosition } : undefined}

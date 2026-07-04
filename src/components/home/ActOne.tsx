@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { motion, useTransform } from "framer-motion";
-import { Sparkle, ArrowRight, ArrowDown } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
+import { ArrowDown } from "@phosphor-icons/react/dist/ssr";
 import { AmbientVideo } from "@/components/AmbientVideo";
 import { DoorOpen } from "@/components/motion";
 import { useStudyRoom } from "./StudyRoomContext";
+import { HeroPromptInput } from "./HeroPromptInput";
 
 /* ============================================================
    第一幕 · 推门（首屏，0 滚动）
@@ -29,8 +28,6 @@ export function ActOne({
   totalCourses: number;
 }) {
   const { px, py, motionOk, isMobile, immersive } = useStudyRoom();
-  const router = useRouter();
-  const [value, setValue] = useState("");
 
   // 鼠标视差 → 场景倾斜（克制 ±1.5°）。仅沉浸态活跃；降级时恒 0。
   const rotY = useTransform(px, [-1, 1], immersive ? [1.5, -1.5] : [0, 0]);
@@ -38,12 +35,6 @@ export function ActOne({
   // 台灯光晕反向轻移，制造「光源在场景深处」的层次。
   const glowX = useTransform(px, [-1, 1], immersive ? [16, -16] : [0, 0]);
   const glowY = useTransform(py, [-1, 1], immersive ? [10, -10] : [0, 0]);
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const q = value.trim();
-    router.push(q ? `/create?prompt=${encodeURIComponent(q)}` : "/create");
-  }
 
   return (
     <section
@@ -171,42 +162,24 @@ export function ActOne({
           边学边记、到点复习。这一夜，你不是一个人在学。
         </motion.p>
 
-        {/* —— 悬浮输入框：首屏即产品。提交跳造课（复用 /create?prompt=）—— */}
-        <motion.form
-          onSubmit={submit}
+        {/* —— 悬浮输入框：首屏即产品。提交跳造课（复用 /create?prompt=）——
+            输入框 + 其 useState 抽入 <HeroPromptInput>：按键只重渲该子组件，
+            第一幕视差/进场 motion 子树不再参与 reconcile。进场编排（这层
+            motion.div）保留在此，占位/样式/提交行为不变。 */}
+        <motion.div
           className="mt-8 w-full max-w-[520px]"
           initial={motionOk ? { opacity: 0, y: 12 } : false}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.24 }}
         >
-          <div
-            className="group flex items-center gap-2 rounded-[16px] border border-[var(--hairline-on-dark)] bg-white/[0.06] p-2 pl-4 backdrop-blur-md transition-colors focus-within:border-[var(--red)]/50"
-            style={{ boxShadow: "0 8px 30px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)" }}
-          >
-            <Sparkle size={18} weight="fill" className="shrink-0 text-[var(--red)]" aria-hidden />
-            <input
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="说出想学的，AI 帮你造一门课…"
-              aria-label="想学什么"
-              maxLength={200}
-              className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--ink-on-dark)] outline-none placeholder:text-[var(--ink-on-dark-3)]"
-            />
-            <button
-              type="submit"
-              className="cta-glow studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-[filter] hover:brightness-105"
-            >
-              开始造课
-              <ArrowRight size={14} weight="bold" aria-hidden />
-            </button>
-          </div>
+          <HeroPromptInput />
           {/* 信任行：真实课程量作社会证明锚（真实 DOM）。 */}
           <p className="mono mt-4 text-[12px] text-[var(--ink-on-dark-3)]">
             已有{" "}
             <span className="font-bold text-[var(--ink-on-dark-2)]">{totalCourses}</span>{" "}
             门课程在架 · 免费体验，无需登录
           </p>
-        </motion.form>
+        </motion.div>
 
         {/* —— 书桌上的屏幕：内嵌 hero-product-demo-loop（AmbientVideo，poster 先行）——
             桌面沉浸态才展示这块「远处桌上的发光屏」，避免与输入框争首屏焦点；

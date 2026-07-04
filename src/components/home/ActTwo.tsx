@@ -194,12 +194,13 @@ function DeskObjectCard({
   const lit = useTransform(progress, [start, start + 0.14], [0, 1]);
   const opacity = useTransform(lit, [0, 1], [0.32, 1]);
   const y = useTransform(lit, [0, 1], [24, 0]);
-  const brightness = useTransform(lit, [0, 1], [0.6, 1]);
-  const filter = useTransform(brightness, (b) => `brightness(${b})`);
   const glowOpacity = useTransform(lit, [0, 1], [0, 1]);
+  // 暗态一层暖色罩降低亮度感（点亮时淡出）。用 overlay opacity 替代 filter:brightness，
+  // 避免逐帧 repaint——opacity 走合成层，不触发重绘。
+  const dimOverlay = useTransform(lit, [0, 1], [0.45, 0]);
 
   return (
-    <motion.div style={{ opacity, y, filter }} className="relative">
+    <motion.div style={{ opacity, y }} className="relative">
       <Link
         href={object.href}
         className="studio-lift group relative flex h-full flex-col overflow-hidden rounded-[16px] border border-[var(--hairline-on-dark)] p-5"
@@ -215,6 +216,16 @@ function DeskObjectCard({
           style={{
             opacity: glowOpacity,
             background: `radial-gradient(circle, ${object.tint}, transparent 68%)`,
+          }}
+        />
+        {/* 暗态暖色罩：替代原 filter:brightness——盖一层暖调半透罩压低亮度，
+            点亮时随 lit 淡出，只走 opacity 合成、无逐帧 repaint。 */}
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 rounded-[16px]"
+          style={{
+            opacity: dimOverlay,
+            background: "rgba(6,8,12,0.9)",
           }}
         />
         <p className="mono relative text-[10px] uppercase tracking-[0.14em] text-[var(--ink-on-dark-3)]">

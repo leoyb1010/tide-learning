@@ -771,6 +771,11 @@ body::before {
     inset 0 1px 0 rgba(255,255,255,.22),
     inset -6px 0 12px -6px rgba(0,0,0,.4),
     inset 6px 0 10px -8px rgba(255,255,255,.18);
+}
+/* will-change 仅在交互瞬间提层：避免每本书脊常驻合成层。
+   现代浏览器在 hover 抽书的 transform 上会自动优化，此处只在意图交互时预告。 */
+.book-spine:hover,
+.book-spine:focus-visible {
   will-change: transform;
 }
 /* 书页侧：在书脊右侧 Z 轴外推一层纸页，抽书时露出，强化「立体一本书」 */
@@ -837,6 +842,7 @@ body::before {
     transform: none !important;
     box-shadow: var(--card-hover), inset 0 1px 0 rgba(255,255,255,.24) !important;
     filter: none !important;
+    will-change: auto !important;
   }
   .book-spine:active { transform: none !important; }
   .book-spine::before,

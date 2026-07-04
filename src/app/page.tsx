@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { listCourses, listUpdates, listRankedDemands } from "@/lib/queries";
+import { listCourses, listUpdates, getHomeDemandTeaser } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
@@ -28,10 +28,12 @@ export default async function HomePage() {
    未登录：三幕沉浸营销首页（server 取真实数据 → client 场景渲染）
    ============================================================ */
 async function MarketingHome() {
-  const [all, updates, demands, plans] = await Promise.all([
+  const [all, updates, demandTeaserResult, plans] = await Promise.all([
     listCourses({ sort: "recommended" }),
     listUpdates(8),
-    listRankedDemands(["collecting", "evaluating", "scheduled", "producing"]),
+    // 首页第三幕只需「榜首一条 teaser + 征集总数」，用轻查询替代最重的
+    // listRankedDemands（7 条聚合 + 社交 join），关键路径不再被社交聚合阻塞。
+    getHomeDemandTeaser(["collecting", "evaluating", "scheduled", "producing"]),
     prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
   ]);
   // 未登录分支：权益快照必为免费态，用于 VoteButton canVote 判定（保持签名一致）。
@@ -61,17 +63,8 @@ async function MarketingHome() {
     isNew: newSlugs.has(c.slug),
   }));
 
-  // 第三幕共创 teaser：取榜首需求（已进入排期优先由 listRankedDemands 排序保证）。
-  const top = demands[0];
-  const demandTeaser = top
-    ? {
-        id: top.id,
-        title: top.title,
-        description: top.description,
-        categoryLabel: top.categoryLabel,
-        totalVotes: top.totalVotes,
-      }
-    : null;
+  // 第三幕共创 teaser：榜首需求（排序口径与需求广场 listRankedDemands 一致）。
+  const demandTeaser = demandTeaserResult.teaser;
 
   // 订阅 teaser：优先全站年费方案，格式化成「¥N/年」文案。
   const yearPlan =
@@ -97,7 +90,7 @@ async function MarketingHome() {
           totalCourses={totalCourses}
           courses={shelfCourses}
           demand={demandTeaser}
-          demandCount={demands.length}
+          demandCount={demandTeaserResult.count}
           canVote={snapshot.canVote}
           yearPriceText={yearPriceText}
         />

@@ -165,6 +165,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   }
   return (
     <html lang="zh-CN" className={`${jakarta.variable} ${notoSC.variable} ${plexMono.variable}`}>
+      <head>
+        {/*
+          Anti-FOUC：paint 前从 localStorage 同步主题/字号/亮暗到 <html> dataset，
+          与 ModeProvider 的 effect（挂载后）逻辑逐条对齐，避免已存 dark/deep/elder
+          的用户先闪浅色标准态再切。只改 documentElement 的 dataset/style，不触碰 React
+          树，因此不引入 hydration mismatch。localStorage 不可用（隐私模式/SSR 早期）时
+          静默兜底到默认态。key 名与 ModeProvider 一致：
+          tide_mode / tide_font_scale / tide_theme / studio_color_scheme。
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var e=document.documentElement;var g=function(k){try{return localStorage.getItem(k)}catch(_){return null}};var m=g("tide_mode")||"standard";e.dataset.mode=m;var s=parseFloat(g("tide_font_scale"));if(!s||isNaN(s))s=1;e.style.setProperty("--font-scale",String(s));var t=g("tide_theme")||"light";var c=g("studio_color_scheme")||"system";if(t==="deep"){e.dataset.theme="deep"}else if(c==="system"){delete e.dataset.theme}else{e.dataset.theme=c}}catch(_){}})();`,
+          }}
+        />
+      </head>
       <body>
         <ModeProvider>
           <ToastProvider>
