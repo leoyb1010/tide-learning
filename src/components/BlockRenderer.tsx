@@ -18,6 +18,7 @@ import {
   ArrowsClockwise,
   FlagCheckered,
   ArrowRight,
+  Image as ImageIcon,
 } from "@phosphor-icons/react";
 import type { Block } from "@/lib/blocks";
 import { renderMarkdown } from "@/lib/markdown";
@@ -25,7 +26,7 @@ import { renderMarkdown } from "@/lib/markdown";
 /**
  * BlockRenderer —— AI 块课件渲染器（客户端，v3「造课革命 / 沉浸刊物」）。
  *
- * 接收已校验的块数组（validateBlocks 产物，含稳定 id），按 type 分派到 12 种精致子组件。
+ * 接收已校验的块数组（validateBlocks 产物，含稳定 id），按 type 分派到 13 种精致子组件（含 image 课件图解）。
  * 每块外层带 data-block-id（笔记锚点）+ 滚动叙事进场（Reveal：IntersectionObserver 懒挂载，
  * opacity+translateY 交错浮现，reduce-motion 直接显示不动画）。
  *
@@ -153,6 +154,8 @@ export function BlockSwitch({ block, courseId }: { block: Block & { id: string }
       return <FlashcardBlock front={block.front} back={block.back} courseId={courseId} />;
     case "summary":
       return <SummaryBlock markdown={block.markdown} next={block.next} />;
+    case "image":
+      return <ImageBlock src={block.src} caption={block.caption} alt={block.alt} />;
     default:
       // 前向兼容：未知块只提示不崩
       return <p className="text-xs text-[var(--ink3)]">（暂不支持的内容块，已跳过）</p>;
@@ -706,6 +709,40 @@ function SummaryBlock({ markdown, next }: { markdown: string; next?: string }) {
         </a>
       )}
     </section>
+  );
+}
+
+/** image —— 课件图解：站内图 + 可选说明。统一卡片壳（对齐 CodeBlock 的 overflow-hidden 卡面）。
+ *  懒加载 loading="lazy"；图裂时优雅降级为「图解暂不可用」占位，不留破图。
+ *  src 已在 validateBlocks 过白名单（仅站内 / 开头路径），此处直接信任。 */
+function ImageBlock({ src, caption, alt }: { src: string; caption?: string; alt?: string }) {
+  const [broken, setBroken] = useState(false);
+  // 无障碍：alt 优先 caption，二者皆无则空 alt（装饰性，避免读屏念出文件名）。
+  const altText = alt || caption || "";
+  return (
+    <figure className={`${CARD} overflow-hidden`}>
+      {broken ? (
+        <div className="flex min-h-[160px] flex-col items-center justify-center gap-2 bg-[var(--surface-inset)] p-8 text-center">
+          <ImageIcon size={22} className="text-[var(--ink4)]" aria-hidden />
+          <p className="text-[13px] text-[var(--ink3)]">图解暂不可用</p>
+        </div>
+      ) : (
+        <img
+          src={src}
+          alt={altText}
+          loading="lazy"
+          decoding="async"
+          onError={() => setBroken(true)}
+          className="block h-auto w-full max-w-full bg-[var(--surface-inset)] object-cover"
+        />
+      )}
+      {caption && (
+        <figcaption className="flex items-start gap-2 border-t border-[var(--border)] px-4 py-3 text-[13px] leading-relaxed text-[var(--ink2)]">
+          <ImageIcon size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--ink3)]" aria-hidden />
+          <span className="flex-1">{caption}</span>
+        </figcaption>
+      )}
+    </figure>
   );
 }
 

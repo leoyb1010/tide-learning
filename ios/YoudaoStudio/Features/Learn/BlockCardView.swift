@@ -39,6 +39,8 @@ struct BlockCardView: View {
             FlashcardCard(front: front, back: back, onSaveReview: onSaveReview)
         case let .summary(_, markdown, next):
             SummaryCard(text: markdown, next: next)
+        case let .image(_, src, caption, alt):
+            ImageCard(src: src, caption: caption, alt: alt)
         case let .unknown(_, type):
             UnknownCard(type: type)
         }
@@ -655,6 +657,66 @@ private struct SummaryCard: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .studioCard()
+    }
+}
+
+// MARK: - image（课件图解：AsyncImage 加载站内图 + 可选说明）
+
+private struct ImageCard: View {
+    let src: String       // 站内 / 开头路径（已过白名单）
+    let caption: String?
+    let alt: String?
+
+    /// 完整图 URL：Web 根地址（shareBaseURL，去掉 /api）+ 站内路径。
+    /// src 已保证以 / 开头，直接拼接即可。
+    private var url: URL? { URL(string: AppConfig.shareBaseURL + src) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            AsyncImage(url: url) { phase in
+                if let img = phase.image {
+                    img.resizable().aspectRatio(contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .accessibilityLabel(Text(alt ?? caption ?? "课件图解"))
+                } else if phase.error != nil {
+                    // 加载失败：占位区 + 图标，不留破图。
+                    placeholder(loading: false)
+                } else {
+                    placeholder(loading: true)
+                }
+            }
+            if let caption, !caption.isEmpty {
+                HStack(alignment: .top, spacing: 6) {
+                    Image(systemName: "photo").font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Studio.ink3).padding(.top, 1)
+                    Text(caption).font(.studio(13)).foregroundStyle(Studio.ink2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .padding(.horizontal, 14).padding(.vertical, 10)
+                .overlay(alignment: .top) { Divider().overlay(Studio.border) }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Studio.surface2)
+        .clipShape(RoundedRectangle(cornerRadius: StudioRadius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: StudioRadius.card, style: .continuous)
+            .strokeBorder(Studio.border, lineWidth: 1))
+    }
+
+    private func placeholder(loading: Bool) -> some View {
+        Studio.surfaceInset
+            .frame(height: 180)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                if loading {
+                    ProgressView().tint(Studio.ink3)
+                } else {
+                    VStack(spacing: 6) {
+                        Image(systemName: "photo").font(.system(size: 20)).foregroundStyle(Studio.ink4)
+                        Text("图解暂不可用").font(.studio(13)).foregroundStyle(Studio.ink3)
+                    }
+                }
+            }
     }
 }
 

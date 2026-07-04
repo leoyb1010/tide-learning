@@ -85,6 +85,9 @@ export function blockWeight(b: BlockWithId): number {
       return 60; // 独占页
     case "summary":
       return 40 + textWeight(b.markdown) + (b.next ? 8 : 0);
+    case "image":
+      // 图占屏可观（默认 16:9 级），偏重块；有说明再加一点。翻页时倾向让图解少挤同页。
+      return 56 + (b.caption ? textWeight(b.caption) : 0);
     default:
       return 24;
   }

@@ -3,9 +3,8 @@ import { redirect } from "next/navigation";
 import { ClockCounterClockwise, GraduationCap, CaretLeft } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { trackLabel } from "@/lib/tracks";
+import { trackLabel, resolveCoverSrc } from "@/lib/tracks";
 import { relativeTime } from "@/lib/queries";
-import { coverSrc } from "@/components/ui";
 import { EmptyTide } from "@/components/TideIllustration";
 import { HistoryGroups, type HistoryCourse } from "./HistoryGroups";
 
@@ -123,7 +122,7 @@ export default async function HistoryPage({
       title: g.course.title,
       trackLabel: trackLabel(g.course.category),
       coverColor: g.course.coverColor,
-      coverSrc: coverSrc(g.course.slug),
+      coverSrc: resolveCoverSrc(g.course.slug, g.course.category, g.course.id),
       totalLessons: Math.max(totalLessons, learnedLessons), // 兜底：脏数据下总数不小于已学数
       learnedLessons,
       doneLessons,

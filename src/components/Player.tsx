@@ -42,6 +42,7 @@ interface LessonData {
 export function Player({
   courseId, courseSlug, courseTitle, lesson, access, canCreateNote,
   outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialSlidePage, initialNotes,
+  posterSrc,
 }: {
   courseId: string; courseSlug: string; courseTitle: string;
   lesson: LessonData; access: boolean; canCreateNote: boolean;
@@ -49,6 +50,8 @@ export function Player({
   remainingLessons: number; isLoggedIn: boolean; initialProgress: number;
   /** 翻页课件上次读到的页码(1-indexed)，0 表示无记录。用于恢复续读位置，与 initialProgress(秒)互不相关。 */
   initialSlidePage: number; initialNotes: NoteItem[];
+  /** 按赛道映射的课程定格图（lesson still）路径，作视频区 poster / 模拟兜底底图，替代纯渐变。 */
+  posterSrc?: string;
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
@@ -402,6 +405,7 @@ export function Player({
           <video
             ref={videoRef}
             src={lesson.videoUrl ?? undefined}
+            poster={posterSrc}
             className="h-full w-full"
             style={{ background: "var(--video-bg)" }}
             playsInline
@@ -413,6 +417,22 @@ export function Player({
           />
         ) : (
           <div className="flex h-full items-center justify-center" style={{ background: "var(--video-grad)" }}>
+            {/* 赛道定格图铺底（真实图，替代纯渐变）；渐变仍作加载前/无图兜底底色。
+                DOM 顺序在下方纹理/柔光/播放圆之前 → 天然叠在最底层。 */}
+            {posterSrc && (
+              <img
+                src={posterSrc}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                decoding="async"
+                className="absolute inset-0 h-full w-full object-cover opacity-90"
+              />
+            )}
+            {/* 定格图上压一层深色渐变，保证白色播放圆与免费标可读 */}
+            {posterSrc && (
+              <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(160deg, rgba(20,26,36,.55), rgba(10,12,16,.68))" }} />
+            )}
             {/* 细点纹理，增加深色区材质，避免死黑平面 */}
             <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.7) 1px, transparent 0)", backgroundSize: "22px 22px" }} aria-hidden />
             {/* 顶部柔光晕，营造展示区聚光感 */}

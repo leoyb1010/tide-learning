@@ -4,8 +4,8 @@ import Foundation
 /// 后端 blocksJson 是一段 JSON 字符串：{ version, blocks: [ { type, ... } ] }。
 /// 用自定义解码把不同 type 折叠成一个强类型 enum，视图侧 switch 渲染各自卡片。
 ///
-/// v3.0：块协议由 5 种扩展为 12 种，对齐 Web src/lib/blocks.ts 的 JSON 结构。
-/// 基础 5 种（concept/code/quiz/keypoint/callout）保留；新增 7 种叙事+交互块。
+/// v3.1：块协议由 5 种扩展为 13 种，对齐 Web src/lib/blocks.ts 的 JSON 结构。
+/// 基础 5 种（concept/code/quiz/keypoint/callout）保留；v3 新增 7 种叙事+交互块；v3.1 再加 image 课件图解。
 enum Block: Identifiable, Equatable {
     // 基础 5 种
     case concept(id: String, title: String, body: String)
@@ -30,6 +30,8 @@ enum Block: Identifiable, Equatable {
     case flashcard(id: String, front: String, back: String)
     /// 节尾小结 + 下节预告钩子。
     case summary(id: String, markdown: String, next: String?)
+    /// 课件图解：站内图路径 + 可选说明/替代文本（对齐 Web image 块）。
+    case image(id: String, src: String, caption: String?, alt: String?)
     /// 未知 type 的兜底，保证前向兼容不崩。
     case unknown(id: String, type: String)
 
@@ -48,6 +50,7 @@ enum Block: Identifiable, Equatable {
              .example(let id, _),
              .flashcard(let id, _, _),
              .summary(let id, _, _),
+             .image(let id, _, _, _),
              .unknown(let id, _):
             return id
         }
@@ -140,6 +143,9 @@ private struct RawBlock: Decodable {
     let front: String?               // flashcard.front
     let back: String?                // flashcard.back
     let next: String?                // summary.next
+    let src: String?                 // image.src（站内 / 开头路径）
+    let caption: String?             // image.caption
+    let alt: String?                 // image.alt
 
     func toBlock(fallbackIndex: Int) -> Block {
         let bid = id ?? "\(type)-\(fallbackIndex)"
@@ -186,6 +192,10 @@ private struct RawBlock: Decodable {
             return .flashcard(id: bid, front: front ?? "", back: back ?? "")
         case "summary":
             return .summary(id: bid, markdown: markdown ?? body ?? "", next: nonEmpty(next))
+        case "image":
+            // src 过白名单（仅站内 / 开头路径）；非法则退化为 unknown，绝不加载任意外链。
+            guard let safe = sanitizedImageSrc(src) else { return .unknown(id: bid, type: type) }
+            return .image(id: bid, src: safe, caption: nonEmpty(caption), alt: nonEmpty(alt))
         default:
             return .unknown(id: bid, type: type)
         }
@@ -194,6 +204,16 @@ private struct RawBlock: Decodable {
     /// 去空白项 + 过滤空串（对齐 Web clampStrArray 的过滤语义）。
     private func cleaned(_ arr: [String]?) -> [String] {
         (arr ?? []).filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+    }
+
+    /// image.src 白名单（对齐 Web sanitizeImageSrc）：仅认单斜杠开头的站内根路径，
+    /// 拒绝协议相对 //host、含协议/反斜杠、以及 .. 路径穿越。非法返回 nil。
+    private func sanitizedImageSrc(_ v: String?) -> String? {
+        guard let raw = v?.trimmingCharacters(in: .whitespacesAndNewlines), !raw.isEmpty else { return nil }
+        guard raw.hasPrefix("/"), !raw.hasPrefix("//") else { return nil }
+        let lowered = raw.lowercased()
+        if lowered.contains(":") || lowered.contains("\\") || raw.contains("..") { return nil }
+        return raw
     }
 
     /// 空/纯空白 → nil，便于视图侧 if-let 判空。

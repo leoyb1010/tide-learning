@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { Users, PlayCircle, Sparkle } from "@phosphor-icons/react/dist/ssr";
-import { Badge, coverSrc } from "./ui";
+import { Badge } from "./ui";
 import { Spotlight } from "./motion";
-import { trackGradientVar } from "@/lib/tracks";
+import { trackGradientVar, resolveCoverSrc } from "@/lib/tracks";
 
 export interface CourseCardData {
   id: string;
@@ -27,7 +27,9 @@ export interface CourseCardData {
 
 export function CourseCard({ course }: { course: CourseCardData }) {
   const grad = trackGradientVar(course.category ?? "");
-  const hasCover = Boolean(course.slug);
+  // 封面决策（server 组件，无法 onError 探测）：有专属封面走 cover-<slug>.jpg，
+  // 否则按赛道+id 从封面池取一张稳定真实图。渐变仅作图片加载前的兜底底色，不再暴露。
+  const cover = resolveCoverSrc(course.slug, course.category ?? "", course.id);
 
   return (
     <Spotlight className="h-full rounded-[var(--radius-card)]">
@@ -44,15 +46,13 @@ export function CourseCard({ course }: { course: CourseCardData }) {
             className="pointer-events-none absolute inset-0"
             style={{ background: "radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.18), transparent 60%)" }}
           />
-          {hasCover && (
-            <img
-              src={coverSrc(course.slug)}
-              alt={course.title}
-              loading="lazy"
-              decoding="async"
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
-            />
-          )}
+          <img
+            src={cover}
+            alt={course.title}
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+          />
           {/* 底部压暗渐变，保证角标与免费标可读 */}
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent" />
 

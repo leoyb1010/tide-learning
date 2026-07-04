@@ -137,8 +137,11 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       isFree: lesson.isFree,
       liveStartAt: lesson.liveStartAt ? lesson.liveStartAt.toISOString() : null,
       liveSeatLimit: lesson.liveSeatLimit,
-      // 关键：付费章节且无权益时，videoUrl / articleMd / blocksJson 一律为 null
-      videoUrl: access && lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : null,
+      // 关键：付费章节且无权益时，videoUrl / articleMd / blocksJson 一律为 null。
+      // 有真实 demo 直链（lesson.videoUrl）时优先返回它（<video> 真播放）；否则回退 mock 受控流。
+      videoUrl: access
+        ? lesson.videoUrl ?? (lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : null)
+        : null,
       articleMd: access ? lesson.articleMd : null,
       // ai_block 类型的结构化课件（付费门控同 articleMd）
       blocksJson: access ? lesson.blocksJson : null,

@@ -5,12 +5,22 @@ import { getCourseDetail, listCourses } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
 import { Button } from "@/components/ui";
+import { AmbientVideo } from "@/components/AmbientVideo";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
 import { SharePanel } from "@/components/SharePanel";
 import { TrialBooking } from "@/components/TrialBooking";
 import { formatDurationSec } from "@/lib/format";
 import { TRACK_MAP, trackGradientVar } from "@/lib/tracks";
+
+// 预告静帧兜底：按赛道选一张定格图，作为通用预告视频的 poster（视频加载前 / reduce-motion 时显示）。
+const PREVIEW_POSTER: Record<string, string> = {
+  english_oral: "/lesson-stills/lesson-still-oral.jpg",
+  english_foundation: "/lesson-stills/lesson-still-english.jpg",
+  silver_english: "/lesson-stills/lesson-still-silver.jpg",
+  ai_skill: "/lesson-stills/lesson-still-ai.jpg",
+  life: "/lesson-stills/lesson-still-life.jpg",
+};
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,6 +70,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             className="studio-lightup group/hero relative aspect-[16/9] w-full overflow-hidden rounded-[20px] shadow-[var(--lift)]"
             style={{ background: "var(--video-grad)", viewTransitionName: "course-cover" }}
           >
+            {/* 通用预告视频铺底（每课共用）：--video-grad 作底色兜底，按赛道选定格图作 poster/静帧；
+                reduce-motion 时只显示 poster 静帧不自动播放。上方赛道色调/高光/播放圆/时长叠层保持不变。 */}
+            <AmbientVideo
+              src="/videos/marketing/course-preview-generic-16x9.mp4"
+              poster={PREVIEW_POSTER[course.category]}
+            />
             {/* 赛道色调层，让深色区带上课程个性 */}
             <div className="absolute inset-0 opacity-[0.55] mix-blend-soft-light" style={{ background: trackGradientVar(course.category) }} />
             {/* 顶部内高光 + 细网格材质 */}

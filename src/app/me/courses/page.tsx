@@ -3,8 +3,8 @@ import { redirect } from "next/navigation";
 import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium, Play } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { CoverBg, coverSrc } from "@/components/ui";
-import { trackLabel } from "@/lib/tracks";
+import { CoverBg } from "@/components/ui";
+import { trackLabel, resolveCoverSrc } from "@/lib/tracks";
 import { ShareToMarketButton, type ShareState } from "@/components/ShareToMarketButton";
 import { AccessRequestActions } from "@/components/AccessRequestActions";
 import { CourseGenControls } from "@/components/CourseGenControls";
@@ -173,7 +173,7 @@ export default async function MyCoursesPage() {
               >
                 {/* 封面 + 标题为链接主体 */}
                 <Link href={href} className="flex flex-col">
-                  <CoverBg color={c.coverColor} imageSrc={coverSrc(c.slug)} alt={c.title} className="aspect-[16/9] w-full">
+                  <CoverBg color={c.coverColor} imageSrc={resolveCoverSrc(c.slug, c.category ?? "", c.id)} alt={c.title} className="aspect-[16/9] w-full">
                     {/* 来源标签 */}
                     <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
                       {isAi ? <Sparkle size={11} weight="fill" /> : <FilePlus size={11} weight="fill" />}

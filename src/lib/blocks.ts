@@ -9,7 +9,7 @@
  *   - 字段截断：超长 markdown/code 截断，避免异常 payload 撑爆存储与渲染。
  */
 
-// —— 块类型定义（v3.0 扩展为 12 种，杂志感 + 交互感）——
+// —— 块类型定义（v3.1 扩展为 13 种：v3 的 12 种 + image 课件图解）——
 export type Block =
   // 基础 5 种（v2 保留，前向兼容旧课）
   | { type: "concept"; title: string; markdown: string }
@@ -25,7 +25,8 @@ export type Block =
   | { type: "compare"; title?: string; left: { heading: string; items: string[] }; right: { heading: string; items: string[] } } // 对比（误区 vs 正确）
   | { type: "example"; markdown: string } // 例子/案例
   | { type: "flashcard"; front: string; back: string } // 内联翻转卡，可存复习
-  | { type: "summary"; markdown: string; next?: string }; // 节尾小结 + 下节预告钩子
+  | { type: "summary"; markdown: string; next?: string } // 节尾小结 + 下节预告钩子
+  | { type: "image"; src: string; caption?: string; alt?: string }; // 课件图解：站内图 + 可选说明/替代文本
 
 export interface CourseBlocks {
   version: 1;
@@ -41,8 +42,26 @@ const MAX_TURNS = 20; // dialog 轮次上限
 const MAX_STEPS = 12; // steps 步骤上限
 const BLOCK_TYPES = new Set([
   "concept", "code", "quiz", "keypoint", "callout",
-  "objectives", "scene", "dialog", "steps", "compare", "example", "flashcard", "summary",
+  "objectives", "scene", "dialog", "steps", "compare", "example", "flashcard", "summary", "image",
 ]);
+
+/**
+ * 图片块 src 白名单前缀：只认站内绝对路径（/ 开头，指向 public/ 下真实资产）。
+ * 防注入：拒绝 http(s):// 外链、data:/javascript:/blob: 伪协议、协议相对 //host、以及路径穿越 ../。
+ * 课件图解目前只引用 public/ 下已就位的图（covers/courseware/lesson-stills/note-captures 等）。
+ */
+function sanitizeImageSrc(v: unknown): string {
+  if (typeof v !== "string") return "";
+  const s = v.trim();
+  if (!s) return "";
+  // 必须是单斜杠开头的站内根路径；排除协议相对 //host 与含协议的绝对 URL。
+  if (!s.startsWith("/")) return "";
+  if (s.startsWith("//")) return "";
+  // 显式拒绝任何伪协议 / 反斜杠 / 路径穿越片段。
+  const lowered = s.toLowerCase();
+  if (lowered.includes(":") || lowered.includes("\\") || s.includes("..")) return "";
+  return clampStr(s, 512);
+}
 
 /** 从未知值取字符串数组，逐项截断、过滤空、限量。 */
 function clampStrArray(v: unknown, maxLen: number, maxCount: number): string[] {
@@ -224,6 +243,18 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
         out.push(block);
         break;
       }
+      case "image": {
+        // src 必须过白名单（站内 / 开头路径）；非法 src 直接丢弃该块，绝不渲染任意外链。
+        const src = sanitizeImageSrc(b.src);
+        if (!src) continue;
+        const caption = clampStr(b.caption, 300);
+        const alt = clampStr(b.alt, 300);
+        const block: Block & { id: string } = { id, type: "image", src };
+        if (caption) block.caption = caption;
+        if (alt) block.alt = alt;
+        out.push(block);
+        break;
+      }
     }
   }
   return out;
@@ -284,6 +315,11 @@ export function blocksToPlainText(blocks: (Block & { id: string })[]): string {
       case "summary":
         parts.push(b.markdown);
         if (b.next) parts.push(b.next);
+        break;
+      case "image":
+        // 图无文本可索引，取 caption / alt 作为可读文本（供搜索 / 伴侣上下文）。
+        if (b.caption) parts.push(b.caption);
+        else if (b.alt) parts.push(b.alt);
         break;
     }
   }

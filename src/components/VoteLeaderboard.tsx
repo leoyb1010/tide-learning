@@ -18,6 +18,7 @@ import {
   Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
 import { VoteButton } from "./VoteButton";
+import { AmbientVideo } from "./AmbientVideo";
 import { ProposalCard } from "./DemandCard";
 import { DEMAND_STATUS } from "@/lib/format";
 import { trackGradientVar, trackIconKey } from "@/lib/tracks";
@@ -52,6 +53,14 @@ const TRACK_ICON: Record<string, typeof Robot> = {
   elder: GraduationCap,
   life: Heart,
   default: Sparkle,
+};
+
+// 本周之星封面视频的静帧兜底（按 iconKey 选定格图，reduce-motion / 未加载时显示）。
+const STAR_POSTER: Record<string, string> = {
+  ai: "/lesson-stills/lesson-still-ai.jpg",
+  english: "/lesson-stills/lesson-still-oral.jpg",
+  elder: "/lesson-stills/lesson-still-silver.jpg",
+  life: "/lesson-stills/lesson-still-life.jpg",
 };
 
 /** 支持者头像堆叠（Hero 深色版）。 */
@@ -298,9 +307,16 @@ function StarHero({
           </div>
         </div>
 
-        {/* 右：赛道封面视觉（大主题图标 + 赛道渐变镶边） */}
+        {/* 右：赛道封面视觉（真实需求预告视频铺底 + 赛道渐变镶边 + 大主题图标） */}
         <div className="relative order-1 min-h-[160px] overflow-hidden md:order-2">
-          <div className="absolute inset-0" style={{ background: trackGrad }} aria-hidden />
+          {/* 需求预告视频作背景：赛道渐变作兜底底色 + 静帧 poster；reduce-motion 时只静帧不播放。 */}
+          <AmbientVideo
+            src="/videos/marketing/demand-course-teaser.mp4"
+            poster={STAR_POSTER[iconKey]}
+            gradient={trackGrad}
+          />
+          {/* 赛道渐变镶边层（半透明叠在视频上，保留赛道个性同时让视频透出）。 */}
+          <div className="absolute inset-0 opacity-45 mix-blend-soft-light" style={{ background: trackGrad }} aria-hidden />
           <div
             className="absolute inset-0 bg-gradient-to-l from-transparent via-[var(--video-bg)]/10 to-[var(--video-bg)] md:bg-gradient-to-r"
             aria-hidden

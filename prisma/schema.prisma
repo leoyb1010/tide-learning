@@ -148,6 +148,7 @@ model Lesson {
   sortOrder     Int       @default(0)
   contentType   String    @default("video") // video / article / mixed / live / ai_block
   videoAssetId  String? // 指向受控视频资源，非订阅用户拿不到直链
+  videoUrl      String? // demo 真实媒体直链（/videos/.../*.mp4）：有值且有权益时优先于 mock 受控流，供 <video> 真播放
   articleMd     String?
   blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）
   genClaimedAt  DateTime? // 造课并发所有权占位：generateLessonCore 生成前原子 claim，防两条流水双写双扣（见 src/lib/course-gen.ts）

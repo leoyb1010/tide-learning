@@ -17,6 +17,7 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { VoteButton } from "@/components/VoteButton";
+import { AmbientVideo } from "@/components/AmbientVideo";
 import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { TRACKS } from "@/lib/tracks";
@@ -144,11 +145,16 @@ async function MarketingHome() {
             className="studio-lift studio-poweron block max-w-[430px] flex-1 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-3.5"
             style={{ boxShadow: "var(--card), var(--inner-hi)" }}
           >
-            {/* 16:9 深色封面 · 用 video-grad 渐变（弃死黑） */}
+            {/* 16:9 深色封面 · 真实产品演示视频铺底（--video-grad 作兜底 poster/底色，reduce-motion 只静帧）。
+                所有下方叠层保持绝对定位，DOM 顺序在视频之后 → 天然叠在视频之上。 */}
             <div
               className="relative aspect-[16/9] w-full overflow-hidden rounded-[13px]"
               style={{ background: "var(--video-grad)" }}
             >
+              <AmbientVideo
+                src="/videos/marketing/hero-product-demo-loop.mp4"
+                poster="/marketing/landing-hero-scene.jpg"
+              />
               {/* 水印「习」 */}
               <span className="pointer-events-none absolute -bottom-4 right-2 select-none text-[120px] font-black leading-none text-white/[0.06]">
                 习

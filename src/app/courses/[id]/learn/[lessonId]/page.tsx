@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { track } from "@/lib/analytics";
 import { Player } from "@/components/Player";
+import { trackStillSrc } from "@/lib/tracks";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string; lessonId: string }> }) {
   const { lessonId } = await params;
@@ -62,6 +63,7 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
       initialProgress={progress?.progressSec ?? 0}
       initialSlidePage={progress?.lastSlideIndex ?? 0}
       initialNotes={notes.map((n) => ({ ...n, updatedAt: n.updatedAt.toISOString() }))}
+      posterSrc={trackStillSrc(course.category)}
     />
   );
 }

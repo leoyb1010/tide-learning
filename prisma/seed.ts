@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { randomBytes, scryptSync } from "crypto";
+// 复用 App 的块校验：种子里的 ai_block 内容也走同一道白名单，确保入库即合法（含 image src 白名单）。
+import { validateBlocks } from "../src/lib/blocks";
 
 const prisma = new PrismaClient();
 
@@ -15,9 +17,30 @@ const HEALTH_DISCLAIMER =
 const article = (t: string) =>
   `## ${t}\n\n这是一节图文课件的示例正文。正式内容由内容团队按标准结构制作：定位、适合谁、要点、模板与更新日志。\n\n- 要点一：先理解概念，再动手实操。\n- 要点二：每节配套可复用模板。\n- 要点三：跟随更新日志掌握内容变化。\n`;
 
+// —— ai_block 演示课件（AI 办公）：结构化块，含两张真实课件图解（public/courseware/courseware-ai-*.png）。
+//   走 validateBlocks 校验后再 JSON.stringify 入库，确保种子数据本身也是合法块协议。
+//   同时这门课挂了「视频课件」(lesson-ai-office-005.mp4 + videoGenStatus:ready)，点亮学习台的视频通路。
+const aiOfficeBlocks: unknown[] = [
+  { type: "scene", title: "为什么先学会「派活」给 AI", markdown: "职场里 80% 的重复文书，都能交给 AI 打初稿。真正拉开效率差距的，不是谁的工具新，而是**谁更会描述任务**。这一节，我们把「派活」这件事讲透。" },
+  { type: "objectives", items: ["理解 AI 办公助手的定位：协作者，不是替你决定的人", "掌握一个可复用的四段式提示词结构", "看懂两张对照图解，知道好提示词长什么样", "能独立写出一封结构清晰的邮件初稿"] },
+  { type: "concept", title: "AI 是协作者，不是甩手掌柜", markdown: "把 AI 当**实习生**：交代得越清楚，产出越靠谱。你负责判断与拍板，它负责把体力活做完。**背景、目标、约束、格式**四件事讲明白，返工就少一大半。" },
+  // —— 课件图解（image 块）：真实课件图，引用 public/courseware/ ——
+  { type: "image", src: "/courseware/courseware-ai-1.png", caption: "图解一：四段式提示词结构，背景 / 目标 / 约束 / 输出格式逐段拆解。", alt: "四段式提示词结构图解" },
+  { type: "keypoint", points: ["背景：你是谁、面对什么场景", "目标：想要 AI 产出什么", "约束：语气、长度、不能出现的内容", "格式：分点、表格还是纯段落"] },
+  { type: "image", src: "/courseware/courseware-ai-2.png", caption: "图解二：同一需求，模糊提示词 vs 结构化提示词的产出对照。", alt: "模糊提示词与结构化提示词产出对照图" },
+  { type: "compare", title: "两种提示词写法", left: { heading: "模糊写法（返工多）", items: ["「帮我写封邮件」", "没有对象和目的", "语气长度全靠猜"] }, right: { heading: "结构化写法（一次到位）", items: ["交代收件人与场景", "写清诉求与截止时间", "指定礼貌、简洁、分点"] } },
+  { type: "quiz", question: "下面哪一项最该写进提示词的「约束」里？", options: ["邮件正文的具体内容", "希望语气正式、控制在 150 字内", "AI 用的是什么模型", "今天的天气"], answerIndex: 1, explain: "约束描述的是对产出的限制条件，比如语气、字数、禁用内容；正文内容属于目标，模型与天气都不相关。" },
+  { type: "flashcard", front: "四段式提示词是哪四段？", back: "背景、目标、约束、输出格式。交代齐这四件事，AI 初稿的返工率显著下降。" },
+  { type: "summary", markdown: "学会用**背景 / 目标 / 约束 / 格式**四段式描述任务，AI 就能稳定产出可用初稿。下一步是把它用到最高频的场景：写邮件。", next: "第 2 讲 · 用 AI 写邮件" },
+];
+
 type LessonSeed = {
   title: string; summary: string; contentType?: string; durationSec: number;
   isFree?: boolean; articleMd?: string; live?: boolean; seat?: number;
+  // ai_block 课件：结构化块数组（JSON.stringify 后写入 blocksJson）。
+  blocks?: unknown[];
+  // 视频课件通路（v3.1）：块课可另挂一版「视频课件」。填 videoUrl(站内 /videos/*.mp4) + videoGenStatus:"ready" 即可真播。
+  videoUrl?: string; videoGenStatus?: string; videoDurationSec?: number;
 };
 type CourseSeed = {
   slug: string; title: string; subtitle: string; description: string;
@@ -105,12 +128,22 @@ const courses: CourseSeed[] = [
     cadence: "每周更新", featured: true, learners: 12430,
     lessons: [
       { title: "第 1 讲 · 认识 AI 办公助手", summary: "AI 是协作者", durationSec: 640, isFree: true },
-      { title: "第 2 讲 · 用 AI 写邮件", summary: "结构化提示词", durationSec: 720 },
-      { title: "第 3 讲 · 会议纪要自动化", summary: "录音到纪要", durationSec: 810 },
-      { title: "第 4 讲 · 一句话生成 PPT", summary: "提纲到成稿", durationSec: 900 },
-      { title: "第 5 讲 · 提示词模板库", summary: "10 个高频模板", contentType: "article", durationSec: 600, articleMd: article("办公提示词模板库") },
+      // ai_block 块课件：图文课件（含 image 图解）+ 视频课件（真播 lesson-ai-office-005.mp4）双通路。
+      // videoGenStatus:"ready" + videoUrl 让学习台「视频课件」Tab 能真播放。
+      {
+        title: "第 2 讲 · 给 AI 派活的四段式提示词", summary: "图文 + 视频双课件", contentType: "ai_block",
+        durationSec: 540, blocks: aiOfficeBlocks,
+        videoUrl: "/videos/lessons/lesson-ai-office-005.mp4", videoGenStatus: "ready", videoDurationSec: 540,
+      },
+      { title: "第 3 讲 · 用 AI 写邮件", summary: "结构化提示词", durationSec: 720 },
+      { title: "第 4 讲 · 会议纪要自动化", summary: "录音到纪要", durationSec: 810 },
+      { title: "第 5 讲 · 一句话生成 PPT", summary: "提纲到成稿", durationSec: 900 },
+      { title: "第 6 讲 · 提示词模板库", summary: "10 个高频模板", contentType: "article", durationSec: 600, articleMd: article("办公提示词模板库") },
     ],
-    updateLogs: [{ updateType: "added", title: "新增 PPT 生成一讲", description: "补充成稿工作流", daysAgo: 2, lessonIdx: 3 }],
+    updateLogs: [
+      { updateType: "added", title: "新增块课件与视频课件", description: "第 2 讲上线图文 + 视频双课件", daysAgo: 1, lessonIdx: 1 },
+      { updateType: "added", title: "新增 PPT 生成一讲", description: "补充成稿工作流", daysAgo: 2, lessonIdx: 4 },
+    ],
   },
   {
     slug: "ai-writing-006", title: "AI 写作与内容生产", subtitle: "选题、初稿、改写、事实核查",
@@ -255,7 +288,42 @@ async function main() {
   });
   await prisma.entitlement.create({ data: { userId: oralUser.id, sourceSubscriptionId: oralSub.id, status: "active", accessLevel: "premium", validUntil: new Date(Date.now() + 30 * 864e5), snapshotJson: JSON.stringify({ accessibleTracks: ["english_oral"] }) } });
 
+  // ---------- 广场/社区 demo 用户（轻量：仅昵称 + 头像，无订阅）----------
+  // 让广场「有人在学」，并把新头像 avatar-4~12 用起来（避免全站只有 3 个头像）。
+  const communitySeeds = [
+    { nickname: "晨读的橙子", avatar: "/avatars/avatar-4.png", ageBand: "22-40" },
+    { nickname: "打卡不迟到", avatar: "/avatars/avatar-5.png", ageBand: "18-24" },
+    { nickname: "AI 造课小王", avatar: "/avatars/avatar-6.png", ageBand: "22-40" },
+    { nickname: "银发也爱学", avatar: "/avatars/avatar-7.png", ageBand: "45-65" },
+    { nickname: "口语练习生", avatar: "/avatars/avatar-8.png", ageBand: "18-24" },
+    { nickname: "职场充电中", avatar: "/avatars/avatar-9.png", ageBand: "22-40" },
+    { nickname: "反诈老陈", avatar: "/avatars/avatar-10.png", ageBand: "35-45" },
+    { nickname: "笔记控 Mia", avatar: "/avatars/avatar-11.png", ageBand: "22-40" },
+    { nickname: "每天进步一点", avatar: "/avatars/avatar-12.png", ageBand: "18-24" },
+  ];
+  const communityUsers: { id: string; nickname: string; avatarUrl: string }[] = [];
+  for (let i = 0; i < communitySeeds.length; i++) {
+    const s = communitySeeds[i];
+    const u = await prisma.user.create({
+      data: {
+        nickname: s.nickname, avatarUrl: s.avatar, role: "user",
+        email: `community${i + 1}@tide.learning`, passwordHash: hashPassword("demo123"),
+        profile: { create: { ageBand: s.ageBand } },
+      },
+    });
+    communityUsers.push({ id: u.id, nickname: u.nickname, avatarUrl: s.avatar });
+  }
+
   // ---------- 课程 ----------
+  // 已就位的真实教学视频：文件名对应课程 slug，只有这 4 门有真片源。
+  // 给对应课程的「第 1 讲」（isFree 免费试学那节）填 videoUrl，让学习台能真播放。
+  const LESSON_VIDEO_BY_SLUG: Record<string, string> = {
+    "oral-smallclass-001": "/videos/lessons/lesson-oral-smallclass-001.mp4",
+    "ai-office-005": "/videos/lessons/lesson-ai-office-005.mp4",
+    "silver-oral-003": "/videos/lessons/lesson-silver-oral-003.mp4",
+    "anti-fraud-007": "/videos/lessons/lesson-anti-fraud-007.mp4",
+  };
+  const videoFilledCourses: string[] = [];
   const courseIds: Record<string, string> = {};
   const lessonIdMap: Record<string, string[]> = {};
   for (const c of courses) {
@@ -276,11 +344,24 @@ async function main() {
     for (let i = 0; i < c.lessons.length; i++) {
       const l = c.lessons[i];
       const type = l.live ? "live" : l.contentType ?? "video";
+      // 真实片源：仅第 1 讲（免费试学节）、且该课有对应视频文件时填直链，让学习台真播放。
+      const lessonZeroVideo = i === 0 && (l.isFree ?? false) ? LESSON_VIDEO_BY_SLUG[c.slug] ?? null : null;
+      // ai_block 课件：校验块数组后 stringify 入库；非块课不写 blocksJson。
+      const blocksJson =
+        type === "ai_block" && Array.isArray(l.blocks)
+          ? JSON.stringify({ version: 1, blocks: validateBlocks(l.blocks) })
+          : null;
+      // 视频课件通路：块课可显式挂 videoUrl + videoGenStatus:"ready"（真播）。否则沿用第 1 讲兜底片源。
+      const realVideoUrl = l.videoUrl ?? lessonZeroVideo;
       const lesson = await prisma.lesson.create({
         data: {
           courseId: created.id, title: l.title, summary: l.summary, sortOrder: i,
           contentType: type,
           videoAssetId: type === "video" || type === "live" ? `asset_${c.slug}_${i}` : null,
+          videoUrl: realVideoUrl,
+          blocksJson,
+          videoGenStatus: l.videoGenStatus ?? null,
+          videoDurationSec: l.videoDurationSec ?? null,
           articleMd: l.articleMd ?? null, durationSec: l.durationSec, isFree: l.isFree ?? false,
           liveStartAt: l.live ? new Date(Date.now() + 3 * 864e5) : null,
           liveSeatLimit: l.seat ?? null,
@@ -288,6 +369,7 @@ async function main() {
         },
       });
       lessonIdMap[c.slug].push(lesson.id);
+      if (realVideoUrl) videoFilledCourses.push(c.slug);
     }
     for (const log of c.updateLogs) {
       await prisma.courseUpdateLog.create({
@@ -482,9 +564,15 @@ async function main() {
   // 目标课程/章节 id（复用上文已建记录）
   const aiOfficeLessons = lessonIdMap["ai-office-005"];
   const oralLessons = lessonIdMap["oral-smallclass-001"];
-  // 1x1 透明 PNG 占位，作为截帧 data-url（演示 kind=capture）
-  const CAPTURE_PLACEHOLDER =
-    "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M8AAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+  // 截帧笔记的真实截图（替换原 1x1 透明 PNG 占位）：kind=capture 的 captureUrl 轮流引用这 4 张。
+  const NOTE_CAPTURES = [
+    "/note-captures/note-capture-01.jpg",
+    "/note-captures/note-capture-02.jpg",
+    "/note-captures/note-capture-03.jpg",
+    "/note-captures/note-capture-04.jpg",
+  ];
+  let captureSeq = 0;
+  const nextCapture = () => NOTE_CAPTURES[captureSeq++ % NOTE_CAPTURES.length];
 
   type NoteSeed = {
     courseSlug: string; lessonIdx: number; timestampSec?: number; title?: string;
@@ -507,7 +595,22 @@ async function main() {
     {
       courseSlug: "ai-office-005", lessonIdx: 0, timestampSec: 20, title: "开场截帧",
       contentMd: "这一页的心态图很好，先存下来回头复习。",
-      kind: "capture", captureUrl: CAPTURE_PLACEHOLDER, tags: ["灵感"],
+      kind: "capture", captureUrl: nextCapture(), tags: ["灵感"],
+    },
+    {
+      courseSlug: "ai-office-005", lessonIdx: 1, timestampSec: 64, title: "邮件三步法截帧",
+      contentMd: "把「收件人关系 → 目标 → 语气」这张图存下来，写邮件前对照一眼。",
+      kind: "capture", captureUrl: nextCapture(), starred: true, tags: ["重点"],
+    },
+    {
+      courseSlug: "oral-smallclass-001", lessonIdx: 0, timestampSec: 40, title: "万能开场白截帧",
+      contentMd: "三句万能开场白截了下来，刷牙时对着念。",
+      kind: "capture", captureUrl: nextCapture(), tags: ["口语句型"],
+    },
+    {
+      courseSlug: "anti-fraud-007", lessonIdx: 0, timestampSec: 88, title: "诈骗类型速查截帧",
+      contentMd: "常见诈骗类型这一页最实用，转给爸妈看。",
+      kind: "capture", captureUrl: nextCapture(), tags: ["待复习"],
     },
     {
       courseSlug: "oral-smallclass-001", lessonIdx: 0, timestampSec: 55, title: "万能救命句",
@@ -548,6 +651,95 @@ async function main() {
   }
   void aiOfficeLessons;
   void oralLessons;
+
+  // ---------- 自习室广场 demo 帖子（让广场一进去就"有人在学"）----------
+  // author 混用现有用户（demo/oral）+ 新建社区用户；type 混合 insight/checkin/question；
+  // 部分帖子带 1-2 张 square 配图，部分纯文字；likeCount/commentCount 给合理非零；
+  // createdAt 分散在近几天（HOUR 为偏移单位）。status=approved 才会出现在广场列表。
+  const HOUR = 3600 * 1000;
+  const authorPool = [demoUser, oralUser, ...communityUsers];
+  const pickAuthor = (i: number) => authorPool[i % authorPool.length];
+  type PostSeed = {
+    author: { id: string }; type: "insight" | "checkin" | "question";
+    content: string; images?: string[]; topicTags?: string[];
+    likeCount: number; commentCount: number; hoursAgo: number;
+  };
+  const postSeeds: PostSeed[] = [
+    {
+      author: communityUsers[1], type: "checkin",
+      content: "打卡第 12 天。今天学完《口语小班课》第 1 讲，跟着念了 5 遍开场白，开口没那么慌了，明天继续。",
+      images: ["/square/square-post-01.jpg"], topicTags: ["口语打卡", "开口挑战"],
+      likeCount: 34, commentCount: 6, hoursAgo: 3,
+    },
+    {
+      author: communityUsers[2], type: "insight",
+      content: "用 AI 造课体验分享：一句话把大纲丢给它，十几分钟就出了一门《职场表达》图文课的骨架，再自己补案例。真正省时间的是初稿，不是终稿，事实核查还得人来。",
+      images: ["/square/square-post-02.jpg", "/square/square-post-03.jpg"], topicTags: ["AI造课", "效率"],
+      likeCount: 58, commentCount: 12, hoursAgo: 8,
+    },
+    {
+      author: communityUsers[4], type: "question",
+      content: "求推荐：基础几乎为零，只想先能在超市、问路时开口，选《银发口语》还是《口语小班课》更合适？有学过的同学说说体验吗？",
+      topicTags: ["求推荐", "零基础"],
+      likeCount: 9, commentCount: 15, hoursAgo: 11,
+    },
+    {
+      author: demoUser, type: "insight",
+      content: "AI 办公课第 3 讲的会议纪要自动化太实用了。把录音转文字丢进去，先让它按「决议/待办/风险」三栏归纳，再补负责人和时间。原来两小时的活现在二十分钟。",
+      images: ["/square/square-post-04.jpg"], topicTags: ["AI办公", "会议纪要"],
+      likeCount: 47, commentCount: 8, hoursAgo: 20,
+    },
+    {
+      author: communityUsers[6], type: "checkin",
+      content: "反诈课打卡。今天把「常见诈骗类型」那一讲截图转到家庭群，老妈看完主动说以后陌生链接不点了。学以致用，值了。",
+      images: ["/square/square-post-05.jpg"], topicTags: ["反诈打卡"],
+      likeCount: 72, commentCount: 10, hoursAgo: 26,
+    },
+    {
+      author: oralUser, type: "insight",
+      content: "坚持口语两周的小心得：别追求句子完美，先把「万能三句」练成肌肉记忆。听不懂就说 Sorry, could you say that again，比硬撑着点头强多了。",
+      topicTags: ["口语心得", "坚持"],
+      likeCount: 41, commentCount: 5, hoursAgo: 33,
+    },
+    {
+      author: communityUsers[0], type: "checkin",
+      content: "晨读打卡 Day 21。今天躺学单词那门课学了音标，跟读了一整节。连续三周没断，潮汐日历终于连成一条线了，很有成就感。",
+      images: ["/square/square-post-06.jpg"], topicTags: ["晨读", "单词打卡"],
+      likeCount: 55, commentCount: 7, hoursAgo: 40,
+    },
+    {
+      author: communityUsers[5], type: "question",
+      content: "问下大家，AI 写作课里讲的「改写链」具体怎么落地？我每次让它改一遍就没思路了，有没有多轮改写的提示词模板可以参考？",
+      topicTags: ["AI写作", "提示词"],
+      likeCount: 18, commentCount: 14, hoursAgo: 48,
+    },
+    {
+      author: communityUsers[7], type: "insight",
+      content: "笔记控の自习室用法：看课时用字幕划线剪藏，重点直接存成卡片；关键页面截帧进「截帧廊」。复习时不用回看整节，翻卡片就够了，效率翻倍。",
+      images: ["/square/square-post-07.jpg", "/square/square-post-08.jpg"], topicTags: ["笔记方法", "复习"],
+      likeCount: 63, commentCount: 9, hoursAgo: 55,
+    },
+    {
+      author: communityUsers[8], type: "checkin",
+      content: "每天进步一点点。今天学了 AI 办公第 1 讲，记住一句话：AI 是协作者，不是许愿池。先给上下文再提要求，产出果然靠谱多了。",
+      images: ["/square/square-post-09.jpg"], topicTags: ["AI办公打卡"],
+      likeCount: 29, commentCount: 4, hoursAgo: 68,
+    },
+  ];
+  void pickAuthor;
+  let postCount = 0;
+  for (const p of postSeeds) {
+    await prisma.post.create({
+      data: {
+        userId: p.author.id, type: p.type, content: p.content, status: "approved",
+        images: JSON.stringify(p.images ?? []),
+        topicTags: JSON.stringify(p.topicTags ?? []),
+        likeCount: p.likeCount, commentCount: p.commentCount,
+        createdAt: new Date(Date.now() - p.hoursAgo * HOUR),
+      },
+    });
+    postCount++;
+  }
 
   // ---------- C2：需求制作剧场（DemandStage）+ 评论 + 关注 ----------
   // 阶段模板：scripting → recording → editing → reviewing → published
@@ -649,8 +841,10 @@ async function main() {
   }
 
   console.log("✅ 融合种子完成：");
-  console.log(`   字幕 ${subtitleCount} 条 · 笔记 ${noteCount} 条 · 成就 ${achievementSeeds.length} 个（demo 解锁 ${demoUnlocked.length}）`);
+  console.log(`   字幕 ${subtitleCount} 条 · 笔记 ${noteCount} 条（截帧 ${captureSeq} 张真实截图）· 成就 ${achievementSeeds.length} 个（demo 解锁 ${demoUnlocked.length}）`);
   console.log(`   需求阶段 ${stageCount} 条 · 关注 ${followCount} 条 · 潮汐日历 ${streakDayCount} 天 · 优惠券 TIDE20`);
+  console.log(`   广场帖子 ${postCount} 条 · 社区用户 ${communityUsers.length} 位（头像 avatar-4~12）`);
+  console.log(`   真实视频已填入 ${[...new Set(videoFilledCourses)].length} 门课首讲：${[...new Set(videoFilledCourses)].join(", ")}`);
   console.log(`   课程 ${courses.length} 门（有道英语板块 + 潮汐 AI/生活）`);
   console.log(`   套餐：全站(月/季/年) + 单赛道(口语/银发/AI) · 线索 ${leadSeeds.length} 条`);
   console.log("   admin@tide.learning/admin123 · demo@tide.learning/demo123(全站) · oral@tide.learning/oral123(仅口语)");

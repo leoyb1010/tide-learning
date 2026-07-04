@@ -69,6 +69,111 @@ export function trackIconKey(category: string): string {
   }
 }
 
+/**
+ * 封面池映射：让「无专属封面」的课（AI 造课 / 新课 / 无 cover-<slug>.jpg 的课）
+ * 也能落到一张与赛道气质相符的真实封面，而不是露出纯渐变。
+ *
+ * public/covers/cover-pool-<key>.jpg 已就位（通用赛道封面池）：
+ *   ai_skill           → ai-1 / ai-2 / ai-3
+ *   english_oral       → oral-1 / oral-2 / oral-3
+ *   english_foundation → english-1 / english-2
+ *   silver_english     → silver-1 / silver-2
+ *   life               → life-1 / life-2
+ * 未识别 category 兜底走 ai 池（中性科技感），仍是真实图，不回渐变。
+ *
+ * 纯函数、无副作用、无 "use client"：server 与 client 组件都能直接调用。
+ */
+const COVER_POOL: Record<string, string[]> = {
+  ai_skill: ["ai-1", "ai-2", "ai-3"],
+  english_oral: ["oral-1", "oral-2", "oral-3"],
+  english_foundation: ["english-1", "english-2"],
+  silver_english: ["silver-1", "silver-2"],
+  life: ["life-1", "life-2"],
+};
+
+/** category 无对应池时的兜底池（仍是真实封面，非渐变）。 */
+const COVER_POOL_FALLBACK = COVER_POOL.ai_skill;
+
+/**
+ * 稳定 hash：把 seed（course id 或 slug）散成非负整数。
+ * 同一门课永远命中池内同一张，翻页/刷新不跳图（djb2 变体，纯数值运算）。
+ */
+function stableHash(seed: string): number {
+  let h = 5381;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 33) ^ seed.charCodeAt(i);
+  }
+  return h >>> 0; // 转无符号 32 位
+}
+
+/**
+ * 按 category 从封面池挑一张稳定图，返回可直接用于 <img src> 的 public 路径。
+ * @param category 赛道 key
+ * @param seed     稳定选图种子，传 course.id 或 course.slug（同课稳定不跳）
+ */
+export function coverPoolSrc(category: string, seed: string): string {
+  const pool = COVER_POOL[category] ?? COVER_POOL_FALLBACK;
+  const pick = pool[stableHash(seed) % pool.length];
+  return `/covers/cover-pool-${pick}.jpg`;
+}
+
+/**
+ * 专属封面白名单：已就位 public/covers/cover-<slug>.jpg 的 8 门 seed 课。
+ * server 组件（如 CourseCard）无法用 <img onError> 探测文件是否存在，
+ * 故用此白名单在渲染前决定「走专属封面」还是「走封面池」，避免新课露渐变。
+ * 新增专属封面的课，在此登记 slug 即可（同时放好对应 jpg）。
+ */
+export const DEDICATED_COVER_SLUGS = new Set<string>([
+  "oral-smallclass-001",
+  "all-round-002",
+  "silver-oral-003",
+  "three-in-one-004",
+  "ai-office-005",
+  "ai-writing-006",
+  "anti-fraud-007",
+  "pre-visit-008",
+]);
+
+/**
+ * 课程封面决策（纯函数，server/client 通用）：
+ * 有专属封面 → /covers/cover-<slug>.jpg；否则 → 按 category+seed 从封面池取一张真实图。
+ * 任何情况下都返回一张真实图路径，永不落回纯渐变。
+ * @param slug     课程 slug
+ * @param category 赛道 key
+ * @param seed     封面池选图种子（course.id 优先，缺省用 slug）
+ */
+export function resolveCoverSrc(slug: string, category: string, seed?: string): string {
+  if (DEDICATED_COVER_SLUGS.has(slug)) return `/covers/cover-${slug}.jpg`;
+  return coverPoolSrc(category, seed ?? slug);
+}
+
+/**
+ * 视觉映射：赛道 category 到课程定格图（lesson still）token。
+ * public/lesson-stills/lesson-still-<key>.jpg 已就位：oral / ai / silver / life / english。
+ * 用作视频区 poster / 续播缩略的真实底图，替代纯渐变；未识别兜底 ai。
+ */
+export function trackStillKey(category: string): string {
+  switch (category) {
+    case "ai_skill":
+      return "ai";
+    case "silver_english":
+      return "silver";
+    case "life":
+      return "life";
+    case "english_oral":
+      return "oral";
+    case "english_foundation":
+      return "english";
+    default:
+      return "ai";
+  }
+}
+
+/** 按 category 拼课程定格图路径（public/lesson-stills/lesson-still-<key>.jpg）。 */
+export function trackStillSrc(category: string): string {
+  return `/lesson-stills/lesson-still-${trackStillKey(category)}.jpg`;
+}
+
 // 未来赛道（仅展示"即将上线"，对应有道跨赛道扩张规划）
 export const FUTURE_TRACKS = [
   { key: "vocational", label: "职业教育" },

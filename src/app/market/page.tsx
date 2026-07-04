@@ -2,8 +2,8 @@ import Link from "next/link";
 import { Storefront, GraduationCap, Users, ListChecks, Sparkle, SignIn } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { CoverBg, coverSrc } from "@/components/ui";
-import { trackLabel } from "@/lib/tracks";
+import { CoverBg } from "@/components/ui";
+import { trackLabel, resolveCoverSrc } from "@/lib/tracks";
 import { MarketRequestButton, type RequestState } from "@/components/MarketRequestButton";
 
 export const metadata = { title: "课程集市" };
@@ -149,7 +149,7 @@ export default async function MarketPage() {
                 style={{ "--i": idx } as React.CSSProperties}
                 className="hover-sheen studio-lift group flex flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)] hover:border-[var(--border2)]"
               >
-                <CoverBg color={c.coverColor} imageSrc={coverSrc(c.slug)} alt={c.title} className="aspect-[16/9] w-full">
+                <CoverBg color={c.coverColor} imageSrc={resolveCoverSrc(c.slug, c.category ?? "", c.id)} alt={c.title} className="aspect-[16/9] w-full">
                   <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-[var(--ink)]/40 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
                     {isAi ? <Sparkle size={11} weight="fill" /> : <ListChecks size={11} weight="fill" />}
                     {isAi ? "AI 生成" : "整理导入"}
