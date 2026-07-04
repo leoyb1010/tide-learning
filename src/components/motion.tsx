@@ -1,7 +1,16 @@
 "use client";
 
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform, type Variants } from "framer-motion";
-import { useRef, useState, type ReactNode } from "react";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+  useTransform,
+  useReducedMotion,
+  useInView,
+  type Variants,
+} from "framer-motion";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 /* ============================================================
    Tide Motion System 2.0 — 涨潮进场 / 退潮离场 / 进度即水位
@@ -301,5 +310,190 @@ export function PageTide({ children, keyId }: { children: ReactNode; keyId: stri
         {children}
       </motion.div>
     </AnimatePresence>
+  );
+}
+
+/* ============================================================
+   §签名时刻 —— 全站「场景编排」的可复用原语
+   自习室隐喻的动效化：从暗到亮的「点亮」是全站唯一记忆语言。
+   三个原语覆盖 5 个签名时刻里「需要跨组件复用」的部分：
+     · LightUp / useLightUp —— 「点亮」（第二幕物件 + 推门文案，moment 2/5 同族）
+     · DoorOpen             —— 「推门进场」一次性开场序列（moment 5）
+     · ArchiveStamp         —— 「结算归档」盖章入册（moment 3）
+   全部 transform/opacity/filter 合成友好、一次性播放不常驻、reduce-motion 终态。
+   ============================================================ */
+
+/** 「点亮」曲线：从暗（.55 亮度 / .35 不透明 / 下沉）到亮，60% 处轻微过亮点睛后落定。
+    与 globals.css @keyframes lightUp 同一手感，供 JS 编排（滚动/进场）复用。
+    返回新数组（非 readonly），供 framer animate 目标可变类型消费。 */
+function lightUpKeyframes() {
+  return {
+    opacity: [0.35, 1, 1],
+    filter: ["brightness(0.55)", "brightness(1.12)", "brightness(1)"],
+    y: [10, 0, 0],
+  };
+}
+export const LIGHTUP_TIMES = [0, 0.6, 1];
+
+/**
+ * useLightUp —— 「点亮」编排 hook。
+ * 返回一个 ref 与 framer 的 animate 目标：元素进入视图（或 active=true）时，
+ * 从暗到亮点亮一次。reduce-motion 直接返回终态（亮），不播放。
+ *
+ * 用法：
+ *   const { ref, animate, initial, transition } = useLightUp();
+ *   <motion.div ref={ref} initial={initial} animate={animate} transition={transition}>
+ *
+ * @param active 受控点亮（如滚动进度驱动）。传 undefined 则用视口进入自动触发。
+ */
+export function useLightUp(active?: boolean) {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: "-60px" });
+  const lit = active ?? inView;
+
+  const initial = reduce
+    ? { opacity: 1, filter: "brightness(1)", y: 0 }
+    : { opacity: 0.35, filter: "brightness(0.55)", y: 10 };
+
+  const animate = reduce
+    ? { opacity: 1, filter: "brightness(1)", y: 0 }
+    : lit
+    ? lightUpKeyframes()
+    : initial;
+
+  const transition = reduce
+    ? { duration: 0 }
+    : { duration: 0.62, ease: EASE, times: [...LIGHTUP_TIMES] };
+
+  return { ref, initial, animate, transition, lit, reduce };
+}
+
+/**
+ * LightUp —— 「点亮」组件（声明式）。包裹任意内容，进入视图时从暗到亮点亮一次，
+ * 顶角浮起一圈可选暖光晕（signature Light-Up 的「微光扩散」）。
+ * 第二幕物件、书桌今日卡、推门文案共用此语言，强化设计一致性。
+ *
+ * @param glow    是否渲染点亮时的暖光晕扩散（默认 true）。
+ * @param glowColor 光晕颜色（默认专注红的柔光；可传 --info/--warn 等赛道色）。
+ * @param active  受控点亮；不传则视口进入自动触发。
+ * @param delay   点亮延迟（编排多个物件依次点亮时用）。
+ */
+export function LightUp({
+  children,
+  className,
+  glow = true,
+  glowColor = "rgba(252,1,26,0.16)",
+  active,
+  delay = 0,
+}: {
+  children: ReactNode;
+  className?: string;
+  glow?: boolean;
+  glowColor?: string;
+  active?: boolean;
+  delay?: number;
+}) {
+  const { ref, initial, animate, transition, lit, reduce } = useLightUp(active);
+  return (
+    <motion.div
+      ref={ref}
+      className={`relative ${className ?? ""}`}
+      initial={initial}
+      animate={animate}
+      transition={{ ...transition, delay: reduce ? 0 : delay }}
+      style={{ willChange: reduce ? undefined : "transform, opacity, filter" }}
+    >
+      {glow && !reduce && (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute -left-6 -top-8 h-28 w-32 rounded-full blur-2xl"
+          style={{ background: `radial-gradient(circle, ${glowColor}, transparent 68%)` }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: lit ? [0, 1, 0.7] : 0 }}
+          transition={{ duration: 0.7, ease: EASE, delay }}
+        />
+      )}
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * DoorOpen —— 「推门进场」一次性开场编排（moment 5）。
+ * 首屏挂载时播放一次：暗场（暗角合拢 + 场景微缩）→ 推开 → 亮场落定。
+ * 只做「场景层」的开门包裹；内部文案的浮现由各自 initial/animate 承担。
+ * reduce-motion：直接终态（亮场、无位移），不播放开门。
+ *
+ * @param children 场景内容（第一幕整场）。
+ */
+export function DoorOpen({ children, className }: { children: ReactNode; className?: string }) {
+  const reduce = useReducedMotion();
+  return (
+    <motion.div
+      className={`relative ${className ?? ""}`}
+      initial={reduce ? false : { opacity: 0, scale: 1.04, filter: "brightness(0.4)" }}
+      animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
+      transition={reduce ? { duration: 0 } : { duration: 1.1, ease: EASE }}
+      style={{ willChange: reduce ? undefined : "transform, opacity, filter" }}
+    >
+      {/* 开门光缝：一道从中缝向两侧推开的暖光，只在开场播一次（reduce 不渲染） */}
+      {!reduce && (
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 z-[2]"
+          style={{
+            background:
+              "linear-gradient(90deg, transparent 48%, rgba(255,214,150,0.28) 50%, transparent 52%)",
+          }}
+          initial={{ opacity: 0, scaleX: 0.2 }}
+          animate={{ opacity: [0, 0.9, 0], scaleX: [0.2, 1, 1.2] }}
+          transition={{ duration: 0.9, ease: EASE, delay: 0.1 }}
+        />
+      )}
+      {children}
+    </motion.div>
+  );
+}
+
+/**
+ * ArchiveStamp —— 「结算归档」盖章入册（moment 3）。
+ * 完课/复习结算时，一枚印章从上方带旋转「盖」下、轻微回弹落定，像把这一轮归档入册。
+ * 一次性播放（active 触发一次）；reduce-motion 直接显示终态印章（无位移、无旋转）。
+ * 纯装饰包裹，不改任何结算逻辑。
+ *
+ * @param active 触发盖章（结算态挂载时置 true）。
+ * @param label  印章文字（如「已归档」「本轮完成」）。
+ */
+export function ArchiveStamp({
+  active,
+  label,
+  className,
+}: {
+  active: boolean;
+  label: string;
+  className?: string;
+}) {
+  const reduce = useReducedMotion();
+  if (!active) return null;
+  return (
+    <motion.span
+      className={`archive-stamp inline-flex select-none items-center gap-1 rounded-[8px] border-2 border-[var(--red)] px-2.5 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[var(--red)] ${className ?? ""}`}
+      initial={
+        reduce
+          ? { opacity: 1, scale: 1, rotate: -8 }
+          : { opacity: 0, scale: 1.8, rotate: -22, y: -16 }
+      }
+      animate={{ opacity: 1, scale: 1, rotate: -8, y: 0 }}
+      transition={
+        reduce
+          ? { duration: 0 }
+          : { type: "spring", stiffness: 520, damping: 16, mass: 0.7, delay: 0.15 }
+      }
+      style={{ willChange: reduce ? undefined : "transform, opacity", transformOrigin: "center" }}
+      aria-hidden
+    >
+      {label}
+    </motion.span>
   );
 }

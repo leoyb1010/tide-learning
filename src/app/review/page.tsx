@@ -24,7 +24,7 @@ import { CalendarCheck as CalendarCheckIcon, Exam as ExamIcon } from "@phosphor-
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, Button } from "@/components/ui";
 import { SharePanel } from "@/components/SharePanel";
-import { TidalReveal, SPRING_TIDE, SPRING_FIRM, WaveProgress, EASE } from "@/components/motion";
+import { TidalReveal, SPRING_TIDE, SPRING_FIRM, WaveProgress, EASE, ArchiveStamp } from "@/components/motion";
 import { renderMarkdown } from "@/lib/markdown";
 import { track } from "@/lib/analytics-client";
 import dynamic from "next/dynamic";
@@ -964,7 +964,11 @@ function SettlementState({
         >
           <Confetti size={30} weight="fill" />
         </motion.div>
-        <h2 className="relative mt-4 text-[20px] font-bold text-white">本轮复习完成</h2>
+        <div className="relative mt-4 flex items-center justify-center gap-2.5">
+          <h2 className="text-[20px] font-bold text-white">本轮复习完成</h2>
+          {/* 结算归档（moment 3）：一枚印章盖下，把这一轮「入册」。一次性、reduce-motion 终态。 */}
+          <ArchiveStamp active={!reduce} label="已归档" className="!text-white !border-white/80" />
+        </div>
         <p className="relative mt-1.5 max-w-[440px] text-[14px] leading-[1.7] text-white/70">
           主动回忆一次，记忆就牢一分。坚持每天，间隔重复替你打理长期记忆。
         </p>

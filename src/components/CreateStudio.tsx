@@ -24,6 +24,7 @@ import {
   HourglassMedium,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
+import { ArchiveStamp } from "@/components/motion";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
 import { ProgressRing, Spinner, useGenPolling, type GenProgress } from "@/components/GenProgress";
@@ -1095,6 +1096,7 @@ function DonePanel({
   onRetry: (lessonId: string) => void;
   onReset: () => void;
 }) {
+  const reduce = useReducedMotion();
   const failed = lessons.filter((l) => l.state === "failed");
   const isImport = source === "import";
 
@@ -1146,10 +1148,12 @@ function DonePanel({
       </div>
 
       {/* 「课有家了」确定感条：明确告知这门课已归入书架，去向不再模糊 */}
+      {/* 结算归档（moment 3）：飞书落定后，一枚印章盖下「入册」——与复习结算同一归档语言。 */}
       <div className="relative flex items-center gap-2 border-b border-[var(--red-soft-border)] bg-[var(--red-soft)] px-5 py-2.5 sm:px-6">
         <Books size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
         <span className="text-[12.5px] font-semibold text-[var(--red-ink)]">已放入你的书架</span>
         <span className="text-[11px] font-semibold text-[var(--red)]/70">· {isImport ? "资料升维" : "AI 造课"}</span>
+        <ArchiveStamp active={!reduce} label="已入册" className="ml-auto" />
       </div>
 
       <div className="p-5 sm:p-6">

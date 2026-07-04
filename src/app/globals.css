@@ -374,6 +374,20 @@ body::before {
   .studio-sweep::after { animation: none !important; display: none; }
 }
 
+/* §10.2 签名动效「结算归档 · 盖章入册」——完课/复习结算的收束记忆点。
+   印章落定后墨色轻微渗开一圈（::after 一次性扩散），像真盖了一枚章。位移/旋转由
+   framer <ArchiveStamp> 承担；此处只补「墨渗」质感与 reduce-motion 降级。 */
+@keyframes stampInk { 0%{opacity:0;transform:scale(.4)} 40%{opacity:.5} 100%{opacity:0;transform:scale(1.5)} }
+.archive-stamp { position: relative; box-shadow: 0 1px 0 rgba(252,1,26,.15); }
+.archive-stamp::after {
+  content:""; position:absolute; inset:-2px; border-radius: inherit; pointer-events:none;
+  border: 2px solid currentColor;   /* 跟随印章文字色（红/白皆可），墨渗与主体同色 */
+  animation: stampInk .5s var(--ease-out-expo) .32s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .archive-stamp::after { animation: none !important; display: none; }
+}
+
 /* §9 入席转场：从「写目标」到「全屏沉浸」的仪式感编排。
    暗角缓缓合拢 (opacity 0→1)，顶部番茄条从上方就位，营造「进入专注舱」。 */
 @keyframes vignetteIn { from { opacity: 0; } to { opacity: 1; } }
@@ -1286,4 +1300,52 @@ body::before {
   .vote-fuel-pop { animation: none !important; transform: none !important; opacity: 1 !important; }
   .vote-spark { display: none !important; }   /* 无动效时不显示飞散火星，避免静态残留 */
   .vote-tinder { transition: none !important; }
+}
+
+/* ============================================================
+   v4.0 沉浸式首页「深夜自习室」三幕（ImmersiveStudyRoom）
+   —— 场景是自习室：无论应用亮/暗主题，三幕内部恒为深色舞台，文字走
+      --ink-on-dark 阶。此处只放「全宽脱离容器」工具类 + 光影关键帧，
+      场景 3D/视差/滚动由 client 组件的 framer-motion 驱动。
+   —— 全部 reduce-motion 统一降级为静态（光晕保留、呼吸/脉动/提示停）。
+   ============================================================ */
+
+/* 全宽脱离：首页沉浸场景要挣脱 <main> 的 max-w-[1280px] + 左右 padding，
+   贴满视口宽。用 100vw + 负 margin 居中反推（含滚动条时用 100vw 会略溢出，
+   故配 overflow 由各幕 section 自身 overflow-hidden 兜住横向溢出）。 */
+.studyroom-bleed {
+  width: 100vw;
+  position: relative;
+  left: 50%;
+  right: 50%;
+  margin-left: -50vw;
+  margin-right: -50vw;
+}
+
+/* 台灯光晕呼吸：缓慢脉动（scale/opacity），画面唯一光源的「活着」感。
+   克制振幅，避免频闪；reduce-motion 静止。 */
+@keyframes lampBreathe {
+  0%, 100% { transform: scale(1);    opacity: 0.9; }
+  50%      { transform: scale(1.06); opacity: 1;   }
+}
+.lamp-breathe { animation: lampBreathe 6.5s ease-in-out infinite; will-change: transform, opacity; }
+
+/* 红色专注信号小点：极缓明灭（待机指示灯），克制的唯一红。 */
+@keyframes focusDot {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1; }
+}
+.focus-dot { animation: focusDot 3.2s ease-in-out infinite; }
+
+/* 向下滚动提示箭头：轻微上下往复（4px），引导进入第二幕。 */
+@keyframes scrollHint {
+  0%, 100% { transform: translateY(0);   opacity: 0.6; }
+  50%      { transform: translateY(4px); opacity: 1;   }
+}
+.scroll-hint { animation: scrollHint 1.8s var(--ease-tide) infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lamp-breathe { animation: none !important; transform: none !important; opacity: 0.95 !important; }
+  .focus-dot { animation: none !important; opacity: 0.7 !important; }
+  .scroll-hint { animation: none !important; transform: none !important; }
 }
