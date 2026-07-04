@@ -110,6 +110,9 @@ struct PostCard: View {
     @State private var commentsExpanded = false
     /// 点赞心跳：按下瞬间放大回弹。
     @State private var heartBeat = false
+    /// 全屏图片查看器（Lightbox）：展示态 + 当前下标。
+    @State private var viewerShown = false
+    @State private var viewerIndex = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -133,6 +136,11 @@ struct PostCard: View {
         }
         .studioCard(padding: 14)
         .animation(reduceMotion ? nil : StudioMotion.smooth, value: commentsExpanded)
+        // 全屏图片查看器（点缩略图放大，多图左右滑动）。
+        .fullScreenCover(isPresented: $viewerShown) {
+            ImageViewerView(images: post.images ?? [], index: $viewerIndex)
+                .presentationBackground(.clear)
+        }
     }
 
     // MARK: 头部（头像 + 昵称 + 类型 + 时间）
@@ -182,38 +190,69 @@ struct PostCard: View {
         }
     }
 
-    // MARK: 图片网格
+    // MARK: 图片缩略图网格（对齐 web v4.0：紧凑小方图 + 点击进 Lightbox）
 
+    /// 缩略图克制：统一小方图，最多铺 4 格；>4 张末格盖「+N」。
+    /// 列数：1 张→2 列(占 1 格保持小方) / 2 张→2 列 / 3+ 张→3 列。
     private func imageGrid(_ images: [String]) -> some View {
-        let cols = images.count == 1 ? 1 : (images.count == 2 || images.count == 4 ? 2 : 3)
+        let cols = images.count == 1 ? 2 : (images.count == 2 ? 2 : 3)
         let layout = Array(repeating: GridItem(.flexible(), spacing: 6), count: cols)
+        let shown = Array(images.prefix(4))
+        let extra = images.count - shown.count   // >4 张的溢出数
         return LazyVGrid(columns: layout, spacing: 6) {
-            ForEach(images.prefix(9), id: \.self) { urlStr in
-                gridImage(urlStr, single: images.count == 1)
+            ForEach(Array(shown.enumerated()), id: \.offset) { i, urlStr in
+                thumb(urlStr,
+                      at: i,
+                      overflow: (i == shown.count - 1 && extra > 0) ? extra : nil)
             }
         }
     }
 
-    private func gridImage(_ urlStr: String, single: Bool) -> some View {
-        ZStack {
-            Studio.surface2
-            if let url = URL(string: urlStr) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let img): img.resizable().aspectRatio(contentMode: .fill)
-                    case .empty: ProgressView().tint(Studio.ink4)
-                    case .failure: Image(systemName: "photo").foregroundStyle(Studio.ink4)
-                    @unknown default: EmptyView()
+    /// 单个缩略图：小方图 .scaledToFill + clipped（object-cover 等价），点击打开 Lightbox。
+    /// overflow 非空时在末格盖半透明「+N」蒙层（点它也进灯箱，可翻看被折叠的全部图）。
+    private func thumb(_ urlStr: String, at index: Int, overflow: Int?) -> some View {
+        Button {
+            Haptics.light()                    // 打开轻触觉（原生浏览节奏）
+            viewerIndex = index
+            viewerShown = true
+        } label: {
+            ZStack {
+                Studio.surface2
+                if let url = URL(string: urlStr) {
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let img): img.resizable().scaledToFill()
+                        case .empty: ProgressView().tint(Studio.ink4)
+                        case .failure: Image(systemName: "photo").foregroundStyle(Studio.ink4)
+                        @unknown default: EmptyView()
+                        }
+                    }
+                } else {
+                    Image(systemName: "photo").foregroundStyle(Studio.ink4)
+                }
+
+                // >4 张：末格「+N」蒙层。
+                if let extra = overflow {
+                    ZStack {
+                        Color.black.opacity(0.45)
+                        Text("+\(extra)")
+                            .font(.studio(15, .bold))
+                            .foregroundStyle(.white)
                     }
                 }
-            } else {
-                Image(systemName: "photo").foregroundStyle(Studio.ink4)
             }
+            .aspectRatio(1, contentMode: .fill)   // 统一小方图
+            .frame(maxWidth: .infinity)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(Studio.border, lineWidth: 1)
+            )
         }
-        .frame(height: single ? 200 : 108)
-        .frame(maxWidth: .infinity)
-        .clipped()
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .buttonStyle(.plain)
+        .pressable(scale: 0.97, haptic: false)   // 触觉在 action 里已给，避免重复
+        .accessibilityLabel(overflow != nil ? "查看全部 \(post.images?.count ?? 0) 张图片" : "查看第 \(index + 1) 张图片")
     }
 
     // MARK: 操作行（点赞 / 评论 / 转发）

@@ -48,6 +48,8 @@ struct DeskView: View {
     @State private var appeared = false
     /// 报表小卡详情 sheet（日/周/月）。
     @State private var activeReport: DeskReport?
+    /// 「我的书架」弹层（五层分类，按需拉 /api/shelf）。
+    @State private var showShelf = false
 
     var body: some View {
         NavigationStack {
@@ -70,6 +72,9 @@ struct DeskView: View {
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                 }
+            }
+            .sheet(isPresented: $showShelf) {
+                ShelfView()
             }
         }
     }
@@ -108,9 +113,13 @@ struct DeskView: View {
             }
             .riseIn(appeared, index: 7, reduceMotion: reduceMotion)
 
-            // 6. AI 建议：深色展示卡 videoGradient（智能气场）
-            adviceCard(d.advice)
+            // 6. 我的书架入口：一行可按压卡，打开五层分类书架弹层
+            shelfEntry
                 .riseIn(appeared, index: 8, reduceMotion: reduceMotion)
+
+            // 7. AI 建议：深色展示卡 videoGradient（智能气场）
+            adviceCard(d.advice)
+                .riseIn(appeared, index: 9, reduceMotion: reduceMotion)
         }
         .padding(16)
         .onAppear {
@@ -397,6 +406,39 @@ struct DeskView: View {
         )
     }
 
+    // MARK: 我的书架入口
+
+    /// 打开五层书架弹层（AI造课/导入/在学/集市淘的/已完成）。按需拉 /api/shelf。
+    private var shelfEntry: some View {
+        Button {
+            Haptics.light()
+            showShelf = true
+        } label: {
+            HStack(spacing: 12) {
+                ZStack {
+                    Circle().fill(Studio.redSoft).frame(width: 34, height: 34)
+                    Image(systemName: "books.vertical.fill")
+                        .font(.system(size: 15, weight: .semibold)).foregroundStyle(Studio.red)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("我的书架")
+                        .font(.studio(15, .semibold)).foregroundStyle(Studio.ink)
+                    Text("AI 造课 · 导入 · 在学 · 集市淘的 · 已完成")
+                        .font(.studio(11)).foregroundStyle(Studio.ink3).lineLimit(1)
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 13, weight: .semibold)).foregroundStyle(Studio.ink4)
+            }
+        }
+        .buttonStyle(.plain)
+        .studioCard(padding: 14)
+        .pressable()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("我的书架，五层分类：AI 造课、导入、在学、集市淘的、已完成")
+        .accessibilityAddTraits(.isButton)
+    }
+
     private func sectionHeader(_ title: String, trailing: String? = nil) -> some View {
         HStack(alignment: .firstTextBaseline) {
             Text(title).font(.studio(16, .bold)).foregroundStyle(Studio.ink)
@@ -423,6 +465,7 @@ struct DeskView: View {
                     SkeletonBar(height: 96).clipShape(RoundedRectangle(cornerRadius: StudioRadius.card))
                 }
             }
+            SkeletonBar(height: 62).clipShape(RoundedRectangle(cornerRadius: StudioRadius.card))
             SkeletonBar(height: 72).clipShape(RoundedRectangle(cornerRadius: StudioRadius.cardLg))
         }.padding(16)
     }

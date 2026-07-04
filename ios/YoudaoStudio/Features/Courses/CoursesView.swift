@@ -131,6 +131,8 @@ struct CoursesView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 主网格首屏进场：内容到达后翻转，驱动课程卡索引交错浮现。
     @State private var gridAppeared = false
+    /// 集市入口 push 态（课程库 → 课程集市，同为浏览面的姊妹目的地）。
+    @State private var goMarket = false
 
     private let columns = [
         GridItem(.flexible(), spacing: 12),
@@ -149,6 +151,24 @@ struct CoursesView: View {
             }
             .background(Studio.bg)
             .navigationTitle("课程库")
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Haptics.light()
+                        goMarket = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "storefront.fill").font(.system(size: 12, weight: .semibold))
+                            Text("集市").font(.studio(14, .semibold))
+                        }
+                        .foregroundStyle(Studio.red)
+                    }
+                    .accessibilityLabel("去逛课程集市")
+                }
+            }
+            .navigationDestination(isPresented: $goMarket) {
+                MarketView()
+            }
             .task { if vm.courses == nil { await vm.load() } }
             .refreshable { await vm.load() }
         }
