@@ -42,7 +42,7 @@ interface LessonData {
 export function Player({
   courseId, courseSlug, courseTitle, lesson, access, canCreateNote,
   outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialSlidePage, initialNotes,
-  posterSrc,
+  posterSrc, sceneBgSrc,
 }: {
   courseId: string; courseSlug: string; courseTitle: string;
   lesson: LessonData; access: boolean; canCreateNote: boolean;
@@ -52,6 +52,8 @@ export function Player({
   initialSlidePage: number; initialNotes: NoteItem[];
   /** 按赛道映射的课程定格图（lesson still）路径，作视频区 poster / 模拟兜底底图，替代纯渐变。 */
   posterSrc?: string;
+  /** 按赛道映射的 scene 块场景背景图路径（server 端按 course.category 解析）。透传给块渲染，作 SceneBlock 氛围底。 */
+  sceneBgSrc?: string;
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
@@ -821,6 +823,7 @@ export function Player({
                       <BlockSlideshow
                         blocks={blocks}
                         courseId={courseId}
+                        sceneBg={sceneBgSrc}
                         initialIndex={initialSlidePage > 0 ? initialSlidePage - 1 : 0}
                         onSlideChange={reportBlockPage}
                         onComplete={onBlockComplete}
@@ -828,7 +831,7 @@ export function Player({
                     ) : (
                       // 滚动模式：保留原长列表叙事（Reveal 交错浮现）
                       <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-6">
-                        <BlockRenderer blocks={blocks} courseId={courseId} />
+                        <BlockRenderer blocks={blocks} courseId={courseId} sceneBg={sceneBgSrc} />
                       </div>
                     )}
                   </div>

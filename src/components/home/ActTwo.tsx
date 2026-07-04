@@ -108,6 +108,27 @@ function ActTwoImmersive() {
             "radial-gradient(120% 100% at 50% 40%, #161c28 0%, #0e131c 55%, #080a0e 100%)",
         }}
       >
+        {/* —— 舞台底图：走近书桌·三物件舞台实景（studyroom-act2-desk）。铺满、object-cover，
+             压在渐变之上、暗角/光晕/物件卡之下，作「桌面舞台实景底」。静态图，reduce-motion 亦显示。
+             上方保留渐变暗角 + 台灯光晕，图作氛围底、三物件卡浮在最上层清晰可辨。 —— */}
+        <img
+          src="/marketing/studyroom-act2-desk.jpg"
+          alt=""
+          aria-hidden
+          className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40"
+          loading="lazy"
+          decoding="async"
+        />
+        {/* 图上暗化：压住图高光、维持深色调，保证三物件卡与标题文字对比度充足。 */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(120% 100% at 50% 42%, rgba(14,19,28,0.62) 0%, rgba(10,14,20,0.82) 58%, rgba(6,8,12,0.95) 100%)",
+          }}
+        />
+
         {/* 暗角遮罩：随推近收拢 */}
         <motion.div
           aria-hidden
@@ -235,6 +256,25 @@ function ActTwoStatic() {
         background: "radial-gradient(120% 90% at 50% 20%, #161c28 0%, #0e131c 60%, #080a0e 100%)",
       }}
     >
+      {/* —— 舞台底图（降级态同样铺）：静态海报态更需要图撑场。铺满、object-cover，
+           压在渐变之上、光晕/卡片之下。上叠暗化层维持深色调与文字对比度。 —— */}
+      <img
+        src="/marketing/studyroom-act2-desk.jpg"
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-35"
+        loading="lazy"
+        decoding="async"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 22%, rgba(14,19,28,0.66) 0%, rgba(10,14,20,0.84) 60%, rgba(6,8,12,0.95) 100%)",
+        }}
+      />
+
       {/* 静态台灯光晕（无呼吸），保留氛围 */}
       <div
         aria-hidden

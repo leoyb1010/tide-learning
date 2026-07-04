@@ -59,6 +59,28 @@ export function ActOne({
            复用 <DoorOpen>（与「点亮」同族语言）；reduce-motion 直接终态亮场。
            包裹整场景层（含网格/光晕/内容），sr-only 导航留在其外恒可达。 —— */}
       <DoorOpen className="absolute inset-0 flex flex-col items-center justify-center">
+      {/* —— 氛围底图：深夜自习室推门实拍（studyroom-act1-hero）。铺满、object-cover，
+           压在网格/光晕/内容之下，作场景「实景底」。静态图无动画，reduce-motion 亦正常显示。
+           上方叠一层暗化 + 径向暗角，压住图的高光、维持深色沉浸调，保证台灯光晕/红点/文案
+           仍是视觉焦点、文字对比度充足。 —— */}
+      <img
+        src="/marketing/studyroom-act1-hero.jpg"
+        alt=""
+        aria-hidden
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-45"
+        loading="eager"
+        decoding="async"
+      />
+      {/* 图上暗化 + 径向暗角遮罩：图作氛围底，此层确保深色调与文字可读（叠在图与网格之间）。 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 30%, rgba(16,20,28,0.55) 0%, rgba(12,16,22,0.78) 52%, rgba(8,10,14,0.94) 100%)",
+        }}
+      />
+
       {/* —— 透视网格地板：CSS 3D，rotateX 铺向远方，径向遮罩渐隐到黑 —— */}
       <motion.div
         aria-hidden
@@ -207,7 +229,7 @@ export function ActOne({
             >
               <AmbientVideo
                 src="/videos/marketing/hero-product-demo-loop.mp4"
-                poster="/marketing/landing-hero-scene.jpg"
+                poster="/marketing/desk-screen-demo.jpg"
               />
               {/* 屏面反光高光，让它像「亮着的屏」而非贴图 */}
               <div

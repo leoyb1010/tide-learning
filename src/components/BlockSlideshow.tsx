@@ -32,12 +32,15 @@ import { BlockSwitch } from "./BlockRenderer";
 export function BlockSlideshow({
   blocks,
   courseId,
+  sceneBg,
   initialIndex = 0,
   onSlideChange,
   onComplete,
 }: {
   blocks: BlockWithId[];
   courseId?: string;
+  /** SceneBlock 赛道场景背景图路径（透传给单块渲染）。无则 scene 保持纯渐变兜底。 */
+  sceneBg?: string;
   /** 续读起始页（0-indexed）。恢复上次读到的位置；超界会被 clamp 到 [0, total-1]。默认 0（首页）。 */
   initialIndex?: number;
   /** 翻页时上报（index 从 0 起，total 为总页数）。用于把「当前页 / 总页」映射成学习进度。 */
@@ -231,7 +234,7 @@ export function BlockSlideshow({
               <div className={`mx-auto flex w-full max-w-3xl flex-col gap-5 sm:gap-6 ${reduce ? "" : "slide-stagger"}`}>
                 {current.blocks.map((block, bi) => (
                   <div key={block.id} data-block-id={block.id} style={{ "--i": bi } as CSSProperties}>
-                    <BlockSwitch block={block} courseId={courseId} />
+                    <BlockSwitch block={block} courseId={courseId} sceneBg={sceneBg} />
                   </div>
                 ))}
               </div>

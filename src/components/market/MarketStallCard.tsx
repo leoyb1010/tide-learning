@@ -18,7 +18,7 @@ import {
 import { CoverBg } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
-import { trackLabel } from "@/lib/tracks";
+import { trackLabel, trackGradientVar } from "@/lib/tracks";
 import { abbrevCount, sellerBadge, type MarketStall } from "@/lib/market-view";
 
 /** 摊主等级徽章配色（tier 1-4，越高越暖，克制不喧宾夺主）。 */
@@ -128,13 +128,29 @@ export function MarketStallCard({
       className="hover-sheen studio-lift group relative flex h-full flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] hover:border-[var(--border2)]"
       aria-label={`查看课程《${stall.title}》大纲`}
     >
-      {/* ——— 封面：赛道渐变 + 封面池；徽标 + 价签 + 拿走热度 ——— */}
+      {/* ——— 封面：赛道渐变(底) + 橱窗背景图 + 融合/暗化层；徽标 + 价签 + 拿走热度 ——— */}
       <CoverBg
         color={stall.coverColor}
         imageSrc={stall.coverSrc}
         alt={stall.title}
         className="aspect-[16/9] w-full"
       >
+        {/* 融合层：赛道渐变以低透明叠在橱窗图上，让不同赛道色调仍可区分（橱窗质感 + 保持赛道识别）。 */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-30 mix-blend-multiply"
+          style={{ background: trackGradientVar(stall.category) }}
+        />
+        {/* 暗化/渐隐层：顶部与底部各压一道暗角，保证左右上下四角的徽标/价签/拿走数在任何橱窗图上都够对比度。 */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to bottom, rgba(15,17,21,.5) 0%, rgba(15,17,21,0) 34%, rgba(15,17,21,0) 60%, rgba(15,17,21,.55) 100%)",
+          }}
+        />
+
         {/* 来源徽标 */}
         <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-[var(--ink)]/40 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
           {isAi ? <Sparkle size={11} weight="fill" /> : <ListChecks size={11} weight="fill" />}

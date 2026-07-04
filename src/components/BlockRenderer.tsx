@@ -72,7 +72,16 @@ function useInView<T extends HTMLElement>(): [React.RefObject<T | null>, boolean
  *   - 交互块（flashcard 翻面、quiz 判分、keypoint/flashcard 存卡）均为本组件内 state，SSR 安全。
  *   - 本组件整体已是 "use client"，无需再拆分交互块。
  */
-export function BlockRenderer({ blocks, courseId }: { blocks: (Block & { id: string })[]; courseId?: string }) {
+export function BlockRenderer({
+  blocks,
+  courseId,
+  sceneBg,
+}: {
+  blocks: (Block & { id: string })[];
+  courseId?: string;
+  /** SceneBlock 赛道场景背景图路径（public 绝对路径）。由 Player 按 course.category 解析后传入；无则 scene 保持纯渐变兜底。 */
+  sceneBg?: string;
+}) {
   if (!blocks || blocks.length === 0) {
     return (
       <div className="rounded-[var(--radius-card)] border border-dashed border-[var(--border)] bg-[var(--surface)] p-8 text-center text-sm text-[var(--ink2)]">
@@ -85,7 +94,7 @@ export function BlockRenderer({ blocks, courseId }: { blocks: (Block & { id: str
       {blocks.map((block, i) => (
         <Reveal key={block.id} index={i}>
           <div data-block-id={block.id} className="scroll-mt-24">
-            <BlockSwitch block={block} courseId={courseId} />
+            <BlockSwitch block={block} courseId={courseId} sceneBg={sceneBg} />
           </div>
         </Reveal>
       ))}
@@ -152,7 +161,16 @@ function Reveal({ children, index }: { children: React.ReactNode; index: number 
  * 按 type 分派单块到其精致子组件。未知类型返回前向兼容占位（新块类型旧客户端遇到时跳过，不中断整页）。
  * 导出供翻页课件（BlockSlideshow）复用同一套单块渲染，滚动模式与翻页模式共享像素级一致的块外观。
  */
-export function BlockSwitch({ block, courseId }: { block: Block & { id: string }; courseId?: string }) {
+export function BlockSwitch({
+  block,
+  courseId,
+  sceneBg,
+}: {
+  block: Block & { id: string };
+  courseId?: string;
+  /** SceneBlock 赛道场景背景图路径；仅 scene 块用到，其余块忽略。 */
+  sceneBg?: string;
+}) {
   switch (block.type) {
     // —— 基础 5 种（升级材质/间距）——
     case "concept":
@@ -176,7 +194,7 @@ export function BlockSwitch({ block, courseId }: { block: Block & { id: string }
     case "objectives":
       return <ObjectivesBlock items={block.items} />;
     case "scene":
-      return <SceneBlock title={block.title} markdown={block.markdown} />;
+      return <SceneBlock title={block.title} markdown={block.markdown} sceneBg={sceneBg} />;
     case "dialog":
       return <DialogBlock turns={block.turns} />;
     case "steps":
@@ -463,8 +481,11 @@ function ObjectivesBlock({ items }: { items: string[] }) {
   );
 }
 
-/** scene —— 深色渐变「为什么学」故事开场：进视口时两片幕帘向两侧拉开，露出大字引言 + 场景铺陈。 */
-function SceneBlock({ title, markdown }: { title: string; markdown: string }) {
+/** scene —— 深色渐变「为什么学」故事开场：进视口时两片幕帘向两侧拉开，露出大字引言 + 场景铺陈。
+ *  接图：sceneBg（按赛道解析的场景背景图）作氛围底叠在 --video-grad 之上，
+ *  再叠一层 --video-grad 暗化遮罩确保浅色文字可读、与深色场景融合。图为静态背景，
+ *  reduce-motion 下同样渲染（幕帘/进场动效降级不影响背景层显示）。 */
+function SceneBlock({ title, markdown, sceneBg }: { title: string; markdown: string; sceneBg?: string }) {
   const [viewRef, inView] = useInView<HTMLElement>();
   return (
     <section
@@ -472,6 +493,25 @@ function SceneBlock({ title, markdown }: { title: string; markdown: string }) {
       className={`relative overflow-hidden rounded-[var(--radius-card)] p-6 shadow-[var(--card)] sm:p-8 ${inView ? "is-in" : ""}`}
       style={{ background: "var(--video-grad)" }}
     >
+      {/* 赛道场景背景图：氛围底，铺在渐变兜底之上、暗化遮罩之下（z-0）。
+          图裂/缺失时该层不渲染，section 的 --video-grad 兜底仍在，不留破图。
+          纯静态背景，reduce-motion 无影响；object-cover 保证宽幅图铺满不变形。 */}
+      {sceneBg && (
+        <span
+          className="pointer-events-none absolute inset-0 z-0 bg-cover bg-center"
+          style={{ backgroundImage: `url("${sceneBg}")` }}
+          aria-hidden
+        />
+      )}
+      {/* 暗化遮罩：图上再压一层 --video-grad（半透明），把浅色场景压暗、与深色 scene 融合，
+          确保白墨阶正文对比达标。无图时此层仍在，不影响纯渐变观感。 */}
+      {sceneBg && (
+        <span
+          className="pointer-events-none absolute inset-0 z-0 opacity-[0.82]"
+          style={{ background: "var(--video-grad)" }}
+          aria-hidden
+        />
+      )}
       {/* 顶部细高光，加材质感 */}
       <span
         className="pointer-events-none absolute inset-x-0 top-0 z-[3] h-px"

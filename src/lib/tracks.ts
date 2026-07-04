@@ -148,6 +148,53 @@ export function resolveCoverSrc(slug: string, category: string, seed?: string): 
 }
 
 /**
+ * 集市摊位「橱窗背景」映射：赛道 category 到 market-cover 图 key。
+ * public/covers/market-cover-<key>.jpg 已就位（各赛道 16:9 摊位橱窗背景）：
+ *   ai_skill                         → ai
+ *   english_oral / english_foundation→ english
+ *   silver_english                   → senior
+ *   life                             → life
+ * 未识别 category 兜底 ai（中性科技感，仍是真实图，不回渐变）。
+ *
+ * 仅集市摊位卡使用：当课程「没有自己的专属封面」时，用赛道橱窗图作氛围底，
+ * 叠在赛道渐变之上、内容之下（详见 marketStallCoverSrc 与 MarketStallCard）。
+ */
+export function marketCoverKey(category: string): string {
+  switch (category) {
+    case "ai_skill":
+      return "ai";
+    case "english_oral":
+    case "english_foundation":
+      return "english";
+    case "silver_english":
+      return "senior";
+    case "life":
+      return "life";
+    default:
+      return "ai";
+  }
+}
+
+/** 按 category 拼集市橱窗背景图路径（public/covers/market-cover-<key>.jpg）。 */
+export function marketCoverSrc(category: string): string {
+  return `/covers/market-cover-${marketCoverKey(category)}.jpg`;
+}
+
+/**
+ * 集市摊位封面决策（纯函数，server/client 通用）——优先级：
+ *   1. 课程自己的专属封面（DEDICATED_COVER_SLUGS → cover-<slug>.jpg）
+ *   2. 赛道橱窗背景（market-cover-<赛道>.jpg，无专属封面的课统一走这张，摊位橱窗质感）
+ * 任何情况都返回一张真实图，永不落回纯渐变；渐变仍在图层之下作融合暗角。
+ * 与集市外的 resolveCoverSrc(走通用封面池)不同：集市专用橱窗底，赛道气质更统一。
+ * @param slug     课程 slug
+ * @param category 赛道 key
+ */
+export function marketStallCoverSrc(slug: string, category: string): string {
+  if (DEDICATED_COVER_SLUGS.has(slug)) return `/covers/cover-${slug}.jpg`;
+  return marketCoverSrc(category);
+}
+
+/**
  * 视觉映射：赛道 category 到课程定格图（lesson still）token。
  * public/lesson-stills/lesson-still-<key>.jpg 已就位：oral / ai / silver / life / english。
  * 用作视频区 poster / 续播缩略的真实底图，替代纯渐变；未识别兜底 ai。
@@ -172,6 +219,32 @@ export function trackStillKey(category: string): string {
 /** 按 category 拼课程定格图路径（public/lesson-stills/lesson-still-<key>.jpg）。 */
 export function trackStillSrc(category: string): string {
   return `/lesson-stills/lesson-still-${trackStillKey(category)}.jpg`;
+}
+
+/**
+ * 视觉映射：赛道 category 到 scene 块「为什么学」代入场景背景图 key。
+ * public/lesson-stills/scene-bg-<key>.jpg 已就位：ai / english / life（宽幅深色场景底）。
+ * 英语三门（口语 / 全能 / 银发）共用 english 场景；未识别兜底 life（最中性的生活场景）。
+ * 图作 SceneBlock 的氛围底，其上仍叠 --video-grad 暗化，保证浅色文字可读。
+ */
+export function trackSceneKey(category: string): "ai" | "english" | "life" {
+  switch (category) {
+    case "ai_skill":
+      return "ai";
+    case "english_oral":
+    case "english_foundation":
+    case "silver_english":
+      return "english";
+    case "life":
+      return "life";
+    default:
+      return "life";
+  }
+}
+
+/** 按 category 拼 scene 场景背景图路径（public/lesson-stills/scene-bg-<key>.jpg）。 */
+export function trackSceneSrc(category: string): string {
+  return `/lesson-stills/scene-bg-${trackSceneKey(category)}.jpg`;
 }
 
 // 未来赛道（仅展示"即将上线"，对应有道跨赛道扩张规划）

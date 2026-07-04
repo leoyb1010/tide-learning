@@ -182,6 +182,27 @@ export function ActThree({
             className="relative overflow-hidden rounded-[20px] border border-[var(--hairline-on-dark)] p-8 text-center sm:p-12"
             style={{ background: "var(--video-grad)", boxShadow: "var(--lift)" }}
           >
+            {/* —— 窗外意象底图：天明潮汐抽象光影（studyroom-act3-dawn）。铺满卡片、object-cover，
+                 作「窗外将亮」的实景氛围底，压在卡片渐变之上、下方潮汐光带 + 中央暖光晕之下。
+                 静态图，reduce-motion 亦显示。上叠暗化层，让「为你留了一盏灯」文案与订阅 CTA 保持清晰。 —— */}
+            <img
+              src="/marketing/studyroom-act3-dawn.jpg"
+              alt=""
+              aria-hidden
+              className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-30"
+              loading="lazy"
+              decoding="async"
+            />
+            {/* 图上暗化：压住天明高光、维持深色收尾调，保证中央文案与双 CTA 对比度充足。 */}
+            <div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(120% 120% at 50% 30%, rgba(16,20,28,0.62) 0%, rgba(12,16,22,0.82) 55%, rgba(8,10,14,0.92) 100%)",
+              }}
+            />
+
             {/* 窗外潮汐光：底部一道横向暖冷渐变，像窗外将亮未亮的海平线 */}
             <div
               aria-hidden

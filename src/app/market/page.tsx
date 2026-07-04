@@ -10,7 +10,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
-import { resolveCoverSrc } from "@/lib/tracks";
+import { marketStallCoverSrc } from "@/lib/tracks";
 import { MarketStallCard } from "@/components/market/MarketStallCard";
 import { MarketSortTabs } from "@/components/market/MarketSortTabs";
 import {
@@ -120,7 +120,7 @@ export default async function MarketPage({
       subtitle: c.subtitle ?? c.description ?? null,
       category: c.category,
       coverColor: c.coverColor,
-      coverSrc: resolveCoverSrc(c.slug, c.category ?? "", c.id),
+      coverSrc: marketStallCoverSrc(c.slug, c.category ?? ""),
       origin: c.origin,
       collectCount,
       learnersCount: c.learnersCount,
