@@ -18,12 +18,13 @@ import {
   ArrowRight,
   ArrowLeft,
   ShareNetwork,
+  Target,
 } from "@phosphor-icons/react";
 import { CalendarCheck as CalendarCheckIcon, Exam as ExamIcon } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, Button } from "@/components/ui";
 import { SharePanel } from "@/components/SharePanel";
-import { TidalReveal, SPRING_TIDE, SPRING_FIRM, WaveProgress } from "@/components/motion";
+import { TidalReveal, SPRING_TIDE, SPRING_FIRM, WaveProgress, EASE } from "@/components/motion";
 import { renderMarkdown } from "@/lib/markdown";
 import { track } from "@/lib/analytics-client";
 import dynamic from "next/dynamic";
@@ -52,79 +53,281 @@ function ExamRunnerSkeleton() {
   );
 }
 
+/** 外壳共享的今日复习概览：来自复习队列 GET 的真实字段（dueToday/streakDays）。 */
+interface ReviewOverview {
+  dueToday: number;
+  streakDays: number;
+}
+
 /**
- * 复习室外壳（v2.3 §8）：顶部双 Tab [每日复习][模拟考试]，切换两大引擎。
- * 每日复习沿用下方 DailyReview；模拟考试整体承载在 ExamRunner，减少与协作改动的冲突面。
- * 登录态在外壳统一探测一次，供两个 Tab 复用。
+ * 复习室外壳（v3.1 视觉深度重设计）。
+ * 从「两个 Tab 方块永远堆着」升级为有仪式感的复习室：
+ *   1) 顶部战报区「今日复习概览」——待复习 / 连续复习 / 正确率，漂亮数字卡，给目标感；
+ *   2) 高级分段控件——材质滑块随选中项平滑滑动 + 图标 + 当前项红点睛，取代双方块堆叠；
+ *   3) 切换用 AnimatePresence 淡入 + 轻滑过渡，非 display 硬切（reduce-motion 即时）；
+ *   4) 进入某 Tab 后内容独占，另一 Tab 收进分段控件里，营造「进入复习」的沉浸感。
+ * 登录态与今日概览在外壳统一探测一次，供战报区与两个 Tab 复用。
+ * DailyReview / ExamRunner 内部逻辑（SM2 / 评分 / 判分）一律不动，仅改外壳 / 切换 / 战报。
  */
 export default function ReviewPage() {
+  const reduce = useReducedMotion();
   const [tab, setTab] = useState<ReviewTab>("daily");
   const [needLogin, setNeedLogin] = useState<boolean | null>(null);
+  const [overview, setOverview] = useState<ReviewOverview | null>(null);
+  // 会话内最近一轮正确率：由 DailyReview 结算时上报，供战报区展示真实数字（无则显占位）。
+  const [lastAccuracy, setLastAccuracy] = useState<number | null>(null);
 
+  // 外壳一次性探测：登录态 + 今日复习概览（复用复习队列 GET，不新增服务端逻辑）。
   useEffect(() => {
     let alive = true;
-    void fetch("/api/auth/me")
-      .then((r) => r.json())
-      .then((res) => {
-        if (alive) setNeedLogin(!res.data?.user);
-      })
-      .catch(() => {
-        if (alive) setNeedLogin(false); // 探测失败按已登录处理，子组件自身仍有兜底
-      });
+    void Promise.all([
+      fetch("/api/auth/me").then((r) => r.json()).catch(() => null),
+      fetch("/api/ai/review-card").then((r) => r.json()).catch(() => null),
+    ]).then(([me, queue]) => {
+      if (!alive) return;
+      setNeedLogin(!me?.data?.user);
+      if (queue?.ok && queue.data) {
+        setOverview({
+          dueToday: queue.data.dueToday ?? 0,
+          streakDays: queue.data.streakDays ?? 0,
+        });
+      } else {
+        setOverview({ dueToday: 0, streakDays: 0 });
+      }
+    });
     return () => {
       alive = false;
     };
   }, []);
 
+  const transition = reduce
+    ? { duration: 0 }
+    : { duration: 0.34, ease: EASE };
+
   return (
-    <div className="mx-auto max-w-[1120px] space-y-6">
-      {/* 顶部双 Tab */}
-      <TidalReveal>
-        <div className="inline-flex items-center gap-1 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-1 shadow-[var(--card),var(--inner-hi)]">
-          <TabButton active={tab === "daily"} onClick={() => setTab("daily")} icon={<CalendarCheckIcon size={16} weight={tab === "daily" ? "fill" : "regular"} />}>
-            每日复习
-          </TabButton>
-          <TabButton active={tab === "exam"} onClick={() => setTab("exam")} icon={<ExamIcon size={16} weight={tab === "exam" ? "fill" : "regular"} />}>
-            模拟考试
-          </TabButton>
-        </div>
+    <div className="mx-auto max-w-[1120px] space-y-7">
+      {/* 顶部战报区：今日复习概览，给复习室仪式感与目标感 */}
+      <ReviewHeadline overview={overview} lastAccuracy={lastAccuracy} reduce={Boolean(reduce)} />
+
+      {/* 高级分段控件：材质滑块 + 图标 + 当前项红点睛，取代双方块堆叠 */}
+      <TidalReveal y={16}>
+        <SegmentedControl
+          tab={tab}
+          onChange={(t) => {
+            if (t === tab) return;
+            setTab(t);
+            track("review_tab_switch", { tab: t });
+          }}
+        />
       </TidalReveal>
 
-      {tab === "daily" ? (
-        <DailyReview />
-      ) : (
-        <div className="mx-auto max-w-[760px]">
-          <ExamRunner needLogin={needLogin === true} />
-        </div>
-      )}
+      {/* 切换过渡：AnimatePresence 淡入 + 轻滑，非 display 硬切；进入后内容独占 */}
+      <div className="relative">
+        <AnimatePresence mode="wait" initial={false}>
+          {tab === "daily" ? (
+            <motion.div
+              key="daily"
+              initial={{ opacity: 0, x: reduce ? 0 : -14 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: reduce ? 0 : -14 }}
+              transition={transition}
+            >
+              <DailyReview onRoundAccuracy={setLastAccuracy} onOverviewChange={setOverview} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="exam"
+              initial={{ opacity: 0, x: reduce ? 0 : 14 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: reduce ? 0 : 14 }}
+              transition={transition}
+              className="mx-auto max-w-[760px]"
+            >
+              <ExamRunner needLogin={needLogin === true} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
 
-function TabButton({
-  active,
-  onClick,
-  icon,
-  children,
+/* ============================================================
+   战报区：今日复习概览。三张漂亮数字卡——待复习 N 张 / 连续复习 X 天 /
+   最近一轮正确率。数字入场后 num-pop 依次落定，连续达标时点睛品牌红。
+   数据全部来自真实字段：dueToday / streakDays（复习队列 GET）与会话内结算正确率。
+   ============================================================ */
+function ReviewHeadline({
+  overview,
+  lastAccuracy,
+  reduce,
 }: {
-  active: boolean;
-  onClick: () => void;
-  icon: React.ReactNode;
-  children: React.ReactNode;
+  overview: ReviewOverview | null;
+  lastAccuracy: number | null;
+  reduce: boolean;
 }) {
+  const loading = overview === null;
+  const due = overview?.dueToday ?? 0;
+  const streak = overview?.streakDays ?? 0;
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`studio-press inline-flex items-center gap-1.5 rounded-[11px] px-4 py-2 text-[13.5px] font-semibold transition-colors ${
-        active
-          ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
-          : "text-[var(--ink3)] hover:text-[var(--ink2)]"
-      }`}
+    <TidalReveal y={20}>
+      <div className="flex flex-col gap-5">
+        <div>
+          <div className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink4)]">REVIEW ROOM · 复习室</div>
+          <h1 className="mt-2 text-[27px] font-bold leading-tight text-[var(--ink)]">今日复习概览</h1>
+          <p className="mt-1.5 max-w-[540px] text-[15px] leading-[1.7] text-[var(--ink2)]">
+            间隔重复替你打理长期记忆。每天来一趟，把该记的记牢，让曲线一直往上走。
+          </p>
+        </div>
+
+        <div className="stagger grid grid-cols-3 gap-3 sm:gap-4">
+          <HeadlineStat
+            i={0}
+            icon={<CardsThree size={18} weight="bold" />}
+            value={loading ? null : due}
+            unit="张"
+            label="今日待复习"
+            tone={due > 0 ? "red" : "muted"}
+            reduce={reduce}
+          />
+          <HeadlineStat
+            i={1}
+            icon={<Fire size={18} weight="fill" />}
+            value={loading ? null : streak}
+            unit="天"
+            label="连续复习"
+            tone={streak >= 3 ? "red" : "muted"}
+            reduce={reduce}
+          />
+          <HeadlineStat
+            i={2}
+            icon={<Target size={18} weight="bold" />}
+            value={loading ? null : lastAccuracy}
+            unit="%"
+            label="最近正确率"
+            tone={lastAccuracy != null && lastAccuracy >= 80 ? "ok" : "muted"}
+            placeholder="··"
+            reduce={reduce}
+          />
+        </div>
+      </div>
+    </TidalReveal>
+  );
+}
+
+function HeadlineStat({
+  i,
+  icon,
+  value,
+  unit,
+  label,
+  tone = "muted",
+  placeholder,
+  reduce,
+}: {
+  i: number;
+  icon: React.ReactNode;
+  value: number | null;
+  unit: string;
+  label: string;
+  tone?: "muted" | "red" | "ok";
+  placeholder?: string;
+  reduce: boolean;
+}) {
+  const accent =
+    tone === "red" ? "text-[var(--red)]" : tone === "ok" ? "text-[var(--ok)]" : "text-[var(--ink3)]";
+  const numInk =
+    tone === "red" ? "text-[var(--red-ink)]" : tone === "ok" ? "text-[var(--ok)]" : "text-[var(--ink)]";
+  const showNum = value != null;
+  return (
+    <div style={{ "--i": i } as React.CSSProperties} className="stat-tile px-4 py-5 sm:px-5">
+      <div className="flex items-center justify-between">
+        <span className={accent}>{icon}</span>
+        {tone === "red" && <span className="h-1.5 w-1.5 rounded-full bg-[var(--red)] shadow-[0_0_0_3px_var(--red-soft)]" aria-hidden />}
+      </div>
+      <div className="mt-3 flex items-baseline gap-1">
+        {value === null && placeholder === undefined ? (
+          <span className="skeleton h-7 w-10 rounded-[6px]" />
+        ) : (
+          <span
+            key={showNum ? String(value) : "ph"}
+            className={`mono text-[28px] font-bold leading-none ${reduce ? "" : "num-pop"} ${numInk}`}
+          >
+            {showNum ? value : placeholder}
+          </span>
+        )}
+        {showNum && <span className="mono text-[13px] font-semibold text-[var(--ink3)]">{unit}</span>}
+      </div>
+      <div className="mt-1.5 text-[12px] leading-tight text-[var(--ink3)]">{label}</div>
+    </div>
+  );
+}
+
+/* ============================================================
+   高级分段控件：材质滑块随选中项平滑滑动 + 图标 + 当前项红点睛。
+   滑块尺寸/位移由测量的按钮几何驱动（--seg-x/--seg-w），窗口尺寸变化时重测。
+   reduce-motion 下滑块瞬时归位（CSS 层已关缓动）。触达高度 ≥44px（.seg-btn）。
+   ============================================================ */
+const SEGMENTS: { key: ReviewTab; label: string; Icon: typeof CalendarCheckIcon }[] = [
+  { key: "daily", label: "每日复习", Icon: CalendarCheckIcon },
+  { key: "exam", label: "模拟考试", Icon: ExamIcon },
+];
+
+function SegmentedControl({ tab, onChange }: { tab: ReviewTab; onChange: (t: ReviewTab) => void }) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const btnRefs = useRef<Record<ReviewTab, HTMLButtonElement | null>>({ daily: null, exam: null });
+  const [thumb, setThumb] = useState<{ x: number; w: number }>({ x: 0, w: 0 });
+
+  const measure = useCallback(() => {
+    const track = trackRef.current;
+    const btn = btnRefs.current[tab];
+    if (!track || !btn) return;
+    const tRect = track.getBoundingClientRect();
+    const bRect = btn.getBoundingClientRect();
+    setThumb({ x: bRect.left - tRect.left - 4, w: bRect.width });
+  }, [tab]);
+
+  // 首帧与选中项变化后测量。滑块初始 --seg-w:0（不可见），首测后按 CSS 过渡自然长出/滑入，
+  // 故用 useEffect（而非 useLayoutEffect）避免 SSR 告警，且无可见闪跳。
+  useEffect(() => {
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, [measure]);
+
+  return (
+    <div
+      ref={trackRef}
+      role="tablist"
+      aria-label="复习模式"
+      className="seg-track"
+      style={{ "--seg-x": `${thumb.x}px`, "--seg-w": `${thumb.w}px` } as React.CSSProperties}
     >
-      {icon}
-      {children}
-    </button>
+      {/* 材质滑块：位于按钮之下，随选中项滑动 */}
+      <span className="seg-thumb" aria-hidden />
+      {SEGMENTS.map(({ key, label, Icon }) => {
+        const active = tab === key;
+        return (
+          <button
+            key={key}
+            ref={(el) => {
+              btnRefs.current[key] = el;
+            }}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            data-active={active}
+            onClick={() => onChange(key)}
+            className="seg-btn studio-press"
+          >
+            <Icon size={16} weight={active ? "fill" : "regular"} />
+            {label}
+            <span className="seg-dot" aria-hidden />
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -149,7 +352,15 @@ const SEC_PER_CARD = 24; // 预计每张约 24s，用于任务卡时长估算
  * 保留 3D 翻面；新增卡堆视觉、评分飞出、连击 combo、水位进度、结算 confetti、加练。
  * 键盘：← 忘了 / → 记得 / 空格翻面。
  */
-function DailyReview() {
+function DailyReview({
+  onRoundAccuracy,
+  onOverviewChange,
+}: {
+  /** 结算完成时上报本轮正确率，供外壳战报区展示真实数字。 */
+  onRoundAccuracy?: (accuracy: number) => void;
+  /** 复习队列刷新时同步今日概览（dueToday/streakDays）给外壳战报区。 */
+  onOverviewChange?: (o: ReviewOverview) => void;
+} = {}) {
   const reduce = useReducedMotion();
 
   const [cards, setCards] = useState<ReviewCard[] | null>(null);
@@ -188,8 +399,12 @@ function DailyReview() {
       }
       if (!res.ok) throw new Error();
       setCards((res.data?.cards ?? []) as ReviewCard[]);
-      setDueToday(res.data?.dueToday ?? 0);
-      setStreakDays(res.data?.streakDays ?? 0);
+      const nextDue = res.data?.dueToday ?? 0;
+      const nextStreak = res.data?.streakDays ?? 0;
+      setDueToday(nextDue);
+      setStreakDays(nextStreak);
+      // 同步今日概览给外壳战报区（真实字段，非加练时才反映今日到期）
+      onOverviewChange?.({ dueToday: nextDue, streakDays: nextStreak });
       setIsPractice(Boolean(res.data?.practice));
       // 重置一轮状态
       setIdx(0);
@@ -202,7 +417,7 @@ function DailyReview() {
     } catch {
       setError(true);
     }
-  }, []);
+  }, [onOverviewChange]);
 
   useEffect(() => {
     void load(false);
@@ -286,40 +501,43 @@ function DailyReview() {
     return () => window.removeEventListener("keydown", onKey);
   }, [started, done, flipped, grade]);
 
+  // 沉浸态：一旦进入某一轮（started 且未结算），页面收束为专注视野——
+  // 弱化外层战报、只留一条聚焦的当前状态条（模式标签 + 连击 + 进度）。
+  const inRound = started && !done && total > 0;
+
   return (
-    <div className="space-y-7">
-      <TidalReveal>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <div className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">REVIEW · 复习室</div>
-            <h1 className="mt-2 text-[26px] font-bold leading-tight text-[var(--ink)]">
-              {isPractice ? "加练模式" : "今日复习"}
-            </h1>
-            <p className="mt-1.5 max-w-[520px] text-[15px] leading-[1.7] text-[var(--ink2)]">
-              {isPractice
-                ? "提前复习未到期的卡片，趁热打铁把记忆再夯实一层。"
-                : "到期的复习卡都在这里。翻面回忆，凭记得或忘了让间隔重复帮你记牢。"}
-            </p>
-          </div>
-          {started && !done && total > 0 && (
-            <div className="flex items-center gap-2.5">
-              {combo >= 2 && (
-                <div
-                  className={`mono inline-flex items-center gap-1 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-2 text-[13px] font-bold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] ${comboBurst ? "review-combo-pop" : ""}`}
-                >
-                  <Fire size={15} weight="fill" />×<span key={combo} className="num-pop inline-block">{combo}</span>
-                </div>
-              )}
-              <div className="mono rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card),var(--inner-hi)]">
-                <span key={idx} className="num-pop inline-block text-[var(--red-ink)]">{Math.min(idx + 1, total)}</span> / {total}
+    <div className="space-y-6">
+      {/* 聚焦状态条：仅在练习中出现。非练习中（任务卡/结算/空态）交给外壳战报区，
+          此处不再重复大标题，避免与外壳「今日复习概览」双标题堆叠。 */}
+      {inRound ? (
+        <div className="studio-rise mx-auto flex max-w-[760px] flex-wrap items-center justify-between gap-3">
+          <span
+            className={`mono inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+              isPractice
+                ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)]"
+                : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)]"
+            }`}
+          >
+            {isPractice ? <Lightning size={12} weight="fill" /> : <CalendarCheckIcon size={12} weight="fill" />}
+            {isPractice ? "加练模式" : "今日复习"}
+          </span>
+          <div className="flex items-center gap-2.5">
+            {combo >= 2 && (
+              <div
+                className={`mono inline-flex items-center gap-1 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-2 text-[13px] font-bold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] ${comboBurst ? "review-combo-pop" : ""}`}
+              >
+                <Fire size={15} weight="fill" />×<span key={combo} className="num-pop inline-block">{combo}</span>
               </div>
+            )}
+            <div className="mono rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card),var(--inner-hi)]">
+              <span key={idx} className="num-pop inline-block text-[var(--red-ink)]">{Math.min(idx + 1, total)}</span> / {total}
             </div>
-          )}
+          </div>
         </div>
-      </TidalReveal>
+      ) : null}
 
       {/* 水位进度线：练习中氛围 */}
-      {started && !done && total > 0 && (
+      {inRound && (
         <div className="studio-rise mx-auto max-w-[760px]">
           <WaveProgress value={reviewed / total} height={8} />
         </div>
@@ -346,6 +564,7 @@ function DailyReview() {
           reduce={Boolean(reduce)}
           onAgain={() => void load(false)}
           onPractice={() => void load(true)}
+          onRoundAccuracy={onRoundAccuracy}
         />
       ) : !started ? (
         <TaskCard
@@ -686,12 +905,14 @@ function SettlementState({
   reduce,
   onAgain,
   onPractice,
+  onRoundAccuracy,
 }: {
   results: RoundResult[];
   maxCombo: number;
   reduce: boolean;
   onAgain: () => void;
   onPractice: () => void;
+  onRoundAccuracy?: (accuracy: number) => void;
 }) {
   const total = results.length;
   const correct = results.filter((r) => r.remembered).length;
@@ -713,7 +934,9 @@ function SettlementState({
 
   useEffect(() => {
     track("review_round_complete", { total, correct, accuracy, maxCombo });
-  }, [total, correct, accuracy, maxCombo]);
+    // 上报本轮正确率给外壳战报区（真实数字，替换战报「最近正确率」的占位）
+    onRoundAccuracy?.(accuracy);
+  }, [total, correct, accuracy, maxCombo, onRoundAccuracy]);
 
   return (
     <motion.div

@@ -262,13 +262,15 @@ export function SheetDrag({
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 z-40 bg-ink-950/40"
+            className="fixed inset-0 bg-ink-950/40"
+            style={{ zIndex: "var(--z-overlay-scrim)" }}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             transition={{ duration: 0.24 }}
             onClick={onClose}
           />
           <motion.div
-            className={`fixed inset-x-0 bottom-0 z-50 rounded-t-3xl bg-paper-raised shadow-2xl ${className ?? ""}`}
+            className={`fixed inset-x-0 bottom-0 rounded-t-3xl bg-paper-raised shadow-2xl ${className ?? ""}`}
+            style={{ zIndex: "var(--z-drawer)" }}
             initial={{ y: "100%" }} animate={{ y: 0 }} exit={{ y: "100%" }}
             transition={{ ...SPRING_TIDE, type: "spring" }}
             drag="y"

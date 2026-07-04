@@ -24,7 +24,8 @@ export function Tooltip({ label, children, side = "top" }: { label: string; chil
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
-            className={`pointer-events-none absolute left-1/2 z-[90] -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink-950 px-2 py-1 text-xs text-paper-raised ${pos}`}
+            style={{ zIndex: "var(--z-tooltip)" }}
+            className={`pointer-events-none absolute left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-ink-950 px-2 py-1 text-xs text-paper-raised ${pos}`}
           >
             {label}
           </motion.span>

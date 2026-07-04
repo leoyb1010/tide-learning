@@ -35,10 +35,11 @@ struct SplashView: View {
 }
 
 struct MainTabView: View {
-    // DEV：启动环境变量 DEV_TAB 指定初始 Tab（0书桌/1课程/2造课/3笔记/4我的），便于逐屏验证。
-    @State private var selection = Int(ProcessInfo.processInfo.environment["DEV_TAB"] ?? "0") ?? 0
+    // 选中态由全局 TabRouter 托管，支持跨屏跳转（书桌「今天想学」→ 造课台）。
+    @Environment(TabRouter.self) private var router
     var body: some View {
-        TabView(selection: $selection) {
+        @Bindable var router = router
+        return TabView(selection: $router.selection) {
             DeskView()
                 .tabItem { Label("书桌", systemImage: "house.fill") }.tag(0)
             CoursesView()

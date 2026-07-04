@@ -4,6 +4,7 @@ import { listCourses } from "@/lib/queries";
 import { expandSearchKeywords } from "@/lib/llm";
 import { CourseCard } from "@/components/CourseCard";
 import { CourseFilterBar } from "@/components/CourseFilterBar";
+import { CourseLibraryView } from "@/components/CourseLibraryView";
 import { Button } from "@/components/ui";
 
 export const metadata = { title: "课程库" };
@@ -67,19 +68,20 @@ export default async function CoursesPage({
           </div>
         </div>
       ) : (
-        <>
-          {/* 课程计数：不再独占一段 section（去掉空的 justify-between），作为网格的小标注紧贴其上 */}
-          <span className="-mb-3 text-[13px] text-[var(--ink3)]">
-            共 <span className="mono num-pop font-semibold text-[var(--ink)]">{courses.length}</span> 门课程
-          </span>
-          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {courses.map((c, i) => (
-              <div key={c.id} className="h-full" style={{ "--i": i } as React.CSSProperties}>
-                <CourseCard course={c} />
-              </div>
-            ))}
-          </div>
-        </>
+        // 视图切换外壳（client）：网格（server 卡片作 children）↔ 书架（client）。
+        // 网格在 server 渲染好后作为 grid prop 传入，守住 client/server 边界。
+        <CourseLibraryView
+          courses={courses}
+          grid={
+            <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {courses.map((c, i) => (
+                <div key={c.id} className="h-full" style={{ "--i": i } as React.CSSProperties}>
+                  <CourseCard course={c} />
+                </div>
+              ))}
+            </div>
+          }
+        />
       )}
     </div>
   );

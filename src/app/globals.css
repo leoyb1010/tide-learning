@@ -148,6 +148,26 @@
   --surface-ink: var(--ink);
   --surface-ink-muted: var(--ink2);
   --shadow-soft: var(--card);
+
+  /* ============================================================
+     Z-INDEX 层级规范（统一浮层堆叠，根治分享/弹窗互挡）
+     语义梯度：内容(base) < 吸顶栏 < 页内下拉 < 遮罩幕 < 抽屉/角卡
+              < 通用弹窗 < 分享面板 < 专注全屏 < Toast < Tooltip。
+     两条铁律：
+       1. 全站 fixed/absolute 浮层一律引用这些变量，禁止再硬编码 z-[60/70/...]。
+       2. 浮层若被祖先 transform/filter/opacity 困在局部堆叠上下文里，
+          光调 z 无效——须用 Portal 逃逸到 body（见 SharePanel 修复）。
+     ============================================================ */
+  --z-base:          0;    /* 常规内容流 */
+  --z-sticky:        30;   /* TopNav 吸顶、页内 sticky 栏 */
+  --z-dropdown:      50;   /* 页内下拉菜单 / popover（随触发器就近弹出） */
+  --z-overlay-scrim: 60;   /* 全屏遮罩幕（scrim / 专注暗角） */
+  --z-drawer:        65;   /* 抽屉 / 右下角次要浮卡（低于弹窗，可被弹窗盖住） */
+  --z-modal:         70;   /* 通用 Dialog / CommandK */
+  --z-share:         72;   /* 分享面板（在通用弹窗之上，业务主浮层） */
+  --z-focus:         78;   /* 专注全屏舱（覆盖一切业务浮层） */
+  --z-toast:         90;   /* 全局吐司（永远压在浮层之上） */
+  --z-tooltip:       100;  /* 悬浮提示（最高，贴光标） */
 }
 
 /* ============================================================
@@ -252,7 +272,8 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  z-index: 60;
+  /* 装饰噪点：只铺在内容层，绝不越到吸顶栏/浮层之上（原 z-60 会盖住 scrim）。 */
+  z-index: 1;
   pointer-events: none;
   opacity: 0.025;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
@@ -405,6 +426,25 @@ body::before {
 .elev-2 { background: var(--surface); border: 1px solid var(--border2); box-shadow: var(--card-hover), var(--inner-hi); }
 .elev-3 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--lift); backdrop-filter: blur(12px); }
 
+/* ============================================================
+   Dialog 模态进场（纯 CSS，替代 framer —— 在 Portal-to-body + 首帧即 present
+   的组合下 framer 会把进场冻在 initial 的 opacity:0）。scrim 淡入 + 面板涨潮上浮。
+   reduce-motion 下直接显示（无位移无缩放），零闪现。
+   ============================================================ */
+@keyframes dialogScrimIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes dialogPanelIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.975); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+/* 静息态即可见（opacity:1）：动画只做「进场点缀」，用 forwards 而非 both。
+   这样即便动画时钟不推进（如后台隐藏标签页会冻结 CSS 动画于首帧），元素也退回到
+   可见静息态而非卡在透明，保证浮层永远可见、可交互。 */
+.dialog-scrim-in { opacity: 1; animation: dialogScrimIn .22s var(--ease-out-expo) forwards; }
+.dialog-panel-in { opacity: 1; animation: dialogPanelIn .34s var(--ease-tide) forwards; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) {
+  .dialog-scrim-in, .dialog-panel-in { animation: none !important; }
+}
+
 /* 关键 CTA 柔光（红按钮的品牌光晕，克制使用） */
 .cta-glow { box-shadow: var(--red-glow); transition: box-shadow var(--dur-fast) var(--ease-out-expo), transform var(--dur-fast) var(--ease-out-expo); }
 .cta-glow:hover { box-shadow: 0 6px 28px -4px rgba(252,1,26,.5); transform: translateY(-1px); }
@@ -451,6 +491,214 @@ body::before {
   .flip3d-back { opacity: 0; pointer-events: none; }
   .flip3d-inner.is-flipped .flip3d-face { opacity: 0; pointer-events: none; }
   .flip3d-inner.is-flipped .flip3d-back { opacity: 1; pointer-events: auto; }
+}
+
+/* ============================================================
+   课程库 书架视图（shelf）——「藏书」把玩感
+   每门课=竖立书脊；hover 抽出前倾（rotateY/translateZ）；进场逐本落位。
+   3D 透视容器 .shelf-row 给子书本共享景深；书本本身走合成友好的 transform。
+   全部 reduce-motion 降级为静态直显（无 3D、无落位）。
+   ============================================================ */
+
+/* 书架一层（一条赛道）：材质隔板 + 共享透视。书靠底排、可横向滚动。 */
+.shelf-row {
+  perspective: 1600px;
+  perspective-origin: 50% 62%;
+}
+/* 隔板底托：材质表面 + 内顶高光 + 前缘细描边，模拟真实隔板厚度 */
+.shelf-plank {
+  position: relative;
+  background: linear-gradient(180deg, var(--surface2) 0%, var(--surface-inset) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.5),
+    inset 0 -3px 6px -3px rgba(35,41,53,.14),
+    var(--card);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+}
+/* 隔板前缘一条高光边，让书像「立在」板上而非贴在图上 */
+.shelf-plank::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 10px;
+  border-radius: 0 0 var(--radius-card) var(--radius-card);
+  background: linear-gradient(180deg, transparent, rgba(35,41,53,.06));
+  pointer-events: none;
+}
+@media (prefers-color-scheme: dark) {
+  .shelf-plank::after { background: linear-gradient(180deg, transparent, rgba(0,0,0,.35)); }
+}
+
+/* 单本书脊：竖立立方体的正面。preserve-3d 让侧书页 ::before 能在 Z 轴外推。
+   --spine-a / --spine-b 由组件按赛道色注入（书脊渐变）。 */
+.book-spine {
+  position: relative;
+  transform-style: preserve-3d;
+  transform-origin: bottom center;
+  transition:
+    transform .5s var(--ease-tide),
+    box-shadow .4s var(--ease-out-expo),
+    filter .4s var(--ease-out-expo);
+  background: linear-gradient(180deg, var(--spine-a, #4a5262), var(--spine-b, #2d3440));
+  box-shadow:
+    var(--card),
+    inset 0 1px 0 rgba(255,255,255,.22),
+    inset -6px 0 12px -6px rgba(0,0,0,.4),
+    inset 6px 0 10px -8px rgba(255,255,255,.18);
+  will-change: transform;
+}
+/* 书页侧：在书脊右侧 Z 轴外推一层纸页，抽书时露出，强化「立体一本书」 */
+.book-spine::before {
+  content: "";
+  position: absolute;
+  top: 3px; bottom: 3px; right: 0;
+  width: 12px;
+  transform: rotateY(78deg) translateZ(1px);
+  transform-origin: right center;
+  background: repeating-linear-gradient(90deg, #f3efe6 0px, #f3efe6 1px, #e6e1d4 1px, #e6e1d4 2px);
+  border-radius: 0 2px 2px 0;
+  opacity: 0;
+  transition: opacity .4s var(--ease-out-expo);
+  pointer-events: none;
+}
+/* 书脊压印高光：hover 时一道光纵向掠过书名 */
+.book-spine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(160deg, transparent 40%, rgba(255,255,255,.16) 50%, transparent 60%);
+  transform: translateY(-110%);
+  transition: transform .6s var(--ease-out-expo);
+  pointer-events: none;
+}
+/* hover / 键盘聚焦：书本抽出前倾——上抬 + 向前旋 + 拉近，投影加深，光掠过、书页露出 */
+.book-spine:hover,
+.book-spine:focus-visible {
+  transform: translateY(-14px) translateZ(48px) rotateY(-19deg) rotateX(5deg);
+  box-shadow:
+    var(--lift),
+    0 26px 40px -18px rgba(0,0,0,.45),
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset -6px 0 12px -6px rgba(0,0,0,.4);
+  filter: saturate(1.08) brightness(1.04);
+  outline: none;
+  z-index: 5;
+}
+.book-spine:hover::before,
+.book-spine:focus-visible::before { opacity: 1; }
+.book-spine:hover::after,
+.book-spine:focus-visible::after { transform: translateY(110%); }
+.book-spine:active { transform: translateY(-8px) translateZ(30px) rotateY(-12deg) scale(.985); }
+
+/* 进场：书本从上方微落 + 轻倾摆正（配 --i 逐本递延，像一本本上架） */
+.book-spine { animation: bookDrop .6s var(--ease-tide) both; animation-delay: calc(var(--i, 0) * 55ms + 60ms); }
+@keyframes bookDrop {
+  0%   { opacity: 0; transform: translateY(-26px) rotateX(14deg); }
+  60%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) rotateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-spine {
+    animation: none !important;
+    transition: box-shadow .2s var(--ease-out-expo) !important;
+    will-change: auto;
+  }
+  /* 降级：无 3D 抽书，仅保留海拔与描边变化作为静态反馈 */
+  .book-spine:hover,
+  .book-spine:focus-visible {
+    transform: none !important;
+    box-shadow: var(--card-hover), inset 0 1px 0 rgba(255,255,255,.24) !important;
+    filter: none !important;
+  }
+  .book-spine:active { transform: none !important; }
+  .book-spine::before,
+  .book-spine::after { display: none !important; }
+}
+
+/* ============================================================
+   复习室外壳（v3.1）：高级分段控件 + 滑动指示器 + 沉浸切换
+   segmented：材质滑块随 --seg-x/--seg-w 平滑滑动，当前项红点睛。
+   指示器只动 transform（合成友好），reduce-motion 下瞬时归位不缓动。
+   ============================================================ */
+.seg-track {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 15px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  box-shadow: var(--card), var(--inner-hi);
+}
+/* 滑块：绝对定位，尺寸/位移由内联 --seg-x/--seg-w 驱动 */
+.seg-thumb {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  height: calc(100% - 8px);
+  width: var(--seg-w, 0px);
+  border-radius: 11px;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  box-shadow: var(--card-hover), var(--inner-hi);
+  transform: translateX(var(--seg-x, 0px));
+  transition: transform .42s var(--ease-tide), width .42s var(--ease-tide);
+  will-change: transform, width;
+  z-index: 0;
+}
+.seg-btn {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink3);
+  transition: color var(--dur-fast) var(--ease-out-expo);
+}
+.seg-btn:hover { color: var(--ink2); }
+.seg-btn[data-active="true"] { color: var(--ink); }
+/* 当前项红点睛：滑块内右上角一枚品牌红小圆点 */
+.seg-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 3px var(--red-soft);
+  transform: scale(0);
+  transition: transform var(--dur-fast) var(--ease-spring);
+}
+.seg-btn[data-active="true"] .seg-dot { transform: scale(1); }
+@media (prefers-reduced-motion: reduce) {
+  .seg-thumb { transition: none !important; }
+  .seg-dot { transition: none !important; }
+}
+
+/* 战报数字卡：hover 轻抬 + 内顶高光；数字用 num-pop 落定（组件层控制） */
+.stat-tile {
+  position: relative;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--card), var(--inner-hi);
+  transition: transform var(--dur-fast) var(--ease-out-expo),
+              box-shadow var(--dur-fast) var(--ease-out-expo),
+              border-color var(--dur-fast) var(--ease-out-expo);
+}
+.stat-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--card-hover), var(--inner-hi);
+  border-color: var(--border2);
+}
+@media (prefers-reduced-motion: reduce) {
+  .stat-tile:hover { transform: none !important; }
 }
 
 /* ============================================================

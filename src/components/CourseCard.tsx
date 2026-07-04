@@ -16,6 +16,8 @@ export interface CourseCardData {
   coverColor: string;
   updateText: string;
   duration: string;
+  /** 课时数（书架视图按此定书脊「厚度」；网格视图不用，故可选） */
+  lessonsCount?: number;
   learnersCount: number;
   freeLessonsCount: number;
   status?: string;

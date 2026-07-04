@@ -454,7 +454,7 @@ export function Player({
     <div className="space-y-4">
       {/* §9 入席准备面板：写目标 + 选番茄钟时长 */}
       {focusStage === "prep" && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" onClick={() => setFocusStage("idle")}>
+        <div className="fixed inset-0 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-focus)" }} onClick={() => setFocusStage("idle")}>
           <div
             role="dialog"
             aria-modal="true"
@@ -514,12 +514,13 @@ export function Player({
         <>
           {/* 四周暗角（vignette）：入席时 400-500ms 缓缓合拢，营造「灯光暗下来」的沉浸转场。点击穿透不挡内容 */}
           <div
-            className="focus-vignette-in pointer-events-none fixed inset-0 z-[60]"
-            style={{ boxShadow: "inset 0 0 200px 60px rgba(0,0,0,0.55)", background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.28) 100%)" }}
+            className="focus-vignette-in pointer-events-none fixed inset-0"
+            style={{ zIndex: "var(--z-overlay-scrim)", boxShadow: "inset 0 0 200px 60px rgba(0,0,0,0.55)", background: "radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.28) 100%)" }}
             aria-hidden
           />
-          {/* 顶部番茄钟条：从上方 slide-down 就位，像「进入专注舱」的顶栏落定 */}
-          <div className="focus-bar-drop fixed inset-x-0 top-0 z-[70]">
+          {/* 顶部番茄钟条：从上方 slide-down 就位，像「进入专注舱」的顶栏落定。
+              位于暗角(scrim)之上、专注舱层内，用 z-sticky+1 压过页面吸顶栏但不与业务弹窗争层 */}
+          <div className="focus-bar-drop fixed inset-x-0 top-0" style={{ zIndex: "calc(var(--z-sticky) + 1)" }}>
             <div className="h-1 w-full bg-black/30">
               <div className="h-full bg-[var(--red)] transition-all duration-1000 ease-linear" style={{ width: `${pomodoroPct}%` }} aria-hidden />
             </div>
@@ -555,7 +556,7 @@ export function Player({
 
       {/* §9 离席小结卡：本次专注 X 分钟 / 记了 N 条笔记 / 可选 AI 小结 */}
       {focusStage === "review" && reviewData && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" onClick={() => setFocusStage("idle")}>
+        <div className="fixed inset-0 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-focus)" }} onClick={() => setFocusStage("idle")}>
           <div
             role="dialog"
             aria-modal="true"
@@ -609,9 +610,10 @@ export function Player({
         </div>
       )}
 
-      {/* 下一节卡：学完本节后右下角弹出，3 秒倒计时自动跳，可手动/可关 */}
+      {/* 下一节卡：学完本节后右下角弹出，3 秒倒计时自动跳，可手动/可关。
+          用 z-drawer（低于分享/弹窗），分享面板打开时不会被这张角卡遮住 */}
       {showNextCard && nextHref && (
-        <div className="fixed bottom-5 right-5 z-[75] w-full max-w-[320px] px-4 sm:px-0">
+        <div className="fixed bottom-5 right-5 w-full max-w-[320px] px-4 sm:px-0" style={{ zIndex: "var(--z-drawer)" }}>
           <div className="studio-rise elev-3 overflow-hidden rounded-[var(--radius-card)] p-4">
             <div className="flex items-start justify-between gap-2">
               {/* 完成信号用完课绿，红只留给下方 CTA */}

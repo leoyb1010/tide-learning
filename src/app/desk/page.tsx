@@ -172,7 +172,7 @@ async function ShelfNew() {
   if (updates.length === 0) return null;
   return (
     <Reveal>
-      <section className="mx-auto mt-14 max-w-[1120px] md:mt-16">
+      <section className="mx-auto mt-12 max-w-[960px] md:mt-14">
         <div className="mb-4 flex items-end justify-between">
           <h2 className="text-[16px] font-bold text-[var(--ink)]">书架上新</h2>
           <Link

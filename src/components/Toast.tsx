@@ -49,7 +49,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{ toast }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[80] flex flex-col items-center gap-2 px-4">
+      <div className="pointer-events-none fixed inset-x-0 bottom-6 flex flex-col items-center gap-2 px-4" style={{ zIndex: "var(--z-toast)" }}>
         <AnimatePresence>
           {items.map((t) => {
             const Icon = ICONS[t.tone];

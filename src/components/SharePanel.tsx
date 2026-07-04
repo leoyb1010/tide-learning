@@ -8,6 +8,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ShareNetwork,
@@ -161,6 +162,12 @@ function SharePanelModal({
   const imgSrc = `/api/share-card/${kind}${buildQuery(params)}`;
   const dlName = `${fileName ?? kind}.png`;
 
+  // Portal 挂载点：面板须逃出触发处的局部堆叠上下文（如笔记详情 .studio-rise
+  // 容器因 transform 造成的 stacking context），否则 z-index 再高也被祖先困住、
+  // 被吸顶栏/其他浮层遮挡。挂到 body 后与全站浮层同处根上下文，z-share 生效。
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
   const [copyState, setCopyState] = useState<ActionState>("idle");
@@ -285,16 +292,19 @@ function SharePanelModal({
     }
   }, [imgSrc, dlName, title, shareUrl]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && (
         <div
-          className="fixed inset-0 z-[75] flex items-center justify-center p-4"
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: "var(--z-share)" }}
           role="dialog"
           aria-modal="true"
           aria-labelledby={headingId}
         >
-          {/* scrim */}
+          {/* scrim：完整覆盖视口 */}
           <motion.div
             className="absolute inset-0 bg-[#0e1116]/55 backdrop-blur-[2px]"
             initial={{ opacity: 0 }}
@@ -303,10 +313,10 @@ function SharePanelModal({
             transition={{ duration: 0.22 }}
             onClick={onClose}
           />
-          {/* 面板：elev-3 浮层 */}
+          {/* 面板：elev-3 浮层。小屏限高可滚，图预览不撑破视口 */}
           <motion.div
             ref={panelRef}
-            className="elev-3 relative w-full max-w-sm overflow-hidden rounded-3xl p-5"
+            className="elev-3 relative flex max-h-[90vh] w-full max-w-sm flex-col overflow-y-auto overflow-x-hidden rounded-3xl p-5"
             initial={{ opacity: 0, y: 22, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.98 }}
@@ -340,9 +350,9 @@ function SharePanelModal({
               </button>
             </div>
 
-            {/* 分享图预览：竖版 3:4，加载骨架 + 出错兜底 */}
+            {/* 分享图预览：竖版 3:4，加载骨架 + 出错兜底。shrink-0 防止在限高滚动容器里被压扁 */}
             <div
-              className="relative mb-4 w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-inset)]"
+              className="relative mb-4 w-full shrink-0 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface-inset)]"
               style={{ aspectRatio: "1080 / 1440" }}
             >
               {!imgLoaded && !imgError && (
@@ -407,7 +417,8 @@ function SharePanelModal({
           </motion.div>
         </div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

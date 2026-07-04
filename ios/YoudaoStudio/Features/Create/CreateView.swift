@@ -254,6 +254,8 @@ struct CreateView: View {
     @State private var vm = CreateViewModel()
     @State private var showRecharge = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    // 消费书桌「今天想学」带来的需求，出现时预填输入框。
+    @Environment(TabRouter.self) private var router
 
     var body: some View {
         NavigationStack {
@@ -269,6 +271,9 @@ struct CreateView: View {
             }
             .background(Studio.bg)
             .navigationTitle("造课")
+            // 书桌「今天想学」切来时预填需求：进入本 Tab（出现）与待处理意图变化都消费一次。
+            .onAppear { consumePendingPrompt() }
+            .onChange(of: router.pendingCreatePrompt) { _, _ in consumePendingPrompt() }
             // 生成中不可返回：隐藏返回并锁交互式下滑关闭。
             .toolbar {
                 if isGenerating {
@@ -302,6 +307,12 @@ struct CreateView: View {
         case .understanding, .outlining, .writing: return true
         default: return false
         }
+    }
+
+    /// 消费书桌带来的待处理需求：仅在造课台空闲态预填，避免打断进行中的生成。
+    private func consumePendingPrompt() {
+        guard case .idle = vm.stage, let text = router.takePendingCreatePrompt() else { return }
+        vm.fill(text)
     }
 
     private var paywallBinding: Binding<Bool> {

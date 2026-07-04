@@ -107,8 +107,8 @@ export function TopNav({ user }: { user: NavUser | null }) {
     <>
       <CommandK />
       <header
-        className="sticky top-0 z-30 border-b border-[var(--border)] backdrop-blur-xl"
-        style={{ background: "color-mix(in srgb, var(--bg) 80%, transparent)" }}
+        className="sticky top-0 border-b border-[var(--border)] backdrop-blur-xl"
+        style={{ zIndex: "var(--z-sticky)", background: "color-mix(in srgb, var(--bg) 80%, transparent)" }}
       >
         <div className="mx-auto flex h-[60px] max-w-[1320px] items-center gap-3 px-4 sm:px-6">
           {/* Logo */}
@@ -312,7 +312,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
 
       {/* 移动端抽屉 */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="fixed inset-0 md:hidden" style={{ zIndex: "var(--z-drawer)" }}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
           <div className="studio-slide absolute right-0 top-0 h-full w-[260px] border-l border-[var(--border)] bg-[var(--bg2)] p-4">
             <div className="mb-4 flex items-center justify-between">
