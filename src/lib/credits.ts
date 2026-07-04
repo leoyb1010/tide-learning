@@ -15,16 +15,38 @@ import type { LlmUsageInfo } from "./llm";
 
 // —— 换算与配置（后续可迁到 AppConfig 表）——
 const TOKENS_PER_CREDIT = 1000; // 1000 token = 1 积分（基准）
-const SCENE_WEIGHT: Record<string, number> = {
+// 场景权重表：每个 AI 出口一条键。改 as const 让键集合成为字面量类型，
+// Scene 由此派生（keyof），call site 传入的 scene 编译期即校验，拼错/漏配无法通过 tsc。
+const SCENE_WEIGHT = {
   generate_course: 1.0,
   generate_lesson: 1.0,
   import_source: 1.0,
   generate_exam: 1.0,
+  review_card: 0.8, // 复习卡批量生成（原借用 note_transform 权重，现独立成键）
   note_transform: 0.8,
   note_summary: 0.8,
   companion: 0.5, // 伴侣问答低价，鼓励多问
   search_expand: 0.2,
-};
+} as const;
+
+/** 记账场景：SCENE_WEIGHT 的键集合。新增出口须先在 SCENE_WEIGHT 补键，否则 call site 报错。 */
+export type Scene = keyof typeof SCENE_WEIGHT;
+
+/**
+ * 取场景权重。缺键（理论上被 Scene 类型挡住，此处防御运行时脏数据 / 类型断言绕过）：
+ * dev 环境显式 warn 暴露漏配，生产回落 1.0（按最贵计，宁多扣不漏扣）。
+ */
+function sceneWeight(scene: Scene): number {
+  const w = SCENE_WEIGHT[scene];
+  if (w === undefined) {
+    if (process.env.NODE_ENV !== "production") {
+      console.warn(`[credits] 未配置场景权重：${String(scene)}，回落 1.0，请在 SCENE_WEIGHT 补键`);
+    }
+    return 1.0;
+  }
+  return w;
+}
+
 export const SIGNUP_BONUS = 100; // 注册赠送
 
 // —— 订阅月度积分：按档位差异化（v3.0 商业化）——
@@ -42,8 +64,6 @@ export const MONTHLY_GRANT_BY_PERIOD: Record<string, number> = {
 };
 export const SINGLE_TRACK_MONTHLY_GRANT = 200; // 单赛道订阅（scope !== "all"）
 export const DEFAULT_MONTHLY_GRANT = 300; // 兜底：拿不到档位信息时的保守额度
-/** @deprecated 保留仅为兼容旧引用；新逻辑用 monthlyGrantForPlan。 */
-export const MONTHLY_GRANT = DEFAULT_MONTHLY_GRANT;
 
 /**
  * 据订阅档位返回该档「每月赠送积分」额度（v3.0 差异化联动）。
@@ -61,14 +81,14 @@ export function monthlyGrantForPlan(
 }
 
 /** Token 用量 → 积分（向上取整，至少 1 分，避免零成本刷调用）。 */
-export function tokensToCredits(usage: LlmUsageInfo, scene: string): number {
-  const weight = SCENE_WEIGHT[scene] ?? 1.0;
+export function tokensToCredits(usage: LlmUsageInfo, scene: Scene): number {
+  const weight = sceneWeight(scene);
   const raw = (usage.totalTokens / TOKENS_PER_CREDIT) * weight;
   return Math.max(1, Math.ceil(raw));
 }
 
 /** 预估某场景一次调用的积分（UI 展示"本次约消耗 ~N 积分"，按典型 token 量估算）。 */
-export function estimateCredits(scene: string, approxTokens = 3000): number {
+export function estimateCredits(scene: Scene, approxTokens = 3000): number {
   return tokensToCredits({ promptTokens: 0, completionTokens: 0, totalTokens: approxTokens }, scene);
 }
 
@@ -121,7 +141,7 @@ export async function grantCredits(
  * 预检余额。默认要求 > 0（有余额即可开始）；传 scene 时用该场景的最坏估算成本设门槛，
  * 堵住「余额 1 分换任意大额生成」的超额免单缺口（HIGH-1）。余额可为负（欠账），负数必被拦。
  */
-export async function assertCanSpend(userId: string, scene?: string): Promise<void> {
+export async function assertCanSpend(userId: string, scene?: Scene): Promise<void> {
   const balance = await getBalance(userId);
   // 场景已知则按最坏成本设门槛，否则最低 1 分
   const threshold = scene ? estimateCredits(scene) : 1;
@@ -136,7 +156,7 @@ export async function assertCanSpend(userId: string, scene?: string): Promise<vo
  * 记全额欠账，下次 assertCanSpend 因余额<门槛自然拦截（不再"超出部分免单"）。
  * 返回本次实扣积分。失败落 AuditLog 可对账（不再静默丢失）。
  */
-export async function recordLlmSpend(userId: string, usage: LlmUsageInfo, scene: string): Promise<number> {
+export async function recordLlmSpend(userId: string, usage: LlmUsageInfo, scene: Scene): Promise<number> {
   const cost = tokensToCredits(usage, scene);
   try {
     return await prisma.$transaction(async (tx) => {
@@ -224,7 +244,7 @@ export async function ensureMonthlyGrant(
 }
 
 /** 便捷 helper：把 llm.ts 的 onUsage 回调直接对接到记账。 */
-export function creditingOnUsage(userId: string, scene: string) {
+export function creditingOnUsage(userId: string, scene: Scene) {
   return (usage: LlmUsageInfo) => {
     void recordLlmSpend(userId, usage, scene);
   };

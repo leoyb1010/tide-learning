@@ -29,9 +29,9 @@
   --color-ink-950: #232935;      /* = ink 主文字/标题（冷灰蓝近黑） */
   --color-ink-800: #3a4250;
   --color-ink-600: #5b6474;      /* = ink2 次级文字 */
-  --color-ink-500: #6e7686;
-  --color-ink-400: #8790a0;      /* = ink3 三级文字 */
-  --color-ink-200: #aeb6c2;      /* = ink4 最弱/占位 */
+  --color-ink-500: #6e7686;      /* 4.57:1 白底，已达 AA */
+  --color-ink-400: #6f7787;      /* = ink3 三级文字：原 #8790a0 仅 3.22:1，提暗至 4.50:1(AA)；仍浅于 ink-500，保持 400<500 阶序。text-ink-400 全站 78 处受益 */
+  --color-ink-200: #aeb6c2;      /* = ink4 最弱：仅作 border/divider(border-ink-200/bg-ink-200 共 49 处，零 text 用途)，纯装饰故不提暗 */
   --color-ink-100: #e2e6ec;      /* = border 主描边 */
   --color-ink-50:  #eaedf2;      /* = surfaceInset 内凹表面 */
 
@@ -87,11 +87,13 @@
   --border:        #e2e6ec;
   --border2:       #d3d9e2;
 
-  /* STUDIO 墨色四阶（冷灰蓝） */
+  /* STUDIO 墨色四阶（冷灰蓝）
+     ink3/ink4 已提暗至 WCAG AA(≥4.5:1 白底)：ink4 4.58:1(最浅正文级) < ink3 5.21:1 < ink2 5.97:1，
+     三阶层级仍成立(ink4 视觉上仍是最浅的次要文字)。原型值 ink3 #8790a0(3.22:1)/ink4 #aeb6c2(2.04:1) 不达标。 */
   --ink:  #232935;
   --ink2: #5b6474;
-  --ink3: #8790a0;
-  --ink4: #aeb6c2;
+  --ink3: #656d7c;
+  --ink4: #6d7686;
 
   /* STUDIO 品牌红 —— 完整状态梯度（default/hover/active/soft/glow） */
   --red:             #fc011a;
@@ -187,7 +189,7 @@
     --ink:  #edeff3;
     --ink2: #aeb6c2;
     --ink3: #9aa3b2;   /* 已从原型 #8790a0 提亮，改善暗色对比度/无障碍 */
-    --ink4: #5b6474;
+    --ink4: #7c8698;   /* 同步提亮：原 #5b6474 仅 2.83:1(暗卡上)不达标；#7c8698 = 4.60:1，仍为最浅次要文字层 */
     --red-hover:       #ff2a3e;
     --red-active:      #ff6470;
     --red-soft:        #2a1216;
@@ -227,7 +229,7 @@
   color-scheme: dark;
   --bg:#0e1116; --bg2:#12151b; --surface:#191d25; --surface2:#20252f; --surface-inset:#20252f;
   --border:#2b3350; --border2:#39415e;
-  --ink:#edeff3; --ink2:#aeb6c2; --ink3:#9aa3b2; --ink4:#5b6474;
+  --ink:#edeff3; --ink2:#aeb6c2; --ink3:#9aa3b2; --ink4:#7c8698;  /* ink4 同步提亮至 4.60:1(暗卡) */
   --red-hover:#ff2a3e; --red-active:#ff6470;
   --red-soft:#2a1216; --red-soft-border:#4c1c22; --red-ink:#ff6470; --red-glow:0 4px 24px -4px rgba(252,1,26,.45);
   --ok:#34c98a; --ok-soft:#12261f; --warn:#d8a24a; --warn-soft:#2a2213; --info:#5b8bff; --info-soft:#151d33;

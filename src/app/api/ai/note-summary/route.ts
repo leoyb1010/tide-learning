@@ -1,11 +1,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { requireUser } from "@/lib/session";
-import { resolveEntitlement } from "@/lib/entitlement";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { creditingOnUsage } from "@/lib/credits";
+import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
@@ -23,12 +22,7 @@ interface SummaryResult {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const user = await requireUser();
-
-    const snapshot = await resolveEntitlement(user.id);
-    if (!snapshot.canUseLLM) throw new AppError("AI 总结为订阅会员权益，订阅后即可使用", 402);
-
-    await assertCanSpend(user.id);
+    const { user } = await requireLLMAccess({ deniedMessage: "AI 总结为订阅会员权益，订阅后即可使用" });
 
     assertUserRateLimit(user.id, "ai_note_summary", 10, 60_000);
 

@@ -1,11 +1,10 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { requireUser } from "@/lib/session";
-import { resolveEntitlement } from "@/lib/entitlement";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { creditingOnUsage } from "@/lib/credits";
+import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { validateBlocks, type Block } from "@/lib/blocks";
 
@@ -166,12 +165,8 @@ function extractBlockSource(blocksJson: string | null): string {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const user = await requireUser();
+    const { user } = await requireLLMAccess({ deniedMessage: "模拟考试为订阅会员权益，订阅后即可使用" });
 
-    const snapshot = await resolveEntitlement(user.id);
-    if (!snapshot.canUseLLM) throw new AppError("模拟考试为订阅会员权益，订阅后即可使用", 402);
-
-    await assertCanSpend(user.id);
     assertUserRateLimit(user.id, "ai_generate_exam", 20, 3_600_000);
 
     const body = (await req.json().catch(() => null)) as {

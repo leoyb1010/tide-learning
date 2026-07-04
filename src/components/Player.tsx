@@ -21,6 +21,7 @@ import { BlockRenderer } from "./BlockRenderer";
 import { BlockSlideshow } from "./BlockSlideshow";
 import { CompanionPanel } from "./CompanionPanel";
 import { validateBlocks } from "@/lib/blocks";
+import { trapFocus } from "./focus-trap";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
 interface SubtitleCue { startSec: number; endSec: number; text: string }
@@ -92,6 +93,8 @@ export function Player({
   const savedRef = useRef(initialProgress);
   const videoRef = useRef<HTMLVideoElement>(null);
   const noteRef = useRef<NoteEditorHandle>(null);
+  // prep / review 全屏面板的边界：Tab focus trap 用（两者同一时刻至多挂一个）。
+  const focusPanelRef = useRef<HTMLDivElement>(null);
   // 仅当 videoUrl 指向真实媒体（.mp4/.m3u8/.webm）时用 <video>；
   // MVP 的受控 mock 流（/api/stream 返回占位 JSON）继续走模拟播放器，保留品牌渐变画面，截帧走兜底帧。
   const hasRealVideo = /\.(mp4|m3u8|webm)(\?|$)/i.test(lesson.videoUrl ?? "");
@@ -330,6 +333,9 @@ export function Player({
   onKeyRef.current = (e: KeyboardEvent) => {
     // Esc 关闭任一全屏浮层（prep/review/active），即使焦点在输入框内也生效
     if (e.key === "Escape" && (focusStage === "prep" || focusStage === "review")) { e.preventDefault(); setFocusStage("idle"); return; }
+    // prep/review 模态开启时把 Tab 焦点困在面板内（须在 INPUT/TEXTAREA 早退之前处理，
+    // 否则焦点落在目标输入框时 Tab 会逃出面板）。
+    if (e.key === "Tab" && (focusStage === "prep" || focusStage === "review")) { trapFocus(e, focusPanelRef.current); return; }
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === "TEXTAREA" || tag === "INPUT") return;
     if (e.key === " ") { e.preventDefault(); togglePlay(); }
@@ -348,6 +354,22 @@ export function Player({
     document.documentElement.dataset.focus = focus ? "on" : "off";
     return () => { delete document.documentElement.dataset.focus; };
   }, [focus]);
+
+  // prep / review 全屏模态：body 锁滚 + 进入时把焦点移入面板（关闭还原由 keydown/点击触发）。
+  // active（专注舱）是点击穿透的沉浸层、非模态，不锁滚。
+  const focusModalOpen = focusStage === "prep" || focusStage === "review";
+  useEffect(() => {
+    if (!focusModalOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const raf = requestAnimationFrame(() =>
+      focusPanelRef.current?.querySelector<HTMLElement>("input,button,a[href]")?.focus(),
+    );
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      cancelAnimationFrame(raf);
+    };
+  }, [focusModalOpen]);
 
   const activeCue = lesson.subtitles?.find((c) => time >= c.startSec && time < c.endSec);
   // 时间轴百分比用有效播放时长：块课视频视图取 videoDurationSec，其余取 durationSec。
@@ -391,12 +413,14 @@ export function Player({
     setShowNextCard(true);
   }, [nextHref]);
 
+  // 工具按钮命中区扩展：透明 44x44 伪元素外扩，视觉尺寸不变（WCAG 2.5.5 目标尺寸）。
+  const hit44 = "relative after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']";
   const CaptureBar = access && (
     <div className="flex items-center gap-1.5">
-      <Tooltip label="截取画面 (S)"><button onClick={captureFrame} className="studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20" aria-label="截取画面"><Camera size={16} className="icon-nudge text-white/75 group-hover:text-white" /></button></Tooltip>
-      <Tooltip label="快速批注 (N)"><button onClick={quickNote} className="studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20" aria-label="快速批注"><NotePencil size={16} className="icon-nudge text-white/75 group-hover:text-white" /></button></Tooltip>
+      <Tooltip label="截取画面 (S)"><button onClick={captureFrame} className={`studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20 ${hit44}`} aria-label="截取画面"><Camera size={16} className="icon-nudge text-white/75 group-hover:text-white" /></button></Tooltip>
+      <Tooltip label="快速批注 (N)"><button onClick={quickNote} className={`studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20 ${hit44}`} aria-label="快速批注"><NotePencil size={16} className="icon-nudge text-white/75 group-hover:text-white" /></button></Tooltip>
       {/* 进入专注：关键动作，用红柔光 CTA 引导（图标常亮 white，仅微动放大） */}
-      <Tooltip label={focusStage === "active" ? "退出专注 (F)" : "进入专注 (F)"}><button onClick={() => (focusStage === "active" ? exitFocus(false) : openFocusPrep())} className={`studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${focusStage === "active" ? "bg-white/10 hover:bg-white/20" : "bg-[var(--red)] cta-glow"}`} aria-label="专注模式">{focusStage === "active" ? <ArrowsIn size={16} className="icon-nudge text-white/75 group-hover:text-white" /> : <ArrowsOut size={16} className="icon-nudge text-white" />}</button></Tooltip>
+      <Tooltip label={focusStage === "active" ? "退出专注 (F)" : "进入专注 (F)"}><button onClick={() => (focusStage === "active" ? exitFocus(false) : openFocusPrep())} className={`studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] transition-colors ${focusStage === "active" ? "bg-white/10 hover:bg-white/20" : "bg-[var(--red)] cta-glow"} ${hit44}`} aria-label="专注模式">{focusStage === "active" ? <ArrowsIn size={16} className="icon-nudge text-white/75 group-hover:text-white" /> : <ArrowsOut size={16} className="icon-nudge text-white" />}</button></Tooltip>
     </div>
   );
 
@@ -498,12 +522,12 @@ export function Player({
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={togglePlay} className="studio-press grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white" aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
+            <button onClick={togglePlay} className={`studio-press grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white ${hit44}`} aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
             <span className="mono text-xs tabular-nums text-white/70"><span className="text-white/90">{mmss(Math.floor(time))}</span> / {mmss(playbackDurationSec)}</span>
             <div className="flex-1" />
             {CaptureBar}
             <Tooltip label={theme === "deep" ? "浅色" : "深海模式"}>
-              <button onClick={toggleTheme} className="studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20" aria-label="切换主题">
+              <button onClick={toggleTheme} className={`studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20 ${hit44}`} aria-label="切换主题">
                 {theme === "deep" ? <Sun size={16} className="icon-nudge text-white/75 group-hover:text-white" /> : <Moon size={16} className="icon-nudge text-white/75 group-hover:text-white" />}
               </button>
             </Tooltip>
@@ -531,6 +555,7 @@ export function Player({
       {focusStage === "prep" && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-focus)" }} onClick={() => setFocusStage("idle")}>
           <div
+            ref={focusPanelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="focus-prep-title"
@@ -633,6 +658,7 @@ export function Player({
       {focusStage === "review" && reviewData && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/55 p-4 backdrop-blur-sm" style={{ zIndex: "var(--z-focus)" }} onClick={() => setFocusStage("idle")}>
           <div
+            ref={focusPanelRef}
             role="dialog"
             aria-modal="true"
             aria-labelledby="focus-review-title"

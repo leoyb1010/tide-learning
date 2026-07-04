@@ -1,9 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { resolveEntitlement } from "@/lib/entitlement";
-import { assertCanSpend } from "@/lib/credits";
+import { requireLLMAccess } from "@/lib/ai-guard";
 import { generateLessonVideo } from "@/lib/video-gen";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +21,8 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const user = await requireUser();
-
-    // 权益闸门：AI 能力需订阅
-    const snapshot = await resolveEntitlement(user.id);
-    if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
-
-    // 积分预检：余额不足抛 402（视频生成为高成本能力，与造课一致先设门槛）
-    await assertCanSpend(user.id);
+    // 权益闸门 + 积分预检（视频生成为高成本能力，与造课一致先设门槛）
+    const { user } = await requireLLMAccess();
 
     // 限流：每用户每小时 30 节视频
     assertUserRateLimit(user.id, "ai_gen_video", 30, 3_600_000);

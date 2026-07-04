@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Lightbulb,
@@ -254,7 +254,7 @@ export function PostCard({
           >
             {post.author.nickname}
           </Link>
-          <div className="mono text-[11px] text-[var(--ink4)]">{formatWhen(post.createdAt)}</div>
+          <RelativeTime iso={post.createdAt} className="mono text-[11px] text-[var(--ink4)]" />
         </div>
         {!isRepost && (
           <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-inset)] px-2.5 py-0.5 text-[11px] font-medium text-[var(--ink3)]">
@@ -573,7 +573,7 @@ function CommentRow({ comment }: { comment: CommentView }) {
           >
             {comment.author.nickname}
           </Link>
-          <span className="mono text-[10px] text-[var(--ink4)]">{formatWhen(comment.createdAt)}</span>
+          <RelativeTime iso={comment.createdAt} className="mono text-[10px] text-[var(--ink4)]" />
         </div>
         <p className="mt-0.5 whitespace-pre-wrap text-[13px] leading-[1.55] text-[var(--ink2)]">{comment.content}</p>
       </div>
@@ -617,6 +617,11 @@ function ActionButton({
   );
 }
 
+/** 绝对日期文案（首帧稳定，SSR 与客户端首帧一致，避免 hydration 文案不符）。 */
+function absoluteWhen(iso: string): string {
+  return new Date(iso).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai", month: "long", day: "numeric" });
+}
+
 /** 相对时间文案（分钟/小时/天，超 7 天回落到日期）。 */
 export function formatWhen(iso: string): string {
   const then = new Date(iso).getTime();
@@ -628,5 +633,20 @@ export function formatWhen(iso: string): string {
   if (h < 24) return `${h} 小时前`;
   const d = Math.floor(h / 24);
   if (d < 7) return `${d} 天前`;
-  return new Date(iso).toLocaleDateString("zh-CN", { month: "long", day: "numeric" });
+  return absoluteWhen(iso);
+}
+
+/**
+ * 相对时间（SSR 安全）：SSR 与客户端首帧都渲染稳定的绝对日期，
+ * 挂载后再切换到基于 Date.now() 的相对文案。规避 formatWhen 在渲染体内
+ * 调 Date.now() 导致 SSR/hydration 跨边界文案不一致的 mismatch。
+ * 复用 DemandComments.RelativeTime 范式。
+ */
+function RelativeTime({ iso, className }: { iso: string; className?: string }) {
+  const [label, setLabel] = useState(() => absoluteWhen(iso));
+  useEffect(() => {
+    setLabel(formatWhen(iso));
+    // iso 唯一标识该条时间，变化时重算即可。
+  }, [iso]);
+  return <span className={className}>{label}</span>;
 }

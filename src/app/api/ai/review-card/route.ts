@@ -2,10 +2,10 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { resolveEntitlement } from "@/lib/entitlement";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 
 export const dynamic = "force-dynamic";
@@ -31,10 +31,12 @@ interface FlashcardsResult {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const user = await requireUser();
-
-    const snapshot = await resolveEntitlement(user.id);
-    if (!snapshot.canUseLLM) throw new AppError("复习卡为订阅会员权益，订阅后即可使用", 402);
+    // 权益门在此，但余额预检延后：仅「批量从笔记生成」(分支 B) 才真正花 LLM，
+    // 单卡直接落库(分支 A)不消耗积分，故 precheckSpend:false，由分支 B 内部按需 assertCanSpend。
+    const { user } = await requireLLMAccess({
+      deniedMessage: "复习卡为订阅会员权益，订阅后即可使用",
+      precheckSpend: false,
+    });
 
     assertUserRateLimit(user.id, "ai_review_card", 30, 3_600_000);
 
@@ -77,7 +79,7 @@ export async function POST(req: NextRequest) {
         user: userMsg,
         temperature: 0.4,
         maxTokens: 6000,
-        onUsage: creditingOnUsage(user.id, "note_transform"),
+        onUsage: creditingOnUsage(user.id, "review_card"),
       });
 
       const cards = (Array.isArray(result?.flashcards) ? result.flashcards : [])

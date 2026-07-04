@@ -171,11 +171,15 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
   // 滚动加载更多：用 nextCursor 追加下一页（仅「全部」列表分页；其余视图消费已加载集合）。
   const loadMore = useCallback(async () => {
     if (!nextCursor || loadingMore) return;
+    // 进入时快照当前请求序号；reload（筛选变化）会递增 loadSeq 使在途 loadMore 失效，
+    // 避免旧筛选的第二页被 append 到新筛选列表（滚动分页 + 切筛选竞态）。
+    const seq = loadSeq.current;
     setLoadingMore(true);
     try {
       const params = buildParams();
       params.set("cursor", nextCursor);
       const res = await fetch(`/api/notes?${params.toString()}`).then((r) => r.json());
+      if (seq !== loadSeq.current) return; // 期间已有 reload，丢弃过期分页结果
       if (!res.ok) throw new Error();
       const more = res.data.notes as NoteRow[];
       setNotes((prev) => {
@@ -186,8 +190,10 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
       setNextCursor((res.data.nextCursor as string | null) ?? null);
       setTotal((res.data.total as number) ?? total);
     } catch {
+      if (seq !== loadSeq.current) return; // 过期请求的异常不打扰用户
       toast("加载更多失败，请重试", { tone: "warn" });
     } finally {
+      // 始终复位：loadingMore 是纯在途/UI 守卫，即便本次结果被丢弃也须解锁下一次分页。
       setLoadingMore(false);
     }
   }, [nextCursor, loadingMore, buildParams, total, toast]);

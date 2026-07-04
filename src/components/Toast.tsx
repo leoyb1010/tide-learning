@@ -49,21 +49,31 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={{ toast }}>
       {children}
-      <div className="pointer-events-none fixed inset-x-0 bottom-6 flex flex-col items-center gap-2 px-4" style={{ zIndex: "var(--z-toast)" }}>
+      {/* aria-live 容器：屏幕阅读器可听到 toast 反馈。success/info 走 polite(不打断)，
+          warn 走 assertive(即时播报)。容器保持 pointer-events-none 不影响视觉与点击。 */}
+      <div
+        aria-live="polite"
+        aria-atomic="false"
+        className="pointer-events-none fixed inset-x-0 bottom-6 flex flex-col items-center gap-2 px-4"
+        style={{ zIndex: "var(--z-toast)" }}
+      >
         <AnimatePresence>
           {items.map((t) => {
             const Icon = ICONS[t.tone];
+            const isWarn = t.tone === "warn";
             return (
               <motion.div
                 key={t.id}
                 layout
+                role={isWarn ? "alert" : "status"}
+                aria-live={isWarn ? "assertive" : "polite"}
                 initial={{ opacity: 0, y: 16, scale: 0.96 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: 8, scale: 0.96 }}
                 transition={{ ...SPRING_FIRM, type: "spring" }}
                 className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-ink-100 bg-paper-raised px-4 py-3 shadow-[0_18px_40px_-20px_rgba(125,8,18,0.28)]"
               >
-                <Icon size={18} weight="fill" className={TONE_CLS[t.tone]} />
+                <Icon size={18} weight="fill" aria-hidden className={TONE_CLS[t.tone]} />
                 <span className="text-sm text-ink-800">{t.message}</span>
                 {t.action && (
                   <button

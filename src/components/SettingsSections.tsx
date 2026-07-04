@@ -180,7 +180,7 @@ export function DeleteAccountButton() {
       <p className="mt-1.5 text-[12px] text-[var(--ink2)]">
         注销为不可逆操作，将清除你的学习记录与个人资料。建议先
         <span className="font-semibold text-[var(--ink)]"> 导出笔记 </span>
-        备份。如需继续，请联系客服 support@tide.learning 完成人工核验。
+        备份。如需继续，请联系客服 support@youdao.com 完成人工核验。
       </p>
       <div className="mt-3 flex items-center gap-2.5">
         <button
@@ -193,7 +193,7 @@ export function DeleteAccountButton() {
         <button
           type="button"
           onClick={() => {
-            toast("注销申请需人工核验，请联系 support@tide.learning", { tone: "info" });
+            toast("注销申请需人工核验，请联系 support@youdao.com", { tone: "info" });
             setConfirming(false);
           }}
           className="rounded-[10px] border border-[var(--red-soft-border)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-opacity hover:opacity-90"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { X } from "@phosphor-icons/react";
 import { PostComposer } from "./PostComposer";
 import { PostCard, type PostView } from "./PostCard";
@@ -32,7 +32,12 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
   const [tag, setTag] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // 请求序号守卫：切排序/筛选 Tab 时仅接受最新一次请求的结果，
+  // 防止较慢的旧响应后返回覆盖较新筛选的列表（竞态）。
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     try {
       const qs = new URLSearchParams();
@@ -42,11 +47,12 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
       const url = qs.toString() ? `/api/posts?${qs.toString()}` : "/api/posts";
       const res = await fetch(url);
       const json = (await res.json()) as { ok: true; data: { posts: PostView[] } } | { ok: false };
+      if (seq !== loadSeq.current) return; // 期间已有更新请求发出，丢弃过期结果
       if (json.ok) setPosts(json.data.posts);
     } catch {
       /* 静默：列表加载失败保持空态 */
     } finally {
-      setLoading(false);
+      if (seq === loadSeq.current) setLoading(false);
     }
   }, [type, sort, tag]);
 

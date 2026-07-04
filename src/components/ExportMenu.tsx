@@ -55,6 +55,7 @@ export function ExportMenu({
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const menuId = useId();
 
   // 点击外部 / Esc 关闭
@@ -72,6 +73,18 @@ export function ExportMenu({
     };
   }, [open]);
 
+  // 关闭后把焦点还给触发按钮（无障碍：焦点不丢，参照 SharePanel wasOpen 范式）。
+  // 仅在「打开→关闭」跃迁时 rAF 还焦；初次挂载不抢焦，避免加载即 focus 打断阅读顺序。
+  const wasOpen = useRef(false);
+  useEffect(() => {
+    if (!open && wasOpen.current) {
+      const raf = requestAnimationFrame(() => triggerRef.current?.focus?.());
+      wasOpen.current = open;
+      return () => cancelAnimationFrame(raf);
+    }
+    wasOpen.current = open;
+  }, [open]);
+
   function run(format: Fmt) {
     track("note_export", { format, scope: scope.kind });
     // 附件响应，浏览器直接下载 / 打印版新标签打开供 Cmd+P
@@ -87,6 +100,7 @@ export function ExportMenu({
   return (
     <div ref={boxRef} className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={triggerCls}

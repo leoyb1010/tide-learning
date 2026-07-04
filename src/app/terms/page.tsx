@@ -4,7 +4,7 @@ import { Reveal } from "@/components/motion";
 
 export const metadata: Metadata = {
   title: "用户协议",
-  description: "潮汐学习用户服务协议：订阅、内容、笔记归属与取消规则。",
+  description: "有道自习室 STUDIO 用户服务协议：订阅、内容、笔记归属与取消规则。",
 };
 
 // 用户协议 — 静态合规文案（订阅制学习平台）
@@ -20,7 +20,7 @@ export default function TermsPage() {
       <div className="tide-md mt-10 space-y-8 text-ink-700">
         <Section title="1. 协议范围">
           <p>
-            本协议是您与网易有道「潮汐学习」平台（下称「本平台」）之间就使用订阅制学习服务达成的约定。
+            本协议是您与网易有道「有道自习室 STUDIO」平台（下称「本平台」）之间就使用订阅制学习服务达成的约定。
             当您注册账号、订阅课程或以其他方式使用本平台服务时，即视为您已阅读并同意本协议全部条款。
           </p>
         </Section>
@@ -71,7 +71,7 @@ export default function TermsPage() {
 
         <Section title="8. 联系我们">
           <p>
-            如对本协议有任何疑问，请发送邮件至 support@tide.learning。隐私相关事项请参见
+            如对本协议有任何疑问，请发送邮件至 support@youdao.com。隐私相关事项请参见
             <Link href="/privacy" className="link-underline text-accent-700">《隐私政策》</Link>。
           </p>
         </Section>

@@ -16,8 +16,13 @@ import { X } from "@phosphor-icons/react";
  * （书桌 hero 的 .studio-lightup / .stagger 会把内联浮层困住变半透明）。见 globals.css Z-INDEX 铁律 2。
  */
 export function Dialog({
-  open, onClose, title, children, className,
-}: { open: boolean; onClose: () => void; title?: string; children: ReactNode; className?: string }) {
+  open, onClose, title, ariaLabel, children, className,
+}: {
+  open: boolean; onClose: () => void; title?: string;
+  /** 无障碍名（不渲染可见标题）；缺省时回退用 title 作可访问名。给无可见标题的浮层（如命令面板）用。 */
+  ariaLabel?: string;
+  children: ReactNode; className?: string;
+}) {
   const panelRef = useRef<HTMLDivElement>(null);
   // 打开前的焦点锚点：关闭时还原，避免焦点落回 body（WCAG 2.4.3 焦点顺序）。
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -63,7 +68,7 @@ export function Dialog({
       style={{ zIndex: "var(--z-modal)" }}
       role="dialog"
       aria-modal="true"
-      aria-label={title}
+      aria-label={ariaLabel ?? title}
     >
       <div className="dialog-scrim-in absolute inset-0 bg-ink-950/45" onClick={onClose} />
       <div

@@ -306,7 +306,7 @@ struct CommunityView: View {
                 .animation(reduceMotion ? nil : StudioMotion.smooth, value: tab)
             }
             .background(Studio.bg)
-            .navigationTitle("社区")
+            .navigationTitle("社区广场")
             .toolbar {
                 if tab == .posts && vm.canPost {
                     ToolbarItem(placement: .topBarTrailing) {

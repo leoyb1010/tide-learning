@@ -15,6 +15,7 @@ import { CommandK } from "./CommandK";
 import { YoudaoLogo } from "./YoudaoLogo";
 import { GenNavIndicator } from "./GenNavIndicator";
 import { track } from "@/lib/analytics-client";
+import { trapFocus } from "./focus-trap";
 import type { NavUser } from "./nav-types";
 
 const ADMIN_ROLES = ["admin", "content_manager", "demand_moderator", "support", "finance", "reviewer"];
@@ -40,7 +41,7 @@ function primaryLinks(loggedIn: boolean): NavLink[] {
 
 // 社区下拉的子项
 const COMMUNITY_LINKS: NavLink[] = [
-  { href: "/demands", label: "社区空间", Icon: PaperPlaneTilt },
+  { href: "/demands", label: "社区广场", Icon: PaperPlaneTilt },
   { href: "/market", label: "课程集市", Icon: Storefront },
 ];
 
@@ -54,6 +55,8 @@ export function TopNav({ user }: { user: NavUser | null }) {
   const menuRef = useRef<HTMLDivElement>(null);
   const commRef = useRef<HTMLDivElement>(null);
   const resumeRef = useRef<HTMLDivElement>(null);
+  const drawerRef = useRef<HTMLDivElement>(null); // 移动抽屉面板：focus trap 边界
+  const hamburgerRef = useRef<HTMLButtonElement>(null); // 汉堡按钮：抽屉关闭后还焦锚点
   // 下拉开合的 ref 镜像：供「挂载一次」的事件委托在回调内即时读取，
   // 避免把 menuOpen/commOpen 塞进 effect 依赖导致每次开合都重绑监听器。
   const menuOpenRef = useRef(false);
@@ -97,6 +100,34 @@ export function TopNav({ user }: { user: NavUser | null }) {
     setResumeOpen(false);
   }, [pathname]);
 
+  // 移动抽屉 = 无障碍模态：Esc 关闭 + Tab focus trap + body 锁滚 + 焦点移入/还原。
+  // 与 Dialog / SharePanel 同一范式（trapFocus 复用共享模块）。仅在打开时挂监听。
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setDrawerOpen(false);
+      } else if (e.key === "Tab") {
+        trapFocus(e, drawerRef.current);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    // 焦点移入抽屉（关闭按钮为首个可聚焦项）。
+    const raf = requestAnimationFrame(() =>
+      drawerRef.current?.querySelector<HTMLElement>("button,a[href]")?.focus(),
+    );
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+      cancelAnimationFrame(raf);
+      // 关闭后把焦点还给汉堡按钮（焦点不丢，WCAG 2.4.3）。
+      hamburgerRef.current?.focus?.();
+    };
+  }, [drawerOpen]);
+
   const openCommandK = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
   const onToggleTheme = () => {
     toggleColorScheme();
@@ -139,6 +170,8 @@ export function TopNav({ user }: { user: NavUser | null }) {
             <div ref={commRef} className="relative">
               <button
                 onClick={() => setCommOpen((o) => !o)}
+                aria-expanded={commOpen}
+                aria-haspopup="menu"
                 className={`flex items-center gap-1 rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${
                   communityActive ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
                 }`}
@@ -147,7 +180,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                 <CaretDown size={11} weight="bold" className={`transition-transform ${commOpen ? "rotate-180" : ""}`} />
               </button>
               {commOpen && (
-                <div className="studio-rise absolute left-0 top-[calc(100%+6px)] w-[180px] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--lift)]">
+                <div role="menu" className="studio-rise absolute left-0 top-[calc(100%+6px)] w-[180px] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--lift)]">
                   {COMMUNITY_LINKS.map((l) => (
                     <Link key={l.href} href={l.href} className="flex items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]">
                       <l.Icon size={16} weight="fill" className="text-[var(--ink3)]" />
@@ -303,21 +336,40 @@ export function TopNav({ user }: { user: NavUser | null }) {
             )}
 
             {/* 移动端汉堡 */}
-            <button onClick={() => setDrawerOpen(true)} className="grid h-[36px] w-[36px] place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] md:hidden" aria-label="菜单">
+            <button
+              ref={hamburgerRef}
+              onClick={() => setDrawerOpen(true)}
+              aria-label="菜单"
+              aria-haspopup="dialog"
+              aria-expanded={drawerOpen}
+              className="relative grid h-[36px] w-[36px] place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] md:hidden"
+            >
               <List size={18} />
             </button>
           </div>
         </div>
       </header>
 
-      {/* 移动端抽屉 */}
+      {/* 移动端抽屉（无障碍模态：role=dialog + aria-modal，Esc/trap/锁滚/还焦在上方 effect） */}
       {drawerOpen && (
         <div className="fixed inset-0 md:hidden" style={{ zIndex: "var(--z-drawer)" }}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
-          <div className="studio-slide absolute right-0 top-0 h-full w-[260px] border-l border-[var(--border)] bg-[var(--bg2)] p-4">
+          <div
+            ref={drawerRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="导航"
+            className="studio-slide absolute right-0 top-0 h-full w-[260px] border-l border-[var(--border)] bg-[var(--bg2)] p-4"
+          >
             <div className="mb-4 flex items-center justify-between">
               <span className="text-[14px] font-bold text-[var(--ink)]">导航</span>
-              <button onClick={() => setDrawerOpen(false)} className="grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)]" aria-label="关闭"><X size={18} /></button>
+              <button
+                onClick={() => setDrawerOpen(false)}
+                aria-label="关闭"
+                className="relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
+              >
+                <X size={18} />
+              </button>
             </div>
             <nav className="flex flex-col gap-1">
               {[...links, ...COMMUNITY_LINKS].map((l) => (

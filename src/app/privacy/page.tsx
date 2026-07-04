@@ -4,7 +4,7 @@ import { Reveal } from "@/components/motion";
 
 export const metadata: Metadata = {
   title: "隐私政策",
-  description: "潮汐学习隐私政策：我们收集哪些数据、如何使用埋点数据，以及你的权利。",
+  description: "有道自习室 STUDIO 隐私政策：我们收集哪些数据、如何使用埋点数据，以及你的权利。",
 };
 
 // 隐私政策 — 静态合规文案，重点说明埋点数据用途
@@ -67,7 +67,7 @@ export default function PrivacyPage() {
 
         <Section title="6. 联系我们">
           <p>
-            如需行使上述权利或对隐私有疑问，请发送邮件至 privacy@tide.learning。服务条款请参见
+            如需行使上述权利或对隐私有疑问，请发送邮件至 privacy@youdao.com。服务条款请参见
             <Link href="/terms" className="link-underline text-accent-700">《用户协议》</Link>。
           </p>
         </Section>

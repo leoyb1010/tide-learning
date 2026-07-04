@@ -21,7 +21,7 @@ export default async function HelpSettingsPage() {
         <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-4 text-[13px] text-[var(--ink2)]">
           <p className="font-bold text-[var(--ink)]">客服与反馈</p>
           <p className="mt-1">
-            遇到问题？发送邮件到 support@tide.learning，或在需求广场留言。
+            遇到问题？发送邮件到 support@youdao.com，或在需求广场留言。
           </p>
         </div>
         <div className="mt-3 space-y-2.5">

@@ -1,9 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { resolveEntitlement } from "@/lib/entitlement";
-import { assertCanSpend } from "@/lib/credits";
+import { requireLLMAccess } from "@/lib/ai-guard";
 import { generateLessonCore } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
@@ -19,12 +17,7 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const user = await requireUser();
-
-    const snapshot = await resolveEntitlement(user.id);
-    if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
-
-    await assertCanSpend(user.id);
+    const { user } = await requireLLMAccess();
 
     assertUserRateLimit(user.id, "ai_gen_lesson", 60, 3_600_000);
 

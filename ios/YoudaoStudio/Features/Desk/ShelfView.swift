@@ -51,8 +51,8 @@ enum ShelfCategory: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .aiCreated: "AI 造课"
-        case .imported:  "导入"
-        case .learning:  "在学"
+        case .imported:  "导入的"
+        case .learning:  "在学中"
         case .collected: "集市淘的"
         case .completed: "已完成"
         }

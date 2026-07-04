@@ -1,11 +1,10 @@
 import { NextRequest, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { resolveEntitlement } from "@/lib/entitlement";
 import { chatJson } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
@@ -35,11 +34,8 @@ interface OutlineResult {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const user = await requireUser();
-
-    // 权益闸门：AI 能力需订阅
-    const snapshot = await resolveEntitlement(user.id);
-    if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
+    // 权益闸门：AI 能力需订阅（余额预检留到限流之后，保持原有先限流再预检的顺序）
+    const { user } = await requireLLMAccess({ precheckSpend: false });
 
     // 高成本 AI：按用户限流，每天 5 门
     assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);

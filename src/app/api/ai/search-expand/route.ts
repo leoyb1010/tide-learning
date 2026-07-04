@@ -6,6 +6,11 @@ import { resolveEntitlement } from "@/lib/entitlement";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { chatJson, isLLMConfigured } from "@/lib/llm";
 
+// 注：本端点保留「登录 → 限流 → 判权益 → 预检」的原有顺序（限流紧跟登录之后，
+// 把最廉价的按账号限流放在权益/DB 查询之前）。requireLLMAccess helper 会把限流挤到
+// 权益判定之后，故此处不套用，仍手写三步；行为与 helper 对齐：未订阅 402、按
+// search_expand 场景预检余额（权重 0.2）。
+
 export const dynamic = "force-dynamic";
 
 interface ExpandResult {
