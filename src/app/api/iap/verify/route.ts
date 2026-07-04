@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { grantCredits, getBalance } from "@/lib/credits";
+import { ensureAccount } from "@/lib/credits";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
 
@@ -90,22 +90,35 @@ export async function POST(req: NextRequest) {
     if (productId in CREDIT_PRODUCTS) {
       const amount = CREDIT_PRODUCTS[productId];
 
-      // 幂等：该 transactionId 是否已入账过（越权铁律：where userId）
-      const dup = await prisma.creditLedger.findFirst({
-        where: { userId: user.id, type: "recharge", refId: transactionId },
-        select: { id: true },
+      // 幂等：以 (userId, type=recharge, refId=transactionId) 作幂等键。
+      // 事务内「查重 → 入账」原子完成，二次确认放行闸门，杜绝并发同 transactionId 双发积分。
+      // （CreditLedger 无法用 @@unique([type,refId])：llm_spend/monthly_grant 的 refId 天然重复，
+      //   全局唯一会破坏计费/月赠契约；故用事务内二次确认，等价幂等且不改 schema。）
+      await ensureAccount(user.id);
+      const result = await prisma.$transaction(async (tx) => {
+        const dup = await tx.creditLedger.findFirst({
+          where: { userId: user.id, type: "recharge", refId: transactionId },
+          select: { id: true },
+        });
+        if (dup) {
+          const acc = await tx.creditAccount.findUnique({ where: { userId: user.id }, select: { balance: true } });
+          return { balance: acc?.balance ?? 0, duplicate: true };
+        }
+        const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: user.id } });
+        const balanceAfter = acc.balance + amount;
+        await tx.creditAccount.update({
+          where: { userId: user.id },
+          data: { balance: balanceAfter, totalEarned: acc.totalEarned + amount },
+        });
+        await tx.creditLedger.create({
+          data: { userId: user.id, delta: amount, type: "recharge", refId: transactionId, reason: "IAP充值", balanceAfter },
+        });
+        return { balance: balanceAfter, duplicate: false };
       });
-      if (dup) {
-        const balance = await getBalance(user.id);
-        return ok({ balance, duplicate: true });
-      }
 
-      const balance = await grantCredits(user.id, amount, "recharge", {
-        refId: transactionId,
-        reason: "IAP充值",
-      });
+      if (result.duplicate) return ok({ balance: result.balance, duplicate: true });
       await track({ eventName: "iap_recharge", userId: user.id, properties: { product_id: productId, amount, transaction_id: transactionId } });
-      return ok({ balance });
+      return ok({ balance: result.balance });
     }
 
     // —— 订阅类 ——

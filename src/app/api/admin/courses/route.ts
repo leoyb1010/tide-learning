@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "").slice(0, 40) || `course-${Date.now()}`;
@@ -24,6 +24,7 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     const admin = await requirePermission("course:write");
+    assertSameOrigin(req);
     const body = (await req.json()) as {
       title: string;
       subtitle?: string;

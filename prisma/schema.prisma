@@ -470,6 +470,11 @@ model Entitlement {
   validUntil           DateTime?
   snapshotJson         String        @default("{}")
   updatedAt            DateTime      @updatedAt
+
+  // 并发写权益快照的幂等键：同一订阅每人至多一行。
+  // sourceSubscriptionId 可空（未绑定订阅的 free 快照），SQLite 允许多个 NULL 并存，
+  // 不会误伤 free 行；upsert 只在非 null 分支走复合唯一键。
+  @@unique([userId, sourceSubscriptionId])
 }
 
 model PaymentWebhookLog {
@@ -516,6 +521,10 @@ model AnalyticsEvent {
   propertiesJson String   @default("{}")
   platform       String   @default("web")
   createdAt      DateTime @default(now())
+
+  // 全站最热写表：埋点查询按事件名 + 时间范围、按用户漏斗高频过滤，补两条覆盖索引。
+  @@index([eventName, createdAt])
+  @@index([userId, eventName, createdAt])
 }
 
 // ---------- §8.2.2 内容排期 ----------

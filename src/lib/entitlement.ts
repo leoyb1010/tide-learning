@@ -175,16 +175,27 @@ export const resolveEntitlement = cache(async (userId: string | null | undefined
   return FREE_SNAPSHOT;
 });
 
-async function persistSnapshot(userId: string, subscriptionId: string, status: string, snapshot: EntitlementSnapshot) {
-  const existing = await prisma.entitlement.findFirst({ where: { userId, sourceSubscriptionId: subscriptionId } });
+async function persistSnapshot(userId: string, subscriptionId: string | null, status: string, snapshot: EntitlementSnapshot) {
   const data = {
     status,
     accessLevel: snapshot.accessLevel,
     validUntil: snapshot.validUntil ? new Date(snapshot.validUntil) : null,
     snapshotJson: JSON.stringify(snapshot),
   };
+  // 非 null：靠 @@unique([userId, sourceSubscriptionId]) 复合唯一键原子 upsert，杜绝并发 check-then-act 写重复快照行。
+  if (subscriptionId) {
+    await prisma.entitlement.upsert({
+      where: { userId_sourceSubscriptionId: { userId, sourceSubscriptionId: subscriptionId } },
+      update: data,
+      create: { userId, sourceSubscriptionId: subscriptionId, ...data },
+    });
+    return;
+  }
+  // null 分支：SQLite 唯一键不能用 NULL 定位（多 NULL 并存），退回 check-then-act。
+  // 现有调用方 subscriptionId 恒非 null，此分支仅为防御性兜底。
+  const existing = await prisma.entitlement.findFirst({ where: { userId, sourceSubscriptionId: null } });
   if (existing) await prisma.entitlement.update({ where: { id: existing.id }, data });
-  else await prisma.entitlement.create({ data: { userId, sourceSubscriptionId: subscriptionId, ...data } });
+  else await prisma.entitlement.create({ data: { userId, sourceSubscriptionId: null, ...data } });
 }
 
 /** 是否可访问某赛道（全站 or 该赛道单订阅）。 */

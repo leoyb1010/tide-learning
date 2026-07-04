@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { track } from "@/lib/analytics";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { generateCourseOutline, slugifyCourse } from "@/lib/course-gen";
 
 const VALID = ["pending_review", "collecting", "evaluating", "scheduled", "producing", "launched", "rejected", "merged"];
@@ -63,6 +63,7 @@ async function generateDemandPreview(demand: { id: string; title: string; descri
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const admin = await requirePermission("demand:moderate");
+    assertSameOrigin(req);
     const { id } = await params;
     const body = (await req.json()) as {
       status: string;

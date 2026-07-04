@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 const VALID = ["new", "contacting", "booked", "trialing", "converted", "lost"];
 
@@ -10,6 +10,7 @@ const VALID = ["new", "contacting", "booked", "trialing", "converted", "lost"];
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const admin = await requirePermission("lead:manage");
+    assertSameOrigin(req);
     const { id } = await params;
     const body = (await req.json()) as { status?: string; followUpNote?: string };
     if (body.status && !VALID.includes(body.status)) return fail("非法状态");

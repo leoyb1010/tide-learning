@@ -2,12 +2,13 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 // POST /api/admin/courses/:id/lessons — 新增章节
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const admin = await requirePermission("course:write");
+    assertSameOrigin(req);
     const { id: courseId } = await params;
     const body = (await req.json()) as {
       title: string;

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
+import { getLessonForUser } from "@/lib/queries";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chat } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
@@ -36,16 +37,19 @@ async function buildCompanionContext(
     return { contextText: "（当前无具体课程内容上下文，请基于通用学习方法回答。）", courseTitle: null, lessonTitle: null };
   }
 
-  const lesson = await prisma.lesson.findUnique({
-    where: { id: lessonId },
-    include: { course: true, subtitles: { orderBy: { startSec: "asc" }, select: { text: true } } },
-  });
-  if (!lesson || !lesson.course) {
+  // 越权铁律：经 getLessonForUser 取内容 —— 它已内置 canViewCourse（归属门）+
+  // canAccessLesson（付费门）。无权时视为不存在（返回 null），或把 articleMd/blocksJson/
+  // subtitles 置 null/空，从源头杜绝把他人私有课 / 未订阅付费课全文注入 LLM。
+  const view = await getLessonForUser(lessonId, userId);
+  if (!view) {
     return { contextText: "（未找到对应课程内容，请基于通用学习方法回答。）", courseTitle: null, lessonTitle: null };
   }
-  const course = lesson.course;
+  const course = view.course;
+  const lesson = view.lesson;
 
   // —— 提取本节内容纯文本（按 contentType 分流）——
+  // 无权益时 blocksJson / articleMd / subtitles 已被 getLessonForUser 置 null/空，
+  // lessonBody 自然为空，伴侣仅凭标题 / 摘要作答，不注入正文。
   let lessonBody = "";
   if (lesson.contentType === "ai_block" && lesson.blocksJson) {
     try {
