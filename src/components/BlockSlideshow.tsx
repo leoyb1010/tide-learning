@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   CaretLeft,
@@ -136,9 +136,12 @@ export function BlockSlideshow({
   const isDarkBoard = current.kind === "scene" || current.kind === "summary";
   const pct = ((safeIndex + 1) / total) * 100;
 
-  // 转场变体：reduce-motion 下位移归零、时长压到极短（即时切换）。
-  const enterX = reduce ? 0 : dir > 0 ? 48 : -48;
-  const exitX = reduce ? 0 : dir > 0 ? -48 : 48;
+  // 转场变体：reduce-motion 下位移/缩放归零、时长压到极短（即时切换）。
+  // 方向滑动 + 轻微景深（进入页略微从远处推近：scale 0.965 → 1；退出页略微退远）——像「推进一页」。
+  const enterX = reduce ? 0 : dir > 0 ? 52 : -52;
+  const exitX = reduce ? 0 : dir > 0 ? -52 : 52;
+  const enterScale = reduce ? 1 : 0.965;
+  const exitScale = reduce ? 1 : 0.985;
 
   return (
     <div
@@ -150,9 +153,16 @@ export function BlockSlideshow({
       }`}
       style={fullscreen ? { zIndex: "var(--z-focus)" } : undefined}
     >
-      {/* 顶部进度条 + 页序 + 全屏 */}
+      {/* 顶部进度条 + 页序 + 全屏（进度条更精致：内嵌轨 + 红芯 + 右缘流光） */}
       <div className="mb-3 flex items-center gap-3">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-inset)]" aria-hidden>
+        <div
+          className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-inset)] shadow-[inset_0_1px_2px_rgba(35,41,53,.08)]"
+          role="progressbar"
+          aria-valuenow={safeIndex + 1}
+          aria-valuemin={1}
+          aria-valuemax={total}
+          aria-label={`阅读进度：第 ${safeIndex + 1} 页，共 ${total} 页`}
+        >
           <div className="slide-progress-fill h-full rounded-full bg-[var(--red)]" style={{ width: `${pct}%` }} />
         </div>
         <span
@@ -179,10 +189,11 @@ export function BlockSlideshow({
           <motion.div
             key={current.id}
             custom={dir}
-            initial={{ opacity: 0, x: enterX }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: exitX }}
+            initial={{ opacity: 0, x: enterX, scale: enterScale }}
+            animate={{ opacity: 1, x: 0, scale: 1 }}
+            exit={{ opacity: 0, x: exitX, scale: exitScale }}
             transition={reduce ? { duration: 0.12 } : { type: "spring", stiffness: 260, damping: 30, mass: 0.9 }}
+            style={{ transformOrigin: dir > 0 ? "left center" : "right center", willChange: "transform, opacity" }}
             className={`flex ${
               fullscreen ? "min-h-[calc(100vh-160px)]" : "min-h-[440px] sm:min-h-[520px]"
             } flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] ${
@@ -214,11 +225,12 @@ export function BlockSlideshow({
               </span>
             </div>
 
-            {/* 页内容：居中限宽，纵向排布本页块（通常 1-3 块）。复用 BlockSwitch 单块渲染。 */}
+            {/* 页内容：居中限宽，纵向排布本页块（通常 1-3 块）。复用 BlockSwitch 单块渲染。
+                slide-stagger：每次换页 motion.div 按 key 重挂，页内块按 --i 逐个上浮（reduce-motion 静态直显）。 */}
             <div className="flex flex-1 items-center overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
-              <div className="mx-auto flex w-full max-w-3xl flex-col gap-5 sm:gap-6">
-                {current.blocks.map((block) => (
-                  <div key={block.id} data-block-id={block.id}>
+              <div className={`mx-auto flex w-full max-w-3xl flex-col gap-5 sm:gap-6 ${reduce ? "" : "slide-stagger"}`}>
+                {current.blocks.map((block, bi) => (
+                  <div key={block.id} data-block-id={block.id} style={{ "--i": bi } as CSSProperties}>
                     <BlockSwitch block={block} courseId={courseId} />
                   </div>
                 ))}

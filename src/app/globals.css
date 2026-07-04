@@ -532,8 +532,122 @@ body::before {
 
 /* 页序进度条内芯：翻页时宽度过渡；reduce-motion 即时跳。 */
 .slide-progress-fill { transition: width .4s var(--ease-out-expo); }
+/* 进度条推进时内芯右缘一抹流光，强化「正在推进」的动势（合成友好，只动 opacity 的伪元素） */
+.slide-progress-fill { position: relative; overflow: hidden; }
+.slide-progress-fill::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55));
+  opacity: .6;
+}
 @media (prefers-reduced-motion: reduce) {
   .slide-progress-fill { transition: none; }
+}
+
+/* ============================================================
+   v4「内容质量革命」· 块渲染层视觉/动效升级（BlockRenderer / BlockSlideshow）
+   —— 全部 transform/opacity 合成友好；每类都在文件末尾 reduce-motion 统一降级为静态直显。
+   —— 进场依赖组件层用 IntersectionObserver 把父容器切到 .is-in（视口触发，长课件不一次性挂载）。
+   ============================================================ */
+
+/* 通用：视口触发的「块内子元素交错上浮」。
+   父容器默认给 data-reveal（子元素起始态：透明下移）；进入视口后加 .is-in 播放。
+   子元素用 --i 递延；reduce-motion 或未支持时，组件直接给 .is-in 常显。 */
+[data-reveal] > * { opacity: 0; transform: translateY(10px); }
+[data-reveal].is-in > * {
+  animation: blockChildIn .5s var(--ease-out-expo) both;
+  animation-delay: calc(var(--i, 0) * 70ms);
+}
+@keyframes blockChildIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+
+/* compare —— 左右「对撞」进场：误区列从左滑入，正确列从右滑入，落定时轻微内挤一下。 */
+.cmp-col { will-change: transform, opacity; }
+.cmp-col-left  { animation: cmpInLeft  .5s var(--ease-tide) both; }
+.cmp-col-right { animation: cmpInRight .5s var(--ease-tide) both; animation-delay: 70ms; }
+@keyframes cmpInLeft  { from { opacity: 0; transform: translateX(-22px); } 70% { transform: translateX(3px); } to { opacity: 1; transform: none; } }
+@keyframes cmpInRight { from { opacity: 0; transform: translateX(22px); }  70% { transform: translateX(-3px); } to { opacity: 1; transform: none; } }
+/* 中缝 vs 徽章：落定后轻弹 */
+.cmp-vs { animation: cmpVsPop .42s var(--ease-spring) both; animation-delay: .22s; }
+@keyframes cmpVsPop { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: scale(1); } }
+
+/* steps —— 连接线自上而下「生长」+ 序号徽章逐个弹入。
+   线用 scaleY(transform-origin:top) 生长；徽章 num-pop 式弹。父加 .is-in 才播放。 */
+.steps-line { transform-origin: top; transform: scaleY(0); }
+.is-in .steps-line { animation: stepsLineGrow .5s var(--ease-out-expo) both; animation-delay: calc(var(--i, 0) * 120ms + 120ms); }
+@keyframes stepsLineGrow { to { transform: scaleY(1); } }
+.steps-badge { transform: scale(.4); opacity: 0; }
+.is-in .steps-badge { animation: stepsBadgePop .44s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 120ms); }
+@keyframes stepsBadgePop { from { transform: scale(.4); opacity: 0; } 60% { transform: scale(1.12); } to { transform: scale(1); opacity: 1; } }
+.steps-body { opacity: 0; transform: translateY(6px); }
+.is-in .steps-body { animation: blockChildIn .46s var(--ease-out-expo) both; animation-delay: calc(var(--i, 0) * 120ms + 60ms); }
+
+/* dialog —— 气泡逐条浮现：左气泡从左轻推、右气泡从右轻推。 */
+.dlg-turn { opacity: 0; }
+.is-in .dlg-turn-l { animation: dlgInL .46s var(--ease-tide) both; animation-delay: calc(var(--i, 0) * 110ms + 100ms); }
+.is-in .dlg-turn-r { animation: dlgInR .46s var(--ease-tide) both; animation-delay: calc(var(--i, 0) * 110ms + 100ms); }
+@keyframes dlgInL { from { opacity: 0; transform: translate(-14px, 6px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes dlgInR { from { opacity: 0; transform: translate(14px, 6px)  scale(.98); } to { opacity: 1; transform: none; } }
+
+/* keypoint —— 要点卡网格逐格弹入（配 --i） */
+.kp-cell { opacity: 0; transform: translateY(10px) scale(.98); }
+.is-in .kp-cell { animation: kpCellIn .46s var(--ease-out-expo) both; animation-delay: calc(var(--i, 0) * 70ms + 60ms); }
+@keyframes kpCellIn { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+
+/* quiz —— 判分反馈：答对整卡微庆祝（轻弹一下），答错被选项横向抖动。 */
+.quiz-correct { animation: quizCelebrate .5s var(--ease-spring) both; }
+@keyframes quizCelebrate { 0% { transform: scale(1); } 30% { transform: scale(1.012); } 60% { transform: scale(.998); } 100% { transform: scale(1); } }
+.quiz-shake { animation: quizShake .4s var(--ease-out-expo) both; }
+@keyframes quizShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-6px); } 40% { transform: translateX(5px); } 60% { transform: translateX(-3px); } 80% { transform: translateX(2px); } }
+/* 判分解析条：从下轻浮入 */
+.quiz-verdict { animation: quizVerdictIn .4s var(--ease-out-expo) both; }
+@keyframes quizVerdictIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+/* 答对时解析条左缘一颗庆祝火花点 */
+.quiz-spark { animation: quizSpark .6s var(--ease-spring) both; }
+@keyframes quizSpark { 0% { transform: scale(0) rotate(-30deg); opacity: 0; } 55% { transform: scale(1.2) rotate(8deg); opacity: 1; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
+
+/* scene —— 「拉开幕布」引入：两片幕帘向两侧退开，露出场景内容。
+   幕帘是覆盖层（absolute），退场后 pointer-events:none 不挡交互。 */
+.scene-curtain { position: absolute; top: 0; bottom: 0; width: 50%; z-index: 2; pointer-events: none; background: var(--video-bg); }
+.scene-curtain-l { left: 0; transform-origin: left; }
+.scene-curtain-r { right: 0; transform-origin: right; }
+.is-in .scene-curtain-l { animation: curtainL .7s var(--ease-out-expo) both; }
+.is-in .scene-curtain-r { animation: curtainR .7s var(--ease-out-expo) both; }
+@keyframes curtainL { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+@keyframes curtainR { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+/* 幕后内容随幕布拉开而淡入 */
+.scene-stage { opacity: 0; }
+.is-in .scene-stage { animation: sceneStageIn .6s var(--ease-out-expo) .28s both; }
+@keyframes sceneStageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+/* summary next 钩子 —— 箭头「钩住下一节」的持续呼吸位移（克制，仅 4px 往复） */
+.next-arrow { animation: nextArrowNudge 1.6s var(--ease-tide) infinite; }
+@keyframes nextArrowNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(4px); } }
+
+/* callout 左缘强调条：进场时从上「注入」一下（scaleY），info/warn 颜色由内联样式给 */
+.callout-strip { transform-origin: top; }
+.is-in .callout-strip { animation: calloutStrip .5s var(--ease-out-expo) both; }
+@keyframes calloutStrip { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+
+/* BlockSlideshow 页内块 stagger 上浮：翻到新页时页内块逐个浮现。
+   每次换页组件重挂 key，动画自然重播。 */
+.slide-stagger > * { animation: slideBlockIn .5s var(--ease-out-expo) both; animation-delay: calc(var(--i, 0) * 80ms + 60ms); }
+@keyframes slideBlockIn { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* —— v4 块渲染层 reduce-motion 统一降级：一切进场/强调动效直接静态显示 —— */
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] > *, [data-reveal].is-in > * { opacity: 1 !important; transform: none !important; animation: none !important; }
+  .slide-progress-fill::after { display: none !important; }
+  .cmp-col-left, .cmp-col-right, .cmp-vs { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .steps-line { transform: scaleY(1) !important; }
+  .is-in .steps-line, .steps-badge, .is-in .steps-badge, .steps-body, .is-in .steps-body { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .dlg-turn, .is-in .dlg-turn-l, .is-in .dlg-turn-r { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .kp-cell, .is-in .kp-cell { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .quiz-correct, .quiz-shake, .quiz-verdict, .quiz-spark { animation: none !important; opacity: 1 !important; transform: none !important; }
+  /* 无动画时幕帘不能停在半开挡住内容：直接收起并让内容常显 */
+  .scene-curtain { display: none !important; }
+  .scene-stage, .is-in .scene-stage { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .next-arrow { animation: none !important; transform: none !important; }
+  .callout-strip, .is-in .callout-strip { animation: none !important; transform: none !important; }
+  .slide-stagger > * { animation: none !important; opacity: 1 !important; transform: none !important; }
 }
 
 /* ============================================================
