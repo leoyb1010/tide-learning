@@ -49,8 +49,28 @@ final class API {
         try await send(path, method: "DELETE", body: body, as: T.self)
     }
 
+    /// 由 `path`（可含 `?query`）拼出请求 URL。
+    ///
+    /// `URL.appending(path:)` 会把 `?`/`=`/`&` 当作路径字符转义（`courses?q=x` → `courses%3Fq=x`），
+    /// 导致 query 根本到不了服务端。这里在首个 `?` 处切分：路径段走 `appending(path:)`，
+    /// query 段作为 **已编码** 串直接挂到 `percentEncodedQuery`（调用方用 URLComponents.queryItems
+    /// 组装，特殊字符 `& = + ?` 已正确转义，此处不得二次编码）。
+    private func makeURL(_ path: String) -> URL {
+        guard let qIdx = path.firstIndex(of: "?") else {
+            return base.appending(path: path)
+        }
+        let rawPath = String(path[path.startIndex..<qIdx])
+        let rawQuery = String(path[path.index(after: qIdx)...])
+        guard var comps = URLComponents(url: base.appending(path: rawPath),
+                                        resolvingAgainstBaseURL: false) else {
+            return base.appending(path: path)
+        }
+        comps.percentEncodedQuery = rawQuery
+        return comps.url ?? base.appending(path: rawPath)
+    }
+
     private func send<B: Encodable, T: Decodable>(_ path: String, method: String, body: B?, as: T.Type) async throws -> T {
-        var req = URLRequest(url: base.appending(path: path))
+        var req = URLRequest(url: makeURL(path))
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(AppConfig.appOrigin, forHTTPHeaderField: "X-App-Origin")

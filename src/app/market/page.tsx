@@ -9,8 +9,7 @@ import {
   ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
-import { prisma } from "@/lib/db";
-import { marketStallCoverSrc } from "@/lib/tracks";
+import { buildMarketStalls } from "@/lib/market-data";
 import { MarketStallCard } from "@/components/market/MarketStallCard";
 import { MarketSortTabs } from "@/components/market/MarketSortTabs";
 import {
@@ -47,93 +46,9 @@ export default async function MarketPage({
   const [user, sp] = await Promise.all([getCurrentUser(), searchParams]);
   const sort = normalizeSort(sp.sort);
 
-  // 已上架课：作者归属 + 学习人数 + 上新时间。
-  const courses = await prisma.course.findMany({
-    where: { sharedStatus: "shared" },
-    orderBy: { lastUpdatedAt: "desc" },
-    take: 60,
-    select: {
-      id: true,
-      slug: true,
-      title: true,
-      subtitle: true,
-      description: true,
-      category: true,
-      coverColor: true,
-      origin: true,
-      authorUserId: true,
-      learnersCount: true,
-      createdAt: true,
-    },
-  });
-
-  const courseIds = courses.map((c) => c.id);
-  // 课 id → 作者 userId，用于「拿走数」聚合时排除作者本人（collect 端点禁止自收藏，统计须一致）。
-  const courseAuthorMap = new Map(courses.map((c) => [c.id, c.authorUserId]));
-
-  // 每门课「拿走数」= 有该课学习记录的去重用户数（collect 建起始 LearningProgress）。
-  // 按 (courseId,userId) 分组去重后按课累加；作者本人学自己的 shared 课不计（与 collect 禁自收藏一致）。
-  const collectRows =
-    courseIds.length > 0
-      ? await prisma.learningProgress.groupBy({
-          by: ["courseId", "userId"],
-          where: { courseId: { in: courseIds } },
-        })
-      : [];
-  const collectCountMap = new Map<string, number>();
-  for (const r of collectRows) {
-    if (r.userId === courseAuthorMap.get(r.courseId)) continue; // 跳过作者本人
-    collectCountMap.set(r.courseId, (collectCountMap.get(r.courseId) ?? 0) + 1);
-  }
-
-  // 我拿走过哪些课（越权铁律：where userId=我）——决定 CTA 初始态。
-  const myCollectedSet = new Set<string>();
-  if (user && courseIds.length > 0) {
-    const mine = await prisma.learningProgress.groupBy({
-      by: ["courseId"],
-      where: { userId: user.id, courseId: { in: courseIds } },
-    });
-    for (const r of mine) myCollectedSet.add(r.courseId);
-  }
-
-  // 作者昵称 + 头像（一次查完）。
-  const authorIds = Array.from(
-    new Set(courses.map((c) => c.authorUserId).filter((x): x is string => Boolean(x))),
-  );
-  const authors =
-    authorIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: authorIds } },
-          select: { id: true, nickname: true, avatarUrl: true },
-        })
-      : [];
-  const authorMap = new Map(authors.map((a) => [a.id, a]));
-
-  // ——— 组装摊位视图模型 ———
-  const stalls: MarketStall[] = courses.map((c) => {
-    const collectCount = collectCountMap.get(c.id) ?? 0;
-    const seller = c.authorUserId ? authorMap.get(c.authorUserId) : undefined;
-    return {
-      id: c.id,
-      slug: c.slug,
-      title: c.title,
-      subtitle: c.subtitle ?? c.description ?? null,
-      category: c.category,
-      coverColor: c.coverColor,
-      coverSrc: marketStallCoverSrc(c.slug, c.category ?? ""),
-      origin: c.origin,
-      collectCount,
-      learnersCount: c.learnersCount,
-      collectedByMe: myCollectedSet.has(c.id),
-      mine: Boolean(user && c.authorUserId === user.id),
-      createdAtMs: c.createdAt.getTime(),
-      seller: {
-        id: c.authorUserId,
-        nickname: seller?.nickname ?? "匿名同学",
-        avatarUrl: seller?.avatarUrl ?? null,
-      },
-    };
-  });
+  // 摊位视图模型：与 GET /api/market 共用同一份组装逻辑（src/lib/market-data.ts），
+  // 保证 Web 与 iOS 集市字段/语义完全一致（拿走数排除作者本人、越权铁律 where userId）。
+  const stalls: MarketStall[] = await buildMarketStalls(user?.id ?? null);
 
   const sorted = sortStalls(stalls, sort);
 

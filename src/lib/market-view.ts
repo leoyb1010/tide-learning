@@ -29,6 +29,8 @@ export interface MarketStall {
     id: string | null;
     nickname: string;
     avatarUrl: string | null;
+    /** 摊主等级(1~4)：按其在本集市所有摊位的累计被拿走数派生（sellerBadge tier），无数据为 1。 */
+    level: number;
   };
 }
 

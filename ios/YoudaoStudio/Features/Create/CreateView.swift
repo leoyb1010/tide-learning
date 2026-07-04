@@ -68,8 +68,17 @@ final class CreateViewModel {
     var paywallMessage: String?
 
     // 取消控制
+    //
+    // 旧实现用共享布尔 `cancelled`：新 generate() 会把它复位为 false，导致「取消旧任务→立刻发起新任务」
+    // 时，旧在途请求返回后 `if cancelled` 判为 false，仍会写入共享 VM 状态、污染新一轮。
+    // 现改为「真取消 Task 句柄 + 单调递增 runID 快照」双保险：
+    //   1. genTask 持有当前造课 Task，cancel()/新 generate() 里 genTask?.cancel() 真取消在途 URLSession 请求；
+    //   2. 每轮 generate() 递增并快照 runID，所有 await 返回后先 `isStale(runID)` 比对，
+    //      非当前轮（被取消或已被新轮取代）一律提前返回、绝不写状态，实现新旧任务状态隔离。
     private var generating = false
-    private var cancelled = false
+    private var genTask: Task<Void, Never>?
+    /// 单调递增的运行序号：每次 generate() 自增并快照，用于隔离新旧在途任务的状态写入。
+    private var runID = 0
 
     // 示例灵感 chip
     let examples = [
@@ -102,10 +111,20 @@ final class CreateViewModel {
     }
 
     /// 取消进行中的造课，回到造课台。
+    /// 真取消在途 Task（触发 URLSession 取消），并递增 runID 让任何仍在途的旧任务变「陈旧」，
+    /// 其 await 返回后一律不再写状态。
     func cancel() {
-        cancelled = true
+        genTask?.cancel()
+        genTask = nil
+        runID &+= 1          // 使任何在途旧任务的快照 runID 失效
         generating = false
         resetToIdle()
+    }
+
+    /// 某轮任务是否已「陈旧」：被取消（Task.isCancelled）或已被更新一轮 generate() 取代（runID 前进）。
+    /// 陈旧任务 await 返回后必须提前退出，绝不写入共享 VM 状态。
+    private func isStale(_ snapshot: Int) -> Bool {
+        snapshot != runID || Task.isCancelled
     }
 
     private func resetToIdle() {
@@ -121,20 +140,35 @@ final class CreateViewModel {
         paywallMessage = nil
     }
 
-    /// 主流程：理解 → 大纲 → 逐节写作 → 完成。
+    /// 主流程入口：占位守卫 → 递增并快照 runID → 存 Task 句柄 → 跑本轮流程。
+    /// 存句柄使 cancel() 能真取消在途请求；快照 runID 使旧任务返回后被判为陈旧、不写状态。
     func generate() async {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !generating else { return }
+
+        // 发起新一轮前先取消上一轮在途任务（防御性：正常情况下 UI 已禁止并发发起）。
+        genTask?.cancel()
+        runID &+= 1
+        let myRun = runID
         generating = true
-        cancelled = false
         error = nil
         needsPaywall = false
         paywallMessage = nil
 
+        let task = Task { [weak self] in
+            guard let self else { return }
+            await self.runGenerate(trimmed, myRun: myRun)
+        }
+        genTask = task
+        await task.value
+    }
+
+    /// 本轮造课流程。每个 await 返回后先 `isStale(myRun)` 比对，陈旧则立即退出、绝不写共享状态。
+    private func runGenerate(_ trimmed: String, myRun: Int) async {
         // 步骤1：理解需求（瞬时 ✓，短暂停顿营造过程感）
         stage = .understanding
         try? await Task.sleep(nanoseconds: 500_000_000)
-        if cancelled { return }
+        if isStale(myRun) { return }
 
         // 步骤2：搭建大纲
         stage = .outlining
@@ -145,14 +179,14 @@ final class CreateViewModel {
                 body: CourseBody(prompt: trimmed),
                 as: GeneratedCourse.self
             )
-            if cancelled { return }
+            if isStale(myRun) { return }
             courseId = course.courseId
             slug = course.slug
             lessons = course.lessons
             // 大纲逐条浮现：初始化状态，逐条揭示交给 View 的 appear 动画。
             for l in course.lessons { lessonStates[l.id] = .pending }
         } catch let e as APIError {
-            if cancelled { return }
+            if isStale(myRun) { return }
             if e.needsPaywall {
                 needsPaywall = true
                 paywallMessage = e.errorDescription
@@ -162,7 +196,7 @@ final class CreateViewModel {
             generating = false
             return
         } catch {
-            if cancelled { return }
+            if isStale(myRun) { return }
             self.error = "搭建大纲失败"
             generating = false
             return
@@ -176,13 +210,13 @@ final class CreateViewModel {
 
         // 让大纲浮现动画播放片刻再进入写作。
         try? await Task.sleep(nanoseconds: 600_000_000)
-        if cancelled { return }
+        if isStale(myRun) { return }
 
         // 步骤3：逐节串行写作。
         stage = .writing
         struct LessonBody: Encodable { let courseId: String; let lessonId: String }
         for (idx, lesson) in lessons.enumerated() {
-            if cancelled { return }
+            if isStale(myRun) { return }
             currentIndex = idx
             lessonStates[lesson.id] = .writing
             do {
@@ -191,11 +225,11 @@ final class CreateViewModel {
                     body: LessonBody(courseId: courseId ?? "", lessonId: lesson.id),
                     as: GeneratedLessonResult.self
                 )
-                if cancelled { return }
+                if isStale(myRun) { return }
                 lessonStates[lesson.id] = .done
                 quizCount += res.quizCount ?? 0
             } catch let e as APIError {
-                if cancelled { return }
+                if isStale(myRun) { return }
                 // 付费墙可能在写作中触发：终止流程去引导。
                 if e.needsPaywall {
                     needsPaywall = true
@@ -206,14 +240,15 @@ final class CreateViewModel {
                 // 单节失败：标「待重试」，不阻断后续。
                 lessonStates[lesson.id] = .failed
             } catch {
-                if cancelled { return }
+                if isStale(myRun) { return }
                 lessonStates[lesson.id] = .failed
             }
         }
 
-        if cancelled { return }
+        if isStale(myRun) { return }
         stage = .finished
         generating = false
+        genTask = nil
     }
 
     /// 重试单个失败节（完成页可点）。

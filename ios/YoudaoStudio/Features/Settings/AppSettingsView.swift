@@ -3,10 +3,13 @@ import Observation
 
 // MARK: - DTO
 
-/// GET /api/account/export 导出笔记结果（后端返回可下载文本/JSON 字符串或计数）。
+/// GET /api/account/export 导出笔记结果。
+/// 对齐后端 { count, text, format }：count=导出篇数，text=组装好的 Markdown 全文，
+/// format 恒为 "markdown"（附加字段，iOS 展示/分享不依赖，故可选）。
 private struct ExportResult: Decodable {
     let count: Int
-    let text: String? // 可选：后端直接回传导出文本
+    let text: String
+    let format: String?
 }
 
 /// 注销账号请求体。POST /api/account/delete { password }
@@ -82,7 +85,9 @@ final class SettingsViewModel {
         defer { exporting = false }
         do {
             let res = try await API.shared.get("/api/account/export", as: ExportResult.self)
-            exportedText = res.text ?? "已导出 \(res.count) 条笔记。"
+            // 后端恒回传组装好的 Markdown 全文；空文本（无笔记）兜底成计数提示。
+            let text = res.text.trimmingCharacters(in: .whitespacesAndNewlines)
+            exportedText = text.isEmpty ? "已导出 \(res.count) 条笔记。" : res.text
             showExportSheet = true
         } catch {
             exportError = (error as? APIError)?.errorDescription ?? "导出失败，请重试"

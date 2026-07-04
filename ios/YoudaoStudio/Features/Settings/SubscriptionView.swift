@@ -96,7 +96,9 @@ private extension PricingPlan {
         }
     }
 
-    /// 该周期折算的整月数（用于每月赠额与每天单价换算）。
+    /// 该周期折算的整月数。
+    /// 注：每天单价已改为按 365 天摊分（对齐 Web，见 perDayText），不再依赖本属性；
+    /// 每月赠额由 monthlyGrant 的固定档位表给出。保留此属性以备后续周期换算复用。
     var monthsInPeriod: Int {
         switch billingPeriod {
         case "quarter": return 3
@@ -122,15 +124,19 @@ private extension PricingPlan {
         }
     }
 
-    /// 每天单价换算（价格锚定），如「约 ¥1.4/天」。年卡最具说服力。
+    /// 每天单价换算（价格锚定），如「≈ ¥1.37/天」。年卡最具说服力。
+    ///
+    /// 与 Web 保持同一算法，避免同一年卡在 iOS 与 Web 显示不同金额：
+    ///   Web（PricingPlans.tsx: yearPerDayCents = Math.round(priceCents / 365)，
+    ///   SubscriptionCard 渲染 `≈ ¥{(cents/100).toFixed(2)}/天`）——
+    ///   365 天基准 + 先四舍五入到「分」再两位小数 + 「≈ ¥」前缀。
+    ///   此前 iOS 用 monthsInPeriod*30=360 天且一/零位小数，与 Web 不一致，已对齐。
     var perDayText: String? {
-        let days = Double(monthsInPeriod) * 30.0
-        guard days > 0 else { return nil }
-        let perDay = Double(priceCents) / 100.0 / days
-        let amount = perDay >= 10
-            ? String(format: "%.0f", perDay)
-            : String(format: "%.1f", perDay)
-        return "约 ¥\(amount)/天"
+        // 与 Web 一致：按 365 天摊分，先四舍五入到「分」（Int），再 /100 两位小数。
+        let perDayCents = Int((Double(priceCents) / 365.0).rounded())
+        guard perDayCents > 0 else { return nil }
+        let amount = String(format: "%.2f", Double(perDayCents) / 100.0)
+        return "≈ ¥\(amount)/天"
     }
 
     /// 首期优惠文案（如有），如「首期 ¥68」。
@@ -160,11 +166,17 @@ private struct RightRow: Identifiable {
 }
 
 /// 权益清单（镜像 Web pricing/page.tsx 的 RIGHTS，并补齐商业化差异项）。
+///
+/// 免费列以「服务端真实门禁」为唯一事实源，绝不虚标：
+///   AI 造课 / AI 整理笔记 / 模拟考三项在服务端均先做 `!canUseLLM → 402` 硬闸
+///   （generate-course / note-transform / generate-exam 三个 route 均如此，且 canUseLLM==isSubscriber，
+///   免费用户 canUseLLM=false）。402 在 assertCanSpend 之前抛出，故免费用户「不存在按积分先用」的路径，
+///   三项对免费用户一律 ✕。此前 iOS 标「试用 / 1 次/日」属虚标，已按服务端门禁改正。
 private let subscriptionRights: [RightRow] = [
     RightRow(name: "订阅赛道课程", free: "✕", premium: "全部解锁", expired: "✕"),
-    RightRow(name: "AI 造课",     free: "试用",  premium: "无限",     expired: "✕"),
+    RightRow(name: "AI 造课",     free: "✕",    premium: "无限",     expired: "✕"),
     RightRow(name: "AI 整理笔记", free: "✕",    premium: "无限",     expired: "仅查看"),
-    RightRow(name: "模拟考",      free: "1 次/日", premium: "无限",   expired: "✕"),
+    RightRow(name: "模拟考",      free: "✕",    premium: "无限",     expired: "✕"),
     RightRow(name: "笔记导出",    free: "✕",    premium: "支持",     expired: "✕"),
     RightRow(name: "学习周报",    free: "✕",    premium: "每周推送",  expired: "✕"),
     RightRow(name: "分享成就卡",  free: "基础",  premium: "全部样式",  expired: "基础"),

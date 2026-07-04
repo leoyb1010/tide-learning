@@ -3,11 +3,13 @@ import Observation
 
 // MARK: - DTO（对齐 web v4.0 交易市场：摊位卡 + 拿走）
 
-/// 集市摊位项。字段对齐 web src/lib/market-view.ts 的 MarketStall。
+/// 集市摊位项。字段对齐后端 GET /api/market → { items: [...] }
+/// （与 web src/lib/market-view.ts 的 MarketStall 共用同一份组装逻辑 buildMarketStalls）。
 ///
-/// 数据来源说明：web 的 /market 是 server component 直接查库拼装（无 GET /api/market JSON 接口）。
-/// iOS 优先请求 GET /api/market（若后端补该接口即命中）；缺省回退 GET /api/courses 过滤
-/// sharedStatus=="shared"，把 courses 字段近似映射成摊位（拿走数缺省用 learnersCount 近似）。
+/// 后端字段：id / slug / title / subtitle / category / coverColor / coverSrc / origin /
+/// collectCount / learnersCount / collectedByMe / mine / createdAtMs / seller{id,nickname,avatarUrl,level}。
+/// iOS 对少数字段放宽为可选（slug/category/coverColor/coverSrc/origin/createdAtMs），
+/// 后端恒返回非空值，可选解码兼容且更抗未来字段调整。
 struct MarketStall: Decodable, Identifiable, Equatable {
     let id: String
     let slug: String?
@@ -15,6 +17,8 @@ struct MarketStall: Decodable, Identifiable, Equatable {
     let subtitle: String?
     let category: String?
     let coverColor: String?
+    /// 封面图 URL（后端 coverSrc；当前渲染走 coverColor 渐变，保留字段对齐后端契约）。
+    let coverSrc: String?
     let origin: String?              // ai_generated / user_imported / official
     /// 拿走数（有该课学习记录的去重用户数，排除作者本人）。
     let collectCount: Int
@@ -28,6 +32,8 @@ struct MarketStall: Decodable, Identifiable, Equatable {
     let createdAtMs: Double?
     let seller: Seller
 
+    /// 摊主。后端还返回 seller.level（等级数字），iOS 卡片按 collectCount 自行派生徽章，
+    /// 未解码 level（Decodable 忽略多余字段，不影响解码）。
     struct Seller: Decodable, Equatable {
         let id: String?
         let nickname: String
@@ -35,27 +41,9 @@ struct MarketStall: Decodable, Identifiable, Equatable {
     }
 }
 
-/// GET /api/market → { items: [MarketStall] }（若后端提供）。
+/// GET /api/market → { items: [MarketStall] }。
 private struct MarketResponse: Decodable {
     let items: [MarketStall]
-}
-
-/// /api/courses 回退项：宽松解码，只取拼摊位需要的字段。
-private struct FallbackCourse: Decodable {
-    let id: String
-    let slug: String?
-    let title: String
-    let subtitle: String?
-    let category: String?
-    let coverColor: String?
-    let origin: String?
-    let authorId: String?
-    let authorName: String?
-    let sharedStatus: String?
-    let learnersCount: Int?
-}
-private struct FallbackCoursesResponse: Decodable {
-    let courses: [FallbackCourse]
 }
 
 // MARK: - 排序（对齐 web MarketSort：最热/最新）
@@ -86,58 +74,17 @@ final class MarketViewModel {
     /// 拿走成功后的「已放入书架」轻提示（course.id -> 文案），驱动卡内成功态与顶部 toast。
     var lastCollected: (id: String, message: String)?
 
+    /// GET /api/market → { items: [...] }（真实 API，主路径）。
+    /// 后端与 web 集市页共用 buildMarketStalls 组装，字段/语义一致，直接解码。
     func load() async {
         loading = true; error = nil
         defer { loading = false }
         do {
             let resp = try await API.shared.get("/api/market", as: MarketResponse.self)
             stalls = resp.items
-        } catch let e as APIError where isMissingEndpoint(e) {
-            await loadFallback()
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? "加载失败"
         }
-    }
-
-    /// 回退到 /api/courses，仅保留 sharedStatus == "shared" 的课，近似映射成摊位。
-    private func loadFallback() async {
-        do {
-            let resp = try await API.shared.get("/api/courses", as: FallbackCoursesResponse.self)
-            let myUserId = AuthManager.shared.user?.id  // 同为 @MainActor，直接读取
-            stalls = resp.courses
-                .filter { ($0.sharedStatus ?? "").lowercased() == "shared" }
-                .map { c in
-                    let learners = c.learnersCount ?? 0
-                    return MarketStall(
-                        id: c.id,
-                        slug: c.slug,
-                        title: c.title,
-                        subtitle: c.subtitle,
-                        category: c.category,
-                        coverColor: c.coverColor,
-                        origin: c.origin,
-                        // 回退无独立「拿走数」，用学习人数近似（保持排序/展示可用）。
-                        collectCount: learners,
-                        learnersCount: learners,
-                        collectedByMe: false,
-                        mine: (myUserId != nil && c.authorId == myUserId),
-                        createdAtMs: nil,
-                        seller: MarketStall.Seller(
-                            id: c.authorId,
-                            nickname: c.authorName ?? "匿名同学",
-                            avatarUrl: nil
-                        )
-                    )
-                }
-        } catch {
-            self.error = (error as? APIError)?.errorDescription ?? "加载失败"
-        }
-    }
-
-    /// 404 视为「接口不存在」，触发回退。
-    private func isMissingEndpoint(_ e: APIError) -> Bool {
-        if case .notFound = e { return true }
-        return false
     }
 
     /// 客户端排序（对齐 web sortStalls：最新按 createdAtMs 降序，最热按 collectCount 降序；同分保原序）。
@@ -202,6 +149,7 @@ final class MarketViewModel {
             subtitle: old.subtitle,
             category: old.category,
             coverColor: old.coverColor,
+            coverSrc: old.coverSrc,
             origin: old.origin,
             collectCount: old.collectCount + (incrementCount ? 1 : 0),
             learnersCount: old.learnersCount,

@@ -1,6 +1,14 @@
 import SwiftUI
 import Observation
 
+// MARK: - DTO
+
+/// GET /api/courses → { courses: [...] }。
+/// 后端返回包裹对象而非顶层数组；出卷范围只取轻量 ExamScopeCourse。
+private struct ScopeCoursesResponse: Decodable {
+    let courses: [ExamScopeCourse]
+}
+
 // MARK: - 出卷设置 ViewModel
 
 @Observable @MainActor
@@ -31,10 +39,13 @@ final class ExamSetupViewModel {
     }
 
     /// 拉课程列表。失败不阻塞（仍可用「全部课程」出卷），静默降级。
+    /// 后端 /api/courses 返回 { courses: [...] } 包裹对象，须解码包裹类型再取 .courses；
+    /// 早前直接解码顶层数组 [ExamScopeCourse] 会触发 DecodingError 被 catch 静默吞，列表恒空。
     func loadCourses() async {
         guard !coursesLoaded else { return }
         do {
-            courses = try await API.shared.get("/api/courses", as: [ExamScopeCourse].self)
+            let resp = try await API.shared.get("/api/courses", as: ScopeCoursesResponse.self)
+            courses = resp.courses
         } catch {
             courses = []
         }

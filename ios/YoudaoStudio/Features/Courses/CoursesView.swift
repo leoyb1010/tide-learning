@@ -102,15 +102,29 @@ final class CoursesViewModel {
         loading = true; error = nil
         defer { loading = false }
         let q = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        let path = q.isEmpty
-            ? "/api/courses"
-            : "/api/courses?q=\(q.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
+        // 用 URLComponents.queryItems 组装：正确转义 & = + ?（"C++"/"R&D" 不再被破坏）。
+        // .urlQueryAllowed 不转义这些字符，会把查询词写坏，故弃用。
+        let path = Self.coursesPath(query: q.isEmpty ? nil : q)
         do {
             let resp = try await API.shared.get(path, as: CoursesResponse.self)
             courses = resp.courses
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? "加载失败"
         }
+    }
+
+    /// 用 URLComponents 组装 /api/courses 路径（带可选 q）。
+    /// queryItems 会对特殊字符做正确的百分号编码，避免 & = + ? 破坏查询串。
+    static func coursesPath(query: String?) -> String {
+        var comps = URLComponents()
+        comps.path = "/api/courses"
+        if let query, !query.isEmpty {
+            comps.queryItems = [URLQueryItem(name: "q", value: query)]
+        }
+        if let encoded = comps.percentEncodedQuery, !encoded.isEmpty {
+            return "\(comps.path)?\(encoded)"
+        }
+        return comps.path
     }
 
     /// 输入防抖：停止输入 350ms 后再打网络。

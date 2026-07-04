@@ -8,10 +8,15 @@ import Observation
 //   - CommunityPost（含 author / content / createdAt / likeCount / commentCount / type）
 // 个人主页仅额外需要「身份摘要」，故这里只声明 PublicProfile。
 
-/// GET /api/u/[id] -> 个人主页身份摘要（后端字段可选，缺省用派生值兜底）。
+/// GET /api/u/[id] -> 个人主页身份摘要（对齐后端公开字段；缺省用派生值兜底）。
+///
+/// 后端返回：id / nickname / avatarUrl? / studentNo / bio? / level? / joinedAt(ISO8601) /
+/// postsCount? / coursesCount?。其中 level/postsCount/coursesCount 受目标用户 showProfile.stats
+/// 开关控制（非本人且关闭时后端不回传，故为可选）。绝不含 email/phone/私密设置。
 struct PublicProfile: Decodable {
     let id: String
     let nickname: String?
+    let avatarUrl: String?
     let studentNo: String?
     let bio: String?
     let level: String?
@@ -69,13 +74,25 @@ final class ProfilePageViewModel {
     private enum PostsOutcome { case success([CommunityPost]); case failure(String) }
 
     private func fetchPosts() async -> PostsOutcome {
-        let encoded = userId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? userId
+        // 用 URLComponents.queryItems 组装 userId，正确转义特殊字符（与搜索词编码同理）。
+        let path = Self.postsPath(userId: userId)
         do {
-            let resp = try await API.shared.get("/api/posts?userId=\(encoded)", as: PostsResponse.self)
+            let resp = try await API.shared.get(path, as: PostsResponse.self)
             return .success(resp.posts)
         } catch {
             return .failure((error as? APIError)?.errorDescription ?? "加载失败")
         }
+    }
+
+    /// 用 URLComponents 组装 /api/posts?userId= 路径，避免手写百分号编码漏转义。
+    static func postsPath(userId: String) -> String {
+        var comps = URLComponents()
+        comps.path = "/api/posts"
+        comps.queryItems = [URLQueryItem(name: "userId", value: userId)]
+        if let encoded = comps.percentEncodedQuery, !encoded.isEmpty {
+            return "\(comps.path)?\(encoded)"
+        }
+        return comps.path
     }
 
     // MARK: 展示派生（profile 缺省时兜底）
