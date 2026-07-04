@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 // 用户协议 — 静态合规文案（订阅制学习平台）
 export default function TermsPage() {
   return (
-    <article className="mx-auto max-w-2xl py-6">
+    <article className="mx-auto max-w-[760px] py-6">
       <Reveal>
         <div className="overline mb-2 text-accent-600">LEGAL</div>
         <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink-950">用户服务协议</h1>

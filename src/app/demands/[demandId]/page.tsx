@@ -140,7 +140,7 @@ export default async function DemandDetailPage({ params }: { params: Promise<{ d
   const launched = demand.status === "launched";
 
   return (
-    <div className="mx-auto max-w-3xl space-y-8 py-4">
+    <div className="mx-auto max-w-[760px] space-y-8 py-4">
       <TrackView event="demand_status_view" properties={{ demand_id: demandId, status: demand.status }} />
       <Link href="/demands" className="text-sm text-accent-700 hover:underline">← 需求广场</Link>
 

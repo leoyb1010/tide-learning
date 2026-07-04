@@ -14,15 +14,22 @@ export const dynamic = "force-dynamic";
 const NOTE_KINDS = ["text", "capture", "clip"] as const;
 type NoteKind = (typeof NOTE_KINDS)[number];
 
+// 分页默认与上限（cursor 分页，避免全量返回拖垮列表）
+const NOTE_PAGE_DEFAULT = 30;
+const NOTE_PAGE_MAX = 50;
+
 /**
  * GET /api/notes — 笔记馆列表
  * 支持过滤：kind（text|capture|clip）、tag（标签 id）、q（标题/正文/剪藏原文）、starred（仅收藏）、courseId
- * 返回：扁平 notes + 按课程归组 groups，供三视图复用。
+ * 分页：?cursor=<noteId>&limit=<n>（默认 30，上限 50）。以 updatedAt desc + id desc 稳定排序，
+ *       多取一条判断是否有下一页，nextCursor 为下一页起点的 note id（无则 null）。
+ * 返回：{ notes, groups, nextCursor, total }。notes 为当前页扁平列表，groups 按当前页归组，
+ *       total 为满足过滤条件的总条数（供前端显示「共 N 条」）。
  */
 export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await getCurrentUser();
-    if (!user) return ok({ notes: [], groups: [] });
+    if (!user) return ok({ notes: [], groups: [], nextCursor: null, total: 0 });
 
     const sp = req.nextUrl.searchParams;
     const q = sp.get("q")?.trim();
@@ -30,6 +37,12 @@ export async function GET(req: NextRequest) {
     const tagId = sp.get("tag");
     const courseId = sp.get("courseId");
     const starred = sp.get("starred");
+    const cursor = sp.get("cursor")?.trim() || null;
+
+    // limit：非法/缺省回落默认值，钳制到上限，防止客户端拉全量
+    const limitRaw = Number.parseInt(sp.get("limit") ?? "", 10);
+    const limit =
+      Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(limitRaw, NOTE_PAGE_MAX) : NOTE_PAGE_DEFAULT;
 
     if (q) {
       // 搜索为高频操作，限流并埋点
@@ -49,18 +62,32 @@ export async function GET(req: NextRequest) {
         : {}),
     };
 
-    const notes = await prisma.note.findMany({
-      where,
-      include: {
-        course: { select: { title: true, slug: true } },
-        lesson: { select: { title: true } },
-        tags: { include: { tag: { select: { id: true, name: true, color: true } } } },
-      },
-      orderBy: { updatedAt: "desc" },
-    });
+    // total 与分页查询并发：total 反映满足过滤条件的全部条数（供「共 N 条」显示）
+    const [total, rows] = await Promise.all([
+      prisma.note.count({ where }),
+      prisma.note.findMany({
+        where,
+        include: {
+          course: { select: { title: true, slug: true } },
+          lesson: { select: { title: true } },
+          tags: { include: { tag: { select: { id: true, name: true, color: true } } } },
+        },
+        // updatedAt 可能并列，追加 id 做稳定 tiebreak，保证 cursor 分页不漏不重
+        orderBy: [{ updatedAt: "desc" }, { id: "desc" }],
+        // cursor 分页：从上一页末尾 note 之后取；skip:1 跳过 cursor 自身
+        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        // 多取 1 条用于判断是否有下一页
+        take: limit + 1,
+      }),
+    ]);
+
+    // 多取的那条不进当前页，其 id 作为下一页 cursor
+    const hasMore = rows.length > limit;
+    const pageRows = hasMore ? rows.slice(0, limit) : rows;
+    const nextCursor = hasMore ? rows[limit].id : null;
 
     // 拍平标签结构，客户端更好用
-    const flat = notes.map((n) => ({
+    const flat = pageRows.map((n) => ({
       ...n,
       tags: n.tags.map((t) => t.tag),
     }));
@@ -77,7 +104,7 @@ export async function GET(req: NextRequest) {
       groupMap.set(n.courseId, g);
     }
 
-    return ok({ notes: flat, groups: Array.from(groupMap.values()) });
+    return ok({ notes: flat, groups: Array.from(groupMap.values()), nextCursor, total });
   });
 }
 

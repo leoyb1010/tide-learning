@@ -59,6 +59,7 @@ struct ExamResultView: View {
     @State private var scorePop = false
     @State private var showConfetti = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(AuthManager.self) private var auth
 
     private var wrongItems: [ExamReviewItem] { result.review.filter { !$0.correct } }
     private var correctCount: Int { result.review.filter { $0.correct }.count }
@@ -129,6 +130,7 @@ struct ExamResultView: View {
                 Text("答对 \(correctCount) / \(result.review.count) 题")
                     .font(.studio(12)).foregroundStyle(.white.opacity(0.6))
             }
+            shareButton
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 28)
@@ -136,6 +138,39 @@ struct ExamResultView: View {
         .background(Studio.videoGradient)
         .clipShape(RoundedRectangle(cornerRadius: StudioRadius.cardLg, style: .continuous))
         .shadow(color: Color.black.opacity(0.28), radius: 22, x: 0, y: 12)
+    }
+
+    // MARK: 分享成绩（文案 + 公开落地页链接，无鉴权）
+
+    /// 优先带上个人主页落地页链接（/u/{id}），无用户时退化为纯文案分享。
+    @ViewBuilder private var shareButton: some View {
+        let summary = "我在有道自习室模拟考得了 \(result.score)/\(result.total) 分，正确率 \(result.accuracyPct)%"
+        Group {
+            if let user = auth.user, let url = AppConfig.profileShareURL(userId: user.id) {
+                ShareLink(
+                    item: url,
+                    subject: Text("我的模拟考成绩"),
+                    message: Text(summary)
+                ) { shareLabel }
+            } else {
+                ShareLink(item: summary) { shareLabel }
+            }
+        }
+        .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
+        .accessibilityLabel("分享成绩")
+        .padding(.top, 4)
+    }
+
+    private var shareLabel: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "square.and.arrow.up").font(.system(size: 12, weight: .semibold))
+            Text("分享成绩").font(.studio(12, .semibold))
+        }
+        .foregroundStyle(.white.opacity(0.9))
+        .padding(.horizontal, 14).padding(.vertical, 7)
+        .background(.white.opacity(0.12))
+        .clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(.white.opacity(0.2), lineWidth: 1))
     }
 
     // MARK: 对错分布（Swift Charts 环形，配 Studio 语义色）

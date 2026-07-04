@@ -33,8 +33,10 @@ export function CourseCard({ course }: { course: CourseCardData }) {
         href={`/courses/${course.slug}`}
         className="studio-lift group flex h-full flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]"
       >
-        {/* 封面：赛道渐变底 + 可选封面图 + hover 高光扫过 */}
-        <div className="hover-sheen relative aspect-[16/10] w-full" style={{ background: grad }}>
+        {/* 封面：赛道渐变底 + 可选封面图 + hover 高光扫过。
+            data-vt-cover 标记共享元素：点击进详情时由 ViewTransitions 临时命名，
+            与详情预告封面配对做形变过渡（无 VT 能力的浏览器忽略此属性，无害）。 */}
+        <div className="hover-sheen relative aspect-[16/10] w-full" style={{ background: grad }} data-vt-cover={course.slug}>
           {/* 深色区柔光顶高光，避免死平面 */}
           <div
             className="pointer-events-none absolute inset-0"

@@ -13,8 +13,10 @@ import {
   Exam as ExamIcon,
   CircleNotch,
   Sparkle,
+  ShareNetwork,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
+import { SharePanel } from "@/components/SharePanel";
 import { SPRING_TIDE } from "@/components/motion";
 import { renderMarkdown } from "@/lib/markdown";
 import { track } from "@/lib/analytics-client";
@@ -281,7 +283,7 @@ export default function ExamRunner({ needLogin }: { needLogin: boolean }) {
             exit={{ opacity: 0, y: -12 }}
             transition={{ ...SPRING_TIDE, type: "spring" }}
           >
-            <ExamReport report={report} onRetake={reset} />
+            <ExamReport report={report} examId={paper?.examId ?? null} onRetake={reset} />
           </motion.div>
         )}
       </AnimatePresence>
@@ -624,7 +626,7 @@ function ExamTaking({
 }
 
 /* ============ 成绩单 ============ */
-function ExamReport({ report, onRetake }: { report: Report; onRetake: () => void }) {
+function ExamReport({ report, examId, onRetake }: { report: Report; examId: string | null; onRetake: () => void }) {
   const pct = report.total > 0 ? Math.round((report.score / report.total) * 100) : 0;
   const wrong = report.review.filter((r) => !r.correct);
   const [carding, setCarding] = useState(false);
@@ -713,6 +715,20 @@ function ExamReport({ report, onRetake }: { report: Report; onRetake: () => void
           >
             <Sparkle size={15} weight="fill" /> 再来一套
           </button>
+          {/* 分享成绩：生成模拟考成绩单图（exam-result 服务端按 examId + 当前用户取最近一次 attempt） */}
+          {examId && (
+            <SharePanel
+              kind="exam-result"
+              title="分享成绩"
+              params={{ examId }}
+              triggerLabel="分享考试成绩"
+              trigger={
+                <span className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]">
+                  <ShareNetwork size={15} weight="bold" /> 分享成绩
+                </span>
+              }
+            />
+          )}
         </div>
         {cardMsg && <p className="text-[12.5px] text-[var(--ink3)]">{cardMsg}</p>}
       </div>

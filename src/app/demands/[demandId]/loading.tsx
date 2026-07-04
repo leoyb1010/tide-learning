@@ -3,7 +3,7 @@
  */
 export default function DemandDetailLoading() {
   return (
-    <div className="mx-auto max-w-3xl space-y-8 py-4">
+    <div className="mx-auto max-w-[760px] space-y-8 py-4">
       {/* 标题 + 状态卡 */}
       <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--card)]">
         <div className="flex items-start justify-between gap-4">

@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { prisma } from "./db";
-import { AppError } from "./api";
+import { AppError } from "./errors";
 import type { LlmUsageInfo } from "./llm";
 
 /**
@@ -26,7 +26,39 @@ const SCENE_WEIGHT: Record<string, number> = {
   search_expand: 0.2,
 };
 export const SIGNUP_BONUS = 100; // 注册赠送
-export const MONTHLY_GRANT = 500; // 订阅用户每月赠送
+
+// —— 订阅月度积分：按档位差异化（v3.0 商业化）——
+// 设计意图：更长周期 / 更高价档位 → 月赠更多积分，强化「年卡更划算」的锚点。
+//   month(月卡)   → 300
+//   quarter(季卡) → 500
+//   year(年卡)    → 800
+//   单赛道订阅     → 200（scope !== "all"，通常按月计费的窄权益）
+// 拿不到具体 plan（异常/历史数据缺失）时用保守默认，宁少发不多发。
+export const MONTHLY_GRANT_BY_PERIOD: Record<string, number> = {
+  month: 300,
+  month_recurring: 300,
+  quarter: 500,
+  year: 800,
+};
+export const SINGLE_TRACK_MONTHLY_GRANT = 200; // 单赛道订阅（scope !== "all"）
+export const DEFAULT_MONTHLY_GRANT = 300; // 兜底：拿不到档位信息时的保守额度
+/** @deprecated 保留仅为兼容旧引用；新逻辑用 monthlyGrantForPlan。 */
+export const MONTHLY_GRANT = DEFAULT_MONTHLY_GRANT;
+
+/**
+ * 据订阅档位返回该档「每月赠送积分」额度（v3.0 差异化联动）。
+ * 优先级：单赛道(scope!=="all") → 固定 200；否则按 billingPeriod 查表；查不到 → 保守默认。
+ * 入参允许 null/缺失（历史订阅或解析失败），一律回落到 DEFAULT_MONTHLY_GRANT。
+ */
+export function monthlyGrantForPlan(
+  plan: { billingPeriod?: string | null; scope?: string | null } | null | undefined,
+): number {
+  if (!plan) return DEFAULT_MONTHLY_GRANT;
+  // 单赛道订阅：窄权益，固定档，不随周期变化
+  if (plan.scope && plan.scope !== "all") return SINGLE_TRACK_MONTHLY_GRANT;
+  const period = plan.billingPeriod ?? "";
+  return MONTHLY_GRANT_BY_PERIOD[period] ?? DEFAULT_MONTHLY_GRANT;
+}
 
 /** Token 用量 → 积分（向上取整，至少 1 分，避免零成本刷调用）。 */
 export function tokensToCredits(usage: LlmUsageInfo, scene: string): number {
@@ -156,22 +188,37 @@ export async function recordLlmSpend(userId: string, usage: LlmUsageInfo, scene:
 /**
  * 月度赠送（订阅用户）。惰性触发：每次需要时检查本月是否已发，未发则发。
  * monthKey 形如 "2026-07"（调用方传入 Asia/Shanghai 当月，保证 SSR 稳定）。
+ *
+ * v3.0：按档位差异化。grantAmount 由调用方据当前订阅档位传入
+ * （见 entitlement 快照的 monthlyGrant 派生字段 / monthlyGrantForPlan）；
+ * 缺省回落 DEFAULT_MONTHLY_GRANT，保证老调用点或拿不到档位时仍能保守发放。
+ *
+ * 幂等/防并发：monthlyGrantKey 作月度水位线——每人每月至多一次；金额在事务外先算好，
+ * 事务内以「二次确认 monthlyGrantKey」为唯一放行闸门，杜绝并发重复发放。
  */
-export async function ensureMonthlyGrant(userId: string, monthKey: string, isSubscriber: boolean): Promise<void> {
+export async function ensureMonthlyGrant(
+  userId: string,
+  monthKey: string,
+  isSubscriber: boolean,
+  grantAmount: number = DEFAULT_MONTHLY_GRANT,
+): Promise<void> {
   if (!isSubscriber) return;
+  // 金额兜底：非正数（脏数据/未解析）一律回落保守默认，绝不发 0 或负数。
+  const amount = grantAmount > 0 ? Math.floor(grantAmount) : DEFAULT_MONTHLY_GRANT;
   const acc = await ensureAccount(userId);
   if (acc.monthlyGrantKey === monthKey) return; // 本月已发
   await prisma.$transaction(async (tx) => {
     // 事务内二次确认，防并发重复发放
     const fresh = await tx.creditAccount.findUniqueOrThrow({ where: { userId } });
     if (fresh.monthlyGrantKey === monthKey) return;
-    const balanceAfter = fresh.balance + MONTHLY_GRANT;
+    const balanceAfter = fresh.balance + amount;
     await tx.creditAccount.update({
       where: { userId },
-      data: { balance: balanceAfter, totalEarned: fresh.totalEarned + MONTHLY_GRANT, monthlyGrantKey: monthKey },
+      data: { balance: balanceAfter, totalEarned: fresh.totalEarned + amount, monthlyGrantKey: monthKey },
     });
     await tx.creditLedger.create({
-      data: { userId, delta: MONTHLY_GRANT, type: "monthly_grant", refId: monthKey, balanceAfter, reason: `${monthKey} 会员月度积分` },
+      // type 保留 "monthly_grant" 不变（对账/历史流水兼容）；档位差异记在 reason 里。
+      data: { userId, delta: amount, type: "monthly_grant", refId: monthKey, balanceAfter, reason: `${monthKey} 会员月度积分 (+${amount})` },
     });
   });
 }

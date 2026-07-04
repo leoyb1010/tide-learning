@@ -7,6 +7,7 @@ import { CoverBg, coverSrc } from "@/components/ui";
 import { trackLabel } from "@/lib/tracks";
 import { ShareToMarketButton, type ShareState } from "@/components/ShareToMarketButton";
 import { AccessRequestActions } from "@/components/AccessRequestActions";
+import { CourseGenControls } from "@/components/CourseGenControls";
 
 export const metadata = { title: "我的课" };
 
@@ -83,14 +84,22 @@ export default async function MyCoursesPage() {
     const total = c.lessons.length;
     // 生成中的章节 = blocksJson 尚为空
     const pending = c.lessons.filter((l) => !l.blocksJson).length;
-    const isGenerating = c.genStatus === "generating" || (c.genStatus !== "ready" && pending > 0);
+    // 已生成节数（进度环分子）：blocksJson 非空即已生成。
+    const genDone = c.lessons.filter((l) => l.blocksJson != null).length;
+    const isGenerating = c.genStatus === "generating" || (c.genStatus !== "ready" && c.genStatus !== "failed" && pending > 0);
+    const isFailed = c.genStatus === "failed";
+    // 尚未就绪（生成中或失败）——决定是否禁用分享 / 显示生成态控件。
+    const notReady = isGenerating || isFailed;
     const done = completedMap.get(c.id) ?? 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     return {
       ...c,
       total,
       pending,
+      genDone,
       isGenerating,
+      isFailed,
+      notReady,
       done,
       pct,
       firstLessonId: c.lessons[0]?.id ?? null,
@@ -148,8 +157,8 @@ export default async function MyCoursesPage() {
           {cards.map((c) => {
             const href = c.firstLessonId ? `/courses/${c.slug}/learn/${c.firstLessonId}` : `/courses/${c.slug}`;
             const isAi = c.origin === "ai_generated";
-            // 仅生成就绪的课可分享（生成中禁用分享按钮，避免半成品上架）。
-            const canShare = !c.isGenerating;
+            // 仅生成就绪的课可分享（生成中/失败禁用分享，避免半成品上架）。
+            const canShare = !c.notReady;
             return (
               <div
                 key={c.id}
@@ -167,7 +176,11 @@ export default async function MyCoursesPage() {
                     {c.isGenerating ? (
                       <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--red)] backdrop-blur-sm">
                         <CircleNotch size={11} weight="bold" className="animate-spin" />
-                        生成中 {c.total - c.pending}/{c.total}
+                        生成中 {c.genDone}/{c.total}
+                      </div>
+                    ) : c.isFailed ? (
+                      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--warn)] backdrop-blur-sm">
+                        待续 {c.genDone}/{c.total}
                       </div>
                     ) : (
                       <div className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
@@ -196,15 +209,18 @@ export default async function MyCoursesPage() {
                   </div>
                 </Link>
 
-                {/* 分享到社区（脱离 Link，避免嵌套交互） */}
+                {/* 底部操作区（脱离 Link，避免嵌套交互）：
+                    就绪 → 分享到社区；生成中/失败 → 进度环 + 查看进度/继续生成。 */}
                 <div className="mt-auto flex items-center justify-end border-t border-[var(--border)] px-4 py-3">
                   {canShare ? (
                     <ShareToMarketButton courseId={c.id} initialStatus={c.sharedStatus as ShareState} />
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ink4)]">
-                      <CircleNotch size={12} weight="bold" className="animate-spin" />
-                      生成完成后可分享
-                    </span>
+                    <CourseGenControls
+                      courseId={c.id}
+                      initialTotal={c.total}
+                      initialDone={c.genDone}
+                      initialStatus={c.isFailed ? "failed" : "generating"}
+                    />
                   )}
                 </div>
               </div>

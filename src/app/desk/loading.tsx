@@ -3,7 +3,7 @@
  */
 export default function DeskLoading() {
   return (
-    <div className="mx-auto flex max-w-[1060px] flex-col gap-14 md:gap-16">
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-14 md:gap-16">
       {/* 问候 */}
       <div className="space-y-2 pt-2">
         <div className="skeleton h-8 w-56 rounded-lg" />

@@ -14,6 +14,8 @@ import {
   Lightning,
   Flame,
 } from "@phosphor-icons/react/dist/ssr";
+import { WeeklyReportBanner } from "./WeeklyReportBanner";
+import type { WeeklyReport } from "@/lib/weekly-report";
 
 /**
  * §1 自习桌 Dashboard。登录后首页主体（D1 视觉升级版）。
@@ -61,6 +63,7 @@ export interface StudyDeskProps {
   advice: string; // AI 今日建议（服务端派生）
   onlineCount: number; // 自习室在线人数（静态）
   focusHref: string; // 进入专注按钮目标
+  weeklyReport: WeeklyReport; // 本周周报（服务端 getWeeklyReport 组装，留存回路）
 }
 
 export function StudyDesk({
@@ -76,6 +79,7 @@ export function StudyDesk({
   advice,
   onlineCount,
   focusHref,
+  weeklyReport,
 }: StudyDeskProps) {
   const router = useRouter();
   const [value, setValue] = useState("");
@@ -108,7 +112,7 @@ export function StudyDesk({
   const secondaryResumes = deskItems.slice(1);
 
   return (
-    <div className="stagger mx-auto flex max-w-[1060px] flex-col gap-14 md:gap-16">
+    <div className="stagger mx-auto flex max-w-[1120px] flex-col gap-14 md:gap-16">
       {/* ============ 1. 问候 + 今日状态（点亮仪式感）============ */}
       <section
         className="flex flex-col gap-2 pt-2"
@@ -152,10 +156,15 @@ export function StudyDesk({
         </div>
       </section>
 
+      {/* ============ 1.5 本周周报（留存回路：一周回望 + 分享）============ */}
+      <div style={{ "--i": 1 } as CSSProperties}>
+        <WeeklyReportBanner report={weeklyReport} />
+      </div>
+
       {/* ============ 2. 中央大输入框「今天想学点什么？」（ChatGPT 首屏感）============ */}
       <section
         className="studio-lightup flex flex-col items-center text-center"
-        style={{ "--i": 1 } as CSSProperties}
+        style={{ "--i": 2 } as CSSProperties}
       >
         <p className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink4)]">
           STUDY DESK
@@ -218,7 +227,7 @@ export function StudyDesk({
       {resume && (
         <section
           className="space-y-3"
-          style={{ "--i": 2 } as CSSProperties}
+          style={{ "--i": 3 } as CSSProperties}
         >
           <div className="flex items-baseline justify-between">
             <h2 className="text-[17px] font-bold tracking-[-0.01em] text-[var(--ink)]">学习中</h2>
@@ -319,7 +328,7 @@ export function StudyDesk({
       )}
 
       {/* ============ 4. 我的书桌（横排 3 卡，材质分级 + hover 抬升 + 数字 num-pop）============ */}
-      <section style={{ "--i": 3 } as CSSProperties}>
+      <section style={{ "--i": 4 } as CSSProperties}>
         <h2 className="mb-3 text-[17px] font-bold tracking-[-0.01em] text-[var(--ink)]">我的书桌</h2>
         <div className="stagger grid gap-4 md:grid-cols-3">
           {/* 我的课：红做「学习主战场」信号 */}
@@ -419,7 +428,7 @@ export function StudyDesk({
 
       {/* ============ 5. AI 今日建议（深色卡，专属 --ai-grad 智能材质，与视频缩略材质区隔）============ */}
       <section
-        style={{ "--i": 4 } as CSSProperties}
+        style={{ "--i": 5 } as CSSProperties}
         className="relative overflow-hidden rounded-[var(--radius-card)] p-5 text-white shadow-[var(--lift)]"
       >
         {/* 专属 AI 智能材质：冷靛蓝基底（比视频缩略更暗更冷），营造「AI 在思考」的独特气场 */}
@@ -461,7 +470,7 @@ export function StudyDesk({
 
       {/* ============ 6. 自习室氛围条（live 红点呼吸）============ */}
       <section
-        style={{ "--i": 5 } as CSSProperties}
+        style={{ "--i": 6 } as CSSProperties}
         className="flex flex-wrap items-center justify-between gap-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface2)] px-5 py-4 shadow-[var(--card)]"
       >
         <div className="flex items-center gap-2.5">

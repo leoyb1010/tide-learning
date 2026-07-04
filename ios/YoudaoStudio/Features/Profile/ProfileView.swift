@@ -123,9 +123,11 @@ struct ProfileView: View {
                 .modifier(SectionEntrance(index: 2, appeared: appeared, reduceMotion: reduceMotion))
             }
 
-            // 底部：设置入口
-            settingsRow
+            // 底部：分享档案 + 设置入口
+            shareProfileRow
                 .modifier(SectionEntrance(index: 3, appeared: appeared, reduceMotion: reduceMotion))
+            settingsRow
+                .modifier(SectionEntrance(index: 4, appeared: appeared, reduceMotion: reduceMotion))
 
             Text("有道自习室 · STUDIO")
                 .font(.mono(11, .semibold)).foregroundStyle(Studio.ink4)
@@ -140,6 +142,31 @@ struct ProfileView: View {
         HStack(spacing: 8) {
             Image(systemName: icon).font(.system(size: 13, weight: .semibold)).foregroundStyle(Studio.ink3)
             Text(title).font(.studio(16, .bold)).foregroundStyle(Studio.ink)
+        }
+    }
+
+    /// 分享成长档案：走公开落地页链接 /u/{id}（无鉴权，最可靠）。
+    @ViewBuilder private var shareProfileRow: some View {
+        if let user = auth.user, let url = AppConfig.profileShareURL(userId: user.id) {
+            ShareLink(
+                item: url,
+                subject: Text("\(user.nickname)的有道自习室成长档案"),
+                message: Text("这是我在有道自习室的学习足迹，来看看")
+            ) {
+                HStack(spacing: 12) {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(Studio.red)
+                    Text("分享成长档案").font(.studio(15, .semibold)).foregroundStyle(Studio.ink)
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.system(size: 13, weight: .semibold)).foregroundStyle(Studio.ink4)
+                }
+                .studioCard()
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
+            .accessibilityLabel("分享成长档案")
+            .accessibilityHint("分享你的个人主页链接")
         }
     }
 

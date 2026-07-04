@@ -17,16 +17,40 @@ import {
   Star,
   ArrowRight,
   ArrowLeft,
+  ShareNetwork,
 } from "@phosphor-icons/react";
 import { CalendarCheck as CalendarCheckIcon, Exam as ExamIcon } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, Button } from "@/components/ui";
+import { SharePanel } from "@/components/SharePanel";
 import { TidalReveal, SPRING_TIDE, SPRING_FIRM, WaveProgress } from "@/components/motion";
 import { renderMarkdown } from "@/lib/markdown";
 import { track } from "@/lib/analytics-client";
-import ExamRunner from "@/components/ExamRunner";
+import dynamic from "next/dynamic";
+
+// 模拟考试引擎按需懒加载：仅在切到「模拟考试」Tab 时才拉这段代码，
+// 减小复习室首包（ExamRunner 体量大且非首屏）。宿主为客户端组件，
+// 且引擎完全交互驱动，故 ssr:false；等待期给出与设计一致的骨架屏。
+const ExamRunner = dynamic(() => import("@/components/ExamRunner"), {
+  ssr: false,
+  loading: () => <ExamRunnerSkeleton />,
+});
 
 type ReviewTab = "daily" | "exam";
+
+/** ExamRunner 懒加载占位：骨架屏在 reduce-motion 下由全局规则自动静止。 */
+function ExamRunnerSkeleton() {
+  return (
+    <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--card)]">
+      <div className="skeleton h-4 w-40" />
+      <div className="skeleton mt-4 h-24 w-full rounded-[12px]" />
+      <div className="mt-5 flex items-center justify-between gap-3">
+        <div className="skeleton h-9 w-28 rounded-[10px]" />
+        <div className="skeleton h-11 w-32 rounded-[12px]" />
+      </div>
+    </div>
+  );
+}
 
 /**
  * 复习室外壳（v2.3 §8）：顶部双 Tab [每日复习][模拟考试]，切换两大引擎。
@@ -53,7 +77,7 @@ export default function ReviewPage() {
   }, []);
 
   return (
-    <div className="mx-auto max-w-[720px] space-y-6">
+    <div className="mx-auto max-w-[1120px] space-y-6">
       {/* 顶部双 Tab */}
       <TidalReveal>
         <div className="inline-flex items-center gap-1 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-1 shadow-[var(--card),var(--inner-hi)]">
@@ -69,7 +93,9 @@ export default function ReviewPage() {
       {tab === "daily" ? (
         <DailyReview />
       ) : (
-        <ExamRunner needLogin={needLogin === true} />
+        <div className="mx-auto max-w-[760px]">
+          <ExamRunner needLogin={needLogin === true} />
+        </div>
       )}
     </div>
   );
@@ -294,11 +320,13 @@ function DailyReview() {
 
       {/* 水位进度线：练习中氛围 */}
       {started && !done && total > 0 && (
-        <div className="studio-rise">
+        <div className="studio-rise mx-auto max-w-[760px]">
           <WaveProgress value={reviewed / total} height={8} />
         </div>
       )}
 
+      {/* 练习卡区内层居中 760，保持专注；页头/进度随外层 1120 展开 */}
+      <div className="mx-auto max-w-[760px]">
       {error ? (
         <ErrorState hint="复习队列加载失败" onRetry={() => void load(isPractice)} />
       ) : cards === null ? (
@@ -343,6 +371,7 @@ function DailyReview() {
           onGrade={grade}
         />
       ) : null}
+      </div>
     </div>
   );
 }
@@ -774,6 +803,17 @@ function SettlementState({
           >
             <Lightning size={15} weight="fill" /> 加练 10 张
           </button>
+          {/* 晒成绩：复习收束时晒连续里程碑（streak 服务端按当前用户取 currentStreak/longestStreak） */}
+          <SharePanel
+            kind="streak"
+            title="晒成绩"
+            triggerLabel="分享连续学习成绩"
+            trigger={
+              <span className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--border2)]">
+                <ShareNetwork size={15} weight="bold" /> 晒成绩
+              </span>
+            }
+          />
           <Button href="/notes">回笔记馆</Button>
         </div>
       </div>

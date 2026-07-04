@@ -87,7 +87,7 @@ export default async function MarketPage() {
   const authorMap = new Map(authors.map((a) => [a.id, a.nickname]));
 
   return (
-    <div className="studio-rise mx-auto flex w-full max-w-[1040px] flex-col gap-6">
+    <div className="studio-rise mx-auto flex w-full max-w-[1280px] flex-col gap-6">
       {/* 头部 */}
       <header className="flex flex-col gap-2">
         <div className="mono text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ink4)]">COURSE MARKET</div>
@@ -134,7 +134,7 @@ export default async function MarketPage() {
         </div>
       ) : (
         // 卡片网格：stagger 递延进场
-        <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {courses.map((c, idx) => {
             const author = c.authorUserId ? authorMap.get(c.authorUserId) ?? "匿名同学" : "匿名同学";
             const isMine = Boolean(user && c.authorUserId === user.id);

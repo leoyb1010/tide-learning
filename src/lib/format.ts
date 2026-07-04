@@ -9,6 +9,25 @@ export function formatDurationSec(sec: number): string {
   return `${m}分钟`;
 }
 
+// 相对时间：纯日期计算，零依赖。放在 format（无 "use client"、不 import server 模块）中，
+// 便于 client 组件安全引用而不把 prisma 打进浏览器 bundle。
+export function relativeTime(date: Date): string {
+  const diff = Date.now() - date.getTime();
+  const day = Math.floor(diff / 864e5);
+  if (day <= 0) return "今天";
+  if (day === 1) return "昨天";
+  if (day < 30) return `${day} 天前`;
+  if (day < 365) return `${Math.floor(day / 30)} 个月前`;
+  return `${Math.floor(day / 365)} 年前`;
+}
+
+export function formatDuration(sec: number): string {
+  const h = Math.floor(sec / 3600);
+  const m = Math.round((sec % 3600) / 60);
+  if (h > 0) return `${h} 小时 ${m} 分钟`;
+  return `${m} 分钟`;
+}
+
 export function mmss(sec: number): string {
   const m = Math.floor(sec / 60);
   const s = Math.floor(sec % 60);

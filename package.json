@@ -7,6 +7,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "preview": "npm run build && DATABASE_URL=\"file:./dev.db\" PORT=3100 next start -p 3100",
     "lint": "next lint",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",

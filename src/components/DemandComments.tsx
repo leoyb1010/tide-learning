@@ -6,7 +6,7 @@ import { TidalReveal, Stagger, StaggerItem } from "./motion";
 import { Button } from "./ui";
 import { useToast } from "./Toast";
 import { track } from "@/lib/analytics-client";
-import { relativeTime } from "@/lib/queries";
+import { relativeTime } from "@/lib/format";
 
 // 首帧稳定的绝对时间（Asia/Shanghai），SSR 与客户端首帧一致，避免 hydration 文案不符。
 function absoluteTime(d: Date): string {

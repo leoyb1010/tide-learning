@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Lightbulb, CheckCircle, Question, PaperPlaneRight, X, ImageSquare, Hash } from "@phosphor-icons/react";
 import { useToast } from "./Toast";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 // 三类帖子的元数据（图标 + 文案 + 占位）
 const TYPES = [
@@ -35,7 +36,6 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
   const [images, setImages] = useState<string[]>([]); // dataURL mock
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
-  const [loading, setLoading] = useState(false);
   // 审核结果提示：approved / pending / rejected
   const [result, setResult] = useState<{ status: string; message: string } | null>(null);
 
@@ -109,13 +109,13 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
     setTags((prev) => prev.filter((x) => x !== t));
   }
 
-  async function submit() {
+  // 提交防抖：guard 拦截发布进行中的重复点击，submitting 驱动按钮 disabled + loading。
+  const { submitting: loading, guard: submit } = useSubmitGuard(async () => {
     const text = content.trim();
     if (text.length < 4) {
       toast("内容太短了，多写几句吧", { tone: "warn" });
       return;
     }
-    setLoading(true);
     setResult(null);
     try {
       const res = await fetch("/api/posts", {
@@ -144,10 +144,8 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
       }
     } catch {
       toast("网络异常，请重试", { tone: "warn" });
-    } finally {
-      setLoading(false);
     }
-  }
+  });
 
   if (!open) {
     return (
@@ -299,9 +297,14 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
         <button
           onClick={submit}
           disabled={!canSubmit}
+          aria-busy={loading}
           className="studio-press inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
         >
-          <PaperPlaneRight size={14} weight="fill" />
+          {loading ? (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/60 border-t-transparent" aria-hidden />
+          ) : (
+            <PaperPlaneRight size={14} weight="fill" />
+          )}
           {loading ? "审核中…" : "发布"}
         </button>
       </div>

@@ -5,6 +5,7 @@ import { ModeProvider } from "@/components/ModeProvider";
 import { ToastProvider } from "@/components/Toast";
 import { TopNav } from "@/components/TopNav";
 import { MobileTabs } from "@/components/MobileTabs";
+import { ViewTransitions } from "@/components/ViewTransitions";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
@@ -74,25 +75,31 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     credits: number; // v2.3 积分余额
     // v2.3 §5 全局续学：最近在学的一节，供 TopNav 续学胶囊直达。无进度则为 null。
     resumeInfo: { courseSlug: string; courseTitle: string; lessonId: string; lessonTitle: string; pct: number } | null;
+    // v3.0：续学胶囊展开的最近学习课程（最多 5 门）。
+    recentCourses: { courseSlug: string; courseTitle: string; lessonId: string; coursePct: number }[];
   } | null = null;
   if (user) {
-    const [snapshot, lastProgress] = await Promise.all([
+    const [snapshot, recentProgress] = await Promise.all([
       resolveEntitlement(user.id),
-      // 最近一次播放的进度，带课程/章节；React cache 去重，无额外成本
-      prisma.learningProgress.findFirst({
+      // 最近学习进度（带课程/章节）。取前 40 条足以覆盖续学胶囊所需的最近 5 门去重课程；
+      // 首条即续学胶囊主入口，其余据此派生「最近 5 门课」下拉。越权铁律：where userId。
+      prisma.learningProgress.findMany({
         where: { userId: user.id },
         orderBy: { lastPlayedAt: "desc" },
+        take: 40,
         select: {
           lessonId: true,
           progressSec: true,
+          courseId: true,
           course: { select: { slug: true, title: true } },
           lesson: { select: { id: true, title: true, durationSec: true } },
         },
       }),
     ]);
+    const lastProgress = recentProgress[0] ?? null;
     // v2.3：订阅用户月度积分惰性赠送（本月未发则发，事务内防并发）。不阻塞渲染。
     const monthKey = shanghaiDayKey().slice(0, 7); // "2026-07"
-    await ensureMonthlyGrant(user.id, monthKey, snapshot.isSubscriber).catch(() => {});
+    await ensureMonthlyGrant(user.id, monthKey, snapshot.isSubscriber, snapshot.monthlyGrant).catch(() => {});
     const credits = await getBalance(user.id);
     // 进度% = progressSec / durationSec，钳到 0~100；时长缺失时按 0 处理
     const resumeInfo =
@@ -108,12 +115,52 @@ export default async function RootLayout({ children }: { children: React.ReactNo
                 : 0,
           }
         : null;
+
+    // v3.0：续学胶囊「最近 5 门课」——按最近学习倒序去重课程，取每门最近在学的章节。
+    const seenCourse = new Set<string>();
+    const recentTop: { courseSlug: string; courseTitle: string; lessonId: string; courseId: string }[] = [];
+    for (const r of recentProgress) {
+      if (!r.course || !r.lesson || seenCourse.has(r.courseId)) continue;
+      seenCourse.add(r.courseId);
+      recentTop.push({ courseSlug: r.course.slug, courseTitle: r.course.title, lessonId: r.lesson.id, courseId: r.courseId });
+      if (recentTop.length >= 5) break;
+    }
+    // 各课总进度：完成章节数 / 课程总章节数（两次聚合查询，仅限这 5 门课）。
+    const recentCourseIds = recentTop.map((c) => c.courseId);
+    const [doneAgg, lessonCountAgg] = recentCourseIds.length
+      ? await Promise.all([
+          prisma.learningProgress.groupBy({
+            by: ["courseId"],
+            where: { userId: user.id, courseId: { in: recentCourseIds }, completedAt: { not: null } },
+            _count: { _all: true },
+          }),
+          prisma.lesson.groupBy({
+            by: ["courseId"],
+            where: { courseId: { in: recentCourseIds } },
+            _count: { _all: true },
+          }),
+        ])
+      : [[], []];
+    const doneMap = new Map(doneAgg.map((d) => [d.courseId, d._count._all]));
+    const totalMap = new Map(lessonCountAgg.map((l) => [l.courseId, l._count._all]));
+    const recentCourses = recentTop.map((c) => {
+      const total = totalMap.get(c.courseId) ?? 0;
+      const done = doneMap.get(c.courseId) ?? 0;
+      return {
+        courseSlug: c.courseSlug,
+        courseTitle: c.courseTitle,
+        lessonId: c.lessonId,
+        coursePct: total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0,
+      };
+    });
+
     navUser = {
       nickname: user.nickname,
       role: user.role,
       studentId: shortStudentId(user.id),
       credits,
       resumeInfo,
+      recentCourses,
     };
   }
   return (
@@ -121,6 +168,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <body>
         <ModeProvider>
           <ToastProvider>
+            {/* v3.0 页面转场：软导航 View Transitions 驱动（无 UI，渐进增强） */}
+            <ViewTransitions />
             {/* STUDIO v2.3 外壳：现代顶部导航 + 全宽内容 + 移动底部 Tab */}
             <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--ink)]">
               <TopNav user={navUser} />

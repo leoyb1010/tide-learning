@@ -4,7 +4,7 @@
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-[940px] space-y-16 py-4">
+    <div className="mx-auto max-w-[1120px] space-y-16 py-4">
       {/* 居中头部 */}
       <header className="flex flex-col items-center">
         <div className="skeleton h-3 w-40" />

@@ -1,13 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CaretRight, Cards, Play, Flame, Medal, Check } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Cards, Play, Flame, Medal, Check, ClockCounterClockwise } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
-import { getGamificationSummary } from "@/lib/gamification";
+import { getGamificationSummary, getYearHeatmap } from "@/lib/gamification";
 import { prisma } from "@/lib/db";
 import { TideCalendar } from "@/components/TideCalendar";
+import { YearHeatmap } from "@/components/YearHeatmap";
 import { StudentCard, type StudentCardData } from "@/components/StudentCard";
 import { CreditCard } from "@/components/CreditCard";
+import { SharePanel } from "@/components/SharePanel";
 import { formatDurationSec } from "@/lib/format";
 import { relativeTime } from "@/lib/queries";
 import { shanghaiDayKey } from "@/lib/week";
@@ -26,7 +28,7 @@ export default async function MePage() {
   if (!user) redirect("/login?next=/me");
 
   const now = new Date();
-  const [snapshot, progressAgg, completedCount, notesCount, learning, dueCount, gamification, profile] =
+  const [snapshot, progressAgg, completedCount, notesCount, learning, dueCount, gamification, profile, yearHeat] =
     await Promise.all([
       resolveEntitlement(user.id),
       prisma.learningProgress.aggregate({ where: { userId: user.id }, _sum: { progressSec: true } }),
@@ -47,6 +49,7 @@ export default async function MePage() {
       prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: now } } }),
       getGamificationSummary(user.id),
       prisma.userProfile.findUnique({ where: { userId: user.id }, select: { motto: true } }),
+      getYearHeatmap(user.id),
     ]);
 
   const meta = STATUS_LABELS[snapshot.subscriptionStatus] ?? STATUS_LABELS.free;
@@ -90,10 +93,22 @@ export default async function MePage() {
   const daysToGoal = Math.max(streakGoal - gamification.currentStreak, 0);
 
   return (
-    <div className="mx-auto flex max-w-[1040px] flex-col gap-6">
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
       {/* ============ 第一段 · 学生证（v2.3 纸质证件）+ 积分卡 ============ */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
-        <StudentCard data={cardData} />
+        <div className="relative flex flex-col">
+          <StudentCard data={cardData} />
+          {/* 分享学生证：贴在证件右上角的 icon 触发器，融入抬头带不抢视觉 */}
+          <div className="absolute right-3 top-3 z-10">
+            <SharePanel
+              kind="student-card"
+              title="分享学生证"
+              shareUrl={`/u/${user.id}`}
+              triggerLabel="分享学生证"
+              triggerClassName="group studio-press inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--hairline-on-dark)] bg-white/10 text-[var(--ink-on-dark-2)] backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-[var(--ink-on-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+            />
+          </div>
+        </div>
         <CreditCard />
       </div>
 
@@ -177,6 +192,25 @@ export default async function MePage() {
           </div>
         )}
 
+        {/* 查看全部学习记录（学习进度上方仅取最近 10 条，这里通向全量分组页） */}
+        {learning.length > 0 && (
+          <Link
+            href="/me/history"
+            className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--surface-inset)] text-[var(--ink3)]">
+                <ClockCounterClockwise size={18} weight="fill" />
+              </div>
+              <div>
+                <p className="text-[14px] font-bold text-[var(--ink)]">全部学习记录</p>
+                <p className="text-[12px] text-[var(--ink3)]">按课程分组查看每门课、每一节的进度足迹</p>
+              </div>
+            </div>
+            <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
+          </Link>
+        )}
+
         {/* 我的复习入口（待复习用 --warn 语义，红只留给关键信号） */}
         <Link
           href="/review"
@@ -207,7 +241,16 @@ export default async function MePage() {
 
       {/* ============ 第三段 · 成长足迹（次要）============ */}
       <section className="studio-rise flex flex-col gap-4 border-t border-[var(--border)] pt-6">
-        <h2 className="text-[16px] font-bold text-[var(--ink)]">成长足迹</h2>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[16px] font-bold text-[var(--ink)]">成长足迹</h2>
+          {/* 学习周报：把本周节奏一键生成分享图，ghost 文本按钮不与红信号争抢 */}
+          <SharePanel
+            kind="week-report"
+            title="学习周报"
+            triggerLabel="生成学习周报"
+            triggerClassName="studio-press inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
+          />
+        </div>
 
         {/* 连续学习 + 本周数据 + 本周节奏柱图 */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -294,6 +337,9 @@ export default async function MePage() {
 
         {/* 学习热力日历（TideCalendar：服务端按 Asia/Shanghai 定基准日，SSR/CSR 一致） */}
         <TideCalendar calendar={gamification.calendar} todayKey={todayKey} />
+
+        {/* 学习热力年视图（GitHub 风格 365 天格：一整年的坚持一屏可见） */}
+        <YearHeatmap days={yearHeat.days} todayKey={yearHeat.todayKey} />
 
         {/* 成就徽章 */}
         {gamification.achievements.length > 0 && (

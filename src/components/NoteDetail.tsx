@@ -4,12 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, PencilSimple, MapPin, ArrowUpRight, Quotes, CalendarBlank, Clock,
-  DownloadSimple, CaretDown, FileMd, FileHtml, FileText,
+  DownloadSimple, CaretDown, FileMd, FileHtml, FileText, ShareNetwork,
 } from "@phosphor-icons/react";
 import { renderMarkdown } from "@/lib/markdown";
 import { mmss } from "@/lib/format";
 import { useToast } from "@/components/Toast";
 import { NoteEditorInline } from "@/components/NoteEditorInline";
+import { SharePanel } from "@/components/SharePanel";
 
 interface NoteTagLite {
   id: string;
@@ -148,7 +149,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
       : null;
 
   return (
-    <div className="mx-auto max-w-[720px] space-y-6">
+    <div className="mx-auto max-w-[760px] space-y-6">
       {/* 顶部返回 */}
       <Link
         href="/notes"
@@ -180,6 +181,18 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
               {title?.trim() || "未命名笔记"}
             </h1>
             <div className="mt-1 flex shrink-0 items-center gap-2">
+              {/* 分享笔记：生成笔记摘录卡（note-quote 服务端 where id+userId，仅取本人笔记） */}
+              <SharePanel
+                kind="note-quote"
+                title="分享笔记"
+                params={{ noteId: note.id }}
+                triggerLabel="分享笔记"
+                trigger={
+                  <span className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]">
+                    <ShareNetwork size={14} weight="bold" /> 分享
+                  </span>
+                }
+              />
               <ExportMenu noteId={note.id} title={title} contentMd={contentMd} />
               <button
                 type="button"

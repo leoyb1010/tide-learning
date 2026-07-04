@@ -84,7 +84,7 @@ export default async function DemandsPage() {
   );
 
   return (
-    <div className="mx-auto max-w-[1000px] space-y-6">
+    <div className="mx-auto max-w-[1120px] space-y-6">
       {/* 深色 Banner：渐变材质替代死黑平面 + 右上柔光装饰 */}
       <section
         className="studio-rise relative overflow-hidden rounded-[18px] p-[26px] text-white shadow-[var(--lift)]"

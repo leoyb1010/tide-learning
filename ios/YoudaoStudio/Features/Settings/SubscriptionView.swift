@@ -41,7 +41,7 @@ private struct PricingPlan: Decodable, Identifiable {
     let firstPriceCents: Int?     // 首期优惠价（分），可空
     let currency: String          // CNY
     let scope: String             // all / english_oral / ...
-    let highlight: Bool           // 是否高亮/推荐档
+    let highlight: Bool           // 是否高亮/推荐档（后端标记）
     let isActive: Bool
 }
 
@@ -86,28 +86,110 @@ private extension PricingPlan {
         }
     }
 
+    /// 计费周期短标签（用于卡片顶部），如「月卡」。
+    var periodLabel: String {
+        switch billingPeriod {
+        case "month", "month_recurring": return "月卡"
+        case "quarter":                  return "季卡"
+        case "year":                     return "年卡"
+        default:                         return name
+        }
+    }
+
+    /// 该周期折算的整月数（用于每月赠额与每天单价换算）。
+    var monthsInPeriod: Int {
+        switch billingPeriod {
+        case "quarter": return 3
+        case "year":    return 12
+        default:        return 1
+        }
+    }
+
     /// 后端价格文案，如「¥99/月」。以分为单位换算。
     var priceText: String {
-        let yuan = Double(priceCents) / 100
+        moneyText(priceCents) + periodSuffix
+    }
+
+    /// 月度赠积分（与后端 credits.ts monthlyGrantForPlan 对齐）：
+    /// 单赛道固定 200；否则 month 300 / quarter 500 / year 800；兜底 300。
+    var monthlyGrant: Int {
+        if scope != "all" { return 200 }
+        switch billingPeriod {
+        case "month", "month_recurring": return 300
+        case "quarter":                  return 500
+        case "year":                     return 800
+        default:                         return 300
+        }
+    }
+
+    /// 每天单价换算（价格锚定），如「约 ¥1.4/天」。年卡最具说服力。
+    var perDayText: String? {
+        let days = Double(monthsInPeriod) * 30.0
+        guard days > 0 else { return nil }
+        let perDay = Double(priceCents) / 100.0 / days
+        let amount = perDay >= 10
+            ? String(format: "%.0f", perDay)
+            : String(format: "%.1f", perDay)
+        return "约 ¥\(amount)/天"
+    }
+
+    /// 首期优惠文案（如有），如「首期 ¥68」。
+    var firstPriceText: String? {
+        guard let first = firstPriceCents else { return nil }
+        return "首期 " + moneyText(first)
+    }
+
+    /// 金额格式化：整数省小数，符号跟随币种。
+    func moneyText(_ cents: Int) -> String {
+        let yuan = Double(cents) / 100
         let symbol = currency == "CNY" ? "¥" : currency + " "
         let amount = yuan == yuan.rounded() ? String(format: "%.0f", yuan) : String(format: "%.2f", yuan)
-        return "\(symbol)\(amount)\(periodSuffix)"
+        return "\(symbol)\(amount)"
     }
-
-    /// 副标题：首期优惠提示 or 权益范围。
-    var subtitle: String? {
-        if let first = firstPriceCents {
-            let yuan = Double(first) / 100
-            let amount = yuan == yuan.rounded() ? String(format: "%.0f", yuan) : String(format: "%.2f", yuan)
-            let symbol = currency == "CNY" ? "¥" : currency + " "
-            return "首期 \(symbol)\(amount)"
-        }
-        return nil
-    }
-
-    /// 是否推荐档（对齐后端 highlight）。
-    var recommended: Bool { highlight }
 }
+
+// MARK: - 权益对比模型（对齐 Web RIGHTS + 档位差异化积分）
+
+/// 一行权益：三态（免费 / 订阅 / 到期）。value 用文本或 ✓/✕ 语义呈现。
+private struct RightRow: Identifiable {
+    let id = UUID()
+    let name: String
+    let free: String
+    let premium: String
+    let expired: String
+}
+
+/// 权益清单（镜像 Web pricing/page.tsx 的 RIGHTS，并补齐商业化差异项）。
+private let subscriptionRights: [RightRow] = [
+    RightRow(name: "订阅赛道课程", free: "✕", premium: "全部解锁", expired: "✕"),
+    RightRow(name: "AI 造课",     free: "试用",  premium: "无限",     expired: "✕"),
+    RightRow(name: "AI 整理笔记", free: "✕",    premium: "无限",     expired: "仅查看"),
+    RightRow(name: "模拟考",      free: "1 次/日", premium: "无限",   expired: "✕"),
+    RightRow(name: "笔记导出",    free: "✕",    premium: "支持",     expired: "✕"),
+    RightRow(name: "学习周报",    free: "✕",    premium: "每周推送",  expired: "✕"),
+    RightRow(name: "分享成就卡",  free: "基础",  premium: "全部样式",  expired: "基础"),
+    RightRow(name: "笔记永久保存", free: "3 篇", premium: "无限",     expired: "仅查看"),
+]
+
+/// 常见问题（iOS 用 DisclosureGroup 呈现，对齐商业化订阅页）。
+private struct FAQItem: Identifiable {
+    let id = UUID()
+    let q: String
+    let a: String
+}
+
+private let subscriptionFAQ: [FAQItem] = [
+    FAQItem(q: "订阅后每月送多少积分？",
+            a: "按档位差异化发放：月卡每月赠 300 积分，季卡每月 500，年卡每月 800。积分用于 AI 造课、AI 整理笔记等消耗，每月自动到账。"),
+    FAQItem(q: "可以随时取消吗？",
+            a: "可以。在系统「设置 › Apple ID › 订阅」中随时取消，当前周期内权益不受影响，到期后不再续费。"),
+    FAQItem(q: "到期后我的笔记会丢吗？",
+            a: "不会。停订后赛道课程会锁定，但你创建的笔记与截帧永久保留、可随时查看。"),
+    FAQItem(q: "支持退款吗？",
+            a: "订阅通过 App Store 计费，退款请在系统「设置 › Apple ID › 订阅」或通过 Apple 支持申请，遵循 App Store 退款政策。"),
+    FAQItem(q: "换了新手机怎么办？",
+            a: "同一 Apple ID 登录后，点本页底部「恢复购买」即可同步已有订阅，无需重新付费。"),
+]
 
 // MARK: - ViewModel
 
@@ -270,6 +352,40 @@ final class SubscriptionViewModel {
         let r = await fetchMe()
         if let v = r.value { me = v }
     }
+
+    // MARK: 商业化派生
+
+    /// 三档展示顺序：月 → 季 → 年（年在最后视觉压轴）。
+    fileprivate var orderedPlans: [PricingPlan] {
+        let rank: (String) -> Int = { p in
+            switch p {
+            case "month", "month_recurring": return 0
+            case "quarter": return 1
+            case "year": return 2
+            default: return 3
+            }
+        }
+        // 只保留全站三档主套餐用于三档卡；单赛道等其余套餐仍按 isActive 保留在后。
+        let full = plans.filter { $0.scope == "all" }
+        let others = plans.filter { $0.scope != "all" }
+        let sortedFull = full.sorted { rank($0.billingPeriod) < rank($1.billingPeriod) }
+        return sortedFull + others
+    }
+
+    /// 推荐档（年卡）id。仅一个，修复「两卡都挂最受欢迎」问题。
+    /// 优先后端 highlight 的年卡；否则取任一年卡；再兜底后端 highlight。
+    fileprivate var recommendedPlanId: String? {
+        let full = plans.filter { $0.scope == "all" }
+        if let year = full.first(where: { $0.billingPeriod == "year" }) { return year.id }
+        if let hl = full.first(where: { $0.highlight }) { return hl.id }
+        return full.last?.id
+    }
+
+    /// 全站月卡整年价（用于年卡「立省」锚定）。取全站 month 档 × 12。
+    fileprivate var monthlyYearlyBaselineCents: Int? {
+        plans.first { $0.scope == "all" && ($0.billingPeriod == "month" || $0.billingPeriod == "month_recurring") }
+            .map { $0.priceCents * 12 }
+    }
 }
 
 // MARK: - View
@@ -303,28 +419,37 @@ struct SubscriptionView: View {
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 22) {
+        VStack(alignment: .leading, spacing: 26) {
             statusCard
             plansSection
-            if let msg = vm.actionMessage {
-                let ok = msg.contains("成功") || msg.contains("已恢复")
-                HStack(spacing: 6) {
-                    Image(systemName: ok ? "checkmark.circle.fill" : "info.circle.fill")
-                        .font(.system(size: 13))
-                    Text(msg).font(.studio(13, .medium))
-                }
-                .foregroundStyle(ok ? Studio.ok : Studio.info)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(10)
-                .background(ok ? Studio.okSoft : Studio.infoSoft)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-                .transition(.opacity.combined(with: .scale(scale: 0.97)))
-            }
+            actionMessageBanner
+            benefitsSection
+            faqSection
             restoreButton
             legal
         }
         .padding(16)
         .animation(reduceMotion ? nil : StudioMotion.smooth, value: vm.actionMessage)
+    }
+
+    // MARK: 行内提示 banner
+
+    @ViewBuilder
+    private var actionMessageBanner: some View {
+        if let msg = vm.actionMessage {
+            let ok = msg.contains("成功") || msg.contains("已恢复")
+            HStack(spacing: 6) {
+                Image(systemName: ok ? "checkmark.circle.fill" : "info.circle.fill")
+                    .font(.system(size: 13))
+                Text(msg).font(.studio(13, .medium))
+            }
+            .foregroundStyle(ok ? Studio.ok : Studio.info)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(10)
+            .background(ok ? Studio.okSoft : Studio.infoSoft)
+            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+            .transition(.opacity.combined(with: .scale(scale: 0.97)))
+        }
     }
 
     // MARK: Status
@@ -342,6 +467,7 @@ struct SubscriptionView: View {
             if isActive {
                 activeStatusCard(planName: planName,
                                  statusLabel: me.entitlement?.statusLabel ?? "会员有效",
+                                 monthlyGrant: me.subscription?.plan.monthlyGrant,
                                  periodEnd: periodEnd, willRenew: willRenew)
             } else {
                 freeStatusCard(planName: planName,
@@ -359,7 +485,7 @@ struct SubscriptionView: View {
     }
 
     /// 会员有效：深色 videoGradient 尊享卡（premium 质感）。
-    private func activeStatusCard(planName: String, statusLabel: String, periodEnd: Date?, willRenew: Bool) -> some View {
+    private func activeStatusCard(planName: String, statusLabel: String, monthlyGrant: Int?, periodEnd: Date?, willRenew: Bool) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack {
                 VStack(alignment: .leading, spacing: 5) {
@@ -371,14 +497,23 @@ struct SubscriptionView: View {
                 }
                 Spacer()
             }
-            if let periodEnd {
-                Rectangle().fill(.white.opacity(0.14)).frame(height: 1)
-                HStack {
+            Rectangle().fill(.white.opacity(0.14)).frame(height: 1)
+            HStack(alignment: .top) {
+                if let monthlyGrant {
                     VStack(alignment: .leading, spacing: 3) {
+                        Text("每月赠积分").font(.studio(11)).foregroundStyle(.white.opacity(0.6))
+                        HStack(spacing: 4) {
+                            Image(systemName: "sparkles").font(.system(size: 12)).foregroundStyle(Studio.newInk)
+                            Text("\(monthlyGrant)").font(.mono(16, .bold)).foregroundStyle(.white)
+                        }
+                    }
+                }
+                Spacer()
+                if let periodEnd {
+                    VStack(alignment: .trailing, spacing: 3) {
                         Text(willRenew ? "下次续费" : "有效期至").font(.studio(11)).foregroundStyle(.white.opacity(0.6))
                         Text(dateText(periodEnd)).font(.mono(16, .bold)).foregroundStyle(.white)
                     }
-                    Spacer()
                 }
             }
         }
@@ -412,9 +547,13 @@ struct SubscriptionView: View {
         if vm.plans.isEmpty {
             EmptyStateView(title: "套餐加载失败", subtitle: "下拉刷新重试")
         } else {
-            VStack(alignment: .leading, spacing: 12) {
-                Text("升级套餐").font(.studio(16, .bold)).foregroundStyle(Studio.ink)
-                ForEach(Array(vm.plans.enumerated()), id: \.element.id) { idx, plan in
+            VStack(alignment: .leading, spacing: 14) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("选择套餐").font(.studio(18, .bold)).foregroundStyle(Studio.ink)
+                    Text("一次订阅，解锁全部赛道，随时可取消").font(.studio(13)).foregroundStyle(Studio.ink3)
+                }
+                let planList = vm.orderedPlans
+                ForEach(Array(planList.enumerated()), id: \.element.id) { idx, plan in
                     planCard(plan)
                         .opacity(appeared || reduceMotion ? 1 : 0)
                         .offset(y: appeared || reduceMotion ? 0 : 14)
@@ -433,37 +572,72 @@ struct SubscriptionView: View {
 
     @ViewBuilder
     private func planCard(_ plan: PricingPlan) -> some View {
-        if plan.recommended {
+        if plan.id == vm.recommendedPlanId {
             recommendedPlanCard(plan)
         } else {
             regularPlanCard(plan)
         }
     }
 
-    /// 推荐档：深色 videoGradient 高亮卡 + 推荐徽章 + 红 CTA（最强说服力）。
+    /// 年卡 vs 全站单月×12 的立省文案（价格锚定）。
+    private func savingText(for plan: PricingPlan) -> String? {
+        guard plan.billingPeriod == "year",
+              let baseline = vm.monthlyYearlyBaselineCents,
+              baseline > plan.priceCents else { return nil }
+        let saved = baseline - plan.priceCents
+        return "较按月订阅立省 " + plan.moneyText(saved)
+    }
+
+    /// 推荐档（年卡）：深色 videoGradient 高亮卡 + 单一推荐徽章 + 每月赠积分 + 价格锚定 + 红 CTA。
     private func recommendedPlanCard(_ plan: PricingPlan) -> some View {
         let product = plan.storeProductId.flatMap { vm.storeProduct(for: $0) }
         let isPurchasing = vm.purchasingProductId == plan.storeProductId
         return VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "star.fill").font(.system(size: 10)).foregroundStyle(.white)
-                        Text("最超值").font(.studio(10, .bold)).foregroundStyle(.white).tracking(0.5)
-                    }
-                    .padding(.horizontal, 8).padding(.vertical, 4)
-                    .background(Studio.red)
-                    .clipShape(Capsule())
-
-                    Text(plan.name).font(.studio(18, .bold)).foregroundStyle(.white)
-                    if let sub = plan.subtitle {
-                        Text(sub).font(.studio(12)).foregroundStyle(.white.opacity(0.7))
-                    }
-                }
+            // 顶行：周期标签 + 单一「最超值」徽章
+            HStack {
+                Text(plan.periodLabel).font(.mono(11, .semibold))
+                    .foregroundStyle(.white.opacity(0.72)).tracking(1)
                 Spacer()
-                Text(product?.displayPrice ?? plan.priceText)
-                    .font(.mono(18, .bold)).foregroundStyle(.white)
+                HStack(spacing: 4) {
+                    Image(systemName: "star.fill").font(.system(size: 9)).foregroundStyle(.white)
+                    Text("最超值").font(.studio(10, .bold)).foregroundStyle(.white).tracking(0.5)
+                }
+                .padding(.horizontal, 9).padding(.vertical, 4)
+                .background(Studio.red)
+                .clipShape(Capsule())
             }
+
+            // 价格行：主价 + 每天换算
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(product?.displayPrice ?? plan.moneyText(plan.priceCents))
+                    .font(.mono(26, .bold)).foregroundStyle(.white)
+                Text(plan.periodSuffix).font(.studio(14, .medium)).foregroundStyle(.white.opacity(0.7))
+                Spacer()
+                if let perDay = plan.perDayText {
+                    Text(perDay).font(.mono(12, .medium))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(.white.opacity(0.12))
+                        .clipShape(Capsule())
+                }
+            }
+
+            // 立省锚定
+            if let saving = savingText(for: plan) {
+                HStack(spacing: 5) {
+                    Image(systemName: "arrow.down.circle.fill").font(.system(size: 11)).foregroundStyle(Studio.ok)
+                    Text(saving).font(.studio(12, .semibold)).foregroundStyle(.white.opacity(0.92))
+                }
+            }
+
+            // 每月赠积分（差异化卖点）
+            grantPill(plan.monthlyGrant, onDark: true)
+
+            // 首期优惠（如有）
+            if let first = plan.firstPriceText {
+                Text(first).font(.studio(12)).foregroundStyle(.white.opacity(0.7))
+            }
+
             StudioButton(title: product == nil ? "暂不可购买" : "立即订阅",
                          kind: .red,
                          loading: isPurchasing) {
@@ -481,22 +655,36 @@ struct SubscriptionView: View {
         .shadow(color: Studio.red.opacity(0.22), radius: 18, x: 0, y: 8)
     }
 
-    /// 常规档：浅色卡。
+    /// 常规档（月/季）：浅色卡 + 每月赠积分 + 每天换算 + ink CTA。
     private func regularPlanCard(_ plan: PricingPlan) -> some View {
         let product = plan.storeProductId.flatMap { vm.storeProduct(for: $0) }
         let isPurchasing = vm.purchasingProductId == plan.storeProductId
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(plan.name).font(.studio(16, .bold)).foregroundStyle(Studio.ink)
-                    if let sub = plan.subtitle {
-                        Text(sub).font(.studio(12)).foregroundStyle(Studio.ink3)
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(plan.periodLabel).font(.mono(11, .semibold))
+                        .foregroundStyle(Studio.ink3).tracking(0.5)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Text(product?.displayPrice ?? plan.moneyText(plan.priceCents))
+                            .font(.mono(20, .bold)).foregroundStyle(Studio.ink)
+                        Text(plan.periodSuffix).font(.studio(12, .medium)).foregroundStyle(Studio.ink3)
+                    }
+                    if let first = plan.firstPriceText {
+                        Text(first).font(.studio(12)).foregroundStyle(Studio.redInk)
                     }
                 }
                 Spacer()
-                Text(product?.displayPrice ?? plan.priceText)
-                    .font(.mono(15, .bold)).foregroundStyle(Studio.ink)
+                if let perDay = plan.perDayText {
+                    Text(perDay).font(.mono(11, .medium))
+                        .foregroundStyle(Studio.ink3)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background(Studio.surface2)
+                        .clipShape(Capsule())
+                }
             }
+
+            grantPill(plan.monthlyGrant, onDark: false)
+
             StudioButton(title: product == nil ? "暂不可购买" : "订阅",
                          kind: .ink,
                          loading: isPurchasing) {
@@ -506,6 +694,117 @@ struct SubscriptionView: View {
             .disabled(product == nil || isPurchasing)
         }
         .studioCard()
+    }
+
+    /// 「每月赠 N 积分」药丸（深色/浅色两态）。差异化卖点统一样式。
+    private func grantPill(_ grant: Int, onDark: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: "sparkles").font(.system(size: 11))
+            Text("每月赠 ").font(.studio(12, .medium))
+                + Text("\(grant)").font(.mono(13, .bold))
+                + Text(" 积分").font(.studio(12, .medium))
+        }
+        .foregroundStyle(onDark ? Studio.newInk : Studio.redInk)
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(onDark ? Color.white.opacity(0.10) : Studio.redSoft)
+        .clipShape(Capsule())
+        .overlay(Capsule().strokeBorder(onDark ? Color.white.opacity(0.16) : Studio.redSoftBorder, lineWidth: 1))
+    }
+
+    // MARK: 权益对比
+
+    private var benefitsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("权益对比").font(.studio(18, .bold)).foregroundStyle(Studio.ink)
+            VStack(spacing: 0) {
+                // 表头：权益 / 免费 / 订阅 / 到期（订阅列红竖带贯穿至各行）
+                HStack(spacing: 0) {
+                    Text("权益").font(.studio(12, .medium)).foregroundStyle(Studio.ink3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Text("免费").font(.studio(12, .medium)).foregroundStyle(Studio.ink4)
+                        .frame(width: 72, alignment: .center)
+                    Text("订阅").font(.studio(12, .bold)).foregroundStyle(Studio.redInk)
+                        .frame(width: 72, alignment: .center)
+                        .frame(maxHeight: .infinity)
+                        .background(Studio.redSoft)
+                    Text("到期").font(.studio(12, .medium)).foregroundStyle(Studio.ink4)
+                        .frame(width: 72, alignment: .center)
+                }
+                .padding(.leading, 14)
+                .frame(height: 40)
+
+                Rectangle().fill(Studio.border).frame(height: 1)
+
+                ForEach(Array(subscriptionRights.enumerated()), id: \.element.id) { idx, row in
+                    rightRowView(row)
+                    if idx < subscriptionRights.count - 1 {
+                        Rectangle().fill(Studio.border).frame(height: 1)
+                    }
+                }
+            }
+            .background(Studio.surface)
+            .clipShape(RoundedRectangle(cornerRadius: StudioRadius.card, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: StudioRadius.card, style: .continuous)
+                .strokeBorder(Studio.border, lineWidth: 1))
+            .shadow(color: StudioElevation.l1(.light).color, radius: 10, x: 0, y: 4)
+
+            Text("停订后课程锁定，但笔记永久保留、可查看。健康类内容仅供健康信息素养学习。")
+                .font(.studio(11)).foregroundStyle(Studio.ink4)
+                .lineSpacing(2)
+        }
+    }
+
+    private func rightRowView(_ row: RightRow) -> some View {
+        HStack(spacing: 0) {
+            Text(row.name).font(.studio(13, .medium)).foregroundStyle(Studio.ink)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            cell(row.free, strong: false)
+                .frame(width: 72, alignment: .center)
+            cell(row.premium, strong: true)
+                .frame(width: 72, alignment: .center)
+                .frame(maxHeight: .infinity)
+                .background(Studio.redSoft)
+            cell(row.expired, strong: false)
+                .frame(width: 72, alignment: .center)
+        }
+        .padding(.leading, 14)
+        .frame(minHeight: 46)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// 权益单元格：✓ 用 ok 语义、✕ 弱化，其余文本原样。strong 用于订阅列强调。
+    @ViewBuilder
+    private func cell(_ value: String, strong: Bool) -> some View {
+        if value == "✓" || value == "支持" {
+            Image(systemName: "checkmark")
+                .font(.system(size: strong ? 13 : 11, weight: strong ? .bold : .semibold))
+                .foregroundStyle(Studio.ok.opacity(strong ? 1 : 0.85))
+        } else if value == "✕" {
+            Image(systemName: "minus")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Studio.ink4)
+        } else {
+            Text(value)
+                .font(.studio(strong ? 12 : 11, strong ? .bold : .regular))
+                .foregroundStyle(strong ? Studio.redInk : Studio.ink3)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
+                .padding(.horizontal, 3)
+        }
+    }
+
+    // MARK: FAQ
+
+    private var faqSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("常见问题").font(.studio(18, .bold)).foregroundStyle(Studio.ink)
+            VStack(spacing: 10) {
+                ForEach(subscriptionFAQ) { item in
+                    FAQRow(item: item)
+                }
+            }
+        }
     }
 
     // MARK: Restore / legal
@@ -538,5 +837,48 @@ struct SubscriptionView: View {
             }
         }
         .padding(16)
+    }
+}
+
+// MARK: - FAQ Row（自定义展开，尊重 reduce-motion）
+
+private struct FAQRow: View {
+    let item: FAQItem
+    @State private var expanded = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button {
+                Haptics.selection()
+                if reduceMotion { expanded.toggle() }
+                else { withAnimation(StudioMotion.smooth) { expanded.toggle() } }
+            } label: {
+                HStack(spacing: 10) {
+                    Text(item.q).font(.studio(14, .semibold)).foregroundStyle(Studio.ink)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(Studio.ink3)
+                        .rotationEffect(.degrees(expanded ? 180 : 0))
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                Text(item.a)
+                    .font(.studio(13)).foregroundStyle(Studio.ink2)
+                    .lineSpacing(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 10)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .padding(14)
+        .background(Studio.surface)
+        .clipShape(RoundedRectangle(cornerRadius: StudioRadius.card, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: StudioRadius.card, style: .continuous)
+            .strokeBorder(Studio.border, lineWidth: 1))
     }
 }

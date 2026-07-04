@@ -68,7 +68,7 @@ async function MarketingHome() {
   const totalCourses = all.length;
 
   return (
-    <div className="mx-auto flex max-w-[1060px] flex-col gap-24 md:gap-28">
+    <div className="mx-auto flex max-w-[1280px] flex-col gap-24 md:gap-28">
       <TrackView event="homepage_view" properties={{ mode: "standard" }} />
 
       {/* ============ 1. HERO 点亮自习室 + 续播深色卡 ============ */}

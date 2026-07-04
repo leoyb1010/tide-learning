@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { prisma } from "./db";
+import { monthlyGrantForPlan } from "./credits";
 
 /**
  * Entitlement 状态机与权益快照 — 计划书 v0.3 §7.3 + 有道融合（分赛道订阅）。
@@ -41,6 +42,7 @@ export interface EntitlementSnapshot {
   canCreateNoteUnlimited: boolean;
   noteFreeLimit: number;
   canUseLLM: boolean;                          // AI 能力权益（当前 = isSubscriber，未来可细分套餐）
+  monthlyGrant: number;                        // v3.0：当前档位每月赠送积分（免费=0）；订阅页/积分卡展示「每月赠 N 积分」
 }
 
 export const FREE_SNAPSHOT: EntitlementSnapshot = {
@@ -55,6 +57,7 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
   canCreateNoteUnlimited: false,
   noteFreeLimit: 3,
   canUseLLM: false,
+  monthlyGrant: 0,
 };
 
 /**
@@ -101,7 +104,12 @@ export const resolveEntitlement = cache(async (userId: string | null | undefined
   if (!userId) return FREE_SNAPSHOT;
   const now = new Date();
 
-  const subs = await prisma.subscription.findMany({ where: { userId }, orderBy: { currentPeriodEnd: "desc" } });
+  const subs = await prisma.subscription.findMany({
+    where: { userId },
+    orderBy: { currentPeriodEnd: "desc" },
+    // v3.0：带出 plan.billingPeriod 以派生档位月赠额度（scope 优先用订阅快照，plan 作兜底）。
+    include: { plan: { select: { billingPeriod: true, scope: true } } },
+  });
 
   // 读时内存判断：付费态且未过期才算有效；过期的付费态在下方 latest 分支按 expired 呈现。
   const activeSubs = subs.filter((s) => PREMIUM_STATUSES.has(s.status) && s.currentPeriodEnd >= now);
@@ -120,6 +128,12 @@ export const resolveEntitlement = cache(async (userId: string | null | undefined
     const primary = activeSubs.find((s) => s.scope === "all") ?? activeSubs[0];
     const meta = STATUS_LABELS[primary.status] ?? STATUS_LABELS.active;
 
+    // v3.0：档位月赠额度。scope 优先用订阅快照（更贴近购买当时），billingPeriod 取自 plan。
+    const monthlyGrant = monthlyGrantForPlan({
+      billingPeriod: primary.plan?.billingPeriod,
+      scope: primary.scope ?? primary.plan?.scope,
+    });
+
     const snapshot: EntitlementSnapshot = {
       isSubscriber: true,
       accessLevel: "premium",
@@ -132,6 +146,7 @@ export const resolveEntitlement = cache(async (userId: string | null | undefined
       canCreateNoteUnlimited: true,
       noteFreeLimit: 3,
       canUseLLM: true,
+      monthlyGrant,
     };
     await persistSnapshot(userId, primary.id, "active", snapshot);
     return snapshot;

@@ -7,6 +7,7 @@ import { Plus, BookBookmark, NotePencil } from "@phosphor-icons/react";
 import { CardSkeleton, ErrorState, Button } from "@/components/ui";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 interface NotebookCard {
   id: string;
@@ -18,6 +19,16 @@ interface NotebookCard {
 }
 
 const TITLE_MAX = 40;
+
+/** 默认图标：新建时预选，用户可改。 */
+const DEFAULT_ICON = "📘";
+
+/** 24 个预设图标（按学习场景），存入 Notebook.icon 字段（emoji）。 */
+const NOTEBOOK_ICONS = [
+  "📘", "📗", "📙", "📕", "📒", "🗂️", "🔖", "✏️",
+  "🖊️", "💡", "🧠", "⭐", "🎯", "🔬", "🧪", "📐",
+  "🎨", "🎧", "🗣️", "💼", "🏥", "🛡️", "🌊", "🔥",
+];
 
 /**
  * NotebookGrid —— 笔记本网格。
@@ -35,8 +46,7 @@ export default function NotebookGrid() {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [icon, setIcon] = useState("");
-  const [saving, setSaving] = useState(false);
+  const [icon, setIcon] = useState(DEFAULT_ICON);
 
   const load = useCallback(async () => {
     setError(false);
@@ -56,14 +66,14 @@ export default function NotebookGrid() {
   function resetForm() {
     setTitle("");
     setDescription("");
-    setIcon("");
+    setIcon(DEFAULT_ICON);
   }
 
-  async function create() {
+  // 提交防抖：guard 内部拦截进行中的重复触发（Enter 连按 / 双击），submitting 驱动按钮 loading。
+  const { submitting: saving, guard: create } = useSubmitGuard(async () => {
     const t = title.trim();
     if (!t) return toast("请填写笔记本标题", { tone: "warn" });
     if (t.length > TITLE_MAX) return toast(`标题最多 ${TITLE_MAX} 个字`, { tone: "warn" });
-    setSaving(true);
     try {
       const json = await fetch("/api/notebooks", {
         method: "POST",
@@ -81,10 +91,8 @@ export default function NotebookGrid() {
       router.push(`/notes/notebook/${json.data.id}`);
     } catch {
       toast("创建失败，请稍后重试", { tone: "warn" });
-    } finally {
-      setSaving(false);
     }
-  }
+  });
 
   if (error) return <ErrorState hint="笔记本加载失败" onRetry={() => void load()} />;
 
@@ -138,30 +146,57 @@ export default function NotebookGrid() {
       {/* 新建笔记本对话框 */}
       <Dialog open={open} onClose={() => (saving ? null : setOpen(false))} title="新建笔记本">
         <div className="space-y-4">
+          {/* 图标选择：预设网格 + 自定义输入 */}
           <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-[var(--ink2)]">
-              标题<span className="text-[var(--red)]"> *</span>
-            </label>
-            <div className="flex items-center gap-2">
+            <label className="mb-1.5 block text-[13px] font-semibold text-[var(--ink2)]">图标</label>
+            <div className="grid grid-cols-8 gap-1.5">
+              {NOTEBOOK_ICONS.map((em) => {
+                const active = icon === em;
+                return (
+                  <button
+                    key={em}
+                    type="button"
+                    onClick={() => setIcon(em)}
+                    aria-pressed={active}
+                    aria-label={`选择图标 ${em}`}
+                    className={`studio-press flex aspect-square items-center justify-center rounded-[10px] border text-[18px] transition-colors ${
+                      active
+                        ? "border-[var(--red)] bg-[var(--red-soft)]"
+                        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--ink3)]"
+                    }`}
+                  >
+                    <span aria-hidden>{em}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center gap-2">
               <input
                 value={icon}
                 onChange={(e) => setIcon(e.target.value.slice(0, 4))}
                 placeholder="📓"
                 maxLength={4}
-                aria-label="图标（emoji，可选）"
+                aria-label="自定义图标（emoji）"
                 className="w-14 shrink-0 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-2.5 text-center text-[18px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)]"
               />
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="例如：产品经理养成"
-                maxLength={TITLE_MAX}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !saving) create();
-                }}
-                className="min-w-0 flex-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
-              />
+              <span className="text-[12px] text-[var(--ink4)]">选一个，或输入你自己的 emoji</span>
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-[13px] font-semibold text-[var(--ink2)]">
+              标题<span className="text-[var(--red)]"> *</span>
+            </label>
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="例如：产品经理养成"
+              maxLength={TITLE_MAX}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !saving) create();
+              }}
+              className="w-full min-w-0 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+            />
             <p className="mono mt-1 text-right text-[11px] text-[var(--ink4)]">
               {title.length}/{TITLE_MAX}
             </p>

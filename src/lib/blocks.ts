@@ -9,13 +9,23 @@
  *   - 字段截断：超长 markdown/code 截断，避免异常 payload 撑爆存储与渲染。
  */
 
-// —— 块类型定义 ——
+// —— 块类型定义（v3.0 扩展为 12 种，杂志感 + 交互感）——
 export type Block =
+  // 基础 5 种（v2 保留，前向兼容旧课）
   | { type: "concept"; title: string; markdown: string }
   | { type: "code"; lang: string; code: string; explanation?: string }
   | { type: "quiz"; question: string; options: string[]; answerIndex: number; explain: string }
   | { type: "keypoint"; points: string[] }
-  | { type: "callout"; tone: "info" | "warn"; markdown: string };
+  | { type: "callout"; tone: "info" | "warn"; markdown: string }
+  // v3 新增 7 种（叙事结构 + 交互）
+  | { type: "objectives"; items: string[] } // 节首学习目标：本节你将学会
+  | { type: "scene"; title: string; markdown: string } // 场景引入/钩子：为什么学
+  | { type: "dialog"; turns: { speaker: string; text: string; note?: string }[] } // 对话示例（口语课刚需）
+  | { type: "steps"; steps: { title: string; detail?: string }[] } // 步骤教程
+  | { type: "compare"; title?: string; left: { heading: string; items: string[] }; right: { heading: string; items: string[] } } // 对比（误区 vs 正确）
+  | { type: "example"; markdown: string } // 例子/案例
+  | { type: "flashcard"; front: string; back: string } // 内联翻转卡，可存复习
+  | { type: "summary"; markdown: string; next?: string }; // 节尾小结 + 下节预告钩子
 
 export interface CourseBlocks {
   version: 1;
@@ -27,7 +37,21 @@ const MAX_MARKDOWN = 4000;
 const MAX_CODE = 6000;
 const MAX_OPTIONS = 8; // quiz 选项上限，避免异常长列表
 const MAX_POINTS = 12; // keypoint 条目上限
-const BLOCK_TYPES = new Set(["concept", "code", "quiz", "keypoint", "callout"]);
+const MAX_TURNS = 20; // dialog 轮次上限
+const MAX_STEPS = 12; // steps 步骤上限
+const BLOCK_TYPES = new Set([
+  "concept", "code", "quiz", "keypoint", "callout",
+  "objectives", "scene", "dialog", "steps", "compare", "example", "flashcard", "summary",
+]);
+
+/** 从未知值取字符串数组，逐项截断、过滤空、限量。 */
+function clampStrArray(v: unknown, maxLen: number, maxCount: number): string[] {
+  if (!Array.isArray(v)) return [];
+  return v
+    .filter((x) => typeof x === "string" && x.trim())
+    .map((x) => clampStr(x, maxLen))
+    .slice(0, maxCount);
+}
 
 /** 截断字符串到 max 长度（非字符串归空串）。 */
 function clampStr(v: unknown, max: number): string {
@@ -118,6 +142,88 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
         out.push({ id, type: "callout", tone, markdown });
         break;
       }
+      case "objectives": {
+        const items = clampStrArray(b.items, 300, MAX_POINTS);
+        if (items.length === 0) continue;
+        out.push({ id, type: "objectives", items });
+        break;
+      }
+      case "scene": {
+        const title = clampStr(b.title, 200);
+        const markdown = clampStr(b.markdown, MAX_MARKDOWN);
+        if (!title && !markdown) continue;
+        out.push({ id, type: "scene", title, markdown });
+        break;
+      }
+      case "dialog": {
+        const rawTurns = Array.isArray(b.turns) ? b.turns : [];
+        const turns = rawTurns
+          .filter((t): t is Record<string, unknown> => Boolean(t) && typeof t === "object")
+          .map((t) => {
+            const speaker = clampStr(t.speaker, 60);
+            const text = clampStr(t.text, 1000);
+            const note = clampStr(t.note, 500);
+            const turn: { speaker: string; text: string; note?: string } = { speaker, text };
+            if (note) turn.note = note;
+            return turn;
+          })
+          .filter((t) => t.text)
+          .slice(0, MAX_TURNS);
+        if (turns.length === 0) continue;
+        out.push({ id, type: "dialog", turns });
+        break;
+      }
+      case "steps": {
+        const rawSteps = Array.isArray(b.steps) ? b.steps : [];
+        const steps = rawSteps
+          .filter((s): s is Record<string, unknown> => Boolean(s) && typeof s === "object")
+          .map((s) => {
+            const title = clampStr(s.title, 200);
+            const detail = clampStr(s.detail, MAX_MARKDOWN);
+            const step: { title: string; detail?: string } = { title };
+            if (detail) step.detail = detail;
+            return step;
+          })
+          .filter((s) => s.title)
+          .slice(0, MAX_STEPS);
+        if (steps.length === 0) continue;
+        out.push({ id, type: "steps", steps });
+        break;
+      }
+      case "compare": {
+        const title = clampStr(b.title, 200);
+        const rawLeft = (b.left && typeof b.left === "object" ? b.left : {}) as Record<string, unknown>;
+        const rawRight = (b.right && typeof b.right === "object" ? b.right : {}) as Record<string, unknown>;
+        const left = { heading: clampStr(rawLeft.heading, 100), items: clampStrArray(rawLeft.items, 300, MAX_POINTS) };
+        const right = { heading: clampStr(rawRight.heading, 100), items: clampStrArray(rawRight.items, 300, MAX_POINTS) };
+        if (left.items.length === 0 && right.items.length === 0) continue;
+        const block: Block & { id: string } = { id, type: "compare", left, right };
+        if (title) block.title = title;
+        out.push(block);
+        break;
+      }
+      case "example": {
+        const markdown = clampStr(b.markdown, MAX_MARKDOWN);
+        if (!markdown) continue;
+        out.push({ id, type: "example", markdown });
+        break;
+      }
+      case "flashcard": {
+        const front = clampStr(b.front, 500);
+        const back = clampStr(b.back, MAX_MARKDOWN);
+        if (!front || !back) continue;
+        out.push({ id, type: "flashcard", front, back });
+        break;
+      }
+      case "summary": {
+        const markdown = clampStr(b.markdown, MAX_MARKDOWN);
+        if (!markdown) continue;
+        const next = clampStr(b.next, 300);
+        const block: Block & { id: string } = { id, type: "summary", markdown };
+        if (next) block.next = next;
+        out.push(block);
+        break;
+      }
     }
   }
   return out;
@@ -150,6 +256,34 @@ export function blocksToPlainText(blocks: (Block & { id: string })[]): string {
         break;
       case "callout":
         parts.push(b.markdown);
+        break;
+      case "objectives":
+        parts.push(b.items.map((p) => `- ${p}`).join("\n"));
+        break;
+      case "scene":
+        if (b.title) parts.push(b.title);
+        if (b.markdown) parts.push(b.markdown);
+        break;
+      case "dialog":
+        parts.push(b.turns.map((t) => `${t.speaker}: ${t.text}`).join("\n"));
+        break;
+      case "steps":
+        parts.push(b.steps.map((s, i) => `${i + 1}. ${s.title}${s.detail ? `\n   ${s.detail}` : ""}`).join("\n"));
+        break;
+      case "compare":
+        if (b.title) parts.push(b.title);
+        parts.push(`${b.left.heading}\n${b.left.items.map((p) => `- ${p}`).join("\n")}`);
+        parts.push(`${b.right.heading}\n${b.right.items.map((p) => `- ${p}`).join("\n")}`);
+        break;
+      case "example":
+        parts.push(b.markdown);
+        break;
+      case "flashcard":
+        parts.push(`${b.front}\n${b.back}`);
+        break;
+      case "summary":
+        parts.push(b.markdown);
+        if (b.next) parts.push(b.next);
         break;
     }
   }

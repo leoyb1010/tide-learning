@@ -1,12 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Play, LockSimple, Check, CaretRight } from "@phosphor-icons/react/dist/ssr";
+import { Play, LockSimple, Check, CaretRight, ShareNetwork } from "@phosphor-icons/react/dist/ssr";
 import { getCourseDetail, listCourses } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
 import { Button } from "@/components/ui";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
+import { SharePanel } from "@/components/SharePanel";
 import { TrialBooking } from "@/components/TrialBooking";
 import { formatDurationSec } from "@/lib/format";
 import { TRACK_MAP, trackGradientVar } from "@/lib/tracks";
@@ -38,6 +39,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const learnedCount = nowIndex === -1 ? Math.max(accessibleCount - 1, 0) : nowIndex;
   const progressPct = lessons.length ? Math.round((learnedCount / lessons.length) * 100) : 0;
   const freeCount = lessons.filter((l) => l.isFree).length;
+  // 完课判定：有权访问 + 大纲无「在学/锁定」节（nowIndex === -1 表示每节都可访问且已学过）。
+  const courseComplete = hasAccess && lessons.length > 0 && nowIndex === -1;
   const continueHref = hasAccess
     ? `/courses/${course.slug}/learn/${firstLesson?.id}`
     : firstFree
@@ -50,10 +53,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       <div className="grid items-start gap-5 lg:grid-cols-[1.55fr_.92fr]">
         {/* ---------- 左列 ---------- */}
         <div className="flex flex-col gap-[18px]">
-          {/* 预告视频：深色展示区，赛道渐变叠 --video-grad + 柔光，弃死黑平面 */}
+          {/* 预告视频：深色展示区，赛道渐变叠 --video-grad + 柔光，弃死黑平面。
+              viewTransitionName 与课程卡封面配对：从列表点进时封面被「托起」形变到此处
+              （渐进增强，不支持 View Transitions 的浏览器忽略此属性）。 */}
           <div
             className="studio-lightup group/hero relative aspect-[16/9] w-full overflow-hidden rounded-[20px] shadow-[var(--lift)]"
-            style={{ background: "var(--video-grad)" }}
+            style={{ background: "var(--video-grad)", viewTransitionName: "course-cover" }}
           >
             {/* 赛道色调层，让深色区带上课程个性 */}
             <div className="absolute inset-0 opacity-[0.55] mix-blend-soft-light" style={{ background: trackGradientVar(course.category) }} />
@@ -197,7 +202,26 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             {/* CTA */}
             <div className="mt-4 space-y-2.5">
               {hasAccess ? (
-                <Button href={continueHref} full size="lg" className="cta-glow">进入学习台</Button>
+                <>
+                  <Button href={continueHref} full size="lg" className="cta-glow">
+                    {courseComplete ? "重温学习台" : "进入学习台"}
+                  </Button>
+                  {/* 完课分享：仅整门学完时出现，生成完课证书图（course-done 服务端按 courseId + 当前用户聚合） */}
+                  {courseComplete && (
+                    <SharePanel
+                      kind="course-done"
+                      title="分享完课"
+                      params={{ courseId: course.id }}
+                      shareUrl={`/courses/${course.slug}`}
+                      triggerLabel="分享完课证书"
+                      trigger={
+                        <span className="studio-press inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--ok)]/40 bg-[var(--ok-soft)] text-[14px] font-semibold text-[var(--ok)] transition-colors hover:border-[var(--ok)]">
+                          <ShareNetwork size={16} weight="bold" /> 分享完课证书
+                        </span>
+                      }
+                    />
+                  )}
+                </>
               ) : (
                 <>
                   {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg" className="cta-glow">免费试学第一章</Button>}

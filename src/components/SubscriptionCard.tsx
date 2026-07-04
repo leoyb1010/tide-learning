@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Star } from "@phosphor-icons/react";
+import { Check, Star, TrendUp, Coins } from "@phosphor-icons/react";
 import { Ripple } from "./motion";
 import { useToast } from "./Toast";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
@@ -18,29 +18,51 @@ export interface PlanData {
   currency: string;
   scope: string;
   highlight: boolean;
+  monthlyGrant: number; // v3.0：该档每月赠送积分（月/连续包月 300、季 500、年 800、单赛道 200）
 }
 
 /** 支付流程分步状态，供 CTA 文案反馈。 */
 type PayStep = "idle" | "creating" | "redirecting";
 
+/** 展示变体：hero=推荐主卡（红 CTA + 描边 + 抬升 + 锚定标签）；plain=普通档。 */
+type CardVariant = "hero" | "plain" | "auto";
+
+export interface Perk {
+  label: string;
+  strong?: boolean;
+}
+
 /**
  * SubscriptionCard, §6.1：连续包月默认高亮，但不得默认勾选额外服务。
- * D1：首月 vs 之后价格对比清晰（大字 + 小字标注）；点击后发起 checkout，
+ * D1：首期 vs 之后价格对比清晰（大字 + 小字标注）；点击后发起 checkout，
  * 跳转 mock 收银台页（payUrl）完成「支付」，不再前端直连 webhook。
  * couponCode 可由 pricing 页透传，进入结算。
- * 视觉：推荐档用 --red-soft 描边 + --inner-hi 材质高光 + .cta-glow 柔光，
- * 与普通档拉开海拔层级；数字用 mono，语义色描述权益。
+ *
+ * v3.0 商业化重做：
+ *   - variant 显式决定视觉层级（不再仅靠 plan.highlight，避免 DB 双 highlight → 双角标 bug）。
+ *     全站三档由 PricingPlans 统一决定唯一 hero；单赛道卡沿用 "auto"（据 highlight 自决）。
+ *   - 角标默认由父层（PricingPlans）绘制并让位；仅 "auto"（单赛道独立使用）时卡内自绘。
+ *   - perks 可由父层按档位递进注入（不再三档复制粘贴）；缺省回落 scope 默认权益。
+ *   - hero 卡展示「省 ¥xxx / ≈¥x.xx/天」锚定标签，联动积分体系（每月赠 N 积分）。
  */
 export function SubscriptionCard({
   plan,
   isLoggedIn,
   redirectTo,
   couponCode,
+  variant = "auto",
+  perks,
+  savingsCents = 0,
+  perDayCents = 0,
 }: {
   plan: PlanData;
   isLoggedIn: boolean;
   redirectTo?: string;
   couponCode?: string;
+  variant?: CardVariant;
+  perks?: Perk[];
+  savingsCents?: number;
+  perDayCents?: number;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -51,7 +73,10 @@ export function SubscriptionCard({
   const periodLabel = PLAN_PERIOD_LABELS[plan.billingPeriod] ?? plan.billingPeriod;
   const perUnit = plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月";
   const loading = step !== "idle";
-  const hot = plan.highlight;
+  // hero 由父层显式指定；auto 时回落 plan.highlight（单赛道独立使用场景）
+  const hot = variant === "hero" || (variant === "auto" && plan.highlight);
+  // 角标只在「独立自决」的 auto 场景由卡内自绘；hero/plain 由父层统一绘制并让位，避免裁切。
+  const drawOwnBadge = variant === "auto" && plan.highlight;
 
   async function subscribe() {
     if (!isLoggedIn) {
@@ -87,42 +112,47 @@ export function SubscriptionCard({
         ? "前往收银台…"
         : "立即订阅";
 
-  const benefits =
-    plan.scope === "all"
+  // 权益：父层注入优先（按档递进）；否则回落 scope 默认（单赛道独立使用）。
+  const benefits: Perk[] =
+    perks ??
+    (plan.scope === "all"
       ? [
           { label: "解锁全部赛道课程", strong: true },
-          { label: "本周上新可学习", strong: false },
-          { label: "无限笔记 + 时间戳锚点", strong: false },
-          { label: "需求投票权", strong: false },
+          { label: `每月赠 ${plan.monthlyGrant} 积分`, strong: true },
+          { label: "本周上新可学习" },
+          { label: "无限笔记 + 时间戳锚点" },
         ]
       : [
           { label: `解锁「${trackLabel(plan.scope)}」全部课程`, strong: true },
-          { label: "该赛道持续更新", strong: false },
-          { label: "无限笔记 + 投票权", strong: false },
-        ];
+          { label: `每月赠 ${plan.monthlyGrant} 积分` },
+          { label: "该赛道持续更新" },
+          { label: "无限笔记 + 投票权" },
+        ]);
 
   return (
     <div
-      className={`hover-sheen studio-lift relative flex h-full flex-col rounded-[16px] p-6 ${
+      className={`hover-sheen studio-lift relative flex h-full w-full flex-col rounded-[16px] p-6 ${
         hot
           ? "border-2 border-[var(--red-soft-border)] bg-[var(--surface)] shadow-[var(--card-hover),var(--inner-hi)] md:-translate-y-1.5 md:scale-[1.02]"
           : "border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]"
       }`}
     >
-      {hot && (
-        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-          <span className="mono cta-glow inline-flex items-center gap-1 rounded-full bg-[var(--red)] px-3 py-1 text-[11px] font-bold tracking-[0.06em] text-white">
+      {/* 仅单赛道独立使用（auto+highlight）时卡内自绘角标；全站三档由父层绘制并让位 */}
+      {drawOwnBadge && (
+        <div className="pointer-events-none absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="mono cta-glow inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-[var(--red)] px-3 py-1 text-[11px] font-bold tracking-[0.06em] text-white">
             <Star size={11} weight="fill" />
             最受欢迎
           </span>
         </div>
       )}
+
       <div className="flex items-baseline justify-between">
         <h3 className="text-[16px] font-bold text-[var(--ink)]">{plan.name}</h3>
         <span className="mono text-[11px] uppercase tracking-[0.08em] text-[var(--ink4)]">{periodLabel}</span>
       </div>
 
-      {/* 价格区：首月大字 + 之后原价小字标注 */}
+      {/* 价格区：首期大字 + 之后原价小字标注 */}
       <div className="mt-4">
         <div className="flex items-baseline gap-1">
           {hasFirstDeal && (
@@ -131,22 +161,56 @@ export function SubscriptionCard({
             </span>
           )}
           <span className="text-[14px] text-[var(--ink3)]">¥</span>
-          <span className={`mono text-[40px] font-extrabold leading-none tracking-tight ${hot ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
+          <span
+            className={`mono text-[40px] font-extrabold leading-none tracking-tight ${
+              hot ? "text-[var(--red)]" : "text-[var(--ink)]"
+            }`}
+          >
             {yuan(shownPrice)}
           </span>
           <span className="text-[13px] text-[var(--ink4)]">/{perUnit}</span>
         </div>
+
+        {/* 锚定标签：年卡「省 ¥xxx（vs 连续包月累计）」+「≈¥x.xx/天」 */}
+        {savingsCents > 0 && (
+          <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+            <span className="mono inline-flex items-center gap-1 rounded-[7px] bg-[var(--ok-soft)] px-2 py-1 text-[11px] font-bold text-[var(--ok)]">
+              <TrendUp size={12} weight="bold" />
+              省 ¥{yuan(savingsCents)}
+            </span>
+            {perDayCents > 0 && (
+              <span className="mono rounded-[7px] bg-[var(--surface2)] px-2 py-1 text-[11px] font-medium text-[var(--ink3)]">
+                ≈ ¥{(perDayCents / 100).toFixed(2)}/天
+              </span>
+            )}
+          </div>
+        )}
+
         {hasFirstDeal ? (
-          <p className="mt-2 text-[12px] text-[var(--ink3)]">
+          <p className="mt-2 text-[12px] leading-[1.6] text-[var(--ink3)]">
             首期 <span className="mono font-semibold text-[var(--red-ink)]">¥{yuan(plan.firstPriceCents!)}</span>，
-            之后每期 <span className="mono text-[var(--ink4)] line-through">¥{yuan(plan.priceCents)}</span>
+            之后每期 <span className="mono text-[var(--ink4)] line-through">¥{yuan(plan.priceCents)}</span> · 随时可取消
           </p>
+        ) : savingsCents > 0 ? (
+          <p className="mt-2 text-[12px] text-[var(--ink3)]">一次付清一整年，随时可取消</p>
         ) : (
           <p className="mt-2 text-[12px] text-[var(--ink3)]">价格透明，无隐藏续费涨价</p>
         )}
       </div>
 
-      <ul className="mt-5 flex-1 space-y-2.5 text-[13px]">
+      {/* 月赠积分强化条：积分是造课/AI 整理货币，视觉上单独拎出 */}
+      <div
+        className={`mono mt-4 flex items-center gap-1.5 rounded-[10px] px-3 py-2 text-[12px] ${
+          hot
+            ? "bg-[var(--red-soft)] text-[var(--red-ink)]"
+            : "bg-[var(--surface2)] text-[var(--ink2)]"
+        }`}
+      >
+        <Coins size={14} weight="fill" className={hot ? "text-[var(--red)]" : "text-[var(--ink3)]"} />
+        每月赠 <span className="font-bold">{plan.monthlyGrant}</span> 积分
+      </div>
+
+      <ul className="mt-4 flex-1 space-y-2.5 text-[13px]">
         {benefits.map((b) => (
           <li key={b.label} className="flex items-start gap-2 leading-[1.5]">
             <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[var(--ok-soft)] text-[var(--ok)]">

@@ -7,33 +7,6 @@ import { useToast } from "./Toast";
  * 设置中心 · 客户端交互岛（STUDIO v2 token）
  * ============================================================ */
 
-/** 分区锚点导航（桌面左栏）——点击平滑滚动到分区。 */
-export function SettingsNav({
-  items,
-}: {
-  items: { id: string; label: string }[];
-}) {
-  const [active, setActive] = useState(items[0]?.id ?? "");
-  return (
-    <nav className="flex flex-col gap-1">
-      {items.map((it) => (
-        <a
-          key={it.id}
-          href={`#${it.id}`}
-          onClick={() => setActive(it.id)}
-          className={`rounded-[10px] px-3 py-2 text-[13px] font-medium transition-colors ${
-            active === it.id
-              ? "bg-[var(--surface-inset)] text-[var(--ink)]"
-              : "text-[var(--ink3)] hover:bg-[var(--surface2)] hover:text-[var(--ink2)]"
-          }`}
-        >
-          {it.label}
-        </a>
-      ))}
-    </nav>
-  );
-}
-
 /** 修改密码表单（第三方登录用户不渲染此表单，由父组件按 authProvider 判断）。 */
 export function ChangePasswordForm() {
   const { toast } = useToast();

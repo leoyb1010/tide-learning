@@ -1,4 +1,4 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
@@ -8,6 +8,7 @@ import { chatJson } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
+import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -26,8 +27,10 @@ const MAX_RAW_TEXT = 50_000; // 粘贴文本上限，避免异常长 payload
  * POST /api/ai/import-source —— 引擎B · 粘贴文本导入。
  *
  * MVP 只做 kind=paste_text：把用户粘贴的原文切成主题章节大纲，落库为一门 private 的
- * user_imported 课程（generating 态）与 N 个空 Lesson（ai_block），逐节由前端调
- * /api/ai/generate-lesson 生成。回填 ImportedSource.generatedCourseId 供追溯。
+ * user_imported 课程（generating 态）与 N 个空 Lesson（ai_block），随后 initGenJob + after()
+ * 注册服务端后台逐节生成（与 generate-course 对齐，兑现「关闭页面也会继续生成」）。
+ * 前端 writeLessons 仍会并发触发，但 generateLessonCore 的 genClaimedAt 原子 claim 兜住并发不双扣。
+ * 回填 ImportedSource.generatedCourseId 供追溯。
  * 越权铁律：ImportedSource / Course 均强制 authorUserId=user.id。
  * 权益：需 canUseLLM。限流：每用户每天 5 次。
  */
@@ -174,6 +177,18 @@ export async function POST(req: NextRequest) {
       eventName: "ai_import_source",
       userId: user.id,
       properties: { sourceId: source.id, courseId: created.course.id, lessons: created.lessons.length, chars: rawText.length },
+    });
+
+    // —— 服务端后台续跑：与 generate-course 对齐，兑现「关闭页面也会继续生成」的承诺 ——
+    // 大纲已落库，逐节生成交给 after() 在响应返回后接管（断点续造，关页/刷新不影响）。
+    // 前端 writeLessons 仍会并发触发逐节生成，但 generateLessonCore 已用 genClaimedAt 原子 claim
+    // 兜住并发，两条流水对同一节只会有一条真正生成并扣费。
+    const courseId = created.course.id;
+    const total = created.lessons.length;
+    await initGenJob(courseId, user.id, total, { category: "user_imported" });
+    after(async () => {
+      // after() 内部绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。
+      await runCourseGenBackground(courseId, user.id);
     });
 
     return ok({

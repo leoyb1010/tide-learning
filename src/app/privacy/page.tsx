@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 // 隐私政策 — 静态合规文案，重点说明埋点数据用途
 export default function PrivacyPage() {
   return (
-    <article className="mx-auto max-w-2xl py-6">
+    <article className="mx-auto max-w-[760px] py-6">
       <Reveal>
         <div className="overline mb-2 text-accent-600">PRIVACY</div>
         <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink-950">隐私政策</h1>

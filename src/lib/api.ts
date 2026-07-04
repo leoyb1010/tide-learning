@@ -1,6 +1,10 @@
 import { NextResponse, NextRequest } from "next/server";
 import { AuthError } from "./session";
 import { RateLimitError } from "./rate-limit";
+import { AppError } from "./errors";
+
+// AppError 抽到零依赖的 errors.ts（供 client 侧安全 import）；此处 re-export 保持既有引用兼容。
+export { AppError };
 
 export function ok(data: unknown, init?: number) {
   return NextResponse.json({ ok: true, data }, { status: init ?? 200 });
@@ -8,16 +12,6 @@ export function ok(data: unknown, init?: number) {
 
 export function fail(message: string, status = 400) {
   return NextResponse.json({ ok: false, error: message }, { status });
-}
-
-/**
- * 业务级错误：message 可安全回传客户端。
- * 与之相对，未包裹的 Error / Prisma 错误一律折叠为通用文案（A1-6：不泄露内部）。
- */
-export class AppError extends Error {
-  constructor(message: string, public status = 400) {
-    super(message);
-  }
 }
 
 /** 统一异常处理（§19 技术验收 + A1-6 安全错误折叠）。 */

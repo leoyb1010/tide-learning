@@ -419,6 +419,14 @@ body::before {
   .cta-glow:hover, .cta-glow:active { transform: none !important; }
 }
 
+/* 周报迷你柱：从底部长起（transform 合成友好），配 .stagger 递延形成「一柱一柱升起」。
+   height 由内联样式给定；这里只做入场生长动画，reduce-motion 下降级为静态直显。 */
+.weekly-bar { transform-origin: bottom; animation: weeklyBarGrow .5s var(--ease-out-expo) both; }
+@keyframes weeklyBarGrow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) {
+  .weekly-bar { animation: none !important; transform: none !important; }
+}
+
 /* 复习卡 3D 翻牌：signature 翻面动效（问题→答案绕 Y 轴翻转）。
    结构：.flip3d(透视容器) > .flip3d-inner(旋转层，.is-flipped 时 rotateY(180deg))
         > .flip3d-face / .flip3d-back(两面，back 预旋 180° 并 backface 隐藏) */
@@ -580,3 +588,108 @@ body::before {
 .tide-md .tide-md-code { font-family: var(--font-mono); background: var(--color-ink-100); padding: 0.05em 0.3em; border-radius: 4px; font-size: 0.9em; }
 .tide-md .tide-md-pre { background: var(--color-ink-950); color: #eef4f6; padding: 0.6em 0.8em; border-radius: 8px; overflow-x: auto; margin: 0.4em 0; font-size: 0.85em; }
 .tide-md .tide-md-pre code { font-family: var(--font-mono); background: none; padding: 0; }
+
+/* 深色渐变卡上的 markdown（scene 块「为什么学」故事开场）——
+   覆盖上面写死的浅色 ink，改用深色带专用白墨阶，保证在 --video-grad 上可读。 */
+.tide-md.tide-md-on-dark .tide-md-h { color: var(--ink-on-dark); }
+.tide-md.tide-md-on-dark .tide-md-p,
+.tide-md.tide-md-on-dark li { color: var(--ink-on-dark-2); }
+.tide-md.tide-md-on-dark .tide-md-quote { color: var(--ink-on-dark-2); border-left-color: var(--red); }
+.tide-md.tide-md-on-dark .tide-md-code { color: var(--ink-on-dark); background: rgba(255,255,255,.12); }
+.tide-md.tide-md-on-dark strong { color: var(--ink-on-dark); }
+.tide-md.tide-md-on-dark a { color: #ff9aa4; }
+
+/* ============================================================
+   SharePanel（v3.0 全局分享面板）辅助动效
+   预览骨架 shimmer 复用现有 @keyframes shimmer；spinner 独立 keyframe。
+   两者均在 reduce-motion 下降级为静态。
+   ============================================================ */
+.share-skeleton {
+  position: relative; overflow: hidden;
+  background: var(--surface-inset);
+}
+.share-skeleton::after {
+  content: ""; position: absolute; inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.08) 50%, transparent);
+  animation: shimmer 1.5s var(--ease-out-expo) infinite;
+}
+@keyframes shareSpin { to { transform: rotate(360deg); } }
+.share-spin { animation: shareSpin .8s linear infinite; transform-origin: center; }
+@media (prefers-reduced-motion: reduce) {
+  .share-skeleton::after { animation: none !important; display: none; }
+  .share-spin { animation: none !important; }
+}
+
+/* ============================================================
+   View Transitions（v3.0 页面转场 · 渐进增强）
+   方案：CSS-only。Next 15.1.3 无稳定 experimental.viewTransition，
+   故不动 next.config，改用原生 @view-transition + document.startViewTransition
+   （由 lib/view-transitions.ts 的软导航拦截驱动）。
+   不支持的浏览器：@view-transition 与 view-transition-name 被静默忽略，
+   startViewTransition 走无过渡回退，功能零影响。
+   ============================================================ */
+
+/* 全站淡入淡出：跨文档导航（硬刷/前进后退）由浏览器直接接管此规则；
+   App Router 软导航则由 startViewTransition 复用同一套 ::view-transition-* 伪元素。 */
+@view-transition {
+  navigation: auto;
+}
+
+/* 根转场：退潮旧页淡出 → 涨潮新页上浮淡入，时长对齐 --dur-normal。 */
+@keyframes vt-fade-out { from { opacity: 1; } to { opacity: 0; } }
+@keyframes vt-fade-in  { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+::view-transition-old(root) {
+  animation: vt-fade-out var(--dur-fast) var(--ease-out-expo) both;
+}
+::view-transition-new(root) {
+  animation: vt-fade-in var(--dur-normal) var(--ease-out-expo) both;
+}
+
+/* 共享元素：课程卡封面 → 课程详情预告封面的连续过渡。
+   两端各标一个 view-transition-name（由 JS 在导航前后配对写入 style），
+   浏览器自动在两页间做位置/尺寸/圆角的形变补间。 */
+::view-transition-group(course-cover) {
+  animation-duration: var(--dur-normal);
+  animation-timing-function: var(--ease-tide);
+}
+::view-transition-old(course-cover),
+::view-transition-new(course-cover) {
+  /* 封面本身不淡出淡入，只做几何形变，保证「同一张封面被托起」的连续感 */
+  mix-blend-mode: normal;
+  height: 100%;
+}
+
+/* reduce-motion：关闭一切转场动画，直接切换（无害降级，仍然可用）。 */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   造课打字机（v3.0 备课剧场 · 节标题逐字浮现 + 光标闪烁）
+   把「等待生成」变成「看 AI 写作」的表演。逐字由 JS 驱动（TypewriterText），
+   此处只提供光标视觉：一道品牌红竖条，写作中稳态闪烁。
+   reduce-motion：JS 直接给出完整文字、光标停止闪烁并隐藏（见 .tw-caret 规则）。
+   ============================================================ */
+@keyframes caretBlink { 0%, 45% { opacity: 1; } 55%, 100% { opacity: 0; } }
+.tw-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  margin-left: 1px;
+  transform: translateY(0.12em);
+  background: var(--red);
+  border-radius: 1px;
+  animation: caretBlink 1s steps(1, end) infinite;
+}
+/* 打字光标：仅在「仍在打字」时显示，打完即隐（由 data-typing 控制）。 */
+.tw-caret[data-typing="false"] { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  /* 降级：无逐字、无闪烁——TypewriterText 直接渲染整句，光标不再出现。 */
+  .tw-caret { animation: none !important; display: none !important; }
+}

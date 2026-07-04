@@ -28,7 +28,9 @@ export async function GET(_req: NextRequest) {
           where: { userId },
           orderBy: { lastPlayedAt: "desc" },
           take: 3,
-          include: {
+          // 收窄：断点续学派生仅需 progressSec + 下方关联字段（lastPlayedAt 仅用于排序，无需取回）
+          select: {
+            progressSec: true,
             course: { select: { slug: true, title: true } },
             lesson: { select: { id: true, title: true, durationSec: true } },
           },
@@ -40,6 +42,8 @@ export async function GET(_req: NextRequest) {
           where: { userId, deletedAt: null },
           orderBy: { createdAt: "desc" },
           take: 3,
+          // 收窄：最近笔记派生仅需这 4 个字段，避免拉回 contentMd 全文 / sourceText / captureUrl 等大字段
+          select: { id: true, title: true, contentMd: true, createdAt: true },
         }),
         prisma.reviewCard.count({ where: { userId, dueAt: { lte: now } } }),
         listUpdates(4),

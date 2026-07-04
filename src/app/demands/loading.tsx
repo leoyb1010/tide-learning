@@ -4,7 +4,7 @@
  */
 export default function Loading() {
   return (
-    <div className="mx-auto max-w-[1000px] space-y-6">
+    <div className="mx-auto max-w-[1120px] space-y-6">
       {/* 深色 Banner 占位 */}
       <section className="relative overflow-hidden rounded-[20px] bg-[var(--video-bg)] p-[26px] shadow-[var(--lift)]">
         <div className="grid grid-cols-1 items-center gap-6 md:grid-cols-[1fr_.8fr]">

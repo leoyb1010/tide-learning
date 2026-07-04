@@ -73,6 +73,7 @@ struct StudentCardView: View {
             }
             Text("学生证")
                 .font(.mono(11, .semibold)).foregroundStyle(.white.opacity(0.7)).tracking(2)
+            shareButton
         }
         .padding(.horizontal, 18)
         .padding(.vertical, 14)
@@ -81,6 +82,28 @@ struct StudentCardView: View {
         // 底缘细高光：抬头带与纸面的材质接缝。
         .overlay(alignment: .bottom) {
             Rectangle().fill(.white.opacity(0.08)).frame(height: 1)
+        }
+    }
+
+    // MARK: 分享（落地页链接 /u/{id}，公开可访问，无鉴权）
+
+    @ViewBuilder private var shareButton: some View {
+        if let url = AppConfig.profileShareURL(userId: userId) {
+            ShareLink(
+                item: url,
+                subject: Text("\(nickname)的有道自习室学生证"),
+                message: Text("我在有道自习室学习 \(level.title)，来看看我的学生证")
+            ) {
+                Image(systemName: "square.and.arrow.up")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 30, height: 30)
+                    .background(.white.opacity(0.12))
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1))
+            }
+            .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
+            .accessibilityLabel("分享学生证")
         }
     }
 

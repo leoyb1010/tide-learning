@@ -6,6 +6,7 @@ import { listUpdates, formatDuration, relativeTime } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { shanghaiDayKey } from "@/lib/week";
+import { getWeeklyReport } from "@/lib/weekly-report";
 import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { StudyDesk, type DeskResume, type DeskNote } from "@/components/StudyDesk";
@@ -29,7 +30,7 @@ async function StudyDeskHome({ user }: { user: User }) {
   const today = shanghaiDayKey();
   const now = new Date();
 
-  const [streak, streakDayToday, resumeRows, myCourseCount, recentNoteRows, dueReviewCount] =
+  const [streak, streakDayToday, resumeRows, myCourseCount, recentNoteRows, dueReviewCount, weeklyReport] =
     await Promise.all([
       // 连续天数
       prisma.streak.findUnique({ where: { userId } }),
@@ -58,6 +59,8 @@ async function StudyDeskHome({ user }: { user: User }) {
       }),
       // 待复习卡数（到期）
       prisma.reviewCard.count({ where: { userId, dueAt: { lte: now } } }),
+      // 本周周报（近两周潮汐日历 + 完课数派生，vs 上周对比）
+      getWeeklyReport(userId),
     ]);
 
   // —— 派生：问候 + 今日状态 ——
@@ -125,6 +128,7 @@ async function StudyDeskHome({ user }: { user: User }) {
         advice={advice}
         onlineCount={onlineCount}
         focusHref={focusHref}
+        weeklyReport={weeklyReport}
       />
       {/* 底部：书架上新（降权展示，复用 listUpdates）*/}
       <ShelfNew />
@@ -168,7 +172,7 @@ async function ShelfNew() {
   if (updates.length === 0) return null;
   return (
     <Reveal>
-      <section className="mx-auto mt-14 max-w-[1060px] md:mt-16">
+      <section className="mx-auto mt-14 max-w-[1120px] md:mt-16">
         <div className="mb-4 flex items-end justify-between">
           <h2 className="text-[16px] font-bold text-[var(--ink)]">书架上新</h2>
           <Link

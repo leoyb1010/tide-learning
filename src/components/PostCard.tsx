@@ -14,6 +14,7 @@ import {
 import { useToast } from "./Toast";
 import { Dialog } from "./Dialog";
 import { track } from "@/lib/analytics-client";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 
 // ---------- 视图类型（与 /api/posts GET 返回对齐）----------
 
@@ -98,7 +99,6 @@ export function PostCard({
   const [comments, setComments] = useState<CommentView[] | null>(null);
   const [loadingComments, setLoadingComments] = useState(false);
   const [commentText, setCommentText] = useState("");
-  const [posting, setPosting] = useState(false);
 
   // 转发弹窗
   const [repostOpen, setRepostOpen] = useState(false);
@@ -165,14 +165,14 @@ export function PostCard({
     if (next && comments === null) void loadComments();
   }
 
-  async function submitComment() {
+  // 评论提交防抖：guard 拦截审核进行中的重复发送（连点/回车连按），posting 驱动按钮 disabled + loading。
+  const { submitting: posting, guard: submitComment } = useSubmitGuard(async () => {
     if (!canInteract) {
       toast("评论为订阅会员权益", { tone: "info" });
       return;
     }
     const text = commentText.trim();
     if (text.length < 1) return;
-    setPosting(true);
     try {
       const res = await fetch(`/api/posts/${post.id}/comment`, {
         method: "POST",
@@ -198,10 +198,8 @@ export function PostCard({
       }
     } catch {
       toast("网络异常，请重试", { tone: "warn" });
-    } finally {
-      setPosting(false);
     }
-  }
+  });
 
   // ---------- 转发 ----------
   async function submitRepost() {
@@ -342,9 +340,14 @@ export function PostCard({
               <button
                 onClick={submitComment}
                 disabled={posting || commentText.trim().length < 1}
+                aria-busy={posting}
                 className="studio-press inline-flex h-[38px] items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3.5 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
               >
-                <PaperPlaneRight size={13} weight="fill" />
+                {posting ? (
+                  <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/60 border-t-transparent" aria-hidden />
+                ) : (
+                  <PaperPlaneRight size={13} weight="fill" />
+                )}
                 {posting ? "审核中" : "发送"}
               </button>
             </div>

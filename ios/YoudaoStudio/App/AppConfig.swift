@@ -11,4 +11,18 @@ enum AppConfig {
 
     /// 当前是否 iOS（用于隐藏微信/支付宝支付，只走 IAP）。
     static let isIOS = true
+
+    /// 落地页基址（分享用）：apiBaseURL 去掉末尾 /api。
+    /// 分享走公开落地页链接（/u/{id} 等）而非需鉴权的图 URL，最可靠。
+    static var shareBaseURL: String {
+        var s = apiBaseURL
+        if s.hasSuffix("/api") { s.removeLast(4) }
+        while s.hasSuffix("/") { s.removeLast() }
+        return s
+    }
+
+    /// 用户个人主页落地页链接（学生证/成长档案分享入口指向此处）。
+    static func profileShareURL(userId: String) -> URL? {
+        URL(string: "\(shareBaseURL)/u/\(userId)")
+    }
 }

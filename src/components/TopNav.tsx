@@ -7,11 +7,13 @@ import {
   House, GraduationCap, Sparkle, NotePencil, CardsThree,
   MagnifyingGlass, Moon, Sun, Play, List, X, CaretDown,
   Storefront, PaperPlaneTilt, Medal, Crown, Gear, SignOut, SquaresFour, Coins,
+  ClockCounterClockwise, CaretRight,
 } from "@phosphor-icons/react/dist/ssr";
 import { useMode } from "./ModeProvider";
 import { NotifBell } from "./NotifBell";
 import { CommandK } from "./CommandK";
 import { YoudaoLogo } from "./YoudaoLogo";
+import { GenNavIndicator } from "./GenNavIndicator";
 import { track } from "@/lib/analytics-client";
 import type { NavUser } from "./nav-types";
 
@@ -48,12 +50,23 @@ export function TopNav({ user }: { user: NavUser | null }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false); // 头像下拉
   const [commOpen, setCommOpen] = useState(false); // 社区下拉
+  const [resumeOpen, setResumeOpen] = useState(false); // v3.0 续学胶囊下拉
   const menuRef = useRef<HTMLDivElement>(null);
   const commRef = useRef<HTMLDivElement>(null);
+  const resumeRef = useRef<HTMLDivElement>(null);
+  // 下拉开合的 ref 镜像：供「挂载一次」的事件委托在回调内即时读取，
+  // 避免把 menuOpen/commOpen 塞进 effect 依赖导致每次开合都重绑监听器。
+  const menuOpenRef = useRef(false);
+  const commOpenRef = useRef(false);
+  const resumeOpenRef = useRef(false);
+  menuOpenRef.current = menuOpen;
+  commOpenRef.current = commOpen;
+  resumeOpenRef.current = resumeOpen;
 
   const loggedIn = Boolean(user);
   const links = primaryLinks(loggedIn);
   const resume = user?.resumeInfo ?? null;
+  const recentCourses = user?.recentCourses ?? [];
 
   const isActive = (href: string) => {
     if (href === "/" || href === "/desk") return pathname === href;
@@ -61,11 +74,16 @@ export function TopNav({ user }: { user: NavUser | null }) {
   };
   const communityActive = pathname.startsWith("/demands") || pathname.startsWith("/market");
 
-  // 点击外部关闭下拉
+  // 点击外部关闭下拉：挂载一次的事件委托（空依赖只绑一次），
+  // 回调内经 ref 判断当前开合，仅在确有下拉打开且点到外部时才 setState。
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
-      if (commRef.current && !commRef.current.contains(e.target as Node)) setCommOpen(false);
+      // 三个下拉都关着：什么都不做，避免每次点击的无谓状态更新。
+      if (!menuOpenRef.current && !commOpenRef.current && !resumeOpenRef.current) return;
+      const target = e.target as Node;
+      if (menuOpenRef.current && menuRef.current && !menuRef.current.contains(target)) setMenuOpen(false);
+      if (commOpenRef.current && commRef.current && !commRef.current.contains(target)) setCommOpen(false);
+      if (resumeOpenRef.current && resumeRef.current && !resumeRef.current.contains(target)) setResumeOpen(false);
     }
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
@@ -76,6 +94,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
     setDrawerOpen(false);
     setMenuOpen(false);
     setCommOpen(false);
+    setResumeOpen(false);
   }, [pathname]);
 
   const openCommandK = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
@@ -142,18 +161,74 @@ export function TopNav({ user }: { user: NavUser | null }) {
 
           {/* 右侧工具区 */}
           <div className="ml-auto flex items-center gap-2">
-            {/* 续学胶囊 */}
+            {/* 生产中指示（有生成中的课时出现，点击回到剧场） */}
+            {loggedIn && <GenNavIndicator />}
+
+            {/* 续学胶囊（v3.0：点击展开最近 5 门课 + 全部学习记录入口） */}
             {resume && (
-              <Link
-                href={`/courses/${resume.courseSlug}/learn/${resume.lessonId}`}
-                onClick={() => track("resume_capsule_click", { course_slug: resume.courseSlug })}
-                className="studio-lift hidden max-w-[200px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-2.5 pr-3 text-[12.5px] shadow-[var(--card)] transition-colors hover:border-[var(--ink4)] lg:flex"
-                title={`继续学习：${resume.courseTitle} · ${resume.lessonTitle}`}
-              >
-                <Play size={12} weight="fill" className="shrink-0 text-[var(--red)]" />
-                <span className="truncate font-medium text-[var(--ink)]">{resume.courseTitle}</span>
-                <span className="mono shrink-0 text-[var(--ink3)]">{resume.pct}%</span>
-              </Link>
+              <div ref={resumeRef} className="relative hidden lg:block">
+                <button
+                  type="button"
+                  onClick={() => setResumeOpen((o) => !o)}
+                  aria-expanded={resumeOpen}
+                  aria-haspopup="menu"
+                  className="studio-lift flex max-w-[220px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-2.5 pr-2.5 text-[12.5px] shadow-[var(--card)] transition-colors hover:border-[var(--ink4)]"
+                  title={`继续学习：${resume.courseTitle} · ${resume.lessonTitle}`}
+                >
+                  <Play size={12} weight="fill" className="shrink-0 text-[var(--red)]" />
+                  <span className="truncate font-medium text-[var(--ink)]">{resume.courseTitle}</span>
+                  <span className="mono shrink-0 text-[var(--ink3)]">{resume.pct}%</span>
+                  <CaretDown size={11} weight="bold" className={`shrink-0 text-[var(--ink4)] transition-transform ${resumeOpen ? "rotate-180" : ""}`} />
+                </button>
+                {resumeOpen && (
+                  <div
+                    role="menu"
+                    className="studio-rise absolute right-0 top-[calc(100%+8px)] w-[280px] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--lift)]"
+                  >
+                    <div className="border-b border-[var(--border)] px-3.5 py-2.5">
+                      <span className="mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink4)]">继续学习</span>
+                    </div>
+                    <div className="p-1.5">
+                      {recentCourses.map((c) => (
+                        <Link
+                          key={c.courseSlug}
+                          href={`/courses/${c.courseSlug}/learn/${c.lessonId}`}
+                          onClick={() => track("resume_capsule_click", { course_slug: c.courseSlug })}
+                          className="group flex items-center gap-2.5 rounded-[10px] px-2.5 py-2 transition-colors hover:bg-[var(--surface2)]"
+                        >
+                          {/* 迷你环形进度：以百分比染红弧，中心显示% */}
+                          <span
+                            className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full"
+                            style={{ background: `conic-gradient(var(--red) ${c.coursePct * 3.6}deg, var(--surface-inset) 0deg)` }}
+                            aria-hidden
+                          >
+                            <span className="mono grid h-7 w-7 place-items-center rounded-full bg-[var(--surface)] text-[9px] font-bold text-[var(--ink2)]">
+                              {c.coursePct}
+                            </span>
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13px] font-semibold text-[var(--ink)] group-hover:text-[var(--red)]">
+                              {c.courseTitle}
+                            </span>
+                            <span className="mono text-[10.5px] text-[var(--ink4)]">进度 {c.coursePct}%</span>
+                          </span>
+                          <Play size={12} weight="fill" className="shrink-0 text-[var(--ink4)] group-hover:text-[var(--red)]" />
+                        </Link>
+                      ))}
+                    </div>
+                    <Link
+                      href="/me/history"
+                      className="flex items-center justify-between border-t border-[var(--border)] px-3.5 py-2.5 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
+                    >
+                      <span className="flex items-center gap-2">
+                        <ClockCounterClockwise size={15} weight="fill" className="text-[var(--ink3)]" />
+                        全部学习记录
+                      </span>
+                      <CaretRight size={12} weight="bold" className="text-[var(--ink4)]" />
+                    </Link>
+                  </div>
+                )}
+              </div>
             )}
 
             {/* 搜索 */}
@@ -205,6 +280,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                     </div>
                     <div className="p-1.5">
                       <MenuItem href="/me" Icon={Medal} label="成长档案" />
+                      <MenuItem href="/me/history" Icon={ClockCounterClockwise} label="学习记录" />
                       <MenuItem href="/me/courses" Icon={CardsThree} label="我的课" />
                       <MenuItem href="/pricing" Icon={Crown} label="订阅方案" />
                       <MenuItem href="/me/settings" Icon={Gear} label="设置" />

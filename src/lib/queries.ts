@@ -2,6 +2,9 @@ import { prisma } from "./db";
 import { resolveEntitlement, canAccessLesson, type EntitlementSnapshot } from "./entitlement";
 import { rankDemands } from "./demand-score";
 import { TRACK_MAP, trackLabel } from "./tracks";
+// relativeTime / formatDuration 是零依赖纯日期函数，已迁至 @/lib/format（无 "use client"、
+// 不 import prisma）。此处 re-export 以兼容既有 server 侧引用（desk/me/demands 等）。
+import { relativeTime, formatDuration } from "./format";
 
 // 赛道标签（融合有道内容板块）。保留 CATEGORY_LABELS 名以兼容旧引用。
 export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
@@ -9,22 +12,8 @@ export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
 );
 export const LEVEL_LABELS: Record<string, string> = { L1: "L1 入门", L2: "L2 进阶", L3: "L3 高阶" };
 
-export function relativeTime(date: Date): string {
-  const diff = Date.now() - date.getTime();
-  const day = Math.floor(diff / 864e5);
-  if (day <= 0) return "今天";
-  if (day === 1) return "昨天";
-  if (day < 30) return `${day} 天前`;
-  if (day < 365) return `${Math.floor(day / 30)} 个月前`;
-  return `${Math.floor(day / 365)} 年前`;
-}
-
-export function formatDuration(sec: number): string {
-  const h = Math.floor(sec / 3600);
-  const m = Math.round((sec % 3600) / 60);
-  if (h > 0) return `${h} 小时 ${m} 分钟`;
-  return `${m} 分钟`;
-}
+// 兼容既有 server 侧 `import { relativeTime, formatDuration } from "@/lib/queries"`。
+export { relativeTime, formatDuration };
 
 /** 课程卡数据（§6.2 字段）。 */
 export async function listCourses(opts?: { category?: string; sort?: string; q?: string | string[] }) {

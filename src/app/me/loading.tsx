@@ -4,7 +4,7 @@
  */
 export default function Loading() {
   return (
-    <div className="mx-auto flex max-w-[1040px] flex-col gap-5">
+    <div className="mx-auto flex max-w-[1120px] flex-col gap-5">
       {/* 用户信息卡 */}
       <section className="flex items-center gap-4 rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
         <div className="skeleton h-14 w-14 shrink-0 rounded-full" />
