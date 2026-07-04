@@ -142,6 +142,9 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       articleMd: access ? lesson.articleMd : null,
       // ai_block 类型的结构化课件（付费门控同 articleMd）
       blocksJson: access ? lesson.blocksJson : null,
+      // v3.1 视频课件生成态：ready + videoAssetId 时学习页出现「视频」Tab，可播放（复用受控流）。
+      // 生成中/pending 显示占位；null 表示未生成视频课件。门控随 access（未订阅付费节拿不到）。
+      videoGenStatus: access ? lesson.videoGenStatus : null,
       subtitles: access ? lesson.subtitles.map((s) => ({ startSec: s.startSec, endSec: s.endSec, text: s.text })) : [],
     },
     outline: siblings.map((l) => ({

@@ -151,6 +151,11 @@ model Lesson {
   articleMd     String?
   blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）
   genClaimedAt  DateTime? // 造课并发所有权占位：generateLessonCore 生成前原子 claim，防两条流水双写双扣（见 src/lib/course-gen.ts）
+  // —— 视频课件生成（v3.1）：把块课件转成带旁白/字幕的视频。留接口，模型后补 ——
+  // null=未发起 / pending=已排队 / generating=生成中 / ready=已就绪(videoAssetId 指向占位或真实资源) / failed=失败可重试
+  videoGenStatus  String? // 视频课件生成态（复用 videoAssetId 承载产物引用）
+  videoScriptJson String? // 由 blocks 组织出的视频脚本 {version, scenes:[{narration, caption, ...}]}（生成前落库，供真实模型消费）
+  videoGenClaimedAt DateTime? // 视频生成并发所有权占位：generateLessonVideo 生成前原子 claim，防两条流水双写（对齐 genClaimedAt 语义）
   durationSec   Int       @default(0)
   isFree        Boolean   @default(false)
   liveStartAt   DateTime? // 直播小班课开播时间（融合：有道口语小班课）

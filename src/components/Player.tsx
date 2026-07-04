@@ -13,11 +13,12 @@ import { useMode } from "./ModeProvider";
 import {
   Play, Pause, LockSimple, CaretLeft, CaretRight, Check,
   Camera, NotePencil, ArrowsOut, ArrowsIn, Moon, Sun, CornersOut, Sparkle,
-  Timer, X, Target, Coffee,
+  Timer, X, Target, Coffee, Cards, ListDashes,
 } from "@phosphor-icons/react";
 import { mmss } from "@/lib/format";
 import { track } from "@/lib/analytics-client";
 import { BlockRenderer } from "./BlockRenderer";
+import { BlockSlideshow } from "./BlockSlideshow";
 import { CompanionPanel } from "./CompanionPanel";
 import { validateBlocks } from "@/lib/blocks";
 
@@ -29,6 +30,7 @@ interface LessonData {
   liveStartAt?: string | null; liveSeatLimit?: number | null;
   subtitles?: SubtitleCue[];
   blocksJson?: string | null; // ai_block 类型：结构化块课件 JSON 字符串
+  videoGenStatus?: string | null; // v3.1 视频课件生成态：null / pending / generating / ready / failed
 }
 
 /**
@@ -56,6 +58,9 @@ export function Player({
   const [sheetOpen, setSheetOpen] = useState(false);
   const [focus, setFocus] = useState(false);
   const [seekPulse, setSeekPulse] = useState<number | null>(null);
+  // 图文课件的排布方式：翻页（黑板式单屏，默认，像 PPT）/ 滚动（长列表叙事）。
+  // 与下方 blockView（图文 vs 视频课件切换）正交：blockView 选「看什么」，blockLayout 选图文「怎么排」。
+  const [blockLayout, setBlockLayout] = useState<"slides" | "scroll">("slides");
 
   // 下一节卡：学完一节后弹出，3 秒倒计时自动跳（可手动/可关）
   const [showNextCard, setShowNextCard] = useState(false);
@@ -329,9 +334,43 @@ export function Player({
   const progress = lesson.durationSec > 0 ? time / lesson.durationSec : 0;
 
   // ai_block 块课件：解析并校验块数组（validateBlocks 永不抛错，脏数据归空数组）。
-  // 块课无视频时间轴，不做截帧 / 进度条；MVP 笔记走普通笔记（anchorRef 可空），先保证能记能显示。
+  // 块课无视频时间轴，不做截帧 / 时间进度条；MVP 笔记走普通笔记（anchorRef 可空），先保证能记能显示。
   const isBlockLesson = lesson.contentType === "ai_block";
   const blocks = isBlockLesson ? validateBlocks(safeParseJson(lesson.blocksJson)) : [];
+
+  // v3.1 视频课件：块课可另有一版「视频课件」。ready 时给块课加「图文 / 视频」切换 Tab；
+  // 生成中(pending/generating)显示占位；null 表示未生成视频课件。仅块课 + 有权益时相关。
+  const videoStatus = lesson.videoGenStatus ?? null;
+  const hasVideoCourseware = isBlockLesson && access && videoStatus === "ready" && !!lesson.videoUrl;
+  const videoGenerating = isBlockLesson && access && (videoStatus === "pending" || videoStatus === "generating");
+  // 视图切换：块课默认看图文；有视频课件时可切到视频。非块课不涉及此切换。
+  const [blockView, setBlockView] = useState<"blocks" | "video">("blocks");
+  const showVideoView = isBlockLesson && blockView === "video" && (hasVideoCourseware || videoGenerating);
+
+  // 翻页课件进度上报：块课无时间轴，用「当前页 / 总页」映射为进度。
+  // progressSec 借道存「已读到第几页」(1-indexed)；completed 在末页触发，落库为完课。
+  // 复用现有 /api/progress，不改 schema。翻页去抖：仅在页码变化时上报。
+  const blockPageRef = useRef(0);
+  const reportBlockPage = useCallback((pageIndex: number, totalPages: number) => {
+    if (!isLoggedIn || !access) return;
+    const page = pageIndex + 1; // 1-indexed
+    if (page === blockPageRef.current) return; // 同页重复上报去抖
+    blockPageRef.current = page;
+    const completed = page >= totalPages && totalPages > 0;
+    fetch("/api/progress", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lessonId: lesson.id, progressSec: page, completed }),
+    }).catch(() => {});
+    track("lesson_slide_advance", { lesson_id: lesson.id, page, total: totalPages });
+  }, [isLoggedIn, access, lesson.id]);
+
+  // 翻页课件完课：抵达末页触发下一节卡（若有下一节且未手动关过）。与视频完课逻辑对齐但走页序而非时间轴。
+  const onBlockComplete = useCallback(() => {
+    if (!nextHref || nextDismissedRef.current) return;
+    setNextCountdown(3);
+    setShowNextCard(true);
+  }, [nextHref]);
 
   const CaptureBar = access && (
     <div className="flex items-center gap-1.5">
@@ -673,9 +712,91 @@ export function Player({
           {/* 左：视频/图文 */}
           <div className={focus ? "mx-auto w-full max-w-4xl" : ""}>
             {isBlockLesson ? (
-              // 块课件：左侧内容区渲染块，而非视频。无视频时间轴 → 无截帧 / 无播放控制条。
-              <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-6">
-                <BlockRenderer blocks={blocks} courseId={courseId} />
+              // 块课件：左侧内容区渲染块。v3.1 若有视频课件（ready/生成中），先给出「图文 / 视频」切换 Tab。
+              <div>
+                {(hasVideoCourseware || videoGenerating) && (
+                  <div className="mb-3 inline-flex gap-1 rounded-full border border-[var(--border)] bg-[var(--surface2)] p-1">
+                    {[
+                      { key: "blocks" as const, label: "图文课件", Icon: NotePencil },
+                      { key: "video" as const, label: "视频课件", Icon: Play },
+                    ].map((t) => {
+                      const on = blockView === t.key;
+                      return (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => setBlockView(t.key)}
+                          className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors duration-150 ${
+                            on ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"
+                          }`}
+                        >
+                          <t.Icon size={15} weight={on ? "fill" : "regular"} className={t.key === "video" ? "text-[var(--red)]" : undefined} />
+                          {t.label}
+                          {t.key === "video" && videoGenerating && (
+                            <span className="mono rounded-full bg-[var(--red-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--red)]">生成中</span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {showVideoView ? (
+                  videoGenerating ? (
+                    <VideoGeneratingPlaceholder />
+                  ) : (
+                    VideoArea
+                  )
+                ) : (
+                  // 图文课件：翻页（黑板式单屏，默认）/ 滚动（长列表）二选一。
+                  <div>
+                    {/* 排布切换段控件：翻页 / 滚动 */}
+                    <div className="mb-3 flex items-center justify-end">
+                      <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
+                        <button
+                          type="button"
+                          onClick={() => setBlockLayout("slides")}
+                          aria-pressed={blockLayout === "slides"}
+                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] px-3.5 transition-colors ${
+                            blockLayout === "slides"
+                              ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
+                              : "text-[var(--ink3)] hover:text-[var(--ink)]"
+                          }`}
+                        >
+                          <Cards size={15} weight={blockLayout === "slides" ? "fill" : "regular"} className="text-[var(--red)]" />
+                          翻页
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBlockLayout("scroll")}
+                          aria-pressed={blockLayout === "scroll"}
+                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] px-3.5 transition-colors ${
+                            blockLayout === "scroll"
+                              ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
+                              : "text-[var(--ink3)] hover:text-[var(--ink)]"
+                          }`}
+                        >
+                          <ListDashes size={15} />
+                          滚动
+                        </button>
+                      </div>
+                    </div>
+
+                    {blockLayout === "slides" ? (
+                      // 翻页课件：黑板式单屏，左右翻页 + 页序进度上报 + 末页完课
+                      <BlockSlideshow
+                        blocks={blocks}
+                        courseId={courseId}
+                        onSlideChange={reportBlockPage}
+                        onComplete={onBlockComplete}
+                      />
+                    ) : (
+                      // 滚动模式：保留原长列表叙事（Reveal 交错浮现）
+                      <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-6">
+                        <BlockRenderer blocks={blocks} courseId={courseId} />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ) : lesson.contentType === "live" ? (
               <LiveBanner lesson={lesson} />
@@ -769,6 +890,30 @@ export function Player({
 function safeParseJson(raw: string | null | undefined): unknown {
   if (!raw) return null;
   try { return JSON.parse(raw); } catch { return null; }
+}
+
+/**
+ * 视频课件生成中占位（v3.1）：块课已切到「视频」Tab 但视频尚未就绪时展示。
+ * 深色展示区材质对齐 VideoArea；转圈用 motion-safe，reduce-motion 下 CSS 自动不转（不眩晕）。
+ */
+function VideoGeneratingPlaceholder() {
+  return (
+    <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] shadow-[var(--card)]" style={{ background: "var(--video-bg)" }}>
+      <div className="relative flex aspect-video items-center justify-center" style={{ background: "var(--ai-grad)" }}>
+        <div className="absolute inset-0 opacity-[0.06]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.7) 1px, transparent 0)", backgroundSize: "22px 22px" }} aria-hidden />
+        <div className="relative flex flex-col items-center gap-3 text-center text-white">
+          <span className="grid h-14 w-14 place-items-center rounded-full bg-white/10 ring-1 ring-white/15">
+            {/* motion-safe 才转；reduce-motion 下静止不眩晕 */}
+            <span className="h-7 w-7 rounded-full border-2 border-white/30 border-t-white motion-safe:animate-spin" aria-hidden />
+          </span>
+          <div>
+            <p className="text-[15px] font-semibold text-white">视频课件生成中</p>
+            <p className="mt-1 text-[12.5px] text-white/60">AI 正在把这节课件转成带旁白的视频，稍后回来查看</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /** 模拟视频截帧兜底：品牌色 + 时间戳 canvas 图。 */

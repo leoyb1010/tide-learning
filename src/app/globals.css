@@ -494,6 +494,49 @@ body::before {
 }
 
 /* ============================================================
+   翻页课件 · 黑板式单屏（BlockSlideshow）
+   一次一页居中呈现，像 PPT/Keynote 翻幕。此处只放「黑板底纹」与页序转场兜底，
+   翻页滑动/淡入由 framer-motion 驱动；reduce-motion 时组件禁用位移动效。
+   ============================================================ */
+
+/* 黑板底：深色渐变 + 细粉笔颗粒噪点，避免死黑平面。用于 scene/summary 等重场景页。 */
+.slide-board {
+  position: relative;
+  background: var(--video-grad);
+  isolation: isolate;
+}
+.slide-board::before {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  /* 顶部聚光柔晕，像黑板上方的灯 */
+  background: radial-gradient(70% 80% at 50% -6%, rgba(255,255,255,.10), transparent 62%);
+  z-index: -1;
+}
+.slide-board::after {
+  content: "";
+  position: absolute; inset: 0;
+  pointer-events: none;
+  /* 极淡颗粒，粉笔灰质感 */
+  background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.5) 1px, transparent 0);
+  background-size: 24px 24px;
+  opacity: .05;
+  z-index: -1;
+}
+
+/* 纸面页：常规讲述页的暖白底 + 内高光，与黑板页形成节奏对比。 */
+.slide-paper {
+  background: var(--surface);
+  box-shadow: var(--card), var(--inner-hi);
+}
+
+/* 页序进度条内芯：翻页时宽度过渡；reduce-motion 即时跳。 */
+.slide-progress-fill { transition: width .4s var(--ease-out-expo); }
+@media (prefers-reduced-motion: reduce) {
+  .slide-progress-fill { transition: none; }
+}
+
+/* ============================================================
    课程库 书架视图（shelf）——「藏书」把玩感
    每门课=竖立书脊；hover 抽出前倾（rotateY/translateZ）；进场逐本落位。
    3D 透视容器 .shelf-row 给子书本共享景深；书本本身走合成友好的 transform。

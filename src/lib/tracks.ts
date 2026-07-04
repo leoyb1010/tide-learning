@@ -48,6 +48,27 @@ export function trackGradientVar(category: string): string {
   }
 }
 
+/**
+ * 视觉映射：赛道 category 到封面主题图标 key（纯字符串，不 import 图标本体，
+ * 避免把图标组件耦合进 lib）。组件层按此 key 从图标表取对应 Phosphor 图标。
+ * 与 trackGradientVar 同源，共同构成「课程封面 = 赛道渐变 + 主题图标」的视觉语言。
+ */
+export function trackIconKey(category: string): string {
+  switch (category) {
+    case "ai_skill":
+      return "ai";
+    case "english_oral":
+    case "english_foundation":
+      return "english";
+    case "silver_english":
+      return "elder";
+    case "life":
+      return "life";
+    default:
+      return "default";
+  }
+}
+
 // 未来赛道（仅展示"即将上线"，对应有道跨赛道扩张规划）
 export const FUTURE_TRACKS = [
   { key: "vocational", label: "职业教育" },

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium, Play } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { CoverBg, coverSrc } from "@/components/ui";
@@ -42,7 +42,7 @@ export default async function MyCoursesPage() {
       // 全部章节数 + 首节（作为进入学习入口）
       lessons: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, blocksJson: true },
+        select: { id: true, blocksJson: true, videoGenStatus: true },
       },
     },
   });
@@ -92,6 +92,10 @@ export default async function MyCoursesPage() {
     const notReady = isGenerating || isFailed;
     const done = completedMap.get(c.id) ?? 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    // v3.1 视频课件进度：ready/生成中(pending|generating) 的节数（用户勾选生成视频课件后可见）。
+    const videoReady = c.lessons.filter((l) => l.videoGenStatus === "ready").length;
+    const videoInFlight = c.lessons.filter((l) => l.videoGenStatus === "pending" || l.videoGenStatus === "generating").length;
+    const hasVideoGen = videoReady > 0 || videoInFlight > 0;
     return {
       ...c,
       total,
@@ -102,6 +106,9 @@ export default async function MyCoursesPage() {
       notReady,
       done,
       pct,
+      videoReady,
+      videoInFlight,
+      hasVideoGen,
       firstLessonId: c.lessons[0]?.id ?? null,
     };
   });
@@ -195,6 +202,23 @@ export default async function MyCoursesPage() {
                       {c.title}
                     </h3>
                     {c.subtitle && <p className="mt-1 line-clamp-1 text-[13px] text-[var(--ink2)]">{c.subtitle}</p>}
+
+                    {/* v3.1 视频课件进度：生成中显示「视频生成中 N/总」，全部就绪显示「视频课件 · N 节」 */}
+                    {c.hasVideoGen && (
+                      <div className="mt-2">
+                        {c.videoInFlight > 0 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2 py-0.5 text-[11px] font-semibold text-[var(--red)]">
+                            <CircleNotch size={11} weight="bold" className="animate-spin" />
+                            视频生成中 {c.videoReady}/{c.videoReady + c.videoInFlight}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface-inset)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink2)]">
+                            <Play size={11} weight="fill" className="text-[var(--red)]" />
+                            视频课件 · {c.videoReady} 节
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {/* 学习进度 */}
                     <div className="pt-3.5">

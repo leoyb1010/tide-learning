@@ -17,6 +17,7 @@ import {
   Waves,
   Star,
   ArrowUUpLeft,
+  Play,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
 import { useToast } from "@/components/Toast";
@@ -96,6 +97,7 @@ interface DoneSummary {
   quizzes: number; // 测验数（≈ 每节 1 测）
   cards: number; // 要点卡数（≈ 每节 1 张）
   chars?: number; // 升维报告：原文字数
+  videos?: number; // v3.1：已发起/就绪的视频课件节数（勾选「生成视频课件」时）
 }
 
 function delay(ms: number) {
@@ -135,6 +137,8 @@ export function CreateStudio({
   // —— 生成课状态 ——
   const [prompt, setPrompt] = useState("");
   const [category, setCategory] = useState<string>("");
+  // v3.1：造课时是否同时生成视频课件（选中 → 逐节写完块课件后，对每节发起视频生成）。
+  const [genVideo, setGenVideo] = useState(false);
 
   // —— 导入资料状态 ——
   const [importTitle, setImportTitle] = useState("");
@@ -196,8 +200,9 @@ export function CreateStudio({
         const lj = await r.json().catch(() => null);
         if (r.status === 402) {
           gate();
-          // 权益中途失效：把剩余节标 failed 后结束
+          // 权益中途失效：把剩余节标 failed 后结束（同步写回入参 list，供 requestVideos 判定）
           setLessons((prev) => prev.map((l, idx) => (idx >= i ? { ...l, state: "failed" } : l)));
+          for (let k = i; k < list.length; k++) list[k].state = "failed";
           return succeeded;
         }
         okThis = r.ok && !!lj?.ok;
@@ -205,11 +210,42 @@ export function CreateStudio({
         okThis = false;
       }
       if (okThis) succeeded++;
+      // 写回入参 list 的本节状态，让 requestVideos 能据此跳过 failed 节（无块课件无法生成视频）
+      list[i].state = okThis ? "done" : "failed";
       setLessons((prev) => prev.map((l, idx) => (idx === i ? { ...l, state: okThis ? "done" : "failed" } : l)));
       // 轻微节奏感，让逐条✓可被看见（不影响真实请求）
       await delay(80);
     }
     return succeeded;
+  }
+
+  /**
+   * v3.1：对已写好块课件的各节发起视频课件生成（best-effort，框架 + mock）。
+   * 逐节 POST /api/ai/generate-video；单节失败不阻断，其余照常。仅在用户勾选「生成视频课件」时调用。
+   * 权益中途失效（402）则停止并提示。返回成功发起/就绪的节数（仅统计用）。
+   */
+  async function requestVideos(list: OutlineLesson[]): Promise<number> {
+    let ok = 0;
+    for (const l of list) {
+      // 只对写作成功的节发起（failed 节尚无块课件，视频生成会 409）
+      if (l.state === "failed") continue;
+      try {
+        const r = await fetch("/api/ai/generate-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lessonId: l.id }),
+        });
+        if (r.status === 402) {
+          gate();
+          return ok;
+        }
+        const j = await r.json().catch(() => null);
+        if (r.ok && j?.ok) ok += 1;
+      } catch {
+        /* 单节视频发起失败不阻断整体 */
+      }
+    }
+    return ok;
   }
 
   /** 单节重试（完成页对 failed 节点重新生成） */
@@ -289,6 +325,11 @@ export function CreateStudio({
       setPhase("lessons");
       const succeeded = await writeLessons(initial);
 
+      // v3.1：勾选「生成视频课件」→ 对已写好块课件的各节发起视频生成（框架 + mock）。
+      // best-effort：块课件已就绪即可学习，视频异步就绪（学习页出现「视频」Tab）。
+      let videos = 0;
+      if (genVideo) videos = await requestVideos(initial);
+
       // 完成页
       setSummary({
         slug: data.slug,
@@ -297,10 +338,13 @@ export function CreateStudio({
         succeeded,
         quizzes: succeeded,
         cards: succeeded,
+        videos: genVideo ? videos : undefined,
       });
       setPhase("done");
       if (succeeded < outline.length) {
         toast(`已生成 ${succeeded}/${outline.length} 节，个别章节可在完成页重试`, { tone: "warn" });
+      } else if (genVideo) {
+        toast(videos > 0 ? "课程已生成，视频课件正在就绪" : "课程已生成，视频课件稍后可在学习页查看", { tone: "success" });
       } else {
         toast("课程已生成，开始学习吧", { tone: "success" });
       }
@@ -560,6 +604,44 @@ export function CreateStudio({
                   })}
                 </div>
               </div>
+
+              {/* v3.1：生成视频课件开关。选中后逐节写完块课件，再把课件转成带旁白的视频课件。 */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={genVideo}
+                onClick={() => setGenVideo((v) => !v)}
+                className={`studio-press flex min-h-[44px] items-center gap-3 rounded-[14px] border px-4 py-3 text-left transition-colors duration-150 ${
+                  genVideo
+                    ? "border-[var(--red-soft-border)] bg-[var(--red-soft)]"
+                    : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)]"
+                }`}
+              >
+                <span
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] ${
+                    genVideo ? "bg-[var(--red)] text-white" : "bg-[var(--surface)] text-[var(--ink3)]"
+                  }`}
+                >
+                  <Play size={16} weight="fill" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-semibold text-[var(--ink)]">同时生成视频课件</span>
+                  <span className="block text-[12px] leading-snug text-[var(--ink3)]">把每节课件转成带旁白讲解的视频，学习页可切换观看</span>
+                </span>
+                {/* 开关轨道：reduce-motion 下无位移动画也能看清开合（颜色 + 位置双编码） */}
+                <span
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+                    genVideo ? "bg-[var(--red)]" : "bg-[var(--border2)]"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-[var(--card)] transition-transform duration-200 ${
+                      genVideo ? "translate-x-[22px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
 
               <button
                 type="button"
@@ -915,6 +997,11 @@ function DonePanel({
         { Icon: Cards, num: summary.cards, label: "张要点卡" },
         { Icon: Sparkle, check: true, label: "AI 伴侣" },
       ];
+
+  // v3.1：勾选了生成视频课件 → 追加一格「视频课件」，展示已发起就绪的节数。
+  if (typeof summary.videos === "number") {
+    facts.push({ Icon: Play, num: summary.videos, label: "节视频课件" });
+  }
 
   return (
     <div className="studio-poweron studio-sweep relative mt-5 w-full overflow-hidden rounded-[18px] border border-[var(--red-soft-border)] bg-[var(--surface)] shadow-[var(--lift)]">

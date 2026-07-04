@@ -112,8 +112,11 @@ function Reveal({ children, index }: { children: React.ReactNode; index: number 
   );
 }
 
-/** 按 type 分派。未知类型返回前向兼容占位（新块类型旧客户端遇到时跳过，不中断整页）。 */
-function BlockSwitch({ block, courseId }: { block: Block & { id: string }; courseId?: string }) {
+/**
+ * 按 type 分派单块到其精致子组件。未知类型返回前向兼容占位（新块类型旧客户端遇到时跳过，不中断整页）。
+ * 导出供翻页课件（BlockSlideshow）复用同一套单块渲染，滚动模式与翻页模式共享像素级一致的块外观。
+ */
+export function BlockSwitch({ block, courseId }: { block: Block & { id: string }; courseId?: string }) {
   switch (block.type) {
     // —— 基础 5 种（升级材质/间距）——
     case "concept":
