@@ -10,11 +10,12 @@ export const metadata = { title: "课程集市" };
 export const dynamic = "force-dynamic";
 
 /**
- * /market —— 课程集市（server）。
+ * /market, 课程集市（server）。
  * 展示 sharedStatus="shared" 的用户造课，供他人申请学习。
  * 每张卡：封面渐变 + 标题 + 大纲前 3 节 + 作者 + 申请数 + 「申请学习」按钮（client）。
  * 越权/隐私：只查已上架课；登录用户预取自己对每门课的申请态（none/pending/approved/rejected），
  *   按钮据此渲染；自己的课不出「申请」按钮（显示作者本人徽标）。未登录：卡片照常展示，底部引导登录。
+ * 视觉：卡片 hover-sheen 分享质感 + 材质高光；网格 stagger 递延进场；语义色区分状态。
  */
 export default async function MarketPage() {
   const user = await getCurrentUser();
@@ -101,11 +102,11 @@ export default async function MarketPage() {
 
       {/* 未登录引导 */}
       {!user && (
-        <div className="flex flex-col items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-5 py-4 sm:flex-row">
+        <div className="flex flex-col items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-5 py-4 shadow-[var(--inner-hi)] sm:flex-row">
           <p className="text-[13.5px] text-[var(--ink2)]">登录后可申请学习集市里的课程。</p>
           <Link
             href="/login?next=/market"
-            className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105"
+            className="cta-glow studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105"
           >
             <SignIn size={15} weight="bold" />
             去登录
@@ -114,27 +115,27 @@ export default async function MarketPage() {
       )}
 
       {courses.length === 0 ? (
-        // —— 空态 ——
-        <div className="flex flex-col items-center justify-center gap-4 rounded-[18px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-16 text-center">
+        // 空态：图形徽章 + 引导 + 发光 CTA
+        <div className="flex flex-col items-center justify-center gap-4 rounded-[16px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-16 text-center shadow-[var(--inner-hi)]">
           <span className="grid h-14 w-14 place-items-center rounded-[16px] bg-[var(--red-soft)]">
             <Sparkle size={26} weight="fill" className="text-[var(--red)]" />
           </span>
           <div>
             <p className="text-[16px] font-bold text-[var(--ink)]">集市还很安静</p>
-            <p className="mt-1 text-[13.5px] text-[var(--ink2)]">还没有课程被分享到社区。去造一门课，第一个把它分享出来。</p>
+            <p className="mt-1 text-[13.5px] leading-[1.6] text-[var(--ink2)]">还没有课程被分享到社区。去造一门课，第一个把它分享出来。</p>
           </div>
           <Link
             href="/create"
-            className="studio-press inline-flex items-center gap-2 rounded-[12px] bg-[var(--red)] px-5 py-3 text-[14px] font-semibold text-white transition-all hover:brightness-105"
+            className="cta-glow studio-press inline-flex items-center gap-2 rounded-[12px] bg-[var(--red)] px-5 py-3 text-[14px] font-bold text-white transition-all hover:brightness-105"
           >
             <Sparkle size={16} weight="fill" />
             去造一门课
           </Link>
         </div>
       ) : (
-        // —— 卡片网格 ——
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {courses.map((c) => {
+        // 卡片网格：stagger 递延进场
+        <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {courses.map((c, idx) => {
             const author = c.authorUserId ? authorMap.get(c.authorUserId) ?? "匿名同学" : "匿名同学";
             const isMine = Boolean(user && c.authorUserId === user.id);
             const reqCount = reqCountMap.get(c.id) ?? 0;
@@ -145,10 +146,11 @@ export default async function MarketPage() {
             return (
               <div
                 key={c.id}
-                className="studio-lift group flex flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)] hover:border-[var(--border2)]"
+                style={{ "--i": idx } as React.CSSProperties}
+                className="hover-sheen studio-lift group flex flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)] hover:border-[var(--border2)]"
               >
                 <CoverBg color={c.coverColor} imageSrc={coverSrc(c.slug)} alt={c.title} className="aspect-[16/9] w-full">
-                  <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
+                  <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-[var(--ink)]/40 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
                     {isAi ? <Sparkle size={11} weight="fill" /> : <ListChecks size={11} weight="fill" />}
                     {isAi ? "AI 生成" : "整理导入"}
                   </div>
@@ -199,7 +201,7 @@ export default async function MarketPage() {
                     ) : (
                       <Link
                         href="/login?next=/market"
-                        className="studio-press inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
+                        className="cta-glow studio-press inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
                       >
                         <GraduationCap size={15} weight="fill" />
                         登录后申请学习

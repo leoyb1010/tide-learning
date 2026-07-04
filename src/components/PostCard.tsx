@@ -334,7 +334,7 @@ export function PostCard({
                 maxLength={300}
                 rows={1}
                 placeholder="友善评论，一起进步…"
-                className="min-h-[38px] flex-1 resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] leading-[1.5] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+                className="min-h-[38px] flex-1 resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] leading-[1.5] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus-visible:ring-2 focus-visible:ring-[var(--ink)]/20"
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) void submitComment();
                 }}
@@ -380,7 +380,7 @@ export function PostCard({
             rows={3}
             data-autofocus
             placeholder="说点什么…（可留空，纯转发）"
-            className="w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[14px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+            className="w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[14px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus-visible:ring-2 focus-visible:ring-[var(--ink)]/20"
           />
           {/* 被转发原帖预览 */}
           <div className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] p-3">
@@ -562,7 +562,7 @@ function ActionButton({
       disabled={disabled}
       aria-pressed={active}
       aria-label={ariaLabel}
-      className={`studio-press inline-flex items-center gap-1.5 rounded-[9px] px-3 py-1.5 text-[12.5px] font-medium transition-colors ${
+      className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] px-3 py-2.5 text-[12.5px] font-medium transition-colors ${
         active ? activeCls : "text-[var(--ink3)]"
       } ${disabled ? "opacity-40" : "hover:bg-[var(--surface-inset)] hover:text-[var(--ink)]"}`}
     >

@@ -1,5 +1,5 @@
 /**
- * 赛道（内容板块）体系 — 融合有道学习会员真实业务 + 潮汐通用平台。
+ * 赛道（内容板块）体系：融合有道学习会员真实业务 + 潮汐通用平台。
  * 有道现有板块：躺学单词篇 / 口语小班课 / 银发口语 / 三合一全能英语（均英语）
  * 潮汐扩展：AI 技能 / 生活实用；未来赛道：职教 / 考证 / 留学 / 亲子（预留）
  *
@@ -26,6 +26,26 @@ export const TRACK_MAP: Record<string, Track> = Object.fromEntries(TRACKS.map((t
 
 export function trackLabel(key: string): string {
   return TRACK_MAP[key]?.label ?? key;
+}
+
+/**
+ * 视觉映射：赛道 category 到 D1 封面渐变 token（纯展示，不参与数据/权益逻辑）。
+ * 英语三门共用绿系，AI 紫、银发暖橙、生活蓝，未识别兜底冷灰。
+ */
+export function trackGradientVar(category: string): string {
+  switch (category) {
+    case "ai_skill":
+      return "var(--track-ai)";
+    case "english_oral":
+    case "english_foundation":
+      return "var(--track-english)";
+    case "silver_english":
+      return "var(--track-elder)";
+    case "life":
+      return "var(--track-life)";
+    default:
+      return "var(--track-default)";
+  }
 }
 
 // 未来赛道（仅展示"即将上线"，对应有道跨赛道扩张规划）

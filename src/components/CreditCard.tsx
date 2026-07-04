@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Coins, Plus, CaretDown, ArrowClockwise, Check } from "@phosphor-icons/react";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
@@ -42,7 +42,7 @@ function fmtDate(iso: string): string {
 }
 
 /**
- * CreditCard —— 积分卡（余额 + 本月消耗 + 充值 + 明细）。
+ * CreditCard, 积分卡（余额 + 本月消耗 + 充值 + 明细）。
  * 数据源 /api/credits/me；充值走 /api/credits/recharge（mock）。
  * 设计走 STUDIO token，余额数字用红色点睛。
  */
@@ -53,6 +53,9 @@ export function CreditCard() {
   const [rechargeOpen, setRechargeOpen] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
   const [buying, setBuying] = useState<string | null>(null);
+  // 余额变化时给数字加 num-pop（反馈：充值到账的强调）
+  const [balancePop, setBalancePop] = useState(false);
+  const prevBalance = useRef<number | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -68,6 +71,18 @@ export function CreditCard() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // 余额上升时触发一次 num-pop（首次加载不触发）
+  useEffect(() => {
+    if (data == null) return;
+    if (prevBalance.current != null && data.balance > prevBalance.current) {
+      setBalancePop(true);
+      const t = setTimeout(() => setBalancePop(false), 450);
+      prevBalance.current = data.balance;
+      return () => clearTimeout(t);
+    }
+    prevBalance.current = data.balance;
+  }, [data]);
 
   // 本月消耗：汇总本月 llm_spend 的绝对值。
   const monthSpend = (() => {
@@ -108,8 +123,16 @@ export function CreditCard() {
 
   const balance = data?.balance ?? 0;
 
+  // 近 7 笔消耗微型曲线（叙事：让「本月消耗」不是一个孤立数字，而有节奏感）
+  const spendSeries = (data?.recentLedger ?? [])
+    .filter((l) => l.type === "llm_spend")
+    .slice(0, 7)
+    .map((l) => Math.abs(l.delta))
+    .reverse();
+  const spendPeak = Math.max(1, ...spendSeries);
+
   return (
-    <div className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--card)]">
+    <div className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--card),var(--inner-hi)]">
       <span className="absolute left-0 top-6 h-6 w-[3px] rounded-r bg-[var(--red)]" aria-hidden />
 
       <div className="flex items-start justify-between">
@@ -120,24 +143,40 @@ export function CreditCard() {
         <button
           type="button"
           onClick={() => setRechargeOpen(true)}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-3.5 py-2 text-[12.5px] font-bold text-white transition-all hover:brightness-105"
+          className="studio-press cta-glow inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-3.5 py-2 text-[12.5px] font-bold text-white"
         >
           <Plus size={13} weight="bold" /> 充值
         </button>
       </div>
 
-      {/* 余额大数字（红色点睛） */}
+      {/* 余额大数字（红色点睛，充值到账 num-pop 强调） */}
       <div className="mt-5 flex items-end gap-2">
-        <span className={`mono text-[44px] font-extrabold leading-none tracking-tight text-[var(--red)] ${loading ? "opacity-30" : ""}`}>
-          {loading ? "—" : balance.toLocaleString()}
+        <span
+          key={loading ? "load" : balance}
+          className={`mono text-[44px] font-extrabold leading-none tracking-tight text-[var(--red)] ${loading ? "opacity-30" : ""} ${balancePop ? "num-pop" : ""}`}
+        >
+          {loading ? "···" : balance.toLocaleString()}
         </span>
         <span className="pb-1 text-[15px] font-semibold text-[var(--ink3)]">积分</span>
       </div>
 
-      {/* 本月消耗 */}
-      <div className="mt-4 flex items-center justify-between border-t border-[var(--border)] pt-3">
-        <span className="text-[12.5px] text-[var(--ink3)]">本月消耗</span>
-        <span className="mono text-[13px] font-semibold text-[var(--ink2)]">{monthSpend.toLocaleString()}</span>
+      {/* 本月消耗 + 近 7 笔消耗微曲线 */}
+      <div className="mt-4 flex items-end justify-between border-t border-[var(--border)] pt-3">
+        <div>
+          <span className="block text-[12.5px] text-[var(--ink3)]">本月消耗</span>
+          <span className="mono mt-0.5 block text-[16px] font-bold text-[var(--ink)]">{monthSpend.toLocaleString()}</span>
+        </div>
+        {spendSeries.length > 1 && (
+          <div className="flex h-7 items-end gap-[3px]" aria-hidden>
+            {spendSeries.map((v, i) => (
+              <span
+                key={i}
+                className="w-[5px] rounded-full bg-[var(--warn)] opacity-70"
+                style={{ height: `${Math.max((v / spendPeak) * 100, 12)}%` }}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 明细入口 */}
@@ -152,14 +191,15 @@ export function CreditCard() {
       </button>
 
       {detailOpen && (
-        <ul className="mt-1 space-y-1.5">
+        <ul className="stagger mt-2 space-y-1.5">
           {(data?.recentLedger ?? []).length === 0 ? (
             <li className="py-2 text-center text-[12px] text-[var(--ink4)]">暂无流水</li>
           ) : (
             data!.recentLedger.map((l, i) => (
               <li
                 key={i}
-                className="flex items-center justify-between rounded-[8px] bg-[var(--surface-inset)] px-3 py-2"
+                style={{ "--i": i } as React.CSSProperties}
+                className="flex items-center justify-between rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] px-3 py-2"
               >
                 <div className="min-w-0">
                   <span className="block truncate text-[12.5px] text-[var(--ink2)]">
@@ -167,8 +207,9 @@ export function CreditCard() {
                   </span>
                   <span className="mono block text-[10px] tracking-[0.06em] text-[var(--ink4)]">{fmtDate(l.createdAt)}</span>
                 </div>
+                {/* 语义色：进账绿(--ok)，消耗暖警(--warn) */}
                 <span
-                  className={`mono shrink-0 text-[13px] font-semibold ${l.delta >= 0 ? "text-[var(--red)]" : "text-[var(--ink3)]"}`}
+                  className={`mono shrink-0 text-[13px] font-semibold ${l.delta >= 0 ? "text-[var(--ok)]" : "text-[var(--warn)]"}`}
                 >
                   {l.delta >= 0 ? "+" : ""}
                   {l.delta}
@@ -181,8 +222,8 @@ export function CreditCard() {
 
       {/* 充值 Dialog：三档 */}
       <Dialog open={rechargeOpen} onClose={() => setRechargeOpen(false)} title="积分充值">
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
-          {PACKS.map((p) => {
+        <div className="stagger grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+          {PACKS.map((p, idx) => {
             const busy = buying === p.id;
             return (
               <button
@@ -190,8 +231,9 @@ export function CreditCard() {
                 type="button"
                 disabled={buying !== null}
                 onClick={() => recharge(p.id)}
-                className={`studio-lift relative flex flex-col items-center gap-1.5 rounded-[14px] border bg-[var(--surface)] px-4 py-5 text-center transition-all disabled:opacity-45 ${
-                  p.hot ? "border-[var(--red-soft-border)] bg-[var(--red-soft)]" : "border-[var(--border)]"
+                style={{ "--i": idx } as React.CSSProperties}
+                className={`studio-lift hover-sheen relative flex flex-col items-center gap-1.5 rounded-[14px] border px-4 py-5 text-center transition-all disabled:opacity-45 ${
+                  p.hot ? "cta-glow border-[var(--red-soft-border)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface)]"
                 } focus:border-[var(--ink3)] focus:outline-none`}
               >
                 {p.hot && (

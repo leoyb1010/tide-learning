@@ -180,7 +180,7 @@ export default function NotesPage() {
             <button
               type="button"
               onClick={() => setComposeOpen(true)}
-              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red)] transition-colors"
+              className="cta-glow studio-press inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
             >
               <Plus size={15} weight="bold" /> 记一条
             </button>
@@ -217,7 +217,7 @@ export default function NotesPage() {
                 key={v.key}
                 type="button"
                 onClick={() => setView(v.key)}
-                className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${
+                className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-3.5 py-2.5 text-[13px] font-semibold transition-all sm:min-h-0 sm:py-1.5 ${
                   active
                     ? "bg-[var(--ink)] text-[var(--surface)] shadow-[var(--card)]"
                     : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -238,9 +238,9 @@ export default function NotesPage() {
             <button
               type="button"
               onClick={() => setCaptureOnly((v) => !v)}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+              className={`inline-flex min-h-[44px] items-center rounded-full px-3.5 py-2.5 text-[13px] font-semibold transition-colors sm:min-h-0 sm:py-1.5 ${
                 captureOnly
-                  ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                  ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)]"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
               }`}
             >
@@ -249,9 +249,9 @@ export default function NotesPage() {
             <button
               type="button"
               onClick={() => setStarredOnly((v) => !v)}
-              className={`inline-flex items-center gap-1 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
+              className={`inline-flex min-h-[44px] items-center gap-1 rounded-full px-3.5 py-2.5 text-[13px] font-semibold transition-colors sm:min-h-0 sm:py-1.5 ${
                 starredOnly
-                  ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                  ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)]"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
               }`}
             >
@@ -309,41 +309,43 @@ export default function NotesPage() {
         </div>
       )}
 
-      {/* 主体 */}
-      {view === "notebook" ? (
-        // v2.2：笔记本视图 —— 笔记本网格（新建/进入/整理）。
-        <NotebookGrid />
-      ) : error ? (
-        <ErrorState hint="笔记加载失败" onRetry={() => void load()} />
-      ) : notes === null ? (
-        <div className="space-y-4">
-          <LoadingSkeleton lines={2} />
-          <CardSkeleton />
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
-      ) : needLogin ? (
-        <EmptyTide
-          variant="notes"
-          description="笔记永久属于你，停订后仍可访问"
-          action={<Button href="/login?next=/notes">去登录</Button>}
-        />
-      ) : !hasNotes ? (
-        <EmptyTide
-          variant="notes"
-          description="进入任意课程边学边记，或点右上「记一条」随手写，都会汇聚到这里"
-          action={<Button href="/courses">去学习</Button>}
-        />
-      ) : view === "gallery" ? (
-        <NoteGallery notes={notes} />
-      ) : view === "course" ? (
-        <CourseView notes={notes} onSaved={() => void load()} />
-      ) : view === "timeline" ? (
-        <NoteTimeline notes={notes} onToggleStar={toggleStar} onDelete={remove} />
-      ) : (
-        // 默认「全部」：普通可点击列表，整卡跳 /notes/{id}
-        <AllNotesList notes={notes} />
-      )}
+      {/* 主体：按 view 作 key，切换视图时重放 .studio-slide 转场 */}
+      <div key={view} className="studio-slide">
+        {view === "notebook" ? (
+          // v2.2：笔记本视图，笔记本网格（新建/进入/整理）。
+          <NotebookGrid />
+        ) : error ? (
+          <ErrorState hint="笔记加载失败" onRetry={() => void load()} />
+        ) : notes === null ? (
+          <div className="space-y-4">
+            <LoadingSkeleton lines={2} />
+            <CardSkeleton />
+            <CardSkeleton />
+            <CardSkeleton />
+          </div>
+        ) : needLogin ? (
+          <EmptyTide
+            variant="notes"
+            description="笔记永久属于你，停订后仍可访问"
+            action={<Button href="/login?next=/notes">去登录</Button>}
+          />
+        ) : !hasNotes ? (
+          <EmptyTide
+            variant="notes"
+            description="进入任意课程边学边记，或点右上「记一条」随手写，都会汇聚到这里"
+            action={<Button href="/courses">去学习</Button>}
+          />
+        ) : view === "gallery" ? (
+          <NoteGallery notes={notes} />
+        ) : view === "course" ? (
+          <CourseView notes={notes} onSaved={() => void load()} />
+        ) : view === "timeline" ? (
+          <NoteTimeline notes={notes} onToggleStar={toggleStar} onDelete={remove} />
+        ) : (
+          // 默认「全部」：普通可点击列表，整卡跳 /notes/{id}
+          <AllNotesList notes={notes} />
+        )}
+      </div>
 
       {/* 记一条：独立笔记编辑弹窗 */}
       <ComposeDialog
@@ -358,7 +360,7 @@ export default function NotesPage() {
   );
 }
 
-// —— §5.2 消化层：AI 整理下拉菜单动作定义 ——
+// §5.2 消化层：AI 整理下拉菜单动作定义
 type TidyAction = "summary" | "flashcards" | "outline" | "actions" | "translate";
 const TIDY_ITEMS: { key: TidyAction; label: string; Icon: typeof Sparkle }[] = [
   { key: "summary", label: "AI 总结", Icon: Sparkle },
@@ -379,7 +381,7 @@ interface TidyResult {
 }
 
 /**
- * §5.2 AiTidyMenu —— 笔记「AI 整理」下拉。
+ * §5.2 AiTidyMenu：笔记「AI 整理」下拉。
  * scope 决定拉取范围：按课（courseId）或按选中笔记（noteIds）。
  * summary 走 /api/ai/note-summary；flashcards 走 /api/ai/review-card（落库）；
  * outline/actions/translate 走 /api/ai/note-transform。结果统一用 Dialog 展示。
@@ -532,7 +534,7 @@ function AiTidyMenu({
       </button>
 
       {open && (
-        <div className="studio-rise absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--lift)]">
+        <div className="studio-rise elev-3 absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] py-1">
           {TIDY_ITEMS.map((it) => {
             const Icon = it.Icon;
             return (
@@ -652,7 +654,7 @@ const KIND_TAG: Record<string, { label: string; icon: typeof Camera }> = {
 };
 
 /**
- * v2.2「全部」视图 —— 普通可点击列表（解决「点不进去」）。
+ * v2.2「全部」视图：普通可点击列表（解决「点不进去」）。
  * 排序：pinned 优先，再按 updatedAt/createdAt 倒序。整卡跳 /notes/{id}。
  * 课程来源作为卡内小字：可点跳课程（stopPropagation，避免与整卡链接冲突）。
  */
@@ -667,36 +669,46 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
   }, [notes]);
 
   return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {sorted.map((n) => {
+    <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2">
+      {sorted.map((n, i) => {
         const src = sourceLabel(n);
         const kindMeta = KIND_TAG[n.kind];
         const KindIcon = kindMeta?.icon;
         const preview = n.excerpt?.trim() || n.contentMd?.trim() || n.sourceText?.trim() || "";
+        const isAi = n.source === "ai_transform";
         return (
           <Link
             key={n.id}
             href={`/notes/${n.id}`}
-            className="studio-lift studio-rise group block rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+            style={{ "--i": i } as React.CSSProperties}
+            className="hover-sheen studio-lift group block rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
-            {/* 顶部元信息：来源 · 相对时间 · 置顶/收藏 */}
+            {/* 顶部元信息：来源标识 · 相对时间 · 置顶/收藏 */}
             <div className="mb-1.5 flex items-center gap-2 text-[12px] text-[var(--ink4)]">
               {n.pinned && <PushPin size={12} weight="fill" className="shrink-0 text-[var(--red)]" />}
+              {/* 来源标识：AI 整理用 info 语义色小圆点，课程/独立笔记用来源名 */}
+              {isAi && <Sparkle size={11} weight="fill" className="shrink-0 text-[var(--info)]" />}
               {src.slug ? (
-                <span
-                  role="link"
-                  tabIndex={0}
+                <button
+                  type="button"
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
                     window.location.href = `/courses/${src.slug}`;
                   }}
-                  className="truncate transition-colors hover:text-[var(--red)]"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      window.location.href = `/courses/${src.slug}`;
+                    }
+                  }}
+                  className="truncate text-left transition-colors hover:text-[var(--red)]"
                 >
                   {src.text}
-                </span>
+                </button>
               ) : (
-                <span className="truncate">{src.text}</span>
+                <span className={`truncate ${isAi ? "font-medium text-[var(--info)]" : ""}`}>{src.text}</span>
               )}
               <span aria-hidden>·</span>
               <span className="mono shrink-0">{relativeTime(n.updatedAt || n.createdAt)}</span>
@@ -710,7 +722,7 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
                   <KindIcon size={11} weight="fill" /> {kindMeta.label}
                 </span>
               )}
-              <p className="truncate text-[15px] font-semibold text-[var(--ink)]">{n.title || "未命名"}</p>
+              <p className="truncate text-[15px] font-semibold text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">{n.title || "未命名"}</p>
             </div>
 
             {/* 正文预览 */}
@@ -735,7 +747,7 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
   );
 }
 
-// —— 采集面板：四入口 ——
+// 采集面板：四入口
 type CaptureEntry = "menu" | "write" | "link" | "image" | "attach";
 
 const ENTRY_META: {
@@ -743,11 +755,14 @@ const ENTRY_META: {
   label: string;
   hint: string;
   Icon: typeof PencilSimple;
+  /** 图标底/字色（功能色语义，四入口彼此区分） */
+  tintBg: string;
+  tintFg: string;
 }[] = [
-  { key: "write", label: "随手写", hint: "写点想法，支持 Markdown", Icon: PencilSimple },
-  { key: "link", label: "链接导入", hint: "粘贴网址，自动抓取正文", Icon: LinkSimple },
-  { key: "image", label: "图片", hint: "上传截图或图片，挂成笔记", Icon: ImageIcon },
-  { key: "attach", label: "附件", hint: "PDF / DOCX / TXT 等文件", Icon: Paperclip },
+  { key: "write", label: "随手写", hint: "写点想法，支持 Markdown", Icon: PencilSimple, tintBg: "var(--red-soft)", tintFg: "var(--red)" },
+  { key: "link", label: "链接导入", hint: "粘贴网址，自动抓取正文", Icon: LinkSimple, tintBg: "var(--info-soft)", tintFg: "var(--info)" },
+  { key: "image", label: "图片", hint: "上传截图或图片，挂成笔记", Icon: ImageIcon, tintBg: "var(--ok-soft)", tintFg: "var(--ok)" },
+  { key: "attach", label: "附件", hint: "PDF / DOCX / TXT 等文件", Icon: Paperclip, tintBg: "var(--warn-soft)", tintFg: "var(--warn)" },
 ];
 
 /**
@@ -789,16 +804,20 @@ function ComposeDialog({
       )}
 
       {entry === "menu" && (
-        <div className="grid grid-cols-2 gap-2.5">
-          {ENTRY_META.map(({ key, label, hint, Icon }) => (
+        <div className="stagger grid grid-cols-2 gap-2.5">
+          {ENTRY_META.map(({ key, label, hint, Icon, tintBg, tintFg }, i) => (
             <button
               key={key}
               type="button"
               onClick={() => setEntry(key)}
-              className="studio-lift flex flex-col items-start gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 text-left shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+              style={{ "--i": i } as React.CSSProperties}
+              className="hover-sheen studio-lift group flex flex-col items-start gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 text-left shadow-[var(--card),var(--inner-hi)]"
             >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-[var(--surface-inset)] text-[var(--ink2)]">
-                <Icon size={18} weight="bold" />
+              <span
+                className="inline-flex h-10 w-10 items-center justify-center rounded-[12px] transition-transform duration-200 group-hover:scale-105"
+                style={{ background: tintBg, color: tintFg }}
+              >
+                <Icon size={19} weight="bold" />
               </span>
               <span className="text-[14px] font-semibold text-[var(--ink)]">{label}</span>
               <span className="text-[12px] leading-[1.5] text-[var(--ink4)]">{hint}</span>
@@ -1062,18 +1081,19 @@ function CourseNoteGroup({
           <span className="mono text-[12px] text-[var(--ink4)]">{items.length} 条</span>
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {items.map((n) => (
+      <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {items.map((n, i) => (
           <Link
             key={n.id}
             href={`/notes/${n.id}`}
-            className="studio-lift block rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+            style={{ "--i": i } as React.CSSProperties}
+            className="hover-sheen studio-lift group block rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
             <div className="mb-1.5 flex items-center gap-2 text-[12px] text-[var(--ink4)]">
               <span className="truncate">{n.lesson?.title ?? "课程笔记"}</span>
-              {n.starred && <Star size={12} weight="fill" className="text-[var(--red)]" />}
+              {n.starred && <Star size={12} weight="fill" className="ml-auto shrink-0 text-[var(--red)]" />}
             </div>
-            {n.title && <p className="font-semibold text-[var(--ink)]">{n.title}</p>}
+            {n.title && <p className="font-semibold text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">{n.title}</p>}
             {(n.excerpt?.trim() || n.contentMd?.trim()) && (
               <p className="mt-0.5 line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink2)]">
                 {n.excerpt?.trim() || n.contentMd}

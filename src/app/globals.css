@@ -48,8 +48,11 @@
   --color-warning: #b7822c;
   --color-error:   #c0392b;
 
-  /* —— 半径 / 字体（STUDIO：Plus Jakarta + Noto Sans SC + IBM Plex Mono）—— */
+  /* —— 半径 / 字体（STUDIO：Plus Jakarta + Noto Sans SC + IBM Plex Mono）——
+     两阶圆角（对齐 iOS StudioRadius card/cardLg 心智）：
+     --radius-card 大容器/展示区(18)、--radius-card-sm 小卡/输入/胶囊(14)。 */
   --radius-card: 18px;
+  --radius-card-sm: 14px;
   --font-sans: var(--font-jakarta), var(--font-noto-sc), -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   --font-mono: var(--font-plex-mono), "SF Mono", ui-monospace, monospace;
 
@@ -90,20 +93,53 @@
   --ink3: #8790a0;
   --ink4: #aeb6c2;
 
-  /* STUDIO 品牌红 */
+  /* STUDIO 品牌红 —— 完整状态梯度（default/hover/active/soft/glow） */
   --red:             #fc011a;
+  --red-hover:       #e00117;   /* hover 加深 */
+  --red-active:      #c8000f;   /* 按下更深 */
   --red-soft:        #fff1f2;
   --red-soft-border: #ffd9dd;
   --red-ink:         #c8000f;
+  --red-glow:        0 4px 20px -4px rgba(252,1,26,.35);  /* 关键 CTA 柔光 */
+
+  /* 功能辅助色（低饱和，仅状态语义，不参与装饰） */
+  --ok:       #1f9e6e;   /* 完课 / 成功 */
+  --ok-soft:  #e7f6ef;
+  --warn:     #b7822c;   /* 待复习 / 警示 */
+  --warn-soft:#faf2e0;
+  --info:     #3b6ef5;   /* 通知 / 信息 */
+  --info-soft:#e9f0ff;
 
   /* 深色区 / 视频 / NEW 徽章 */
   --video-bg: #232935;
+  --video-grad: linear-gradient(140deg, #2a3140 0%, #1c2331 46%, #141a24 100%); /* 深色区渐变，弃死黑平面 */
+  /* AI 智能材质：更冷更暗的靛蓝基底，透一点红紫智性光。与 --video-grad(中性灰蓝) 一眼可分，
+     让「AI 卡=在思考」和「视频缩略=可播放」两种深色语义材质区隔开。斜向流光在组件层叠加。 */
+  --ai-grad: linear-gradient(150deg, #1e2440 0%, #191d31 44%, #14131f 100%);
+  --hairline-on-dark: rgba(255,255,255,.10);  /* 深色/视频渐变区上的内顶细高光，统一常量替代硬编码 white/10 */
+  /* 深色区中性文字阶：浮在 --video-grad / --ai-grad 上的文字统一走这套白墨阶，
+     替代各处各写 text-white/45、white/55 的硬编码透明度。深色带在亮暗两种应用主题下
+     都是暗的，故此阶与应用主题无关，在 :root 定义一次即全站通用。 */
+  --ink-on-dark:   rgba(255,255,255,.92);  /* 主文字 */
+  --ink-on-dark-2: rgba(255,255,255,.62);  /* 次要文字 / 单位 */
+  --ink-on-dark-3: rgba(255,255,255,.46);  /* 标签 / 弱说明 */
+  /* 图表非峰值柱：surface2 与 ink4 之间取一档干净的冷灰实色，替代 ink4/45 半透明「脏灰蓝」。 */
+  --chart-bar-muted: #c4ccd6;
   --new-bg:   #fff3d0;
   --new-ink:  #8a6a00;
 
-  /* 软深度阴影（双层柔投影，基色 = ink 的 RGB） */
-  --card:  0 2px 6px -2px rgba(35,41,53,.12);
-  --lift:  0 10px 26px -12px rgba(35,41,53,.28), 0 1px 0 rgba(255,255,255,.7) inset;
+  /* 赛道色板（课程封面渐变，按 category 映射；亮暗共用，暗色下自然变深） */
+  --track-ai:      linear-gradient(140deg, #5b3fd6, #7b5cf0);   /* AI 技能 紫 */
+  --track-english: linear-gradient(140deg, #1f7a5a, #2ba578);   /* 英语 绿 */
+  --track-elder:   linear-gradient(140deg, #c4632a, #e0843c);   /* 银发 暖橙 */
+  --track-life:    linear-gradient(140deg, #2a6ab0, #3b8dd6);   /* 生活 蓝 */
+  --track-default: linear-gradient(140deg, #4a5262, #2d3440);   /* 兜底 冷灰 */
+
+  /* 表面海拔材质（L0 页面底 / L1 主卡 / L2 浮起 / L3 浮层）—— 每级不同投影+边缘高光 */
+  --card:   0 1px 2px -1px rgba(35,41,53,.06), 0 2px 8px -3px rgba(35,41,53,.10);
+  --card-hover: 0 2px 4px -1px rgba(35,41,53,.08), 0 8px 20px -6px rgba(35,41,53,.16);
+  --lift:   0 10px 26px -12px rgba(35,41,53,.28), 0 1px 0 rgba(255,255,255,.7) inset;
+  --inner-hi: inset 0 1px 0 rgba(255,255,255,.6);  /* 卡片内顶高光，增加材质 */
 
   /* 兼容旧 surface-* 语义（映射到 STUDIO） */
   --surface-bg: var(--bg);
@@ -132,12 +168,24 @@
     --ink2: #aeb6c2;
     --ink3: #9aa3b2;   /* 已从原型 #8790a0 提亮，改善暗色对比度/无障碍 */
     --ink4: #5b6474;
+    --red-hover:       #ff2a3e;
+    --red-active:      #ff6470;
     --red-soft:        #2a1216;
     --red-soft-border: #4c1c22;
     --red-ink:         #ff6470;
+    --red-glow:        0 4px 24px -4px rgba(252,1,26,.45);
+    --ok:       #34c98a; --ok-soft:  #12261f;
+    --warn:     #d8a24a; --warn-soft:#2a2213;
+    --info:     #5b8bff; --info-soft:#151d33;
     --video-bg: #0a0c10;
-    --card:  0 2px 8px -3px rgba(0,0,0,.5);
-    --lift:  0 14px 30px -14px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.03) inset;
+    --video-grad: linear-gradient(140deg, #1a2130 0%, #12171f 46%, #0a0c10 100%);
+    --ai-grad: linear-gradient(150deg, #171c33 0%, #121427 44%, #0c0b14 100%);
+    --hairline-on-dark: rgba(255,255,255,.08);
+    --chart-bar-muted: #3a4354;  /* 暗色卡上的非峰值柱：border2 与 ink4 之间的干净冷灰 */
+    --card:   0 1px 3px -1px rgba(0,0,0,.4), 0 2px 10px -3px rgba(0,0,0,.5);
+    --card-hover: 0 4px 14px -3px rgba(0,0,0,.55), 0 10px 28px -8px rgba(0,0,0,.6);
+    --lift:  0 14px 30px -14px rgba(0,0,0,.6), 0 0 0 1px rgba(255,255,255,.04) inset;
+    --inner-hi: inset 0 1px 0 rgba(255,255,255,.05);
     /* 旧 Tailwind ink/paper 类名在暗色下的映射（让全站类名自动变暗） */
     --color-paper:        #0e1116;
     --color-paper-raised: #191d25;
@@ -160,10 +208,17 @@
   --bg:#0e1116; --bg2:#12151b; --surface:#191d25; --surface2:#20252f; --surface-inset:#20252f;
   --border:#2b3350; --border2:#39415e;
   --ink:#edeff3; --ink2:#aeb6c2; --ink3:#9aa3b2; --ink4:#5b6474;
-  --red-soft:#2a1216; --red-soft-border:#4c1c22; --red-ink:#ff6470;
-  --video-bg:#0a0c10;
-  --card:0 2px 8px -3px rgba(0,0,0,.5);
-  --lift:0 14px 30px -14px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.03) inset;
+  --red-hover:#ff2a3e; --red-active:#ff6470;
+  --red-soft:#2a1216; --red-soft-border:#4c1c22; --red-ink:#ff6470; --red-glow:0 4px 24px -4px rgba(252,1,26,.45);
+  --ok:#34c98a; --ok-soft:#12261f; --warn:#d8a24a; --warn-soft:#2a2213; --info:#5b8bff; --info-soft:#151d33;
+  --video-bg:#0a0c10; --video-grad:linear-gradient(140deg,#1a2130 0%,#12171f 46%,#0a0c10 100%);
+  --ai-grad:linear-gradient(150deg,#171c33 0%,#121427 44%,#0c0b14 100%);
+  --hairline-on-dark:rgba(255,255,255,.08);
+  --chart-bar-muted:#3a4354;
+  --card:0 1px 3px -1px rgba(0,0,0,.4),0 2px 10px -3px rgba(0,0,0,.5);
+  --card-hover:0 4px 14px -3px rgba(0,0,0,.55),0 10px 28px -8px rgba(0,0,0,.6);
+  --lift:0 14px 30px -14px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.04) inset;
+  --inner-hi:inset 0 1px 0 rgba(255,255,255,.05);
   --color-paper:#0e1116; --color-paper-raised:#191d25;
   --color-ink-950:#edeff3; --color-ink-800:#cdd3dd; --color-ink-600:#aeb6c2; --color-ink-500:#9aa3b2;
   --color-ink-400:#8790a0; --color-ink-200:#5b6474; --color-ink-100:#2b3350; --color-ink-50:#20252f;
@@ -297,14 +352,71 @@ body::before {
   .studio-lightup, .studio-poweron { animation: none !important; }
   .studio-sweep::after { animation: none !important; display: none; }
 }
-/* 卡片悬浮：hover 上浮 + 软阴影 */
+
+/* §9 入席转场：从「写目标」到「全屏沉浸」的仪式感编排。
+   暗角缓缓合拢 (opacity 0→1)，顶部番茄条从上方就位，营造「进入专注舱」。 */
+@keyframes vignetteIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes focusBarDrop { from { opacity: 0; transform: translateY(-100%); } to { opacity: 1; transform: translateY(0); } }
+.focus-vignette-in { animation: vignetteIn .48s var(--ease-out-expo) both; }
+.focus-bar-drop { animation: focusBarDrop .42s var(--ease-tide) 80ms both; }
+@media (prefers-reduced-motion: reduce) {
+  .focus-vignette-in, .focus-bar-drop { animation: none !important; }
+}
+/* 卡片悬浮：hover 上浮 + 阶梯投影 + 边缘微亮 */
 .studio-lift { transition: transform var(--dur-fast) var(--ease-out-expo), box-shadow var(--dur-fast) var(--ease-out-expo), border-color var(--dur-fast) var(--ease-out-expo); }
-.studio-lift:hover { transform: translateY(-3px); box-shadow: var(--lift); }
+.studio-lift:hover { transform: translateY(-3px); box-shadow: var(--card-hover); border-color: var(--border2); }
 /* 按压反馈 */
 .studio-press:active { transform: scale(.97); }
+
+/* 工具按钮图标微动：hover 时图标轻抬 scale(1.06) + 提亮（配 .group 容器与 currentColor 图标）。
+   让扁平工具按钮有「按下前的活性」，追平旁边水位条的精修度。 */
+.icon-nudge { transition: transform var(--dur-fast) var(--ease-out-expo), color var(--dur-fast) var(--ease-out-expo); }
+.group:hover .icon-nudge { transform: scale(1.06); }
+@media (prefers-reduced-motion: reduce) {
+  .group:hover .icon-nudge { transform: none !important; }
+}
+
+/* ============================================================
+   D1 动效系统（4 类）—— 全部 transform/opacity 合成友好，reduced-motion 全降级
+   ============================================================ */
+
+/* 1) 进场编排 stagger：父容器加 .stagger，子元素按 --i 递延浮现（60ms 步进） */
+.stagger > * { animation: staggerIn .5s var(--ease-out-expo) both; animation-delay: calc(var(--i, 0) * 60ms); }
+@keyframes staggerIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+
+/* 2) 数据动画：数字/进度变化时的强调（配 JS 触发 class） */
+.num-pop { animation: numPop .4s var(--ease-spring); }
+@keyframes numPop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+/* 2b) 结算页数字依次落定：在 stagger 卡片就位（≈--i*60ms + 出场）后，数字轻弹一下，
+   形成「1…2…3」的收束叙事。用 --i 递延，避免三个同时跳或两跳一静的失衡。 */
+.num-pop-seq { display: inline-block; animation: numPop .42s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 90ms + 220ms); }
+
+/* 3) 微交互：hover 高光扫过（配 overflow-hidden 容器） */
+.hover-sheen { position: relative; overflow: hidden; }
+.hover-sheen::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.14) 50%, transparent 65%);
+  transform: translateX(-120%); transition: transform .6s var(--ease-out-expo);
+}
+.hover-sheen:hover::after { transform: translateX(120%); }
+
+/* 4) 材质海拔工具类（L1/L2/L3 直接可用） */
+.elev-1 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--card), var(--inner-hi); }
+.elev-2 { background: var(--surface); border: 1px solid var(--border2); box-shadow: var(--card-hover), var(--inner-hi); }
+.elev-3 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--lift); backdrop-filter: blur(12px); }
+
+/* 关键 CTA 柔光（红按钮的品牌光晕，克制使用） */
+.cta-glow { box-shadow: var(--red-glow); transition: box-shadow var(--dur-fast) var(--ease-out-expo), transform var(--dur-fast) var(--ease-out-expo); }
+.cta-glow:hover { box-shadow: 0 6px 28px -4px rgba(252,1,26,.5); transform: translateY(-1px); }
+.cta-glow:active { transform: scale(.98); }
+
 @media (prefers-reduced-motion: reduce) {
   .studio-rise, .studio-slide { animation: none !important; }
   .studio-lift:hover { transform: none !important; }
+  .stagger > * { animation: none !important; }
+  .num-pop, .num-pop-seq { animation: none !important; }
+  .hover-sheen::after { display: none !important; }
+  .cta-glow:hover, .cta-glow:active { transform: none !important; }
 }
 
 /* 复习卡 3D 翻牌：signature 翻面动效（问题→答案绕 Y 轴翻转）。

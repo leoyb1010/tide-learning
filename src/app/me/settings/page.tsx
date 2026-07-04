@@ -77,11 +77,13 @@ export default async function SettingsPage() {
           </div>
         </aside>
 
-        {/* 右分区卡 */}
-        <div className="min-w-0 flex-1 space-y-6">
+        {/* 右分区卡：stagger 递延进场 */}
+        <div className="stagger min-w-0 flex-1 space-y-6">
           {/* 1. 账号安全 */}
           <SectionCard
             id="security"
+            index={0}
+            tone="info"
             icon={<ShieldCheck size={18} weight="fill" />}
             title="账号安全"
             desc="登录信息与密码"
@@ -129,6 +131,8 @@ export default async function SettingsPage() {
           {/* 2. 订阅与积分 */}
           <SectionCard
             id="subscription"
+            index={1}
+            tone="red"
             icon={<CreditCard size={18} weight="fill" />}
             title="订阅与积分"
             desc="会员状态与学习积分"
@@ -137,6 +141,7 @@ export default async function SettingsPage() {
               href="/me/subscription"
               label="订阅管理"
               hint={meta.label}
+              hintTone={meta.tone}
             />
             <LinkRow
               href="/me"
@@ -148,6 +153,7 @@ export default async function SettingsPage() {
           {/* 3. 偏好 */}
           <SectionCard
             id="preferences"
+            index={2}
             icon={<SlidersHorizontal size={18} weight="fill" />}
             title="偏好"
             desc="阅读与通知"
@@ -166,6 +172,7 @@ export default async function SettingsPage() {
           {/* 4. 隐私与数据 */}
           <SectionCard
             id="privacy"
+            index={3}
             icon={<Lock size={18} weight="fill" />}
             title="隐私与数据"
             desc="导出与账号注销"
@@ -202,6 +209,7 @@ export default async function SettingsPage() {
           {/* 5. 帮助 */}
           <SectionCard
             id="help"
+            index={4}
             icon={<Question size={18} weight="fill" />}
             title="帮助"
             desc="客服、关于与条款"
@@ -230,26 +238,38 @@ export default async function SettingsPage() {
 
 /* ---------- 服务端展示组件 ---------- */
 
+/** 分区图标底色 tone：安全→info，订阅→red，其余中性；语义化让分区一眼可辨。 */
+const SECTION_ICON_TONE: Record<string, string> = {
+  info: "bg-[var(--info-soft)] text-[var(--info)]",
+  red: "bg-[var(--red-soft)] text-[var(--red)]",
+  neutral: "bg-[var(--surface-inset)] text-[var(--ink2)]",
+};
+
 function SectionCard({
   id,
   icon,
   title,
   desc,
+  index = 0,
+  tone = "neutral",
   children,
 }: {
   id: string;
   icon: React.ReactNode;
   title: string;
   desc?: string;
+  index?: number;
+  tone?: "info" | "red" | "neutral";
   children: React.ReactNode;
 }) {
   return (
     <section
       id={id}
-      className="studio-rise scroll-mt-6 rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)] sm:p-6"
+      style={{ "--i": index } as React.CSSProperties}
+      className="scroll-mt-6 rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-6"
     >
       <div className="mb-4 flex items-center gap-3">
-        <span className="grid h-9 w-9 place-items-center rounded-[10px] bg-[var(--surface-inset)] text-[var(--ink2)]">
+        <span className={`grid h-9 w-9 place-items-center rounded-[10px] ${SECTION_ICON_TONE[tone]}`}>
           {icon}
         </span>
         <div>
@@ -286,20 +306,30 @@ function LinkRow({
   href,
   label,
   hint,
+  hintTone,
 }: {
   href: string;
   label: string;
   hint?: string;
+  hintTone?: "ok" | "warn" | "muted";
 }) {
+  // 状态点：订阅正常→--ok，需处理→--warn，其余中性
+  const dot =
+    hintTone === "ok"
+      ? "bg-[var(--ok)]"
+      : hintTone === "warn"
+        ? "bg-[var(--warn)]"
+        : null;
   return (
     <Link
       href={href}
-      className="studio-lift flex items-center justify-between rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5"
+      className="studio-lift flex items-center justify-between gap-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5"
     >
-      <span className="text-[14px] font-semibold text-[var(--ink)]">{label}</span>
-      <span className="flex items-center gap-2 text-[13px] text-[var(--ink3)]">
-        {hint}
-        <CaretRight size={14} weight="bold" className="text-[var(--ink4)]" />
+      <span className="shrink-0 text-[14px] font-semibold text-[var(--ink)]">{label}</span>
+      <span className="flex min-w-0 items-center gap-2 text-[13px] text-[var(--ink3)]">
+        {dot && <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />}
+        <span className="truncate">{hint}</span>
+        <CaretRight size={14} weight="bold" className="shrink-0 text-[var(--ink4)]" />
       </span>
     </Link>
   );

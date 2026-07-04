@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Badge } from "./ui";
+import { Check, Star } from "@phosphor-icons/react";
 import { Ripple } from "./motion";
 import { useToast } from "./Toast";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
@@ -24,10 +24,12 @@ export interface PlanData {
 type PayStep = "idle" | "creating" | "redirecting";
 
 /**
- * SubscriptionCard — §6.1：连续包月默认高亮，但不得默认勾选额外服务。
+ * SubscriptionCard, §6.1：连续包月默认高亮，但不得默认勾选额外服务。
  * D1：首月 vs 之后价格对比清晰（大字 + 小字标注）；点击后发起 checkout，
- * 跳转 mock 收银台页（payUrl）完成「支付」——不再前端直连 webhook。
+ * 跳转 mock 收银台页（payUrl）完成「支付」，不再前端直连 webhook。
  * couponCode 可由 pricing 页透传，进入结算。
+ * 视觉：推荐档用 --red-soft 描边 + --inner-hi 材质高光 + .cta-glow 柔光，
+ * 与普通档拉开海拔层级；数字用 mono，语义色描述权益。
  */
 export function SubscriptionCard({
   plan,
@@ -49,6 +51,7 @@ export function SubscriptionCard({
   const periodLabel = PLAN_PERIOD_LABELS[plan.billingPeriod] ?? plan.billingPeriod;
   const perUnit = plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月";
   const loading = step !== "idle";
+  const hot = plan.highlight;
 
   async function subscribe() {
     if (!isLoggedIn) {
@@ -84,65 +87,88 @@ export function SubscriptionCard({
         ? "前往收银台…"
         : "立即订阅";
 
+  const benefits =
+    plan.scope === "all"
+      ? [
+          { label: "解锁全部赛道课程", strong: true },
+          { label: "本周上新可学习", strong: false },
+          { label: "无限笔记 + 时间戳锚点", strong: false },
+          { label: "需求投票权", strong: false },
+        ]
+      : [
+          { label: `解锁「${trackLabel(plan.scope)}」全部课程`, strong: true },
+          { label: "该赛道持续更新", strong: false },
+          { label: "无限笔记 + 投票权", strong: false },
+        ];
+
   return (
     <div
-      className={`relative flex flex-col rounded-[var(--radius-card)] border p-6 transition-all duration-300 [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 ${
-        plan.highlight ? "border-accent-600 bg-paper-raised shadow-[var(--shadow-soft)]" : "border-ink-200 bg-paper-raised hover:border-accent-300"
+      className={`hover-sheen studio-lift relative flex h-full flex-col rounded-[16px] p-6 ${
+        hot
+          ? "border-2 border-[var(--red-soft-border)] bg-[var(--surface)] shadow-[var(--card-hover),var(--inner-hi)] md:-translate-y-1.5 md:scale-[1.02]"
+          : "border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]"
       }`}
     >
-      {plan.highlight && (
-        <div className="absolute -top-3 left-6">
-          <Badge tone="accent">推荐</Badge>
+      {hot && (
+        <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+          <span className="mono cta-glow inline-flex items-center gap-1 rounded-full bg-[var(--red)] px-3 py-1 text-[11px] font-bold tracking-[0.06em] text-white">
+            <Star size={11} weight="fill" />
+            最受欢迎
+          </span>
         </div>
       )}
       <div className="flex items-baseline justify-between">
-        <h3 className="text-base font-semibold text-ink-950">{plan.name}</h3>
-        <span className="text-xs text-ink-400">{periodLabel}</span>
+        <h3 className="text-[16px] font-bold text-[var(--ink)]">{plan.name}</h3>
+        <span className="mono text-[11px] uppercase tracking-[0.08em] text-[var(--ink4)]">{periodLabel}</span>
       </div>
 
       {/* 价格区：首月大字 + 之后原价小字标注 */}
       <div className="mt-4">
         <div className="flex items-baseline gap-1">
-          {hasFirstDeal && <span className="rounded bg-accent-50 px-1.5 py-0.5 text-[11px] font-medium text-accent-700">首月</span>}
-          <span className="text-sm text-ink-500">¥</span>
-          <span className="num text-4xl font-semibold text-ink-950">{yuan(shownPrice)}</span>
-          <span className="text-sm text-ink-400">/{perUnit}</span>
+          {hasFirstDeal && (
+            <span className="mono rounded-[6px] bg-[var(--red-soft)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--red-ink)]">
+              首期
+            </span>
+          )}
+          <span className="text-[14px] text-[var(--ink3)]">¥</span>
+          <span className={`mono text-[40px] font-extrabold leading-none tracking-tight ${hot ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
+            {yuan(shownPrice)}
+          </span>
+          <span className="text-[13px] text-[var(--ink4)]">/{perUnit}</span>
         </div>
         {hasFirstDeal ? (
-          <p className="mt-1.5 text-xs text-ink-400">
-            首月 <span className="font-medium text-accent-700">¥{yuan(plan.firstPriceCents!)}</span>，
-            之后每月 <span className="text-ink-500 line-through decoration-ink-300">¥{yuan(plan.priceCents)}</span>
+          <p className="mt-2 text-[12px] text-[var(--ink3)]">
+            首期 <span className="mono font-semibold text-[var(--red-ink)]">¥{yuan(plan.firstPriceCents!)}</span>，
+            之后每期 <span className="mono text-[var(--ink4)] line-through">¥{yuan(plan.priceCents)}</span>
           </p>
         ) : (
-          <p className="mt-1.5 text-xs text-ink-400">价格透明，无隐藏续费涨价</p>
+          <p className="mt-2 text-[12px] text-[var(--ink3)]">价格透明，无隐藏续费涨价</p>
         )}
       </div>
 
-      <ul className="mt-5 flex-1 space-y-2 text-sm text-ink-500">
-        {plan.scope === "all" ? (
-          <>
-            <li>✓ 解锁<span className="font-medium text-ink-800">全部赛道</span>课程</li>
-            <li>✓ 本周上新可学习</li>
-            <li>✓ 无限笔记 + 时间戳锚点</li>
-            <li>✓ 需求投票权</li>
-          </>
-        ) : (
-          <>
-            <li>✓ 解锁「{trackLabel(plan.scope)}」全部课程</li>
-            <li>✓ 该赛道持续更新</li>
-            <li>✓ 无限笔记 + 投票权</li>
-            <li className="text-ink-400">升级全站可解锁其他赛道</li>
-          </>
+      <ul className="mt-5 flex-1 space-y-2.5 text-[13px]">
+        {benefits.map((b) => (
+          <li key={b.label} className="flex items-start gap-2 leading-[1.5]">
+            <span className="mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[var(--ok-soft)] text-[var(--ok)]">
+              <Check size={11} weight="bold" />
+            </span>
+            <span className={b.strong ? "font-semibold text-[var(--ink)]" : "text-[var(--ink2)]"}>{b.label}</span>
+          </li>
+        ))}
+        {plan.scope !== "all" && (
+          <li className="pl-6 text-[12px] text-[var(--ink4)]">升级全站可解锁其他赛道</li>
         )}
       </ul>
 
       <div className="mt-6">
-        <Ripple className="w-full rounded-xl">
+        <Ripple className="w-full rounded-[12px]">
           <button
             onClick={subscribe}
             disabled={loading}
-            className={`btn flex w-full items-center justify-center gap-2 rounded-xl py-3 font-medium transition-all duration-150 disabled:opacity-60 ${
-              plan.highlight ? "bg-accent-600 text-white hover:bg-accent-700" : "border border-ink-200 bg-white text-ink-950 hover:border-accent-400"
+            className={`studio-press flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-bold transition-all disabled:opacity-60 ${
+              hot
+                ? "cta-glow bg-[var(--red)] text-white hover:brightness-105"
+                : "border border-[var(--border2)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--ink3)]"
             }`}
           >
             {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
@@ -150,7 +176,7 @@ export function SubscriptionCard({
           </button>
         </Ripple>
       </div>
-      <p className="mt-3 text-center text-xs text-ink-400">随时可取消 · 取消后笔记仍保留</p>
+      <p className="mt-3 text-center text-[11px] text-[var(--ink4)]">随时可取消，取消后笔记仍保留</p>
     </div>
   );
 }

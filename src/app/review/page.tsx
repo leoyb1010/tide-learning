@@ -20,7 +20,7 @@ import {
 } from "@phosphor-icons/react";
 import { CalendarCheck as CalendarCheckIcon, Exam as ExamIcon } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
-import { ErrorState, CardSkeleton, Button } from "@/components/ui";
+import { ErrorState, Button } from "@/components/ui";
 import { TidalReveal, SPRING_TIDE, SPRING_FIRM, WaveProgress } from "@/components/motion";
 import { renderMarkdown } from "@/lib/markdown";
 import { track } from "@/lib/analytics-client";
@@ -56,7 +56,7 @@ export default function ReviewPage() {
     <div className="mx-auto max-w-[720px] space-y-6">
       {/* 顶部双 Tab */}
       <TidalReveal>
-        <div className="inline-flex items-center gap-1 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-1 shadow-[var(--card)]">
+        <div className="inline-flex items-center gap-1 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-1 shadow-[var(--card),var(--inner-hi)]">
           <TabButton active={tab === "daily"} onClick={() => setTab("daily")} icon={<CalendarCheckIcon size={16} weight={tab === "daily" ? "fill" : "regular"} />}>
             每日复习
           </TabButton>
@@ -118,7 +118,7 @@ interface RoundResult {
 const SEC_PER_CARD = 24; // 预计每张约 24s，用于任务卡时长估算
 
 /**
- * §5.4 / v2.3 §4 复习室 —— 从「能用」到「想来」。
+ * §5.4 / v2.3 §4 复习室，从「能用」到「想来」。
  * 三段式：任务卡(task) → 卡堆练习(review) → 结算(done)。
  * 保留 3D 翻面；新增卡堆视觉、评分飞出、连击 combo、水位进度、结算 confetti、加练。
  * 键盘：← 忘了 / → 记得 / 空格翻面。
@@ -279,13 +279,13 @@ function DailyReview() {
             <div className="flex items-center gap-2.5">
               {combo >= 2 && (
                 <div
-                  className={`mono inline-flex items-center gap-1 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-2 text-[13px] font-bold text-[var(--red)] shadow-[var(--card)] ${comboBurst ? "review-combo-pop" : ""}`}
+                  className={`mono inline-flex items-center gap-1 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-2 text-[13px] font-bold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] ${comboBurst ? "review-combo-pop" : ""}`}
                 >
-                  <Fire size={15} weight="fill" />×{combo}
+                  <Fire size={15} weight="fill" />×<span key={combo} className="num-pop inline-block">{combo}</span>
                 </div>
               )}
-              <div className="mono rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)]">
-                <span className="text-[var(--red)]">{Math.min(idx + 1, total)}</span> / {total}
+              <div className="mono rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card),var(--inner-hi)]">
+                <span key={idx} className="num-pop inline-block text-[var(--red-ink)]">{Math.min(idx + 1, total)}</span> / {total}
               </div>
             </div>
           )}
@@ -302,10 +302,7 @@ function DailyReview() {
       {error ? (
         <ErrorState hint="复习队列加载失败" onRetry={() => void load(isPractice)} />
       ) : cards === null ? (
-        <div className="space-y-4">
-          <CardSkeleton />
-          <CardSkeleton />
-        </div>
+        <ReviewSkeleton />
       ) : needLogin ? (
         <EmptyTide
           variant="notes"
@@ -351,7 +348,7 @@ function DailyReview() {
 }
 
 /* ============================================================
-   入场：今日任务卡 —— N 张到期 · 预计 N 分钟 · 连续复习 N 天
+   入场：今日任务卡，N 张到期 · 预计 N 分钟 · 连续复习 N 天
    点「开始」牌堆扇形展开进入练习。
    ============================================================ */
 function TaskCard({
@@ -391,71 +388,88 @@ function TaskCard({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...SPRING_TIDE, type: "spring" }}
-      className="studio-rise overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--card)]"
+      className="studio-rise overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]"
     >
-      {/* 牌堆缩略：静止叠放，开始时扇形展开 */}
-      <div className="relative mx-auto mb-7 h-[120px] w-[180px]">
-        {fan.map((f, i) => (
-          <motion.div
-            key={i}
-            className="absolute inset-0 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] shadow-[var(--card)]"
-            initial={false}
-            animate={
-              spread
-                ? { rotate: f.rot, x: f.x, y: -8, opacity: 0, scale: 0.92 }
-                : { rotate: (i - 1) * 4, x: (i - 1) * 6, y: (i - 1) * 3, opacity: 1, scale: 1 }
-            }
-            transition={{ ...SPRING_FIRM, type: "spring", delay: spread ? f.delay : 0 }}
-            style={{ transformOrigin: "bottom center", zIndex: 3 - i }}
-          >
-            <div className="flex h-full items-center justify-center text-[var(--ink4)]">
-              <CardsThree size={26} weight="duotone" />
-            </div>
-          </motion.div>
-        ))}
-      </div>
-
-      <h2 className="text-center text-[20px] font-bold text-[var(--ink)]">
-        {isPractice ? "加练队列已就绪" : dueCount > 0 ? "今日待复习" : "今日无到期"}
-      </h2>
-      <p className="mx-auto mt-2 max-w-[420px] text-center text-[14px] leading-[1.7] text-[var(--ink2)]">
-        {isPractice
-          ? "这是从未到期卡里抽出的最早 10 张，提前巩固不会打乱调度节奏。"
-          : "主动回忆是最有效的记忆方式。准备好了就开始，我们一起把该记的记牢。"}
-      </p>
-
-      {/* 三项指标 */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <TaskStat icon={<CardsThree size={17} weight="bold" />} value={dueCount} label="张待复习" />
-        <TaskStat icon={<Timer size={17} weight="bold" />} value={minutes} label="分钟 · 预计" />
-        <TaskStat
-          icon={<Fire size={17} weight="fill" />}
-          value={streakDays}
-          label="天 · 连续复习"
-          highlight={streakDays >= 3}
-        />
-      </div>
-
-      <button
-        type="button"
-        onClick={handleStart}
-        className="studio-press mt-7 flex w-full items-center justify-center gap-2 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] py-3.5 text-[15px] font-bold text-[var(--red)] shadow-[var(--card)] transition-colors hover:border-[var(--red)]"
+      {/* 深色展示带：牌堆浮于渐变之上，仪式感入口而非死白平面 */}
+      <div
+        className="relative flex h-[188px] items-center justify-center overflow-hidden rounded-t-[18px]"
+        style={{ background: "var(--video-grad)" }}
       >
-        <Lightning size={18} weight="fill" /> 开始复习
-      </button>
-      <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">
-        键盘：空格翻面 · <ArrowLeft size={11} className="inline" /> 忘了 · <ArrowRight size={11} className="inline" /> 记得
-      </p>
+        {/* 顶部柔光高光，深色区材质 */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-24"
+          style={{ background: "radial-gradient(120% 90% at 50% -20%, rgba(255,255,255,.10), transparent 70%)" }}
+          aria-hidden
+        />
+        {/* 牌堆缩略：静止叠放，开始时扇形展开 */}
+        <div className="relative h-[120px] w-[180px]">
+          {fan.map((f, i) => (
+            <motion.div
+              key={i}
+              className="absolute inset-0 rounded-[14px] border border-white/10 bg-white/[0.06] shadow-[0_8px_24px_-8px_rgba(0,0,0,.45)] backdrop-blur-[2px]"
+              initial={false}
+              animate={
+                spread
+                  ? { rotate: f.rot, x: f.x, y: -8, opacity: 0, scale: 0.92 }
+                  : { rotate: (i - 1) * 4, x: (i - 1) * 6, y: (i - 1) * 3, opacity: 1, scale: 1 }
+              }
+              transition={{ ...SPRING_FIRM, type: "spring", delay: spread ? f.delay : 0 }}
+              style={{ transformOrigin: "bottom center", zIndex: 3 - i }}
+            >
+              <div className="flex h-full items-center justify-center text-white/45">
+                <CardsThree size={26} weight="duotone" />
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      <div className="p-8 pt-7">
+        <h2 className="text-center text-[20px] font-bold text-[var(--ink)]">
+          {isPractice ? "加练队列已就绪" : dueCount > 0 ? "今日待复习" : "今日无到期"}
+        </h2>
+        <p className="mx-auto mt-2 max-w-[420px] text-center text-[14px] leading-[1.7] text-[var(--ink2)]">
+          {isPractice
+            ? "这是从未到期卡里抽出的最早 10 张，提前巩固不会打乱调度节奏。"
+            : "主动回忆是最有效的记忆方式。准备好了就开始，我们一起把该记的记牢。"}
+        </p>
+
+        {/* 三项指标：递延浮现 */}
+        <div className="stagger mt-6 grid grid-cols-3 gap-3">
+          <TaskStat i={0} icon={<CardsThree size={17} weight="bold" />} value={dueCount} label="张待复习" />
+          <TaskStat i={1} icon={<Timer size={17} weight="bold" />} value={minutes} label="分钟 · 预计" />
+          <TaskStat
+            i={2}
+            icon={<Fire size={17} weight="fill" />}
+            value={streakDays}
+            label="天 · 连续复习"
+            highlight={streakDays >= 3}
+          />
+        </div>
+
+        <button
+          type="button"
+          onClick={handleStart}
+          className="cta-glow studio-press mt-7 flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] py-3.5 text-[15px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+        >
+          <Lightning size={18} weight="fill" /> 开始复习
+        </button>
+        <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">
+          键盘：空格翻面 · <ArrowLeft size={11} className="inline" /> 忘了 · <ArrowRight size={11} className="inline" /> 记得
+        </p>
+      </div>
     </motion.div>
   );
 }
 
 function TaskStat({
+  i,
   icon,
   value,
   label,
   highlight,
 }: {
+  i: number;
   icon: React.ReactNode;
   value: number;
   label: string;
@@ -463,8 +477,9 @@ function TaskStat({
 }) {
   return (
     <div
-      className={`flex flex-col items-center gap-1 rounded-[14px] border bg-[var(--surface2)] px-2 py-4 text-center ${
-        highlight ? "border-[var(--red-soft-border)]" : "border-[var(--border)]"
+      style={{ "--i": i } as React.CSSProperties}
+      className={`flex flex-col items-center gap-1 rounded-[14px] border px-2 py-4 text-center shadow-[var(--inner-hi)] ${
+        highlight ? "border-[var(--red-soft-border)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface2)]"
       }`}
     >
       <span className={highlight ? "text-[var(--red)]" : "text-[var(--ink3)]"}>{icon}</span>
@@ -528,7 +543,7 @@ function ReviewStage({
               style={{
                 background:
                   flyDir === 1
-                    ? "linear-gradient(90deg, transparent, color-mix(in srgb, var(--color-success) 26%, transparent))"
+                    ? "linear-gradient(90deg, transparent, color-mix(in srgb, var(--ok) 26%, transparent))"
                     : "linear-gradient(270deg, transparent, var(--red-soft))",
               }}
               initial={{ opacity: 0 }}
@@ -560,9 +575,9 @@ function ReviewStage({
               className={`flip3d-inner studio-lift block w-full text-left ${flipped ? "is-flipped" : ""}`}
             >
               {/* 正面 · 问题 */}
-              <div className="flip3d-face rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--card)]">
+              <div className="flip3d-face rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-8 shadow-[var(--card),var(--inner-hi)]">
                 <div className="mb-4 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--surface2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink3)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--surface2)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink3)]">
                     问题
                   </span>
                   {current.courseTitle && (
@@ -581,9 +596,9 @@ function ReviewStage({
               </div>
 
               {/* 背面 · 答案（3D 预旋 180°） */}
-              <div className="flip3d-back rounded-[18px] border border-[var(--red-soft-border)] bg-[var(--surface)] p-8 shadow-[var(--card)]">
+              <div className="flip3d-back rounded-[18px] border border-[var(--red-soft-border)] bg-[var(--surface)] p-8 shadow-[var(--card),var(--inner-hi)]">
                 <div className="mb-4 flex items-center justify-between">
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red)]">
+                  <span className="inline-flex items-center gap-1.5 rounded-[8px] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red-ink)]">
                     答案
                   </span>
                   {current.courseTitle && (
@@ -605,29 +620,29 @@ function ReviewStage({
         </AnimatePresence>
       </div>
 
-      {/* 记得 / 忘了 —— 翻面后才可评分 */}
+      {/* 记得 / 忘了，翻面后才可评分 */}
       <div className="grid grid-cols-2 gap-3">
         <button
           type="button"
           disabled={!flipped || grading}
           onClick={() => onGrade(false)}
-          className="studio-press inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="studio-press inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--warn-soft)] bg-[var(--surface)] py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--warn)] hover:text-[var(--warn)] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <XCircle size={18} weight="fill" className="text-[var(--ink3)]" /> 忘了
+          <XCircle size={18} weight="fill" className="text-[var(--warn)]" /> 忘了
           <kbd className="mono ml-1 hidden rounded border border-[var(--border)] px-1 text-[10px] text-[var(--ink4)] sm:inline">←</kbd>
         </button>
         <button
           type="button"
           disabled={!flipped || grading}
           onClick={() => onGrade(true)}
-          className="studio-press inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] py-3.5 text-[14px] font-semibold text-[var(--red)] shadow-[var(--card)] transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          className="hover-sheen studio-press inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] py-3.5 text-[14px] font-semibold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--red)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           <CheckCircle size={18} weight="fill" /> 记得
-          <kbd className="mono ml-1 hidden rounded border border-[var(--red-soft-border)] px-1 text-[10px] text-[var(--red)] sm:inline">→</kbd>
+          <kbd className="mono ml-1 hidden rounded border border-[var(--red-soft-border)] px-1 text-[10px] text-[var(--red-ink)] sm:inline">→</kbd>
         </button>
       </div>
       {!flipped && (
-        <p className="text-center text-[12px] text-[var(--ink4)]">先回忆，再翻面自评 —— 主动回忆才记得牢。</p>
+        <p className="text-center text-[12px] text-[var(--ink4)]">先回忆，再翻面自评。主动回忆才记得牢。</p>
       )}
     </div>
   );
@@ -676,96 +691,120 @@ function SettlementState({
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ ...SPRING_TIDE, type: "spring" }}
-      className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-8 text-center shadow-[var(--card)]"
+      className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]"
     >
-      {!reduce && <ConfettiLayer />}
-
-      <div className="relative flex h-16 w-16 items-center justify-center rounded-full bg-[var(--red-soft)] text-[var(--red)] mx-auto">
-        <Confetti size={30} weight="fill" />
+      {/* 深色庆祝带：奖章浮于渐变之上，confetti 抛洒其间，仪式收束 */}
+      <div
+        className="relative flex flex-col items-center overflow-hidden rounded-t-[18px] px-8 pb-7 pt-9 text-center"
+        style={{ background: "var(--video-grad)" }}
+      >
+        {!reduce && <ConfettiLayer />}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-24"
+          style={{ background: "radial-gradient(120% 90% at 50% -20%, rgba(255,255,255,.12), transparent 70%)" }}
+          aria-hidden
+        />
+        <motion.div
+          initial={reduce ? false : { scale: 0.6, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ ...SPRING_FIRM, type: "spring", delay: 0.08 }}
+          className="relative flex h-16 w-16 items-center justify-center rounded-full border border-white/15 bg-[var(--red)] text-white shadow-[var(--red-glow)]"
+        >
+          <Confetti size={30} weight="fill" />
+        </motion.div>
+        <h2 className="relative mt-4 text-[20px] font-bold text-white">本轮复习完成</h2>
+        <p className="relative mt-1.5 max-w-[440px] text-[14px] leading-[1.7] text-white/70">
+          主动回忆一次，记忆就牢一分。坚持每天，间隔重复替你打理长期记忆。
+        </p>
       </div>
-      <h2 className="mt-4 text-[20px] font-bold text-[var(--ink)]">本轮复习完成</h2>
-      <p className="mt-1.5 text-[14px] leading-[1.7] text-[var(--ink2)]">
-        主动回忆一次，记忆就牢一分。坚持每天，间隔重复替你打理长期记忆。
-      </p>
 
-      {/* 三项指标 */}
-      <div className="mt-6 grid grid-cols-3 gap-3">
-        <SettleStat icon={<CardsThree size={16} weight="bold" />} value={`${total}`} label="本轮张数" />
-        <SettleStat icon={<CheckCircle size={16} weight="fill" />} value={`${accuracy}%`} label="正确率" accent />
-        <SettleStat icon={<Trophy size={16} weight="fill" />} value={`×${maxCombo}`} label="连击最高" accent={maxCombo >= 3} />
-      </div>
-
-      {/* 下次到期预告 */}
-      {nextDue && (
-        <div className="mt-4 inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface2)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--ink2)]">
-          <CalendarCheck size={13} className="text-[var(--ink3)]" />
-          下次到期 <span className="mono font-semibold text-[var(--ink)]">{formatDue(nextDue)}</span>
+      <div className="p-8 pt-6">
+        {/* 三项指标：递延浮现，正确率用成功绿语义色 */}
+        <div className="stagger grid grid-cols-3 gap-3">
+          <SettleStat i={0} icon={<CardsThree size={16} weight="bold" />} value={`${total}`} label="本轮张数" />
+          <SettleStat i={1} icon={<CheckCircle size={16} weight="fill" />} value={`${accuracy}%`} label="正确率" tone="ok" />
+          <SettleStat i={2} icon={<Trophy size={16} weight="fill" />} value={`×${maxCombo}`} label="连击最高" tone={maxCombo >= 3 ? "red" : "muted"} />
         </div>
-      )}
 
-      {/* 最难卡 TOP3 */}
-      {hardest.length > 0 && (
-        <div className="mt-6 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-4 text-left">
-          <div className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--ink2)]">
-            <Star size={14} weight="fill" className="text-[var(--red)]" /> 最需要再看的 {hardest.length} 张
+        {/* 下次到期预告 */}
+        {nextDue && (
+          <div className="mt-4 flex justify-center">
+            <div className="inline-flex items-center gap-1.5 rounded-full border border-[var(--info-soft)] bg-[var(--info-soft)] px-3.5 py-1.5 text-[12px] font-medium text-[var(--info)]">
+              <CalendarCheck size={13} />
+              下次到期 <span className="mono font-semibold">{formatDue(nextDue)}</span>
+            </div>
           </div>
-          <ul className="space-y-2">
-            {hardest.map((c, i) => (
-              <li key={c.id} className="flex items-start gap-2.5">
-                <span className="mono mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full bg-[var(--surface)] text-[11px] font-bold text-[var(--ink3)]">
-                  {i + 1}
-                </span>
-                <span
-                  className="line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink)]"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(c.front) }}
-                />
-              </li>
-            ))}
-          </ul>
-          <p className="mt-3 text-[11px] leading-relaxed text-[var(--ink4)]">这些卡已重置为明天再见，明天优先攻克它们。</p>
-        </div>
-      )}
+        )}
 
-      <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={onAgain}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
-        >
-          <ArrowsClockwise size={15} weight="bold" /> 再检查一遍
-        </button>
-        <button
-          type="button"
-          onClick={onPractice}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red)] shadow-[var(--card)] transition-colors hover:border-[var(--red)]"
-        >
-          <Lightning size={15} weight="fill" /> 加练 10 张
-        </button>
-        <Button href="/notes">回笔记馆</Button>
+        {/* 最难卡 TOP3：待复习语义用警示暖色 */}
+        {hardest.length > 0 && (
+          <div className="mt-6 rounded-[14px] border border-[var(--warn-soft)] bg-[var(--warn-soft)] p-4 text-left shadow-[var(--inner-hi)]">
+            <div className="mb-3 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--ink2)]">
+              <Star size={14} weight="fill" className="text-[var(--warn)]" /> 最需要再看的 {hardest.length} 张
+            </div>
+            <ul className="space-y-2">
+              {hardest.map((c, i) => (
+                <li key={c.id} className="flex items-start gap-2.5">
+                  <span className="mono mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full border border-[var(--warn)]/40 bg-[var(--surface)] text-[11px] font-bold text-[var(--ink2)]">
+                    {i + 1}
+                  </span>
+                  <span
+                    className="line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink)]"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(c.front) }}
+                  />
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 text-[11px] leading-relaxed text-[var(--ink4)]">这些卡已重置为明天再见，明天优先攻克它们。</p>
+          </div>
+        )}
+
+        <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={onAgain}
+            className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--border2)]"
+          >
+            <ArrowsClockwise size={15} weight="bold" /> 再检查一遍
+          </button>
+          <button
+            type="button"
+            onClick={onPractice}
+            className="cta-glow studio-press inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
+          >
+            <Lightning size={15} weight="fill" /> 加练 10 张
+          </button>
+          <Button href="/notes">回笔记馆</Button>
+        </div>
       </div>
     </motion.div>
   );
 }
 
 function SettleStat({
+  i,
   icon,
   value,
   label,
-  accent,
+  tone = "muted",
 }: {
+  i: number;
   icon: React.ReactNode;
   value: string;
   label: string;
-  accent?: boolean;
+  tone?: "muted" | "ok" | "red";
 }) {
+  const border =
+    tone === "ok" ? "border-[var(--ok-soft)] bg-[var(--ok-soft)]" : tone === "red" ? "border-[var(--red-soft-border)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface2)]";
+  const accentInk = tone === "ok" ? "text-[var(--ok)]" : tone === "red" ? "text-[var(--red)]" : "text-[var(--ink3)]";
   return (
     <div
-      className={`flex flex-col items-center gap-1 rounded-[14px] border bg-[var(--surface2)] px-2 py-4 ${
-        accent ? "border-[var(--red-soft-border)]" : "border-[var(--border)]"
-      }`}
+      style={{ "--i": i } as React.CSSProperties}
+      className={`flex flex-col items-center gap-1 rounded-[14px] border px-2 py-4 shadow-[var(--inner-hi)] ${border}`}
     >
-      <span className={accent ? "text-[var(--red)]" : "text-[var(--ink3)]"}>{icon}</span>
-      <span className="mono text-[20px] font-bold leading-none text-[var(--ink)]">{value}</span>
+      <span className={accentInk}>{icon}</span>
+      {/* 三个数字统一走 num-pop-seq：按 --i 递延，形成「1…2…3」依次落定，杜绝两跳一静 */}
+      <span className="num-pop-seq mono text-[20px] font-bold leading-none text-[var(--ink)]">{value}</span>
       <span className="text-[11px] leading-tight text-[var(--ink3)]">{label}</span>
     </div>
   );
@@ -775,7 +814,8 @@ function SettleStat({
 function ConfettiLayer() {
   const pieces = useRef(
     Array.from({ length: 26 }, (_, i) => {
-      const colors = ["var(--red)", "var(--color-success)", "var(--ink3)", "var(--ink4)"];
+      // 抛洒于深色庆祝带之上：品牌红 + 成功绿 + 亮白墨点，非彩虹，深底清晰
+      const colors = ["var(--red)", "var(--ok)", "rgba(255,255,255,.9)", "rgba(255,255,255,.6)"];
       return {
         left: Math.random() * 100,
         cx: (Math.random() - 0.5) * 220,
@@ -814,19 +854,48 @@ function ConfettiLayer() {
 }
 
 /* ============================================================
-   空态：今日无到期 —— 加练 10 张（从未到期卡抽最早 10 张）
+   加载骨架：贴合任务卡布局（深色展示带 + 标题 + 三指标 + 主按钮）
+   ============================================================ */
+function ReviewSkeleton() {
+  return (
+    <div className="overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
+      {/* 展示带占位：深色渐变，牌堆轮廓 */}
+      <div className="relative flex h-[188px] items-center justify-center overflow-hidden rounded-t-[18px]" style={{ background: "var(--video-grad)" }}>
+        <div className="h-[120px] w-[180px] rounded-[14px] border border-white/10 bg-white/[0.05]" />
+      </div>
+      <div className="p-8 pt-7">
+        <div className="mx-auto skeleton h-5 w-40" />
+        <div className="mx-auto mt-3 skeleton h-3.5 w-[68%]" />
+        <div className="mx-auto mt-2 skeleton h-3.5 w-[52%]" />
+        <div className="mt-6 grid grid-cols-3 gap-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="flex flex-col items-center gap-2 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-2 py-4">
+              <div className="skeleton h-4 w-4 rounded-full" />
+              <div className="skeleton h-5 w-8" />
+              <div className="skeleton h-2.5 w-12" />
+            </div>
+          ))}
+        </div>
+        <div className="skeleton mt-7 h-12 w-full rounded-[14px]" />
+      </div>
+    </div>
+  );
+}
+
+/* ============================================================
+   空态：今日无到期，加练 10 张（从未到期卡抽最早 10 张）
    ============================================================ */
 function EmptyState({ onPractice }: { onPractice: () => void }) {
   return (
     <EmptyTide
-      variant="notes"
+      variant="review"
       description="今日无到期的复习卡。想趁热打铁？加练 10 张提前巩固，或去笔记馆生成新卡。"
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
             type="button"
             onClick={onPractice}
-            className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red)] shadow-[var(--card)] transition-colors hover:border-[var(--red)]"
+            className="hover-sheen studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--red)]"
           >
             <Lightning size={15} weight="fill" /> 加练 10 张
           </button>

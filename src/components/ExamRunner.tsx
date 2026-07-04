@@ -353,7 +353,7 @@ function ExamForm({
                     : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)]"
                 }`}
               >
-                <div className={`text-[13.5px] font-semibold ${active ? "text-[var(--red)]" : "text-[var(--ink2)]"}`}>
+                <div className={`text-[13.5px] font-semibold ${active ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}>
                   {s.label}
                 </div>
                 <div className="mt-0.5 text-[11px] text-[var(--ink4)]">{s.hint}</div>
@@ -388,7 +388,7 @@ function ExamForm({
                         : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)]"
                     }`}
                   >
-                    <span className={`text-[13.5px] font-semibold ${active ? "text-[var(--red)]" : "text-[var(--ink2)]"}`}>
+                    <span className={`text-[13.5px] font-semibold ${active ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}>
                       {o.title}
                     </span>
                     {o.meta && <span className="text-[11.5px] text-[var(--ink4)]">{o.meta}</span>}
@@ -414,7 +414,7 @@ function ExamForm({
                   onClick={() => setCount(n)}
                   className={`studio-press mono flex-1 rounded-[12px] border py-2.5 text-[14px] font-semibold transition-colors ${
                     active
-                      ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                      ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)]"
                       : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink2)] hover:border-[var(--border2)]"
                   }`}
                 >
@@ -439,7 +439,7 @@ function ExamForm({
                   onClick={() => setDifficulty(d.v)}
                   className={`studio-press flex-1 rounded-[12px] border py-2.5 text-[13.5px] font-semibold transition-colors ${
                     active
-                      ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                      ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)]"
                       : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink2)] hover:border-[var(--border2)]"
                   }`}
                 >
@@ -452,7 +452,7 @@ function ExamForm({
       </div>
 
       {error && (
-        <div className="mb-4 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] text-[var(--red)]">
+        <div className="mb-4 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] text-[var(--red-ink)]">
           {error}
         </div>
       )}
@@ -507,7 +507,7 @@ function ExamTaking({
               type="button"
               onClick={() => setCursor(i)}
               aria-label={`第 ${i + 1} 题`}
-              className={`h-2.5 rounded-full transition-all ${
+              className={`relative h-2.5 rounded-full transition-all before:absolute before:left-1/2 before:top-1/2 before:h-11 before:w-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-[''] ${
                 isCur
                   ? "w-6 bg-[var(--red)]"
                   : answered
@@ -518,7 +518,7 @@ function ExamTaking({
           );
         })}
         <span className="mono ml-auto text-[12px] font-semibold text-[var(--ink3)]">
-          <span className="text-[var(--red)]">{cursor + 1}</span> / {total}
+          <span className="text-[var(--red-ink)]">{cursor + 1}</span> / {total}
         </span>
       </div>
 
@@ -550,7 +550,7 @@ function ExamTaking({
               onChange={(e) => setAnswer(q.id, e.target.value)}
               rows={5}
               placeholder="写下你的答案…"
-              className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] leading-[1.7] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+              className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] leading-[1.7] text-[var(--ink)] outline-none transition-[color,border-color,box-shadow] placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
             />
           ) : (
             <div className="space-y-2.5">
@@ -577,7 +577,7 @@ function ExamTaking({
                       >
                         {selected ? <CheckCircle size={13} weight="fill" /> : ""}
                       </span>
-                      <span className={`text-[14.5px] leading-[1.6] ${selected ? "text-[var(--red)]" : "text-[var(--ink2)]"}`}>
+                      <span className={`text-[14.5px] leading-[1.6] ${selected ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}>
                         {opt.label}
                       </span>
                     </button>
@@ -590,7 +590,7 @@ function ExamTaking({
       </AnimatePresence>
 
       {error && (
-        <div className="rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] text-[var(--red)]">
+        <div className="rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] text-[var(--red-ink)]">
           {error}
         </div>
       )}
@@ -613,7 +613,7 @@ function ExamTaking({
           <button
             type="button"
             onClick={() => setCursor(Math.min(total - 1, cursor + 1))}
-            className="studio-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[14px] font-semibold text-[var(--red)] shadow-[var(--card)] transition-colors"
+            className="studio-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-3 text-[14px] font-semibold text-white shadow-[var(--card)] transition-colors hover:bg-[var(--red-hover)]"
           >
             下一题 <ArrowRight size={16} weight="bold" />
           </button>
@@ -687,7 +687,7 @@ function ExamReport({ report, onRetake }: { report: Report; onRetake: () => void
           {report.examTitle} · 共 {report.review.length} 题
           {wrong.length > 0 ? (
             <>
-              ，答错 <span className="font-bold text-[var(--red)]">{wrong.length}</span> 题
+              ，答错 <span className="font-bold text-[var(--red-ink)]">{wrong.length}</span> 题
             </>
           ) : (
             "，全部答对，漂亮！"
@@ -700,7 +700,7 @@ function ExamReport({ report, onRetake }: { report: Report; onRetake: () => void
               type="button"
               onClick={makeCards}
               disabled={carding}
-              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red)] shadow-[var(--card)] transition-colors disabled:opacity-50"
+              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red-ink)] shadow-[var(--card)] transition-colors disabled:opacity-50"
             >
               {carding ? <CircleNotch size={15} className="animate-spin" /> : <Cards size={15} weight="fill" />}
               错题生成复习卡
@@ -785,7 +785,7 @@ function ReviewCardItem({ q, index }: { q: ReviewQuestion; index: number }) {
         ) : (
           <>
             {!q.correct && (
-              <div className="text-[var(--red)]">
+              <div className="text-[var(--red-ink)]">
                 <span className="text-[var(--ink4)]">你的作答：</span>
                 {userLabel}
               </div>
@@ -819,10 +819,10 @@ function answerLabel(q: ReviewQuestion, val: string): string {
     if (q.options && Number.isInteger(idx) && idx >= 0 && idx < q.options.length) {
       return `${String.fromCharCode(65 + idx)}. ${q.options[idx]}`;
     }
-    return val || "—";
+    return val || "未作答";
   }
-  if (q.type === "judge") return val === "true" ? "正确" : val === "false" ? "错误" : "—";
-  return val || "—";
+  if (q.type === "judge") return val === "true" ? "正确" : val === "false" ? "错误" : "未作答";
+  return val || "未作答";
 }
 
 // 错题复习卡背面：正解 + 解析（+溯源）

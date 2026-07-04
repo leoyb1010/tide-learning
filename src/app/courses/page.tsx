@@ -1,9 +1,10 @@
 import { Suspense } from "react";
+import { MagnifyingGlass, Compass } from "@phosphor-icons/react/dist/ssr";
 import { listCourses } from "@/lib/queries";
 import { expandSearchKeywords } from "@/lib/llm";
 import { CourseCard } from "@/components/CourseCard";
 import { CourseFilterBar } from "@/components/CourseFilterBar";
-import { EmptyState, Button } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 export const metadata = { title: "课程库" };
 
@@ -30,7 +31,7 @@ export default async function CoursesPage({
           课程库
         </h1>
         <p className="text-[15px] leading-relaxed text-[var(--ink2)]">
-          订阅解锁全站 · 每门课都在持续更新
+          订阅解锁全站，每门课都在持续更新
         </p>
       </header>
 
@@ -39,21 +40,43 @@ export default async function CoursesPage({
       </Suspense>
 
       {courses.length === 0 ? (
-        <EmptyState
-          title="没有找到相关课程"
-          hint="换个关键词，或看看推荐课程"
-          action={<Button href="/courses">查看全部课程</Button>}
-        />
+        // 空态：有设计感的构图（图形 + 引导 + 双 CTA），而非灰图标一句话
+        <div className="elev-1 flex flex-col items-center justify-center rounded-[18px] px-6 py-16 text-center">
+          <div
+            className="relative flex h-20 w-20 items-center justify-center rounded-[20px] text-white"
+            style={{ background: "var(--track-default)" }}
+          >
+            <div
+              className="pointer-events-none absolute inset-0 rounded-[20px]"
+              style={{ background: "radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.22), transparent 60%)" }}
+            />
+            <MagnifyingGlass size={34} weight="light" />
+          </div>
+          <p className="mt-5 text-[17px] font-bold text-[var(--ink)]">没有找到相关课程</p>
+          <p className="mt-1.5 max-w-[360px] text-[14px] leading-[1.7] text-[var(--ink2)]">
+            换个关键词试试，或直接浏览全部课程，也许下一门就是你要找的。
+          </p>
+          <div className="mt-6 flex items-center gap-2.5">
+            <Button href="/courses">查看全部课程</Button>
+            <a
+              href="/pricing"
+              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+            >
+              <Compass size={15} weight="bold" /> 看看订阅权益
+            </a>
+          </div>
+        </div>
       ) : (
         <>
-          <div className="flex items-center justify-between">
-            <span className="mono text-[12px] text-[var(--ink3)]">
-              共 {courses.length} 门课程
-            </span>
-          </div>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {courses.map((c) => (
-              <CourseCard key={c.id} course={c} />
+          {/* 课程计数：不再独占一段 section（去掉空的 justify-between），作为网格的小标注紧贴其上 */}
+          <span className="-mb-3 text-[13px] text-[var(--ink3)]">
+            共 <span className="mono num-pop font-semibold text-[var(--ink)]">{courses.length}</span> 门课程
+          </span>
+          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {courses.map((c, i) => (
+              <div key={c.id} className="h-full" style={{ "--i": i } as React.CSSProperties}>
+                <CourseCard course={c} />
+              </div>
             ))}
           </div>
         </>

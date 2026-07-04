@@ -15,7 +15,7 @@ import { DEMAND_STATUS } from "@/lib/format";
 import type { RankedDemandView } from "@/lib/queries";
 
 /**
- * VoteLeaderboard — 课程共创投票重设计（§6.6 v2）。
+ * VoteLeaderboard, 课程共创投票重设计（§6.6 v2）。
  * 顶部「本周之星」深色 Color Block 大卡 + 生命周期阶段轨 + 增强需求卡列表。
  * 每张卡新增：讨论数、本周新增票（↑N 绿字）、支持者头像堆叠、发起人一句话理由。
  * 投票逻辑/API 完全复用 VoteButton，不做改动。
@@ -106,10 +106,11 @@ function WeeklyDelta({
   tone?: "light" | "dark";
 }) {
   if (recent <= 0) return null;
+  // 正向增长信号：亮/暗都用 --ok 语义色（token 已双值，深色区对比达标）
   return (
     <span
       className={`mono inline-flex items-center gap-0.5 text-[11px] font-semibold ${
-        tone === "dark" ? "text-[#4ade80]" : "text-[#16a34a]"
+        tone === "dark" ? "text-[var(--ok)] brightness-125" : "text-[var(--ok)]"
       }`}
       title="本周新增票数"
     >
@@ -138,7 +139,8 @@ function StarCard({
       initial={{ opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
       transition={SPRING}
-      className="relative overflow-hidden rounded-[18px] bg-[var(--video-bg)] p-6 text-white shadow-[var(--lift)]"
+      className="relative overflow-hidden rounded-[18px] p-6 text-white shadow-[var(--lift)]"
+      style={{ background: "var(--video-grad)" }}
     >
       {/* 右上红圆装饰（信号红，低透明） */}
       <div
@@ -171,7 +173,7 @@ function StarCard({
             <p className="line-clamp-2 max-w-[560px] text-[14px] leading-[1.65]">
               {pitch}
               {demand.authorNickname && (
-                <span className="ml-1.5 text-white/45">— {demand.authorNickname}</span>
+                <span className="ml-1.5 text-white/45">· {demand.authorNickname}</span>
               )}
             </p>
           </div>
@@ -384,7 +386,7 @@ function RankedCard({
             <p className="line-clamp-1 text-[13px] leading-[1.55]">
               {pitch}
               {demand.authorNickname && (
-                <span className="ml-1 text-[var(--ink4)]">— {demand.authorNickname}</span>
+                <span className="ml-1 text-[var(--ink4)]">· {demand.authorNickname}</span>
               )}
             </p>
           </div>

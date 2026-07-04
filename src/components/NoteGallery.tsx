@@ -25,7 +25,7 @@ export function NoteGallery({ notes }: { notes: NoteRow[] }) {
             href={n.courseId && n.lessonId
               ? `/courses/${n.courseId}/learn/${n.lessonId}${n.timestampSec != null ? `?t=${n.timestampSec}` : ""}`
               : `/notes/${n.id}`}
-            className="studio-lift group block overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]"
+            className="studio-lift group block overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]"
           >
             {/* 顶部标记点：截帧橙 */}
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -37,10 +37,11 @@ export function NoteGallery({ notes }: { notes: NoteRow[] }) {
             />
             <div className="space-y-1.5 p-3.5">
               <div className="flex items-center gap-2 text-[12px] text-[var(--ink4)]">
-                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "#f59e0b" }} />
+                <span className="inline-block h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: "var(--warn)" }} />
                 <span className="truncate">{n.lesson?.title ?? "截帧笔记"}</span>
                 {n.timestampSec != null && (
-                  <span className="mono ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2 py-0.5 text-[var(--red)]">
+                  // 时间戳只是「第几秒」的中性元数据，改中性胶囊——把红留给 CTA/进度/到期这类关键信号
+                  <span className="mono ml-auto inline-flex shrink-0 items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2 py-0.5 text-[var(--ink3)]">
                     <Clock size={11} weight="fill" /> {mmss(n.timestampSec)}
                   </span>
                 )}

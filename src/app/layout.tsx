@@ -22,16 +22,23 @@ export const metadata: Metadata = {
     template: "%s · 有道自习室",
   },
   description:
-    "有道自习室 STUDIO — 订阅制学习平台：口语实战、AI 技能、银发英语、生活实用。视频与笔记在同一张桌面，边看边记，随手截帧成卡。",
+    "有道自习室 STUDIO，订阅制学习平台：口语实战、AI 技能、银发英语、生活实用。视频与笔记在同一张桌面，边看边记，随手截帧成卡。",
   keywords: ["有道自习室", "STUDIO", "订阅学习", "口语", "AI技能", "银发英语", "在线课程", "持续更新"],
+  manifest: "/manifest.webmanifest",
   openGraph: {
     title: "有道自习室 · STUDIO",
-    description: "视频与笔记在同一张桌面——边看边记，随手截帧成卡。持续更新的订阅制学习流。",
+    description: "视频与笔记在同一张桌面，边看边记，随手截帧成卡。持续更新的订阅制学习流。",
     type: "website",
     siteName: "有道自习室",
     locale: "zh_CN",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: "有道自习室 STUDIO" }],
   },
-  twitter: { card: "summary_large_image", title: "有道自习室 · STUDIO", description: "视频与笔记在同一张桌面，边看边记。" },
+  twitter: {
+    card: "summary_large_image",
+    title: "有道自习室 · STUDIO",
+    description: "视频与笔记在同一张桌面，边看边记。",
+    images: ["/og-image.png"],
+  },
 };
 
 export const viewport: Viewport = {

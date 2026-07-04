@@ -9,7 +9,7 @@ import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
 import { TrialBooking } from "@/components/TrialBooking";
 import { formatDurationSec } from "@/lib/format";
-import { TRACK_MAP } from "@/lib/tracks";
+import { TRACK_MAP, trackGradientVar } from "@/lib/tracks";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -50,21 +50,28 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       <div className="grid items-start gap-5 lg:grid-cols-[1.55fr_.92fr]">
         {/* ---------- 左列 ---------- */}
         <div className="flex flex-col gap-[18px]">
-          {/* 预告视频 */}
+          {/* 预告视频：深色展示区，赛道渐变叠 --video-grad + 柔光，弃死黑平面 */}
           <div
-            className="relative aspect-[16/9] w-full overflow-hidden rounded-[20px] shadow-[var(--lift)]"
-            style={{ background: "radial-gradient(120% 120% at 30% 20%, #3b2a5e 0%, #241d3a 45%, #17131f 100%)" }}
+            className="studio-lightup group/hero relative aspect-[16/9] w-full overflow-hidden rounded-[20px] shadow-[var(--lift)]"
+            style={{ background: "var(--video-grad)" }}
           >
+            {/* 赛道色调层，让深色区带上课程个性 */}
+            <div className="absolute inset-0 opacity-[0.55] mix-blend-soft-light" style={{ background: trackGradientVar(course.category) }} />
+            {/* 顶部内高光 + 细网格材质 */}
             <div
-              className="absolute inset-0 opacity-[0.10]"
+              className="pointer-events-none absolute inset-0"
+              style={{ background: "radial-gradient(130% 90% at 50% 0%, rgba(255,255,255,.16), transparent 58%)" }}
+            />
+            <div
+              className="pointer-events-none absolute inset-0 opacity-[0.10]"
               style={{ backgroundImage: "radial-gradient(circle at 1px 1px, rgba(255,255,255,0.6) 1px, transparent 0)", backgroundSize: "18px 18px" }}
             />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white/[0.16] backdrop-blur-sm ring-1 ring-white/25">
+              <span className="flex h-[66px] w-[66px] items-center justify-center rounded-full bg-white/[0.16] backdrop-blur-sm ring-1 ring-white/25 transition-transform duration-300 group-hover/hero:scale-105">
                 <Play size={26} weight="fill" className="translate-x-[2px] text-white" />
               </span>
             </div>
-            <span className="mono absolute bottom-4 left-4 rounded-full bg-black/35 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+            <span className="mono absolute bottom-4 left-4 rounded-full bg-black/35 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-sm ring-1 ring-white/10">
               预告 · 02:30
             </span>
           </div>
@@ -116,7 +123,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               <h2 className="text-[18px] font-bold text-[var(--ink)]">课程大纲</h2>
               <span className="mono text-[12px] text-[var(--ink3)]">已学 {learnedCount}/{lessons.length}</span>
             </div>
-            <ul className="overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
+            <ul className="stagger overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
               {lessons.map((l, i) => {
                 const isNow = i === nowIndex;
                 const isDone = nowIndex === -1 ? true : i < nowIndex;
@@ -125,6 +132,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
                 return (
                   <li
                     key={l.id}
+                    style={{ "--i": i } as React.CSSProperties}
                     className={`border-b border-[var(--border)] last:border-b-0 ${isNow ? "bg-[var(--red-soft)]" : ""}`}
                   >
                     <OutlineRow
@@ -169,11 +177,11 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
         {/* ---------- 右列 sticky ---------- */}
         <aside className="flex flex-col gap-4 lg:sticky lg:top-24">
           {/* 进度卡 */}
-          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
+          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)]">
             <div className="flex items-center justify-between">
               <span className="text-[13px] font-medium text-[var(--ink3)]">你的进度</span>
-              <span className="mono rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red)]">
-                {progressPct}% 继续加油
+              <span className="rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red)]">
+                <span className="mono num-pop">{progressPct}%</span> 继续加油
               </span>
             </div>
             <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-[var(--surface-inset)]">
@@ -189,18 +197,36 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             {/* CTA */}
             <div className="mt-4 space-y-2.5">
               {hasAccess ? (
-                <Button href={continueHref} full size="lg">进入学习台</Button>
+                <Button href={continueHref} full size="lg" className="cta-glow">进入学习台</Button>
               ) : (
                 <>
-                  {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg">免费试学第一章</Button>}
+                  {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg" className="cta-glow">免费试学第一章</Button>}
                   <Button href="/pricing" variant="secondary" full>订阅解锁全部</Button>
                   {/* 英语赛道提供预约试听（有道 0转正入口） */}
                   {isEnglish && <TrialBooking courseId={course.id} track={course.category} source="youdao_dict" />}
                 </>
               )}
             </div>
+
+            {/* 订阅门：有说服力的三点价值，而非干巴巴一句话 */}
+            {!hasAccess && (
+              <ul className="mt-4 space-y-2 text-[12.5px] leading-[1.5] text-[var(--ink2)]">
+                <li className="flex items-start gap-2">
+                  <Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--ok)]" />
+                  <span>订阅即解锁本赛道全部课程，随更新持续获得新内容</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--ok)]" />
+                  <span>边学边记，笔记与截帧永久保留，停订后仍可查看</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--ok)]" />
+                  <span><span className="mono font-semibold text-[var(--ink)]">{freeCount}</span> 讲免费试学，先看后订，随时可退</span>
+                </li>
+              </ul>
+            )}
             <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">
-              {snapshot.isSubscriber && !hasAccess ? "你的订阅未覆盖该赛道，升级全站即可解锁" : "订阅后解锁该赛道课程 · 笔记永久保留"}
+              {snapshot.isSubscriber && !hasAccess ? "你的订阅未覆盖该赛道，升级全站即可解锁" : "订阅后解锁该赛道课程，笔记永久保留"}
             </p>
 
             {/* 讲师 */}
@@ -235,8 +261,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       {related.length > 0 && (
         <section>
           <h2 className="mb-4 text-[18px] font-bold text-[var(--ink)]">相关课程</h2>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {related.map((c) => <CourseCard key={c.id} course={c} />)}
+          <div className="stagger grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {related.map((c, i) => (
+              <div key={c.id} className="h-full" style={{ "--i": i } as React.CSSProperties}>
+                <CourseCard course={c} />
+              </div>
+            ))}
           </div>
         </section>
       )}
@@ -253,7 +283,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 function Stat({ value, label }: { value: string; label: string }) {
   return (
     <div>
-      <div className="text-[20px] font-extrabold leading-none tracking-tight text-[var(--ink)]">{value}</div>
+      <div className="mono text-[20px] font-extrabold leading-none tracking-tight text-[var(--ink)]">{value}</div>
       <div className="mt-1 text-[12px] text-[var(--ink3)]">{label}</div>
     </div>
   );
@@ -308,13 +338,16 @@ function OutlineRow({
       <span className="mono shrink-0 text-[12px] text-[var(--ink4)]">{duration}</span>
       <span className="flex w-[52px] shrink-0 items-center justify-end">
         {isNow ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-[var(--red)] px-2.5 py-1 text-[11px] font-semibold text-white">
+          <span className="cta-glow inline-flex items-center gap-1 rounded-full bg-[var(--red)] px-2.5 py-1 text-[11px] font-semibold text-white">
             在学 <CaretRight size={11} weight="bold" />
           </span>
         ) : isNew ? (
           <span className="rounded-full bg-[var(--new-bg)] px-2 py-0.5 text-[10px] font-bold text-[var(--new-ink)]">NEW</span>
         ) : isDone ? (
-          <Check size={16} weight="bold" className="text-[var(--ink4)]" />
+          // 完课用功能色 --ok，语义清晰且不与红信号争抢
+          <span className="inline-flex h-[18px] w-[18px] items-center justify-center rounded-full bg-[var(--ok-soft)] text-[var(--ok)]">
+            <Check size={12} weight="bold" />
+          </span>
         ) : locked ? (
           <LockSimple size={15} className="text-[var(--ink4)]" />
         ) : (

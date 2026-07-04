@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
+import type { CSSProperties } from "react";
 import { useEffect, useMemo, useState } from "react";
 import {
   Sparkle,
@@ -27,6 +28,15 @@ const TRACK_OPTIONS: { key: string; label: string }[] = [
   { key: "english_foundation", label: "听说读写全能" },
   { key: "life", label: "生活实用" },
   { key: "silver_english", label: "银发口语" },
+];
+
+// 造课首屏「试试这些」灵感 chip（与 iOS 端 CreateView 对齐/本地化）：
+// 点击即填充 prompt，给空输入框一个明确的启动引导，降冷启动门槛。
+const PROMPT_EXAMPLES: string[] = [
+  "讲讲 Python 装饰器，我是初学者",
+  "30 天练成职场邮件写作",
+  "用一周搞懂神经网络是怎么学习的",
+  "带我从零开口说英语",
 ];
 
 // §4 资料升维——导入 Tab 的 6 项收益
@@ -416,9 +426,9 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
         </div>
       )}
 
-      {/* —— 权益不足横幅 —— */}
+      {/* —— 权益预检提示（未订阅时，红只做关键信号） —— */}
       {!canUseLLM && !inTheater && (
-        <div className="mt-5 flex w-full items-center gap-2.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[13px] text-[var(--ink2)]">
+        <div className="studio-rise mt-5 flex w-full items-center gap-2.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[13px] text-[var(--ink2)] shadow-[var(--card)]">
           <Lock size={16} weight="fill" className="shrink-0 text-[var(--red)]" />
           <span className="flex-1">AI 造课为订阅会员专享，订阅后即可无限生成专属课程。</span>
           <Button href="/pricing" size="sm" variant="primary">去订阅</Button>
@@ -427,7 +437,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
 
       {/* —— 主体：编辑态 / 剧场态 / 完成态 —— */}
       {phase === "idle" ? (
-        <div className="mt-5 w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)] sm:p-6">
+        <div className="studio-rise mt-5 w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-6">
           {tab === "generate" ? (
             <div className="flex flex-col gap-4">
               <div className="relative">
@@ -437,11 +447,28 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
                   rows={5}
                   maxLength={500}
                   placeholder="描述你想学的，比如：讲讲 Python 装饰器，我是初学者"
-                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3.5 text-[16px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus:bg-[var(--surface)]"
+                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[16px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
                   {prompt.length}/500
                 </span>
+              </div>
+
+              {/* 「试试这些」灵感 chip：点击即填充 prompt，给空输入框一个启动引导（与 iOS 端一致） */}
+              <div className="flex flex-col gap-2">
+                <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">试试这些</span>
+                <div className="flex flex-wrap gap-2">
+                  {PROMPT_EXAMPLES.map((ex) => (
+                    <button
+                      key={ex}
+                      type="button"
+                      onClick={() => setPrompt(ex)}
+                      className="studio-press rounded-full border border-[var(--border)] bg-[var(--surface2)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink3)] transition-all duration-150 hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                    >
+                      {ex}
+                    </button>
+                  ))}
+                </div>
               </div>
 
               {/* 赛道选择（可选） */}
@@ -471,7 +498,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
               <button
                 type="button"
                 onClick={handleGenerate}
-                className="studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] hover:brightness-105"
+                className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
               >
                 <Sparkle size={17} weight="fill" />
                 生成课程
@@ -480,12 +507,13 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
             </div>
           ) : (
             <div className="flex flex-col gap-4">
-              {/* §4 导入收益六宫格 */}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {IMPORT_BENEFITS.map((b) => (
+              {/* §4 导入收益六宫格：stagger 递延进场 + hover 抬升，材质分级到 surface2 */}
+              <div className="stagger grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {IMPORT_BENEFITS.map((b, i) => (
                   <div
                     key={b.label}
-                    className="flex flex-col gap-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5"
+                    style={{ "--i": i } as CSSProperties}
+                    className="studio-lift flex cursor-default flex-col gap-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5 shadow-[var(--card)]"
                   >
                     <div className="flex items-center gap-1.5">
                       <b.Icon size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
@@ -501,7 +529,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
                 onChange={(e) => setImportTitle(e.target.value)}
                 maxLength={60}
                 placeholder="课程标题（可留空，AI 帮你起）"
-                className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3 text-[15px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus:bg-[var(--surface)]"
+                className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
               />
               <div className="relative">
                 <textarea
@@ -510,7 +538,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
                   rows={8}
                   maxLength={50000}
                   placeholder="把你的学习资料 / PDF 内容 / 文章粘贴进来，AI 帮你整理成可学的课"
-                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--bg2)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus:bg-[var(--surface)]"
+                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
                   {importText.length}/50000
@@ -519,7 +547,7 @@ export function CreateStudio({ canUseLLM }: { canUseLLM: boolean }) {
               <button
                 type="button"
                 onClick={handleImport}
-                className="studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] hover:brightness-105"
+                className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
               >
                 <FilePlus size={17} weight="fill" />
                 把资料升维成课
@@ -575,7 +603,7 @@ function TheaterPanel({
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
   return (
-    <div className="mt-5 w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)] sm:p-6">
+    <div className="studio-rise mt-5 w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-6">
       {/* —— 三步步骤条 —— */}
       <ol className="flex flex-col gap-2.5">
         {steps.map((s, i) => {
@@ -623,8 +651,8 @@ function TheaterPanel({
               {source === "import" ? "升维章节" : "课程大纲"} · {total} 节
             </span>
             {phase === "lessons" && (
-              <span className="mono text-[11px] font-semibold text-[var(--ink2)]">
-                {doneCount}/{total}
+              <span key={doneCount} className="num-pop mono text-[11px] font-semibold text-[var(--ink2)]">
+                <span className="text-[var(--ink)]">{doneCount}</span>/{total}
               </span>
             )}
           </div>
@@ -632,7 +660,7 @@ function TheaterPanel({
           {/* 逐节写作时的当前节提示 */}
           {phase === "lessons" && writingIndex < total && lessons[writingIndex]?.state === "writing" && (
             <p className="mb-3 text-[13px] text-[var(--ink2)]">
-              正在写第 <span className="mono font-semibold text-[var(--ink)]">{writingIndex + 1}/{total}</span> 节：
+              正在写第 <span key={writingIndex} className="num-pop mono font-semibold text-[var(--red)]">{writingIndex + 1}/{total}</span> 节：
               <span className="font-semibold text-[var(--ink)]">{lessons[writingIndex].title}</span>
             </p>
           )}
@@ -641,7 +669,12 @@ function TheaterPanel({
             {lessons.map((l, i) => (
               <li
                 key={l.id}
-                className="studio-slide flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2"
+                className={`studio-slide flex items-center gap-2.5 rounded-[10px] border px-3 py-2 transition-colors duration-200 ${
+                  l.state === "writing"
+                    ? // 正在写的这行自己发光：提亮到 surface + 一道红左边框，和顶部「正在写第 N 节」提示形成注意力接力
+                      "border-[var(--red-soft-border)] border-l-2 border-l-[var(--red)] bg-[var(--surface)] shadow-[var(--card)]"
+                    : "border-[var(--border)] bg-[var(--surface2)]"
+                }`}
                 style={{ animationDelay: `${Math.min(i, 8) * 55}ms` }}
               >
                 <LessonStateIcon state={l.state} index={i} />
@@ -659,7 +692,7 @@ function TheaterPanel({
                   {l.title}
                 </span>
                 {l.state === "failed" && (
-                  <span className="mono shrink-0 rounded-full bg-[var(--red-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--red)]">
+                  <span className="mono shrink-0 rounded-full border border-[var(--warn)]/40 bg-[var(--warn-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink2)]">
                     待重试
                   </span>
                 )}
@@ -682,31 +715,45 @@ function TheaterPanel({
         </div>
       )}
 
-      {/* 大纲未回来前的等待态（步骤1/2） */}
+      {/* 大纲未回来前的等待态（步骤1/2）：贴合大纲布局的骨架预览，而非孤零一句 */}
       {total === 0 && (
-        <div className="mt-5 flex items-center gap-2.5 border-t border-[var(--border)] pt-4">
-          <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--red)] border-t-transparent" />
-          <span className="text-[13px] text-[var(--ink2)]">
-            {phase === "understand"
-              ? source === "import"
-                ? "正在通读你的资料…"
-                : "正在读懂你的需求…"
-              : source === "import"
-              ? "正在按主题拆分章节…"
-              : "正在设计课程大纲…"}
-          </span>
+        <div className="mt-5 border-t border-[var(--border)] pt-4">
+          <div className="flex items-center gap-2.5">
+            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--red)] border-t-transparent" />
+            <span className="text-[13px] font-medium text-[var(--ink2)]">
+              {phase === "understand"
+                ? source === "import"
+                  ? "正在通读你的资料…"
+                  : "正在读懂你的需求…"
+                : source === "import"
+                ? "正在按主题拆分章节…"
+                : "正在设计课程大纲…"}
+            </span>
+          </div>
+          {/* 大纲骨架占位（预告即将逐条浮现的章节结构） */}
+          <ul className="mt-3.5 flex flex-col gap-1.5" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <li
+                key={i}
+                className="flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2"
+              >
+                <span className="skeleton h-[17px] w-[17px] shrink-0 rounded-full" />
+                <span className="skeleton h-3 rounded-full" style={{ width: `${72 - i * 12}%` }} />
+              </li>
+            ))}
+          </ul>
         </div>
       )}
     </div>
   );
 }
 
-/** 单节状态图标 */
+/** 单节状态图标：完成 ✓ 用 --ok（绿），失败用 --warn（琥珀），写作中用红（live 生成信号） */
 function LessonStateIcon({ state, index }: { state?: LessonState; index: number }) {
   if (state === "done")
-    return <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--red)]" />;
+    return <CheckCircle key="done" size={17} weight="fill" className="num-pop shrink-0 text-[var(--ok)]" />;
   if (state === "failed")
-    return <XCircle size={17} weight="fill" className="shrink-0 text-[var(--ink4)]" />;
+    return <XCircle size={17} weight="fill" className="shrink-0 text-[var(--warn)]" />;
   if (state === "writing")
     return <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--red)] border-t-transparent" />;
   // pending：显示序号
@@ -738,41 +785,49 @@ function DonePanel({
   const failed = lessons.filter((l) => l.state === "failed");
   const isImport = source === "import";
 
-  // 「这门课包含」/「升维报告」条目
-  const facts: { Icon: typeof BookOpen; num: number | string; label: string }[] = isImport
+  // 「这门课包含」/「升维报告」条目。
+  // 大数字行只放纯数字（保证 18px extrabold 强调档整齐）；「AI 伴侣」不是可数量，
+  // 数字槽改用 Check 图标点亮它的「已就位」状态，不再把中文词塞进数字位撑爆节奏。
+  const facts: { Icon: typeof BookOpen; num?: number; check?: boolean; label: string }[] = isImport
     ? [
         { Icon: BookOpen, num: summary.total, label: "章" },
         { Icon: MagicWand, num: summary.quizzes, label: "个测验" },
         { Icon: Cards, num: summary.cards, label: "张要点卡" },
-        { Icon: Sparkle, num: "已就位", label: "伴侣读完全文" },
+        { Icon: Sparkle, check: true, label: "AI 伴侣读完全文" },
       ]
     : [
         { Icon: BookOpen, num: summary.total, label: "节" },
         { Icon: MagicWand, num: summary.quizzes, label: "个测验" },
         { Icon: Cards, num: summary.cards, label: "张要点卡" },
-        { Icon: Sparkle, num: "已就位", label: "AI 伴侣" },
+        { Icon: Sparkle, check: true, label: "AI 伴侣" },
       ];
 
   return (
-    <div className="studio-poweron studio-sweep relative mt-5 w-full overflow-hidden rounded-[18px] border border-[var(--red-soft-border)] bg-[var(--surface)] p-5 shadow-[var(--lift)] sm:p-6">
-      {/* 顶部：成功徽标 */}
-      <div className="flex items-center gap-2.5">
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--red-soft)]">
-          <Star size={18} weight="fill" className="text-[var(--red)]" />
+    <div className="studio-poweron studio-sweep relative mt-5 w-full overflow-hidden rounded-[18px] border border-[var(--red-soft-border)] bg-[var(--surface)] shadow-[var(--lift)]">
+      {/* 顶部：深色通电展示带（--video-grad 渐变，弃死黑平面），成功徽标点亮 */}
+      <div
+        className="relative flex items-center gap-3 overflow-hidden px-5 py-4 sm:px-6"
+        style={{ background: "var(--video-grad)" }}
+      >
+        {/* 内顶柔光，材质而非平面 */}
+        <span className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[var(--hairline-on-dark)]" />
+        <span className="studio-lightup flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--red)] shadow-[var(--red-glow)]">
+          <Star size={20} weight="fill" className="text-white" />
         </span>
-        <div>
-          <div className="text-[16px] font-extrabold text-[var(--ink)]">
+        <div className="min-w-0">
+          <div className="text-[16px] font-extrabold text-white">
             {isImport ? "升维报告" : "这门课已就绪"}
           </div>
-          <div className="text-[12.5px] text-[var(--ink3)]">
+          <div className="text-[12.5px] text-white/65">
             {isImport ? "你的资料已经变成一门可学的课" : "大纲、讲解、测验、伴侣，全部准备好了"}
           </div>
         </div>
       </div>
 
+      <div className="p-5 sm:p-6">
       {/* 升维报告：字数 → 结构化 转化句 */}
       {isImport && summary.chars ? (
-        <p className="mt-4 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--ink2)]">
+        <p className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--ink2)] shadow-[var(--inner-hi)]">
           你的 <span className="mono font-bold text-[var(--ink)]">{summary.chars.toLocaleString()}</span> 字资料
           <ArrowRight size={13} weight="bold" className="mx-1.5 inline align-middle text-[var(--red)]" />
           <span className="mono font-bold text-[var(--ink)]">{summary.total}</span> 章 ·
@@ -780,39 +835,47 @@ function DonePanel({
           <span className="mono font-bold text-[var(--ink)]"> {summary.cards}</span> 要点卡 · 伴侣已读完全文
         </p>
       ) : (
-        <p className="mt-4 text-[13.5px] text-[var(--ink2)]">这门课包含：</p>
+        <p className="text-[13.5px] font-semibold text-[var(--ink2)]">这门课包含：</p>
       )}
 
-      {/* 事实清单（数字用 .mono） */}
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {facts.map((f) => (
+      {/* 事实清单：stagger 递延点亮，数字 .num-pop 强调 */}
+      <div className="stagger mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {facts.map((f, i) => (
           <div
             key={f.label}
-            className="flex flex-col items-center gap-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-3 text-center"
+            style={{ "--i": i } as CSSProperties}
+            className="flex flex-col items-center gap-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-3 text-center shadow-[var(--card)]"
           >
             <f.Icon size={18} weight="fill" className="text-[var(--red)]" />
-            <span className="mono text-[18px] font-extrabold leading-none text-[var(--ink)]">{f.num}</span>
+            {f.check ? (
+              // 「已就位」用 Check 图标占数字槽——与前三格纯数字同高，不撑爆 18px 数字位
+              <span className="num-pop flex h-[22px] items-center leading-none text-[var(--ok)]">
+                <Check size={19} weight="bold" />
+              </span>
+            ) : (
+              <span className="num-pop mono text-[18px] font-extrabold leading-none text-[var(--ink)]">{f.num}</span>
+            )}
             <span className="text-[11px] leading-snug text-[var(--ink3)]">{f.label}</span>
           </div>
         ))}
       </div>
 
-      {/* 部分失败：可重试的章节 */}
+      {/* 部分失败：可重试的章节（--warn 语义，非红信号） */}
       {failed.length > 0 && (
-        <div className="mt-4 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3">
+        <div className="mt-4 rounded-[12px] border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-4 py-3">
           <p className="text-[12.5px] font-semibold text-[var(--ink2)]">
-            有 {failed.length} 节暂未写完，可单独重试：
+            有 <span className="mono font-bold text-[var(--ink)]">{failed.length}</span> 节暂未写完，可单独重试：
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
             {failed.map((l) => (
               <li key={l.id} className="flex items-center gap-2">
-                <XCircle size={15} weight="fill" className="shrink-0 text-[var(--ink4)]" />
+                <XCircle size={15} weight="fill" className="shrink-0 text-[var(--warn)]" />
                 <span className="flex-1 truncate text-[12.5px] text-[var(--ink2)]">{l.title}</span>
                 <button
                   type="button"
                   onClick={() => onRetry(l.id)}
                   disabled={l.state === "writing"}
-                  className="studio-press mono shrink-0 rounded-full border border-[var(--red)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red)] transition-colors hover:bg-[var(--red)] hover:text-white disabled:opacity-50"
+                  className="studio-press mono shrink-0 rounded-full border border-[var(--warn)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:bg-[var(--warn)] hover:text-white disabled:opacity-50"
                 >
                   {l.state === "writing" ? "写作中…" : "重试"}
                 </button>
@@ -827,7 +890,7 @@ function DonePanel({
         <button
           type="button"
           onClick={onStart}
-          className="studio-press group inline-flex flex-1 items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] hover:brightness-105"
+          className="cta-glow studio-press group inline-flex flex-1 items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
         >
           <BookOpen size={17} weight="fill" />
           开始学习
@@ -836,10 +899,11 @@ function DonePanel({
         <button
           type="button"
           onClick={onReset}
-          className="studio-press shrink-0 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+          className="studio-press shrink-0 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
         >
           再来一门
         </button>
+      </div>
       </div>
     </div>
   );

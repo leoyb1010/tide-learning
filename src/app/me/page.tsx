@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CaretRight, Cards, Play, Flame, Medal } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Cards, Play, Flame, Medal, Check } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { getGamificationSummary } from "@/lib/gamification";
@@ -102,14 +102,16 @@ export default async function MePage() {
         <h2 className="text-[18px] font-bold text-[var(--ink)]">学习进度</h2>
 
         {learning.length > 0 ? (
-          <div className="flex flex-col gap-2.5">
-            {learning.map((r) => {
+          <div className="stagger flex flex-col gap-2.5">
+            {learning.map((r, i) => {
               const dur = r.lesson.durationSec;
               const pct = dur > 0 ? Math.min(Math.round((r.progressSec / dur) * 100), 100) : 0;
+              const done = pct >= 100;
               return (
                 <div
                   key={r.lessonId}
-                  className="studio-lift rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+                  style={{ "--i": i } as React.CSSProperties}
+                  className="studio-lift rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -118,17 +120,24 @@ export default async function MePage() {
                     </div>
                     <Link
                       href={`/courses/${r.course.slug}/learn/${r.lesson.id}`}
-                      className="studio-press inline-flex shrink-0 items-center gap-1 rounded-[10px] bg-[var(--red)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                      className="studio-press cta-glow hover-sheen inline-flex shrink-0 items-center gap-1 rounded-[10px] bg-[var(--red)] px-3.5 py-1.5 text-[13px] font-semibold text-white"
                     >
-                      <Play size={12} weight="fill" /> 继续
+                      <Play size={12} weight="fill" /> {done ? "重温" : "继续"}
                     </Link>
                   </div>
-                  {/* 进度条 */}
+                  {/* 进度条：完课用语义绿(--ok)，进行中用有道红 */}
                   <div className="mt-3 flex items-center gap-3">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-inset)]">
-                      <div className="h-full rounded-full bg-[var(--red)]" style={{ width: `${pct}%` }} />
+                      <div
+                        className={`h-full rounded-full ${done ? "bg-[var(--ok)]" : "bg-[var(--red)]"}`}
+                        style={{ width: `${pct}%` }}
+                      />
                     </div>
-                    <span className="mono shrink-0 text-[11px] font-semibold text-[var(--ink3)]">{pct}%</span>
+                    <span
+                      className={`mono shrink-0 text-[11px] font-semibold ${done ? "text-[var(--ok)]" : "text-[var(--ink3)]"}`}
+                    >
+                      {pct}%
+                    </span>
                   </div>
                   <p className="mono mt-2 text-[11px] text-[var(--ink4)]">
                     最近学习 · {relativeTime(r.lastPlayedAt)}
@@ -138,19 +147,29 @@ export default async function MePage() {
             })}
           </div>
         ) : (
-          <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-6 text-center shadow-[var(--card)]">
-            <p className="text-[14px] font-semibold text-[var(--ink)]">还没有开始学习</p>
-            <p className="mt-1 text-[13px] text-[var(--ink3)]">挑一门课，或从一个想法开始你的第一堂课。</p>
-            <div className="mt-4 flex items-center justify-center gap-2.5">
+          <div className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-6 py-10 text-center shadow-[var(--card),var(--inner-hi)]">
+            {/* 构图：同心圆导引 + 播放符号，替代单调灰图标 */}
+            <div className="relative mx-auto grid h-20 w-20 place-items-center">
+              <span className="absolute inset-0 rounded-full border border-[var(--border)]" aria-hidden />
+              <span className="absolute inset-[10px] rounded-full border border-[var(--border2)]" aria-hidden />
+              <span className="grid h-11 w-11 place-items-center rounded-full bg-[var(--red-soft)] text-[var(--red)]" aria-hidden>
+                <Play size={20} weight="fill" />
+              </span>
+            </div>
+            <p className="mt-5 text-[16px] font-bold text-[var(--ink)]">开启你的第一堂课</p>
+            <p className="mx-auto mt-1.5 max-w-[300px] text-[13px] leading-relaxed text-[var(--ink3)]">
+              挑一门感兴趣的课程，或从一个想法出发，让自习室为你生成专属内容。
+            </p>
+            <div className="mt-5 flex items-center justify-center gap-2.5">
               <Link
                 href="/courses"
-                className="rounded-[10px] bg-[var(--red)] px-4 py-2 text-[13px] font-semibold text-white transition-opacity hover:opacity-90"
+                className="studio-press cta-glow hover-sheen inline-flex items-center rounded-[10px] bg-[var(--red)] px-4 py-2 text-[13px] font-semibold text-white"
               >
                 去选课
               </Link>
               <Link
                 href="/create"
-                className="rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--border2)]"
+                className="studio-press inline-flex items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--border2)]"
               >
                 创建课程
               </Link>
@@ -158,13 +177,15 @@ export default async function MePage() {
           </div>
         )}
 
-        {/* 我的复习入口 */}
+        {/* 我的复习入口（待复习用 --warn 语义，红只留给关键信号） */}
         <Link
           href="/review"
-          className="studio-lift flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+          className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
         >
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--red-soft)] text-[var(--red)]">
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-[12px] ${dueCount > 0 ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--surface-inset)] text-[var(--ink3)]"}`}
+            >
               <Cards size={18} weight="fill" />
             </div>
             <div>
@@ -172,7 +193,7 @@ export default async function MePage() {
               <p className="text-[12px] text-[var(--ink3)]">
                 {dueCount > 0 ? (
                   <>
-                    <span className="mono font-semibold text-[var(--red)]">{dueCount}</span> 张待复习
+                    <span className="mono font-semibold text-[var(--warn)]">{dueCount}</span> 张待复习
                   </>
                 ) : (
                   "暂无到期复习卡"
@@ -190,63 +211,80 @@ export default async function MePage() {
 
         {/* 连续学习 + 本周数据 + 本周节奏柱图 */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-          {/* 连续学习（浅色精致卡，红色数字主视觉） */}
-          <div className="relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
-            <div className="flex items-center justify-between">
-              <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">连续学习</span>
-              <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--red-soft)] text-[var(--red)]">
+          {/* 连续学习（深色展示区：渐变 + 红数字主视觉 + 柔光，体验高峰） */}
+          <div
+            className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--hairline-on-dark)] p-5 shadow-[var(--lift)]"
+            style={{ background: "var(--video-grad)" }}
+          >
+            {/* 右下红色柔光晕，暗区不死黑 */}
+            <span
+              className="pointer-events-none absolute -bottom-10 -right-8 h-32 w-32 rounded-full opacity-40 blur-2xl"
+              style={{ background: "radial-gradient(circle, var(--red) 0%, transparent 70%)" }}
+              aria-hidden
+            />
+            <div className="relative flex items-center justify-between">
+              <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink-on-dark-3)]">连续学习</span>
+              <span className="grid h-8 w-8 place-items-center rounded-full bg-[var(--red)] text-white shadow-[var(--red-glow)]">
                 <Flame size={15} weight="fill" />
               </span>
             </div>
-            <div className="mt-2 flex items-baseline gap-1">
-              <span className="font-[var(--font-jakarta)] text-[52px] font-extrabold leading-none text-[var(--red)]">
+            <div className="relative mt-2 flex items-baseline gap-1">
+              <span
+                key={gamification.currentStreak}
+                className="num-pop mono text-[52px] font-extrabold leading-none tracking-tight text-[var(--red)]"
+              >
                 {gamification.currentStreak}
               </span>
-              <span className="text-[15px] text-[var(--ink3)]">天</span>
+              <span className="text-[15px] text-[var(--ink-on-dark-2)]">天</span>
             </div>
             {/* 14 格进度（映射到满月目标进度） */}
-            <div className="mt-4 flex gap-1">
+            <div className="relative mt-4 flex gap-1">
               {Array.from({ length: 14 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`h-1.5 flex-1 rounded-full ${i < Math.round(streakPct * 14) ? "bg-[var(--red)]" : "bg-[var(--surface-inset)]"}`}
+                  className={`h-1.5 flex-1 rounded-full ${i < Math.round(streakPct * 14) ? "bg-[var(--red)]" : "bg-[var(--hairline-on-dark)]"}`}
                 />
               ))}
             </div>
-            <p className="mt-3 text-[12px] text-[var(--ink3)]">
+            <p className="relative mt-3 text-[12px] text-[var(--ink-on-dark-2)]">
               {daysToGoal > 0 ? `再学 ${daysToGoal} 天解锁满月徽章` : "已解锁满月徽章"}
             </p>
           </div>
 
           {/* 本周数据 */}
-          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
+          <div className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
             <WeekStat label="本周时长" value={formatDurationSec(weekMinutes * 60)} />
             <div className="mx-5 border-t border-[var(--border)]" />
-            <WeekStat label="活跃天数" value={`${weekActiveDays} 天`} />
+            <WeekStat label="活跃天数" value={`${weekActiveDays} 天`} accent={weekActiveDays > 0} />
             <div className="mx-5 border-t border-[var(--border)]" />
             <WeekStat label="新增笔记" value={`${weekNotes} 条`} />
           </div>
 
-          {/* 本周节奏柱状图 */}
-          <div className="flex flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
+          {/* 本周节奏柱状图（峰值日红色点睛，柱体递延升起） */}
+          <div className="flex flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)]">
             <div className="flex items-baseline justify-between">
               <h3 className="text-[13px] font-bold text-[var(--ink)]">本周学习节奏</h3>
               <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">分钟 · 天</span>
             </div>
-            <div className="mt-4 flex flex-1 items-end justify-between gap-2" style={{ minHeight: 108 }}>
+            <div className="stagger mt-4 flex flex-1 items-end justify-between gap-2" style={{ minHeight: 108 }}>
               {weekDays.map((d, i) => {
                 const h = d.minutes > 0 ? Math.max((d.minutes / peakMinutes) * 100, 8) : 0;
                 const isPeak = d.minutes >= peakMinutes;
+                const isToday = i === todayLocalDow;
                 return (
-                  <div key={i} className="flex flex-1 flex-col items-center gap-1.5">
+                  <div key={i} style={{ "--i": i } as React.CSSProperties} className="flex flex-1 flex-col items-center gap-1.5">
                     <div className="flex h-[88px] w-full items-end">
                       <div
-                        className={`w-full rounded-t-[4px] transition-colors ${isPeak && d.minutes > 0 ? "bg-[var(--red)]" : d.minutes > 0 ? "bg-[var(--border2)]" : "bg-[var(--surface-inset)]"}`}
+                        className={`w-full rounded-t-[4px] transition-colors ${isPeak && d.minutes > 0 ? "bg-[var(--red)]" : d.minutes > 0 ? "bg-[var(--chart-bar-muted)]" : "bg-[var(--surface-inset)]"}`}
                         style={{ height: `${Math.max(h, d.minutes > 0 ? h : 4)}%` }}
                         title={d.isFuture ? undefined : `周${WEEK_LABELS[i]} · ${d.minutes} 分钟`}
                       />
                     </div>
-                    <span className="mono text-[10px] text-[var(--ink4)]">{WEEK_LABELS[i]}</span>
+                    <span
+                      className={`mono text-[10px] ${isToday ? "font-bold text-[var(--ink2)]" : "text-[var(--ink4)]"}`}
+                    >
+                      {WEEK_LABELS[i]}
+                    </span>
                   </div>
                 );
               })}
@@ -261,32 +299,34 @@ export default async function MePage() {
         {gamification.achievements.length > 0 && (
           <div>
             <h3 className="mb-3.5 text-[14px] font-bold text-[var(--ink)]">成就徽章</h3>
-            <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
-              {gamification.achievements.map((a) => {
+            <div className="stagger grid grid-cols-2 gap-3.5 sm:grid-cols-3 lg:grid-cols-6">
+              {gamification.achievements.map((a, i) => {
                 // 成就 key → 徽章图（缺省回退 emoji/icon 文本）
                 const badgeImg: Record<string, string> = {
                   week_streak: "/badges/badge-streak.png",
                   first_subscribe: "/badges/badge-milestone.png",
                   first_note: "/badges/badge-note.png",
-                  first_tide: "/badges/badge-vote.png",
+                  first_tide: "/badges/badge-tide.png",
                   cocreator: "/badges/badge-vote.png",
                 };
                 const img = badgeImg[a.key];
                 return (
                   <div
                     key={a.key}
-                    className="studio-lift flex flex-col items-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 text-center shadow-[var(--card)]"
+                    style={{ "--i": i } as React.CSSProperties}
+                    className="studio-lift hover-sheen flex flex-col items-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 text-center shadow-[var(--card),var(--inner-hi)]"
                   >
                     {img ? (
-                      <img src={img} alt="" width={40} height={40} loading="lazy" className="h-10 w-10 object-contain" />
+                      <img src={img} alt={`${a.name} 徽章`} width={40} height={40} loading="lazy" className="h-10 w-10 object-contain" />
                     ) : (
-                      <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--red-soft)] text-[var(--red)]" aria-hidden>
+                      <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-inset)] text-[var(--ink2)]" aria-hidden>
                         <Medal size={22} weight="fill" />
                       </span>
                     )}
                     <p className="truncate text-[12px] font-semibold text-[var(--ink)]">{a.name}</p>
-                    <span className="rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--red)]">
-                      已获得
+                    {/* 已获得用 --ok 语义（达成=成功绿），红留给关键信号 */}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--ok-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ok)]">
+                      <Check size={9} weight="bold" /> 已获得
                     </span>
                   </div>
                 );
@@ -311,11 +351,11 @@ export default async function MePage() {
   );
 }
 
-function WeekStat({ label, value }: { label: string; value: string }) {
+function WeekStat({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
   return (
     <div className="flex items-center justify-between px-5 py-4">
       <span className="text-[13px] text-[var(--ink2)]">{label}</span>
-      <span className="mono text-[22px] font-bold text-[var(--ink)]">{value}</span>
+      <span className={`mono text-[22px] font-bold ${accent ? "text-[var(--ok)]" : "text-[var(--ink)]"}`}>{value}</span>
     </div>
   );
 }

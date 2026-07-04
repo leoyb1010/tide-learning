@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
  * 潮汐主题空态插画库（B4）。纯 SVG，入场时波形 path 生长。
  * variant 对应不同空态场景。
  */
-type Variant = "notes" | "courses" | "demands" | "search" | "offline" | "notfound";
+type Variant = "notes" | "courses" | "demands" | "search" | "offline" | "notfound" | "review";
 
 const TITLES: Record<Variant, string> = {
   notes: "还没有笔记",
@@ -15,8 +15,17 @@ const TITLES: Record<Variant, string> = {
   search: "没有找到结果",
   offline: "网络离线了",
   notfound: "页面走丢了",
+  review: "今日已复习完",
 };
 
+/**
+ * 空态插画统一为一套纯 SVG 潮汐场景：透明底、跟随亮暗的 ink/accent 语义色、
+ * 按 variant 切换的场景符号，全套从同一基座（滩涂 + 双道波形）生长，天然成系统。
+ * 原三张栅格图（empty-tide/notes/review）各带米白底（sips 实测 hasAlpha:no）+
+ * 烤入文案 / Youdao 字标，画风构图不一，且米白矩形在 dark 模式露出刺眼亮块——
+ * 已全部退出渲染路径，文案一律交给组件层的 title + description 承担（可 i18n、
+ * 自动跟随暗色模式），杜绝图内双标题与暗色破相。
+ */
 export function TideIllustration({ variant, size = 120 }: { variant: Variant; size?: number }) {
   return (
     <svg width={size} height={size * 0.8} viewBox="0 0 160 128" fill="none" role="img" aria-label={TITLES[variant]}>
@@ -88,6 +97,16 @@ function VariantGlyph({ variant }: { variant: Variant }) {
           <path d="M74 40a6 6 0 018 0c0 4-6 4-6 8M80 58v.5" />
         </g>
       );
+    case "review":
+      // 今日复习已清空：完成勾（accent 描边，呼应红纸船点题）
+      return (
+        <g strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="80" cy="44" r="17" className="stroke-ink-300" />
+          <path d="M72 44l6 6 11-12" className="stroke-accent-400" />
+        </g>
+      );
+    default:
+      return null;
   }
 }
 
@@ -100,16 +119,13 @@ export function EmptyTide({
       className="flex flex-col items-center justify-center py-14 text-center"
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
     >
-      {/* 统一潮汐水潭插画：一叶红纸船漂在空空的潮池，点题「潮汐」且更有温度 */}
-      <img
-        src="/illustrations/empty-tide.png"
-        alt={TITLES[variant]}
-        width={220}
-        height={165}
-        loading="lazy"
-        className="h-auto w-[220px] max-w-full opacity-95"
-      />
-      <p className="mt-4 text-base font-medium text-ink-800">{TITLES[variant]}</p>
+      {/* 空态插画统一为纯 SVG 潮汐场景（透明底 + 跟随亮暗的 ink/accent 语义色 +
+          按 variant 切换的场景符号）：无烤字、无白底矩形，light/dark 双端都不破相，
+          整套图从一个基座生长，天然成系统。原三张栅格图（各带米白底 + 烤入文案）
+          已退出渲染路径，文案一律交由下方 title + description 承担。 */}
+      <TideIllustration variant={variant} size={200} />
+      {/* 插画→标题多一档呼吸（mt-6），补上「大图—标题」间距档位，避免 200px 插画贴着标题 */}
+      <p className="mt-6 text-base font-medium text-ink-800">{TITLES[variant]}</p>
       {description && <p className="mt-1 max-w-xs text-sm text-ink-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </motion.div>

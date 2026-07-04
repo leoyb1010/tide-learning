@@ -1,13 +1,16 @@
 import Link from "next/link";
 import { Users, PlayCircle, Sparkle } from "@phosphor-icons/react/dist/ssr";
-import { Badge, CoverBg, coverSrc } from "./ui";
+import { Badge, coverSrc } from "./ui";
 import { Spotlight } from "./motion";
+import { trackGradientVar } from "@/lib/tracks";
 
 export interface CourseCardData {
   id: string;
   slug: string;
   title: string;
   subtitle: string | null;
+  /** 赛道 key，用于封面渐变映射（视觉，不参与权益判断） */
+  category?: string;
   categoryLabel: string;
   levelLabel: string;
   coverColor: string;
@@ -21,15 +24,38 @@ export interface CourseCardData {
 }
 
 export function CourseCard({ course }: { course: CourseCardData }) {
+  const grad = trackGradientVar(course.category ?? "");
+  const hasCover = Boolean(course.slug);
+
   return (
     <Spotlight className="h-full rounded-[var(--radius-card)]">
       <Link
         href={`/courses/${course.slug}`}
-        className="studio-lift group flex h-full flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)] hover:border-[var(--border2)]"
+        className="studio-lift group flex h-full flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]"
       >
-        <CoverBg color={course.coverColor} imageSrc={coverSrc(course.slug)} alt={course.title} className="aspect-[16/10] w-full">
+        {/* 封面：赛道渐变底 + 可选封面图 + hover 高光扫过 */}
+        <div className="hover-sheen relative aspect-[16/10] w-full" style={{ background: grad }}>
+          {/* 深色区柔光顶高光，避免死平面 */}
+          <div
+            className="pointer-events-none absolute inset-0"
+            style={{ background: "radial-gradient(120% 90% at 50% 0%, rgba(255,255,255,.18), transparent 60%)" }}
+          />
+          {hasCover && (
+            <img
+              src={coverSrc(course.slug)}
+              alt={course.title}
+              loading="lazy"
+              decoding="async"
+              className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+            />
+          )}
+          {/* 底部压暗渐变，保证角标与免费标可读 */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/30 to-transparent" />
+
           <div className="absolute left-3.5 top-3.5">
-            <span className="rounded-full bg-black/20 px-2.5 py-1 text-[0.7rem] font-medium text-white backdrop-blur-sm">{course.categoryLabel}</span>
+            <span className="rounded-full bg-black/25 px-2.5 py-1 text-[0.7rem] font-medium text-white/95 backdrop-blur-sm ring-1 ring-white/10">
+              {course.categoryLabel}
+            </span>
           </div>
           {/* NEW 角标：本周上新（A3） */}
           {course.isNew && (
@@ -39,26 +65,31 @@ export function CourseCard({ course }: { course: CourseCardData }) {
             </div>
           )}
           {course.freeLessonsCount > 0 && (
-            <div className="absolute bottom-3.5 left-3.5 flex items-center gap-1.5 rounded-full bg-white/90 px-2.5 py-1 text-[0.7rem] font-medium text-accent-700 backdrop-blur-sm">
-              <PlayCircle size={13} weight="fill" />
+            // 免费试学：文字退成中性深色，只保留 PlayCircle 一点红点睛——封面上同时最多一处彩色热点
+            <div className="absolute bottom-3.5 left-3.5 flex items-center gap-1.5 rounded-full bg-white/92 px-2.5 py-1 text-[0.7rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
+              <PlayCircle size={13} weight="fill" className="text-[var(--red-active)]" />
               {course.freeLessonsCount} 节免费试学
             </div>
           )}
-        </CoverBg>
+        </div>
+
         <div className="flex flex-1 flex-col p-5">
           <div className="mono flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">
             <span>{course.levelLabel}</span>
             <span className="h-3 w-px bg-[var(--border)]" />
             <span>{course.duration}</span>
           </div>
-          <h3 className="mt-2 font-bold tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">{course.title}</h3>
-          {course.subtitle && <p className="mt-1 line-clamp-1 text-sm text-[var(--ink2)]">{course.subtitle}</p>}
+          {/* 标题显式提到 17px/leading-snug，与 14px 副标拉开层级；封面→标题→副标→指标四级节奏 */}
+          <h3 className="mt-2 text-[17px] font-bold leading-snug tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">{course.title}</h3>
+          {/* 副标始终占一行高度（无则 &nbsp; 占位），让同排卡片标题基线对齐、栅格成一条线 */}
+          <p className="mt-1 line-clamp-1 text-sm text-[var(--ink2)]">{course.subtitle || " "}</p>
           <div className="mt-auto flex items-center justify-between border-t border-[var(--border)] pt-3.5 text-[0.78rem]">
             {/* 更新标记做成 Badge，比裸文本更醒目（A3） */}
             <Badge tone="success">{course.updateText}</Badge>
-            <span className="mono flex items-center gap-1 text-[var(--ink3)]">
+            {/* 学习人数=社会证明：数字 num 强调（semibold + ink2），图标留在 ink3，别和数字同灰同重 */}
+            <span className="flex items-center gap-1 text-[var(--ink3)]">
               <Users size={13} />
-              {course.learnersCount.toLocaleString()}
+              <span className="num font-semibold text-[var(--ink2)]">{course.learnersCount.toLocaleString()}</span>
             </span>
           </div>
         </div>
