@@ -108,6 +108,8 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
   const [state, setState] = useState<LoadState>("idle");
   const [tab, setTab] = useState<TabKey>("all");
   const panelRef = useRef<HTMLDivElement>(null);
+  // 打开前的焦点锚点：关闭时还原，避免焦点落回 body（WCAG 2.4.3 焦点顺序）。
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     setHost(document.body);
@@ -141,6 +143,10 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
   /* Esc 关闭 + focus trap + 滚动锁（对齐 Dialog）。 */
   useEffect(() => {
     if (!open) return;
+    // 仅在 open 转真时记录一次锚点（onClose 变更导致 effect 重跑时不覆盖成浮层内按钮）。
+    if (!restoreFocusRef.current) {
+      restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    }
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
@@ -158,6 +164,13 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
       document.removeEventListener("keydown", onKey);
     };
   }, [open, onClose]);
+
+  /* 关闭（open 转假）时还原焦点并清空锚点，为下次打开重新记录做准备。 */
+  useEffect(() => {
+    if (open) return;
+    restoreFocusRef.current?.focus?.();
+    restoreFocusRef.current = null;
+  }, [open]);
 
   /* 打开时把 Tab 复位到「全部」，让每次召唤都从总览开始。 */
   useEffect(() => {

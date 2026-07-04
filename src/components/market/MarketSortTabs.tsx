@@ -2,18 +2,17 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import { FireSimple, ClockCounterClockwise, Heart } from "@phosphor-icons/react";
+import { FireSimple, ClockCounterClockwise } from "@phosphor-icons/react";
 import { MARKET_SORTS, normalizeSort, type MarketSort } from "@/lib/market-view";
 
 const ICONS: Record<MarketSort, React.ComponentType<{ size?: number; weight?: "fill" | "bold" | "regular" }>> = {
   hot: FireSimple,
   new: ClockCounterClockwise,
-  loved: Heart,
 };
 
 /**
  * MarketSortTabs —— 集市排序切换（client）。
- * 最热(拿走多) / 最新 / 收藏多。改写 URL ?sort= 触发 server 重排（保 SEO + 可分享 + 刷新保持）。
+ * 最热(拿走多) / 最新。改写 URL ?sort= 触发 server 重排（保 SEO + 可分享 + 刷新保持）。
  * 铁律：仅 router 导航，不引 server 链。当前项红点睛（唯一强调），reduce-motion 靠 CSS 全局降级。
  */
 export function MarketSortTabs() {

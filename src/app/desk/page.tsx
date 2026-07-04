@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
@@ -126,22 +127,25 @@ async function StudyDeskHome({ user }: { user: User }) {
   return (
     <>
       <TrackView event="desk_view" properties={{ mode: "desk" }} />
-      <StudyDesk
-        nickname={user.nickname}
-        greeting={greeting}
-        streak={streakCount}
-        litToday={litToday}
-        resume={resume}
-        resumeList={resumeList}
-        myCourseCount={myCourseCount}
-        recentNotes={recentNotes}
-        dueReviewCount={dueReviewCount}
-        advice={advice}
-        onlineCount={onlineCount}
-        focusHref={focusHref}
-        weeklyReport={weeklyReport}
-        shelfCount={shelfCount}
-      />
+      {/* StudyDesk 用 useSearchParams 读 ?shelf=1（自动开书架），Next 15 要求 Suspense 边界。 */}
+      <Suspense fallback={null}>
+        <StudyDesk
+          nickname={user.nickname}
+          greeting={greeting}
+          streak={streakCount}
+          litToday={litToday}
+          resume={resume}
+          resumeList={resumeList}
+          myCourseCount={myCourseCount}
+          recentNotes={recentNotes}
+          dueReviewCount={dueReviewCount}
+          advice={advice}
+          onlineCount={onlineCount}
+          focusHref={focusHref}
+          weeklyReport={weeklyReport}
+          shelfCount={shelfCount}
+        />
+      </Suspense>
       {/* 底部：书架上新（降权展示，复用 listUpdates）*/}
       <ShelfNew />
     </>

@@ -9,7 +9,6 @@ import {
   Sparkle,
   ListChecks,
   BookmarkSimple,
-  Heart,
   UsersThree,
   ArrowRight,
   Gift,
@@ -33,14 +32,12 @@ const BADGE_TONE: Record<1 | 2 | 3 | 4, { fg: string; bg: string; bd: string }> 
 /**
  * MarketStallCard —— 集市「摊位卡」（client，v4.0 交易市场重设计）。
  *
- * 摊位隐喻：卖家(摊主)立在卡上，交易气息数字(N 人拿走 / N 收藏)，价签(免费拿走)，
+ * 摊位隐喻：卖家(摊主)立在卡上，交易气息数字(N 人拿走 / N 在学)，价签(免费拿走)，
  * 封面赛道渐变 + 材质精致，hover 抬升 + hover-sheen。
  *
  * 互动：
  *  - 「拿走」→ POST /api/market/collect → 乐观更新(拿走数+1、CTA 变「去学习」)
- *    + 微动效(课本飞入袋) + Toast。已在书架/本人摊位不出「拿走」。
- *  - 收藏/点赞：本地乐观 toggle（MVP 无课程收藏表，纯前端心情态；样式复用互动语言，
- *    数字随手感 +1/-1，不落库，待数据层补 favorite 后接真值即可）。
+ *    + 微动效(课本飞入袋) + Toast「去书架」跳 /desk?shelf=1。已在书架/本人摊位不出「拿走」。
  *  - 卡片主体点进课程详情看大纲。
  *
  * 铁律：本文件 "use client"，只 fetch API + 客户端埋点，不引 server 链。
@@ -62,10 +59,6 @@ export function MarketStallCard({
   const [collected, setCollected] = useState(stall.collectedByMe);
   const [collectCount, setCollectCount] = useState(stall.collectCount);
   const [flying, setFlying] = useState(false); // 课本入袋动效开关
-
-  // 收藏态（本地心情，占位互动）。
-  const [loved, setLoved] = useState(false);
-  const [favoriteCount, setFavoriteCount] = useState(stall.favoriteCount);
 
   const isAi = stall.origin === "ai_generated";
   const detailHref = `/courses/${stall.slug}`;
@@ -114,7 +107,7 @@ export function MarketStallCard({
         if (!stall.collectedByMe) setCollectCount(stall.collectCount);
         toast(json.data.message, { tone: "info" });
       } else {
-        toast(json.data.message, { tone: "success", action: { label: "去书架", onClick: () => router.push("/me/courses") } });
+        toast(json.data.message, { tone: "success", action: { label: "去书架", onClick: () => router.push("/desk?shelf=1") } });
         track("market_collect", { course_id: stall.id });
       }
       router.refresh();
@@ -127,16 +120,6 @@ export function MarketStallCard({
       // 动效收尾（reduce 下瞬时结束）。
       window.setTimeout(() => setFlying(false), reduce ? 0 : 720);
     }
-  }
-
-  // ---------- 收藏（本地占位 toggle）----------
-  function toggleLove(e: React.MouseEvent) {
-    e.preventDefault();
-    e.stopPropagation();
-    const next = !loved;
-    setLoved(next);
-    setFavoriteCount((c) => Math.max(0, c + (next ? 1 : -1)));
-    if (next) track("market_favorite", { course_id: stall.id });
   }
 
   return (
@@ -230,23 +213,12 @@ export function MarketStallCard({
           </span>
         </div>
 
-        {/* 交易气息数字条：拿走 · 收藏 · 学习人数 */}
+        {/* 交易气息数字条：拿走 · 学习人数 */}
         <div className="mt-3 flex items-center gap-3 text-[11.5px] text-[var(--ink3)]">
           <span className="flex items-center gap-1" title="被拿走到书架的人数">
             <BookmarkSimple size={13} weight="fill" className="text-[var(--ink4)]" />
             <span className="mono text-[var(--ink2)]">{abbrevCount(collectCount)}</span> 拿走
           </span>
-          <span className="h-3 w-px bg-[var(--border)]" />
-          <button
-            type="button"
-            onClick={toggleLove}
-            className="studio-press flex items-center gap-1 rounded-full px-1 py-0.5 transition-colors hover:text-[var(--red)]"
-            aria-pressed={loved}
-            aria-label={loved ? "取消收藏" : "收藏这门课"}
-          >
-            <Heart size={13} weight={loved ? "fill" : "regular"} className={loved ? "text-[var(--red)]" : "text-[var(--ink4)]"} />
-            <span className={`mono ${loved ? "text-[var(--red)]" : "text-[var(--ink2)]"}`}>{abbrevCount(favoriteCount)}</span> 收藏
-          </button>
           {stall.learnersCount > 0 && (
             <>
               <span className="h-3 w-px bg-[var(--border)]" />

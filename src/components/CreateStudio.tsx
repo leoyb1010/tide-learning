@@ -719,7 +719,7 @@ export function CreateStudio({
           summary={summary}
           lessons={lessons}
           onStart={() => router.push(`/courses/${summary.slug}/learn/${summary.firstLessonId}`)}
-          onViewShelf={() => router.push("/me/courses")}
+          onViewShelf={() => router.push("/desk?shelf=1")}
           onRetry={retryLesson}
           onReset={resetTheater}
         />

@@ -15,10 +15,8 @@ export interface MarketStall {
   coverColor: string;
   coverSrc: string;
   origin: string; // ai_generated / user_imported / official
-  /** 拿走数（= 有该课学习记录的去重用户数，来自数据层）。 */
+  /** 拿走数（= 有该课学习记录的去重用户数，排除作者本人，来自数据层）。 */
   collectCount: number;
-  /** 收藏数（MVP 无课程收藏表，服务端给合理占位；后续接真值即替换）。 */
-  favoriteCount: number;
   /** 累计学习人数（Course.learnersCount 真值，交易气息补充信号）。 */
   learnersCount: number;
   /** 当前登录用户是否已把此课拿到书架（决定 CTA 初始态）。 */
@@ -34,18 +32,17 @@ export interface MarketStall {
   };
 }
 
-/** 排序键：最热（拿走多）/ 最新 / 收藏多。URL searchParam 契约。 */
-export type MarketSort = "hot" | "new" | "loved";
+/** 排序键：最热（拿走多）/ 最新。URL searchParam 契约。 */
+export type MarketSort = "hot" | "new";
 
 export const MARKET_SORTS: { key: MarketSort; label: string }[] = [
   { key: "hot", label: "最热" },
   { key: "new", label: "最新" },
-  { key: "loved", label: "收藏多" },
 ];
 
 /** 把任意入参规整为合法排序键，非法值回落"最热"（交易市场默认看热货）。 */
 export function normalizeSort(raw: string | undefined | null): MarketSort {
-  return raw === "new" || raw === "loved" ? raw : "hot";
+  return raw === "new" ? raw : "hot";
 }
 
 /**
@@ -72,7 +69,7 @@ export function stallGradientVar(category: string): string {
 }
 
 /**
- * 客户端排序：卡片"拿走/收藏"乐观更新后，切排序 tab 无需回服务端，
+ * 客户端排序：卡片"拿走"乐观更新后，切排序 tab 无需回服务端，
  * 直接在已加载的摊位数组上稳定重排（同分保原序，交互零延迟）。
  * 纯函数、不改原数组。
  */
@@ -81,8 +78,6 @@ export function sortStalls(stalls: MarketStall[], sort: MarketSort): MarketStall
   arr.sort((a, b) => {
     if (sort === "new") {
       if (b.s.createdAtMs !== a.s.createdAtMs) return b.s.createdAtMs - a.s.createdAtMs;
-    } else if (sort === "loved") {
-      if (b.s.favoriteCount !== a.s.favoriteCount) return b.s.favoriteCount - a.s.favoriteCount;
     } else {
       if (b.s.collectCount !== a.s.collectCount) return b.s.collectCount - a.s.collectCount;
     }

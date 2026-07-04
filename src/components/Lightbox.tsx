@@ -34,6 +34,8 @@ export function Lightbox({
   onClose: () => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
+  // 打开前的焦点锚点：卸载时还原，避免焦点落回 body 丢失缩略图位置（WCAG 2.4.3）。
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [host, setHost] = useState<HTMLElement | null>(null);
 
   const n = images.length;
@@ -51,6 +53,15 @@ export function Lightbox({
 
   useEffect(() => {
     setHost(document.body);
+  }, []);
+
+  // 焦点还原：仅挂载时记录打开前的焦点元素，卸载时还原（与键盘 effect 分离，
+  // 避免 goPrev/goNext 因切换重建导致 effect 重跑时把锚点覆盖成浮层内按钮）。
+  useEffect(() => {
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    return () => {
+      restoreFocusRef.current?.focus?.();
+    };
   }, []);
 
   // 键盘：Esc 关闭、← → 切换、Tab focus trap（与 Dialog 一致）

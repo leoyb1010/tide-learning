@@ -31,24 +31,13 @@ function startOfTodayMs(): number {
 }
 
 /**
- * 收藏数占位（MVP 无课程收藏表）：用 courseId 稳定散列出一个与拿走量正相关的伪值，
- * 同课刷新不跳、热门课收藏更高，视觉上是"合理占位"。数据层补真值后，删此函数改读真实字段即可。
- */
-function placeholderFavorites(courseId: string, collectCount: number): number {
-  let h = 5381;
-  for (let i = 0; i < courseId.length; i++) h = (h * 33) ^ courseId.charCodeAt(i);
-  const noise = (h >>> 0) % 7; // 0-6 的稳定抖动
-  return Math.round(collectCount * 0.6) + noise;
-}
-
-/**
  * /market —— 课程集市「交易市场」（server, v4.0 重设计）。
  *
  * 结构：今日集市氛围条 + 摊位卡网格（stagger 进场）+ 排序切换 + 空态引导。
- * 数据：sharedStatus="shared" 的用户造课；每课派生 拿走数(去重学习用户)/学习人数/摊主，
- *   收藏数为占位（无收藏表）。排序 ?sort=hot|new|loved 由 URL 驱动，server 端重排。
+ * 数据：sharedStatus="shared" 的用户造课；每课派生 拿走数(去重学习用户，排除作者本人)/学习人数/摊主。
+ *   排序 ?sort=hot|new 由 URL 驱动，server 端重排。
  * 越权：登录用户预取"我拿走过哪些课"（where userId=我）决定 CTA 初始态；自己的课标"你的摊位"。
- * 铁律：本 server 组件只查库 + 组装视图模型，交互(拿走/收藏/排序)全在 client 子组件。
+ * 铁律：本 server 组件只查库 + 组装视图模型，交互(拿走/排序)全在 client 子组件。
  */
 export default async function MarketPage({
   searchParams,
@@ -79,9 +68,11 @@ export default async function MarketPage({
   });
 
   const courseIds = courses.map((c) => c.id);
+  // 课 id → 作者 userId，用于「拿走数」聚合时排除作者本人（collect 端点禁止自收藏，统计须一致）。
+  const courseAuthorMap = new Map(courses.map((c) => [c.id, c.authorUserId]));
 
   // 每门课「拿走数」= 有该课学习记录的去重用户数（collect 建起始 LearningProgress）。
-  // 按 (courseId,userId) 分组去重后按课累加。
+  // 按 (courseId,userId) 分组去重后按课累加；作者本人学自己的 shared 课不计（与 collect 禁自收藏一致）。
   const collectRows =
     courseIds.length > 0
       ? await prisma.learningProgress.groupBy({
@@ -91,6 +82,7 @@ export default async function MarketPage({
       : [];
   const collectCountMap = new Map<string, number>();
   for (const r of collectRows) {
+    if (r.userId === courseAuthorMap.get(r.courseId)) continue; // 跳过作者本人
     collectCountMap.set(r.courseId, (collectCountMap.get(r.courseId) ?? 0) + 1);
   }
 
@@ -131,7 +123,6 @@ export default async function MarketPage({
       coverSrc: resolveCoverSrc(c.slug, c.category ?? "", c.id),
       origin: c.origin,
       collectCount,
-      favoriteCount: placeholderFavorites(c.id, collectCount),
       learnersCount: c.learnersCount,
       collectedByMe: myCollectedSet.has(c.id),
       mine: Boolean(user && c.authorUserId === user.id),

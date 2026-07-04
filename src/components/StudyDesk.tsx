@@ -2,7 +2,7 @@
 
 import { useState, type CSSProperties, type FormEvent } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ArrowRight,
   Play,
@@ -95,8 +95,10 @@ export function StudyDesk({
   shelfCount,
 }: StudyDeskProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [value, setValue] = useState("");
-  const [shelfOpen, setShelfOpen] = useState(false);
+  // 从集市「去书架」/造课「查看我的书架」带 ?shelf=1 进来时，自动展开书架弹层（含全五层，collected 在此可见）。
+  const [shelfOpen, setShelfOpen] = useState(searchParams.get("shelf") === "1");
 
   // 中央输入框「三合一」：把需求带去 /create 造课（AI 自习室主入口）。
   // 内容较像「找现成课程」的短查询走 /courses?q=；否则默认造课意图带 prompt 过去。
