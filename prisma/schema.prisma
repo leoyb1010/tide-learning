@@ -14,6 +14,7 @@ model User {
   id           String    @id @default(cuid())
   email        String?   @unique
   phone        String?   @unique
+  username     String?   @unique // 短用户名登录（如体验账号 dingyue / admin）；新注册留空，仅 seed 账号使用
   nickname     String
   avatarUrl    String?
   authProvider String    @default("password") // password / wechat

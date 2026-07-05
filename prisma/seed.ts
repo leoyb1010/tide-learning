@@ -265,10 +265,10 @@ async function main() {
 
   // ---------- 用户 ----------
   const admin = await prisma.user.create({
-    data: { nickname: "平台管理员", email: "admin@tide.learning", phone: "13800000000", role: "admin", avatarUrl: "/avatars/avatar-2.png", passwordHash: hashPassword("admin123"), profile: { create: { ageBand: "22-40" } } },
+    data: { nickname: "平台管理员", username: "admin", email: "admin@tide.learning", phone: "13800000000", role: "admin", avatarUrl: "/avatars/avatar-2.png", passwordHash: hashPassword("admin123"), profile: { create: { ageBand: "22-40" } } },
   });
   const demoUser = await prisma.user.create({
-    data: { nickname: "体验用户", email: "demo@tide.learning", phone: "13900000000", role: "user", avatarUrl: "/avatars/avatar-1.png", passwordHash: hashPassword("demo123"), profile: { create: { ageBand: "22-40", learningGoal: "口语 + AI" } } },
+    data: { nickname: "体验用户", username: "dingyue", email: "demo@tide.learning", phone: "13900000000", role: "user", avatarUrl: "/avatars/avatar-1.png", passwordHash: hashPassword("demo123"), profile: { create: { ageBand: "22-40", learningGoal: "口语 + AI" } } },
   });
   // demo：全站年卡
   const sub = await prisma.subscription.create({
@@ -961,7 +961,7 @@ async function main() {
   console.log(`   真实视频已填入 ${[...new Set(videoFilledCourses)].length} 门课首讲：${[...new Set(videoFilledCourses)].join(", ")}`);
   console.log(`   课程 ${courses.length} 门（有道英语板块 + 潮汐 AI/生活）`);
   console.log(`   套餐：全站(月/季/年) + 单赛道(口语/银发/AI) · 线索 ${leadSeeds.length} 条`);
-  console.log("   admin@tide.learning/admin123 · demo@tide.learning/demo123(全站) · oral@tide.learning/oral123(仅口语)");
+  console.log("   dingyue/demo123(全站, 或 demo@tide.learning) · admin/admin123(后台) · oral@tide.learning/oral123(仅口语)");
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

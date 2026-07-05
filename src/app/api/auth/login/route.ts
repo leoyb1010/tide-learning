@@ -14,9 +14,12 @@ export async function POST(req: NextRequest) {
     // 账号维度不受 XFF 伪造影响（key 含 identifier）；IP 维度用已加固的 clientIp。
     assertRateLimit(req, `login:${identifier}`, 5, 60_000);
     assertRateLimit(req, "login-ip", 20, 60_000);
+    // 含 @ → 邮箱；否则按 手机号 或 短用户名 命中（体验账号 dingyue / admin 走 username）。
     const isEmail = identifier.includes("@");
     const user = await prisma.user.findFirst({
-      where: isEmail ? { email: identifier } : { phone: identifier },
+      where: isEmail
+        ? { email: identifier }
+        : { OR: [{ phone: identifier }, { username: identifier }] },
     });
     if (!user || user.deletedAt || !verifyPassword(password, user.passwordHash)) {
       return fail("账号或密码不正确", 401);

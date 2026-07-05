@@ -45,11 +45,11 @@ function LoginInner() {
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm text-ink-800">手机号 / 邮箱</label>
+            <label className="mb-1.5 block text-sm text-ink-800">用户名 / 手机号 / 邮箱</label>
             <input
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="13900000000 或 you@example.com"
+              placeholder="dingyue 或 13900000000 或 you@example.com"
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]"
               required
             />
@@ -84,7 +84,7 @@ function LoginInner() {
           </button>
         </p>
         <div className="mt-6 rounded-xl bg-accent-50 p-3 text-xs text-accent-700">
-          体验账号：demo@tide.learning / demo123（已订阅）· admin@tide.learning / admin123（后台）
+          体验账号：dingyue / demo123（已订阅）· admin / admin123（后台）
         </div>
       </div>
       <p className="mt-4 text-center text-xs text-ink-400">
