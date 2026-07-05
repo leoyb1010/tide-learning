@@ -11,128 +11,13 @@ import { track } from "@/lib/analytics";
 import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { buildExcerpt } from "@/lib/format";
+import { htmlToStructuredMarkdown, paragraphizePlainText } from "@/lib/note-structure";
 
 export const dynamic = "force-dynamic";
 
 const FETCH_TIMEOUT_MS = 10_000; // 抓取超时 10s
 const MAX_BODY_LEN = 50_000; // 正文截断 50k 字符
 const MAX_HTML_BYTES = 4_000_000; // 原始 HTML 硬上限 4MB，防超大页面撑爆内存
-
-/**
- * 纯文本 → 分段 Markdown：仅在 Readability 只吐得出 textContent（无结构 HTML）时兜底。
- * 优先按空行分段；若整段无空行（textContent 常见），退而按单换行分段，避免所有内容堆成一坨。
- */
-function paragraphizePlainText(text: string): string {
-  const t = (text ?? "").replace(/\r\n?/g, "\n").trim();
-  if (!t) return "";
-  // 有空行：按空行分段，段内换行折叠为空格
-  if (/\n\s*\n/.test(t)) {
-    return t
-      .split(/\n\s*\n+/)
-      .map((p) => p.replace(/\s*\n\s*/g, " ").trim())
-      .filter(Boolean)
-      .join("\n\n");
-  }
-  // 无空行：按单换行切成段（去掉纯空白行）
-  return t
-    .split(/\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-    .join("\n\n");
-}
-
-/**
- * Readability 的结构化 HTML（article.content）→ 保结构 Markdown。零依赖，走已解析的 jsdom Document。
- * 只做块级结构化（段落 / h1-h6 / 列表 / 引用 / 代码块 / 分隔线）——目的是把断行救回来，
- * 不追求富文本还原（行内加粗/链接等由前端 renderMarkdown + tide-md 承接）。
- * 每个块之间以空行分隔，前端 renderMarkdown 才能识别为独立段落、套上 tide-md 排版。
- */
-function htmlToStructuredMarkdown(contentHtml: string, doc: Document): string {
-  const container = doc.createElement("div");
-  container.innerHTML = contentHtml;
-
-  const clean = (s: string) => s.replace(/\s+/g, " ").trim();
-  const blocks: string[] = [];
-
-  const walk = (node: Element) => {
-    for (const child of Array.from(node.children)) {
-      const tag = child.tagName.toLowerCase();
-      switch (tag) {
-        case "h1":
-        case "h2":
-        case "h3":
-        case "h4":
-        case "h5":
-        case "h6": {
-          const lvl = Math.min(3, Number(tag[1])); // renderMarkdown 仅识别 #{1,3}
-          const txt = clean(child.textContent ?? "");
-          if (txt) blocks.push(`${"#".repeat(lvl)} ${txt}`);
-          break;
-        }
-        case "p": {
-          const txt = clean(child.textContent ?? "");
-          if (txt) blocks.push(txt);
-          break;
-        }
-        case "ul":
-        case "ol": {
-          const ordered = tag === "ol";
-          const items = Array.from(child.querySelectorAll(":scope > li"))
-            .map((li, i) => {
-              const txt = clean(li.textContent ?? "");
-              return txt ? (ordered ? `${i + 1}. ${txt}` : `- ${txt}`) : "";
-            })
-            .filter(Boolean);
-          if (items.length) blocks.push(items.join("\n"));
-          break;
-        }
-        case "blockquote": {
-          const txt = clean(child.textContent ?? "");
-          if (txt) blocks.push(`> ${txt}`);
-          break;
-        }
-        case "pre": {
-          const code = (child.textContent ?? "").replace(/\s+$/, "");
-          if (code.trim()) blocks.push("```\n" + code + "\n```");
-          break;
-        }
-        case "hr":
-          blocks.push("---");
-          break;
-        case "figure":
-        case "figcaption": {
-          const txt = clean(child.textContent ?? "");
-          if (txt) blocks.push(txt);
-          break;
-        }
-        case "div":
-        case "section":
-        case "article":
-        case "main": {
-          // 容器：若自身直含文字而无块级子元素，作为一段；否则递归。
-          const hasBlockChild = child.querySelector(
-            "p,h1,h2,h3,h4,h5,h6,ul,ol,blockquote,pre,figure,section,article,div",
-          );
-          if (hasBlockChild) {
-            walk(child);
-          } else {
-            const txt = clean(child.textContent ?? "");
-            if (txt) blocks.push(txt);
-          }
-          break;
-        }
-        default: {
-          // 其余标签：有文字就当一段，保证不丢内容。
-          const txt = clean(child.textContent ?? "");
-          if (txt) blocks.push(txt);
-        }
-      }
-    }
-  };
-
-  walk(container);
-  return blocks.join("\n\n").replace(/\n{3,}/g, "\n\n").trim();
-}
 
 /**
  * SSRF 防护：仅允许 http/https，且 hostname / 解析出的 IP 不得指向内网 / 环回 / 链路本地。

@@ -165,7 +165,13 @@ function extractBlockSource(blocksJson: string | null): string {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user } = await requireLLMAccess({ deniedMessage: "模拟考试为订阅会员权益，订阅后即可使用" });
+    // 权益门 + 余额预检：出卷是高成本生成（generate_exam 权重 1.0），预检按该场景最坏成本
+    // 设门槛（spendScene），堵住「余额仅够 1 分却发起满额出卷」的超额免单缺口，与造课/逐节生成对齐。
+    // 预检在 requireUser 之后、调 LLM 之前完成（requireLLMAccess 内部 assertCanSpend）。
+    const { user } = await requireLLMAccess({
+      deniedMessage: "模拟考试为订阅会员权益，订阅后即可使用",
+      spendScene: "generate_exam",
+    });
 
     assertUserRateLimit(user.id, "ai_generate_exam", 20, 3_600_000);
 

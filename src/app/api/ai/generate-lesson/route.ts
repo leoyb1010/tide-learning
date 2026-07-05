@@ -17,7 +17,9 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user } = await requireLLMAccess();
+    // 逐节生成为高成本 AI（generate_lesson 权重 1.0）：预检按该场景最坏成本设门槛，
+    // 与造课对齐，堵住负余额/欠账继续逐节刷。扣费在内核 generateLessonCore 按真实 token 记。
+    const { user } = await requireLLMAccess({ spendScene: "generate_lesson" });
 
     assertUserRateLimit(user.id, "ai_gen_lesson", 60, 3_600_000);
 

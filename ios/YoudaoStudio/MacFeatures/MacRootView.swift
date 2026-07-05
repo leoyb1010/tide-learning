@@ -83,8 +83,17 @@ struct MacMainView: View {
             MacNotesView()
                 .navigationTitle("笔记")
         case .profile:
-            comingSoon("我的", icon: "person.fill", subtitle: "个人主页桌面版即将上线")
+            MacProfileView()
                 .navigationTitle("我的")
+        case .market:
+            MacMarketView()
+                .navigationTitle("集市")
+        case .review:
+            MacReviewView()
+                .navigationTitle("复习")
+        case .exam:
+            MacExamView()
+                .navigationTitle("考试")
         }
     }
 

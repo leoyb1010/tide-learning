@@ -94,6 +94,99 @@ export interface LessonCoreResult {
   allReady: boolean;
   /** 实际写入的块数 */
   blocks: number;
+  /** 本节课件质量评分（规则评估，0-100；降级占位节为 0）。见 scoreLesson。 */
+  qualityScore: number;
+}
+
+// ————————————————————————————————————————————————————————————
+//  造课质量评估（规则，零额外 LLM 调用）—— 流3 · U7
+// ————————————————————————————————————————————————————————————
+
+/** 视觉表现力强的块型集合（对应 prompt「硬性规则」中的视觉块要求）。 */
+const VISUAL_BLOCK_TYPES = new Set(["compare", "steps", "dialog", "flashcard", "callout"]);
+/** 交互块集合（quiz 检查理解 / flashcard 记忆点）。 */
+const INTERACTIVE_BLOCK_TYPES = new Set(["quiz", "flashcard"]);
+/** 低于此分视为「弱课件」，记录供 admin 观测 / 后续重生成决策（不阻断，永不空课）。 */
+export const LESSON_QUALITY_THRESHOLD = 60;
+
+export interface LessonQuality {
+  /** 0-100 综合分（六项规则各占权重，命中即加分）。 */
+  score: number;
+  /** 是否达标（score >= 阈值）。 */
+  passed: boolean;
+  /** 逐项命中标志（供埋点/排查，看是哪条规则拖低了分）。 */
+  flags: {
+    /** 块数落在 6-10 的健康区间。 */
+    countOk: boolean;
+    /** 以 scene 或 objectives 开头（钩子/目标）。 */
+    hasOpening: boolean;
+    /** 以 summary 结尾（小结+预告）。 */
+    hasSummary: boolean;
+    /** 至少 1 个交互块（quiz / flashcard）。 */
+    hasInteractive: boolean;
+    /** 至少 2 个视觉强块（compare/steps/dialog/flashcard/callout）。 */
+    hasVisuals: boolean;
+    /** concept 占比 < 60%（未沦为文字墙）。 */
+    conceptRatioOk: boolean;
+  };
+  /** 观测辅助计数。 */
+  total: number;
+  conceptCount: number;
+  visualCount: number;
+  conceptRatio: number;
+}
+
+/**
+ * 规则评估一节 blocks 的质量分（纯函数，零 LLM，零副作用）。
+ *
+ * 六项规则映射 prompt 的「硬性规则」，命中即得对应分（总分 100）：
+ *   - 块数 6-10（20）：过少信息不足、过多冗长。
+ *   - scene/objectives 开头（15）：有钩子与目标。
+ *   - summary 结尾（15）：有小结与下节预告。
+ *   - ≥1 交互块（20）：quiz/flashcard 检查/巩固。
+ *   - ≥2 视觉强块（20）：compare/steps/dialog/flashcard/callout，避免文字墙。
+ *   - concept 占比 <60%（10）：块型混合、有呼吸感。
+ *
+ * 只做「事后打分」，不改内容、不 throw、不触发重生成——由调用方据分数决定埋点/后续动作。
+ * 降级占位节（单个 concept）会自然低分，调用方另行区分（usedFallback）不必依赖本分数。
+ */
+export function scoreLesson(blocks: { type: string }[]): LessonQuality {
+  const total = blocks.length;
+  const conceptCount = blocks.filter((b) => b.type === "concept").length;
+  const visualCount = blocks.filter((b) => VISUAL_BLOCK_TYPES.has(b.type)).length;
+  const interactiveCount = blocks.filter((b) => INTERACTIVE_BLOCK_TYPES.has(b.type)).length;
+  const conceptRatio = total > 0 ? conceptCount / total : 0;
+
+  const firstType = blocks[0]?.type;
+  const lastType = blocks[total - 1]?.type;
+
+  const flags = {
+    countOk: total >= 6 && total <= 10,
+    hasOpening: firstType === "scene" || firstType === "objectives",
+    hasSummary: lastType === "summary",
+    hasInteractive: interactiveCount >= 1,
+    hasVisuals: visualCount >= 2,
+    // 空课/单块不参与占比判定：total<2 直接视为不达标（内容不足）。
+    conceptRatioOk: total >= 2 && conceptRatio < 0.6,
+  };
+
+  const score =
+    (flags.countOk ? 20 : 0) +
+    (flags.hasOpening ? 15 : 0) +
+    (flags.hasSummary ? 15 : 0) +
+    (flags.hasInteractive ? 20 : 0) +
+    (flags.hasVisuals ? 20 : 0) +
+    (flags.conceptRatioOk ? 10 : 0);
+
+  return {
+    score,
+    passed: score >= LESSON_QUALITY_THRESHOLD,
+    flags,
+    total,
+    conceptCount,
+    visualCount,
+    conceptRatio: Math.round(conceptRatio * 100) / 100,
+  };
 }
 
 /**
@@ -124,11 +217,12 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
   if (course.authorUserId !== userId) throw new Error("无权操作该课程");
 
   // —— 已生成：本节 blocksJson 已非空则直接返回，不重复调用 LLM / 不重复扣费 ——
+  // qualityScore=0：本次未新生成、未重评分（分值以「生成时」那次的埋点为准）。
   if (lesson.blocksJson) {
     const remaining = await prisma.lesson.count({
       where: { courseId: course.id, blocksJson: null },
     });
-    return { ok: true, failed: false, allReady: remaining === 0, blocks: 0 };
+    return { ok: true, failed: false, allReady: remaining === 0, blocks: 0, qualityScore: 0 };
   }
 
   // —— 原子 claim：抢占本节生成所有权（替代 check-then-act，杜绝并发双写双扣）——
@@ -140,11 +234,11 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     data: { genClaimedAt: new Date() },
   });
   if (claim.count === 0) {
-    // 本节已被另一条流水认领或已生成：跳过，不调 LLM、不扣费。
+    // 本节已被另一条流水认领或已生成：跳过，不调 LLM、不扣费。qualityScore=0：未新生成。
     const remaining = await prisma.lesson.count({
       where: { courseId: course.id, blocksJson: null },
     });
-    return { ok: true, failed: false, allReady: remaining === 0, blocks: 0 };
+    return { ok: true, failed: false, allReady: remaining === 0, blocks: 0, qualityScore: 0 };
   }
 
   // 前序节标题（同课程、sortOrder 更小），供 LLM 保持连贯、避免重复
@@ -266,14 +360,12 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
       ]);
     }
 
-    // —— 层3 后处理观测（轻量、不阻塞、不二次调用 LLM）——
-    // 统计块型混合度：concept 占比过高说明本节偏“文字墙”、视觉/交互块不足。
-    // 只埋点供观测（判断 prompt 是否真的把内容做吸睛了），不 throw、不重生成、不改内容。
-    const conceptCount = blocks.filter((b) => b.type === "concept").length;
-    const visualCount = blocks.filter((b) =>
-      b.type === "compare" || b.type === "steps" || b.type === "dialog" || b.type === "flashcard" || b.type === "callout",
-    ).length;
-    const conceptRatio = blocks.length > 0 ? conceptCount / blocks.length : 0;
+    // —— 层3 后处理质量评估（规则，轻量、不阻塞、不二次调用 LLM）——
+    // 把原「块型混合度」观测升级为可查的质量分（六项规则，见 scoreLesson）：
+    // 块数/开头钩子/结尾小结/交互块/视觉强块/concept 占比。只观测、不 throw、不重生成、不改内容。
+    const quality = scoreLesson(blocks);
+    const { conceptCount, visualCount, conceptRatio } = quality;
+    // 兼容旧埋点：concept 占比过高（文字墙）仍单独发 ai_gen_block_mix，便于既有看板延续。
     if (!usedFallback && conceptRatio > 0.6) {
       await track({
         eventName: "ai_gen_block_mix",
@@ -284,7 +376,23 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
           total: blocks.length,
           conceptCount,
           visualCount,
-          conceptRatio: Math.round(conceptRatio * 100) / 100,
+          conceptRatio,
+        },
+      });
+    }
+    // 弱课件（低于阈值且非降级占位）：记一条可查事件，供 admin 观测哪些节需重生成。
+    // 降级占位节（usedFallback）由 fallback 标志单独区分，不重复报低质量噪声。
+    if (!usedFallback && !quality.passed) {
+      await track({
+        eventName: "ai_gen_lesson_low_quality",
+        userId,
+        properties: {
+          courseId: course.id,
+          lessonId: lesson.id,
+          qualityScore: quality.score,
+          total: quality.total,
+          flags: quality.flags,
+          conceptRatio,
         },
       });
     }
@@ -318,12 +426,21 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
         blocks: blocks.length,
         conceptCount,
         visualCount,
+        // 质量分随生成事件落库，admin 可按 lessonId 查每节评分（降级占位节记 0）。
+        qualityScore: usedFallback ? 0 : quality.score,
+        qualityPassed: usedFallback ? false : quality.passed,
         fallback: usedFallback,
         allReady,
       },
     });
 
-    return { ok: !usedFallback, failed: usedFallback, allReady, blocks: blocks.length };
+    return {
+      ok: !usedFallback,
+      failed: usedFallback,
+      allReady,
+      blocks: blocks.length,
+      qualityScore: usedFallback ? 0 : quality.score,
+    };
   } catch (e) {
     // 释放 claim：把认领标记复位为 null，让本节可被 resume-gen 后台重取（不吞原异常）。
     try {

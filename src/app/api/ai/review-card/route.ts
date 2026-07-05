@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
         `以下是用户的学习笔记，请提炼成 5-8 张问答复习卡片（问题在正面，答案在背面）。\n笔记：\n${noteText}\n\n` +
         `输出 JSON：{flashcards:[{q:问题, a:答案}]}`;
 
-      await assertCanSpend(user.id);
+      // 批量生成卡消耗 LLM（review_card 权重 0.8）：按该场景最坏成本预检，避免欠账继续刷。
+      await assertCanSpend(user.id, "review_card");
 
       const result = await chatJson<FlashcardsResult>({
         system,

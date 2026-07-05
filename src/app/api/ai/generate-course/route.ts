@@ -40,8 +40,9 @@ export async function POST(req: NextRequest) {
     // 高成本 AI：按用户限流，每天 5 门
     assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
 
-    // 积分预检：余额不足抛 402
-    await assertCanSpend(user.id);
+    // 积分预检：余额不足抛 402。造课高成本（generate_course 权重 1.0），按该场景最坏成本
+    // 设门槛，堵住「余额仅够 1 分却发起满额造课」的超额免单缺口。
+    await assertCanSpend(user.id, "generate_course");
 
     const body = (await req.json().catch(() => null)) as {
       prompt?: string;

@@ -77,8 +77,9 @@ export async function POST(req: NextRequest) {
     // 高成本 AI 按用户限流
     assertUserRateLimit(user.id, "ai_note_transform", 20, 3_600_000);
 
-    // 积分预检：余额不足抛 402
-    await assertCanSpend(user.id);
+    // 积分预检：余额不足抛 402。AI 整理为中成本（note_transform 权重 0.8），按该场景
+    // 最坏成本设门槛，避免负余额/欠账继续整理。
+    await assertCanSpend(user.id, "note_transform");
 
     const body = (await req.json().catch(() => null)) as {
       noteIds?: string[];

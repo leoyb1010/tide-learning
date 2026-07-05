@@ -22,7 +22,11 @@ interface SummaryResult {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user } = await requireLLMAccess({ deniedMessage: "AI 总结为订阅会员权益，订阅后即可使用" });
+    // AI 总结为中成本（note_summary 权重 0.8）：预检按该场景最坏成本设门槛，避免欠账继续刷。
+    const { user } = await requireLLMAccess({
+      deniedMessage: "AI 总结为订阅会员权益，订阅后即可使用",
+      spendScene: "note_summary",
+    });
 
     assertUserRateLimit(user.id, "ai_note_summary", 10, 60_000);
 

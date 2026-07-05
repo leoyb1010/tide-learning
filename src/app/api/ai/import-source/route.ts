@@ -36,7 +36,12 @@ const MAX_RAW_TEXT = 50_000; // 粘贴文本上限，避免异常长 payload
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user } = await requireLLMAccess({ deniedMessage: "AI 导入为订阅会员权益，订阅后即可使用" });
+    // 导入切章为高成本生成（import_source 权重 1.0）：预检按该场景最坏成本设门槛，
+    // 与造课对齐，堵住负余额/欠账继续导入。逐节生成扣费在 generateLessonCore 按真实 token 记。
+    const { user } = await requireLLMAccess({
+      deniedMessage: "AI 导入为订阅会员权益，订阅后即可使用",
+      spendScene: "import_source",
+    });
 
     assertUserRateLimit(user.id, "ai_import", 5, 86_400_000);
 

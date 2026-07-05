@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { NoteDetail } from "@/components/NoteDetail";
+import { NoteTransformPanel } from "@/components/NoteTransformPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -33,25 +34,31 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
   });
   if (!note) notFound();
 
+  // 一键多转面板：仅对有正文的笔记开放（无正文的空笔记 / 纯截帧笔记转换无意义）
+  const hasBody = note.contentMd.trim().length > 0;
+
   // 序列化为可传给 client 组件的普通对象（Date → ISO 字符串）
   return (
-    <NoteDetail
-      note={{
-        id: note.id,
-        title: note.title,
-        contentMd: note.contentMd,
-        kind: note.kind,
-        source: note.source,
-        sourceText: note.sourceText,
-        captureUrl: note.captureUrl,
-        timestampSec: note.timestampSec,
-        starred: note.starred,
-        createdAt: note.createdAt.toISOString(),
-        updatedAt: note.updatedAt.toISOString(),
-        course: note.course ? { slug: note.course.slug, title: note.course.title } : null,
-        lesson: note.lesson ? { id: note.lesson.id, title: note.lesson.title } : null,
-        tags: note.tags.map((t) => t.tag),
-      }}
-    />
+    <div className="mx-auto max-w-[760px] space-y-6">
+      <NoteDetail
+        note={{
+          id: note.id,
+          title: note.title,
+          contentMd: note.contentMd,
+          kind: note.kind,
+          source: note.source,
+          sourceText: note.sourceText,
+          captureUrl: note.captureUrl,
+          timestampSec: note.timestampSec,
+          starred: note.starred,
+          createdAt: note.createdAt.toISOString(),
+          updatedAt: note.updatedAt.toISOString(),
+          course: note.course ? { slug: note.course.slug, title: note.course.title } : null,
+          lesson: note.lesson ? { id: note.lesson.id, title: note.lesson.title } : null,
+          tags: note.tags.map((t) => t.tag),
+        }}
+      />
+      {hasBody && <NoteTransformPanel noteId={note.id} noteTitle={note.title} />}
+    </div>
   );
 }
