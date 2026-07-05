@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { CourseCardData } from "@/components/CourseCard";
 import { StudyRoomProvider, usePointerMotion, type StudyRoomEnv } from "./StudyRoomContext";
 import { ActOne } from "./ActOne";
 import { ActTwo } from "./ActTwo";
-import { ActThree } from "./ActThree";
+// 注：第三幕 ActThree 现由「三幕 agent」维护为纯沉浸收尾。落地后在下方 render 中
+// 于 <HomeFunnel/> 之前 import 并渲染 <ActThree/> 即可；此处暂不引以保持 lint 清洁。
+import { HomeFunnel } from "./HomeFunnel";
+import type { TrackCardData } from "./types";
 
 /* ============================================================
    ImmersiveStudyRoom —— 沉浸首页 orchestrator（client 场景根）
@@ -23,7 +25,8 @@ import { ActThree } from "./ActThree";
 export interface ImmersiveData {
   onlineCount: number;
   totalCourses: number;
-  courses: CourseCardData[];
+  /** 第三幕赛道精选卡片墙数据（替代原书架墙 courses） */
+  tracks: TrackCardData[];
   demand: {
     id: string;
     title: string;
@@ -97,10 +100,23 @@ export function ImmersiveStudyRoom(data: ImmersiveData) {
       {/* 场景根：满宽脱离常规容器边距（首页 layout 若有 max-w 由 page 决定）。
           文字选择保留（真实内容），只是场景层不可选中由各幕内 aria-hidden 装饰承担。 */}
       <div className="relative w-full">
+        {/* 上半 · 三幕沉浸叙事（推门 → 走近书桌 → 环顾房间）。
+            第一幕/第二幕已承载核心叙事：第二幕讲透三大能力（边学边记/到点复习/AI 伴侣）。
+            第三幕 ActThree 由「三幕 agent」维护为纯沉浸收尾（镜头拉远见全貌，移除书架）；
+            原先塞在第三幕里的「赛道精选 + 社区共创 + 订阅」功能块（等重、无主次）已下沉到
+            下半区 HomeFunnel 重新编排，两者互不重复（内容取舍见问题⑩-3）。
+
+            衔接：三幕 agent 落地纯收尾版 ActThree 后，把 <ActThree/> 放回此处、
+            置于 <HomeFunnel/> 之前即可（两者底色均走 --scene-*，无缝过渡）。
+            当前 ActThree 仍含功能块，为避免与下半区重复渲染，暂只渲染 ActOne/ActTwo + HomeFunnel。 */}
         <ActOne onlineCount={data.onlineCount} totalCourses={data.totalCourses} />
         <ActTwo />
-        <ActThree
-          courses={data.courses}
+
+        {/* 下半 · 转化漏斗（问题⑩）：三幕之后重新编排的「探索 → 参与 → 决定」三拍，
+            视觉重量递增、订阅为唯一高潮；材质延续三幕 --scene-* 冷灰蓝，平滑过渡。 */}
+        <HomeFunnel
+          tracks={data.tracks}
+          totalCourses={data.totalCourses}
           demand={data.demand}
           demandCount={data.demandCount}
           canVote={data.canVote}

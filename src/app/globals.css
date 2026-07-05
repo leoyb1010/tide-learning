@@ -173,6 +173,69 @@
 }
 
 /* ============================================================
+   沉浸首页 · 场景主题 token（--scene-*）
+   问题⑧「深浅色区分不好」根治：三幕原本硬编码单一深色（#1a2130…）+
+   永远白的 --ink-on-dark-*，浅色系统下首页仍是黑场、与全站割裂。
+   这里把「场景底/雾气/墨阶/材质」抽成一套 --scene-* 变量：
+     · 默认（浅色系统）→ 高级「晨光工作室」亮场（暖白纸感、冷灰蓝墨、柔投影）
+     · 暗色系统 / data-theme=dark → 沉浸「夜航自习室」暗场（原深蓝黑基调）
+   三幕只引用 --scene-*，一处切换、两套都精致、跟随系统，不再硬编码单深色。
+   ============================================================ */
+:root {
+  /* 场景底：三层径向雾（幕背景直接引用） */
+  --scene-bg-1: #eef1f6;   /* 中心亮处 */
+  --scene-bg-2: #e3e8f0;   /* 中场 */
+  --scene-bg-3: #d5dbe6;   /* 四周压暗（浅色下是「压柔」不是压黑） */
+  /* 场景网格线 / 细分隔（地板透视网格、卡边内高光） */
+  --scene-grid:     rgba(35,41,53,.07);
+  --scene-hairline: rgba(35,41,53,.08);
+  /* 场景墨阶：随场景底自适应（浅场用深墨，暗场用白墨） */
+  --scene-ink:   #232935;             /* 主标题 */
+  --scene-ink-2: #4a5262;             /* 正文 */
+  --scene-ink-3: #6d7686;             /* 标签 / 弱说明 */
+  /* 场景卡材质：浮在场景底上的卡背景 + 投影 */
+  --scene-card:   linear-gradient(150deg, #ffffff 0%, #f7f9fc 100%);
+  --scene-card-2: rgba(255,255,255,.72);        /* 半透卡（内嵌小卡） */
+  --scene-card-shadow: 0 18px 44px -22px rgba(35,41,53,.30), inset 0 1px 0 rgba(255,255,255,.9);
+  --scene-card-shadow-sm: 0 10px 26px -16px rgba(35,41,53,.24), inset 0 1px 0 rgba(255,255,255,.8);
+  /* 台灯暖光：浅场下是「晨光」冷暖平衡，避免死黑上打黄光的违和 */
+  --scene-lamp: radial-gradient(circle, rgba(255,208,150,.20) 0%, rgba(255,190,120,.08) 36%, transparent 66%);
+  /* 场景暗角：浅场几乎不压，暗场明显收拢（幕内用 opacity 叠加时的目标色） */
+  --scene-vignette: #c3cad6;
+  /* 屏幕面板底（HTML 演示的「显示器」外框内底）：浅场用亮工作台 */
+  --scene-screen: linear-gradient(155deg, #f4f6fb 0%, #e9edf4 100%);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --scene-bg-1: #1a2130;
+    --scene-bg-2: #12171f;
+    --scene-bg-3: #0a0c10;
+    --scene-grid:     rgba(139,152,178,.14);
+    --scene-hairline: rgba(255,255,255,.09);
+    --scene-ink:   rgba(255,255,255,.92);
+    --scene-ink-2: rgba(255,255,255,.64);
+    --scene-ink-3: rgba(255,255,255,.46);
+    --scene-card:   linear-gradient(150deg, #2a3140 0%, #171d29 100%);
+    --scene-card-2: rgba(255,255,255,.05);
+    --scene-card-shadow: 0 22px 50px -24px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06);
+    --scene-card-shadow-sm: 0 14px 34px -18px rgba(0,0,0,.66), inset 0 1px 0 rgba(255,255,255,.05);
+    --scene-lamp: radial-gradient(circle, rgba(255,214,150,.30) 0%, rgba(255,190,120,.12) 34%, transparent 66%);
+    --scene-vignette: #05070a;
+    --scene-screen: linear-gradient(155deg, #1c2432 0%, #0e131c 100%);
+  }
+}
+:root[data-theme="dark"] {
+  --scene-bg-1: #1a2130; --scene-bg-2: #12171f; --scene-bg-3: #0a0c10;
+  --scene-grid: rgba(139,152,178,.14); --scene-hairline: rgba(255,255,255,.09);
+  --scene-ink: rgba(255,255,255,.92); --scene-ink-2: rgba(255,255,255,.64); --scene-ink-3: rgba(255,255,255,.46);
+  --scene-card: linear-gradient(150deg, #2a3140 0%, #171d29 100%); --scene-card-2: rgba(255,255,255,.05);
+  --scene-card-shadow: 0 22px 50px -24px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.06);
+  --scene-card-shadow-sm: 0 14px 34px -18px rgba(0,0,0,.66), inset 0 1px 0 rgba(255,255,255,.05);
+  --scene-lamp: radial-gradient(circle, rgba(255,214,150,.30) 0%, rgba(255,190,120,.12) 34%, transparent 66%);
+  --scene-vignette: #05070a; --scene-screen: linear-gradient(155deg, #1c2432 0%, #0e131c 100%);
+}
+
+/* ============================================================
    暗色模式：跟随系统 prefers-color-scheme:dark（默认），
    或 data-theme=dark 手动强制；data-theme=light 手动强制亮色。
    ============================================================ */
@@ -1189,9 +1252,11 @@ body::before {
            克制地提示「已进入输入」。reduce-motion 下降级为静态柔光（无呼吸）。
    ============================================================ */
 .hero-prompt {
-  /* 与深色背景融合的极淡描边：白色 6%，几乎看不见的边界，仅给出「这是一块输入区」的轮廓 */
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: 0 8px 30px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  /* 与场景底融合的极淡描边（主题跟随 --scene-hairline）：仅给出「这是一块输入区」的轮廓。
+     浅场为冷灰蓝细线、暗场为白色微光，两态都不显硬边。 */
+  border: 1px solid var(--scene-hairline);
+  background: var(--scene-card-2);
+  box-shadow: var(--scene-card-shadow-sm);
   transition: box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.45s ease;
 }
 .hero-prompt::after {
@@ -1210,11 +1275,10 @@ body::before {
   pointer-events: none;
 }
 .hero-prompt:focus-within {
-  border-color: rgba(255, 255, 255, 0.12);
-  /* 柔和光晕外扩：一层贴身的极淡红边 + 一层扩散的红雾，无硬边缘 */
+  border-color: color-mix(in srgb, var(--red) 40%, var(--scene-hairline));
+  /* 柔和光晕外扩：一层贴身的极淡红边 + 一层扩散的红雾，无硬边缘（两态通用） */
   box-shadow:
-    0 8px 30px -12px rgba(0, 0, 0, 0.6),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    var(--scene-card-shadow-sm),
     0 0 0 4px rgba(252, 1, 26, 0.1),
     0 0 26px -2px rgba(252, 1, 26, 0.28);
 }
@@ -1442,4 +1506,33 @@ body::before {
   .lamp-breathe { animation: none !important; transform: none !important; opacity: 0.95 !important; }
   .focus-dot { animation: none !important; opacity: 0.7 !important; }
   .scroll-hint { animation: none !important; transform: none !important; }
+}
+
+/* ============================================================
+   第一幕 · 真实 UI 产品演示（<DeskDemo>）辅助样式
+   造课输入 → AI 生成进度 → 课程卡浮现，纯 CSS/HTML + framer-motion。
+   这里只放「不方便用 framer 表达」的循环装饰：打字光标、进度流光、
+   AI 智能材质扫光。主编排（分镜/浮现）在组件内用 framer-motion。
+   全部 reduce-motion 静止降级。
+   ============================================================ */
+/* 生成中步骤 spinner 旋转（该项 setup 未内置 animate-spin keyframe，本地定义一次） */
+@keyframes spin { to { transform: rotate(360deg); } }
+/* 打字光标：AI 正在「写」课程时输入行末尾的呼吸竖条 */
+@keyframes demoCaret { 0%, 45% { opacity: 1; } 55%, 100% { opacity: 0; } }
+.demo-caret { display: inline-block; width: 2px; height: 1em; vertical-align: -0.12em;
+  background: var(--red); border-radius: 1px; animation: demoCaret 1s steps(1) infinite; }
+/* 进度条流光：生成进度条上的一束扫过高光，强化「正在生成」的活感 */
+@keyframes demoProgressSheen { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+.demo-progress-sheen::after { content: ""; position: absolute; inset: 0; width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  animation: demoProgressSheen 1.5s var(--ease-out-expo) infinite; }
+/* AI 生成面板斜向智能流光：极缓，像模型在「思考」 */
+@keyframes demoAiFlow { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
+.demo-ai-flow { background-image: linear-gradient(115deg,
+    transparent 30%, rgba(123,92,240,.10) 45%, rgba(252,1,26,.08) 55%, transparent 70%);
+  background-size: 200% 100%; animation: demoAiFlow 3.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .demo-caret { animation: none !important; opacity: 1 !important; }
+  .demo-progress-sheen::after { animation: none !important; display: none !important; }
+  .demo-ai-flow { animation: none !important; }
 }

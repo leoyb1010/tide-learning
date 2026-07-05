@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { listCourses, listUpdates, getHomeDemandTeaser } from "@/lib/queries";
+import { listCourses, getHomeDemandTeaser } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { TrackView } from "@/components/TrackView";
-import type { CourseCardData } from "@/components/CourseCard";
+import { TRACKS, trackGradientVar, trackIconKey } from "@/lib/tracks";
+import type { TrackCardData } from "@/components/home/types";
 import { ImmersiveStudyRoom } from "@/components/home/ImmersiveStudyRoom";
 
 /**
@@ -28,9 +29,8 @@ export default async function HomePage() {
    未登录：三幕沉浸营销首页（server 取真实数据 → client 场景渲染）
    ============================================================ */
 async function MarketingHome() {
-  const [all, updates, demandTeaserResult, plans] = await Promise.all([
+  const [all, demandTeaserResult, plans] = await Promise.all([
     listCourses({ sort: "recommended" }),
-    listUpdates(8),
     // 首页第三幕只需「榜首一条 teaser + 征集总数」，用轻查询替代最重的
     // listRankedDemands（7 条聚合 + 社交 join），关键路径不再被社交聚合阻塞。
     getHomeDemandTeaser(["collecting", "evaluating", "scheduled", "producing"]),
@@ -42,25 +42,21 @@ async function MarketingHome() {
   // 全站课程总量（信任条真实数字）
   const totalCourses = all.length;
 
-  // 书架墙数据：直接复用 listCourses 结果映射为 CourseShelf 所需的 CourseCardData 形状。
-  // 本周有更新的课打 isNew（书脊 Sparkle 点睛）。
-  const newSlugs = new Set(updates.map((u) => u.courseSlug));
-  const shelfCourses: CourseCardData[] = all.map((c) => ({
-    id: c.id,
-    slug: c.slug,
-    title: c.title,
-    subtitle: c.subtitle,
-    category: c.category,
-    categoryLabel: c.categoryLabel,
-    levelLabel: c.levelLabel,
-    coverColor: c.coverColor,
-    updateText: c.updateText,
-    duration: c.duration,
-    lessonsCount: c.lessonsCount,
-    learnersCount: c.learnersCount,
-    freeLessonsCount: c.freeLessonsCount,
-    status: c.status,
-    isNew: newSlugs.has(c.slug),
+  // 第三幕赛道精选卡片墙数据（替代原 CourseShelf 书架墙，问题⑧-3）：
+  // 真实赛道体系（TRACKS）+ 每赛道真实在架课程数，映射为赛道渐变 + 主题图标卡。
+  // 书架能力回归 /desk，首页改用产品能力/赛道展示。
+  const courseCountByCat = new Map<string, number>();
+  for (const c of all) {
+    courseCountByCat.set(c.category, (courseCountByCat.get(c.category) ?? 0) + 1);
+  }
+  const tracks: TrackCardData[] = TRACKS.map((t) => ({
+    key: t.key,
+    label: t.label,
+    blurb: t.blurb,
+    people: t.people,
+    gradient: trackGradientVar(t.key),
+    iconKey: trackIconKey(t.key),
+    courseCount: courseCountByCat.get(t.key) ?? 0,
   }));
 
   // 第三幕共创 teaser：榜首需求（排序口径与需求广场 listRankedDemands 一致）。
@@ -73,7 +69,7 @@ async function MarketingHome() {
     plans[0];
   const yearPriceText = yearPlan ? `¥${(yearPlan.priceCents / 100).toFixed(0)}/年` : null;
 
-  // 「凌晨一点，还有 N 人在这里自习」——真实在线数占位：
+  // 社会证明「此刻 N 位同学正在一起学」——当前在线数占位（去掉原「凌晨一点」压抑基调）：
   // 无实时在线埋点，用「全站累计学习人数」派生一个稳定、合理的当前在线数
   // （学习人数总和的一个小比例，落在 [120, 4800] 的可信区间；同一数据集稳定不乱跳）。
   // 真实 DOM 数字，SSR 直出，利于 LCP/SEO。
@@ -88,7 +84,7 @@ async function MarketingHome() {
         <ImmersiveStudyRoom
           onlineCount={onlineCount}
           totalCourses={totalCourses}
-          courses={shelfCourses}
+          tracks={tracks}
           demand={demandTeaser}
           demandCount={demandTeaserResult.count}
           canVote={snapshot.canVote}

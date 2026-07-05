@@ -3,21 +3,31 @@
 import { motion, useTransform } from "framer-motion";
 import Link from "next/link";
 import { ArrowDown } from "@phosphor-icons/react/dist/ssr";
-import { AmbientVideo } from "@/components/AmbientVideo";
 import { DoorOpen } from "@/components/motion";
 import { useStudyRoom } from "./StudyRoomContext";
 import { HeroPromptInput } from "./HeroPromptInput";
+import { DeskDemo } from "./DeskDemo";
 
 /* ============================================================
    第一幕 · 推门（首屏，0 滚动）
-   全屏深色自习室：3D 透视网格地板（径向渐隐到黑）+ 远处亮着台灯的书桌，
-   台灯光晕是唯一光源（呼吸），红色专注小点克制点缀。中央真实文案（SEO/LCP），
-   悬浮输入框「说出想学的」→ /create?prompt=…。鼠标移动整场景 ±1.5° 视差。
-   书桌屏幕内嵌 hero-product-demo-loop（AmbientVideo，poster 先行控 LCP）。
+   全屏「学习工作室」：3D 透视网格地板（径向渐隐）+ 台灯暖光唯一光源（呼吸），
+   红色专注小点克制点缀。中央真实文案（SEO/LCP），悬浮输入框「说出想学的」
+   → /create?prompt=…。鼠标移动整场景 ±1.5° 视差。桌上的屏内嵌 <DeskDemo>：
+   用产品真实 UI 拼装的造课演示（造课输入→AI生成→课程卡浮现），替代视频。
+
+   深浅色（问题⑧-5）：场景底/墨阶/材质全部走 --scene-* token —— 浅色系统下是
+   「晨光工作室」高级亮场，暗色系统 / data-theme=dark 下是沉浸夜航暗场，跟随系统。
+   不再硬编码单一深色。
+
+   宽屏响应式（问题⑧-1）：内容列 max-w 阶梯放宽（720→lg:1040→xl:1200→2xl:1360），
+   H1 字号阶梯放大，输入框/演示区同步按视口扩展，宽屏用双列铺开，消除中央窄条。
+
+   文案（问题⑧-2）：去「深夜/凌晨一点」压抑恐怖感，改温暖有力的「一句话造课 +
+   同学同行」社会证明。N=真实在线数，server 传入。
 
    降级：
-   - reduce-motion（motionOk=false）→ 光晕/呼吸/视差全静，退为静态分层海报。
-   - 移动端（isMobile）→ 砍鼠标视差与激进 rotateX，网格压平，纵向排布。
+   - reduce-motion（motionOk=false）→ 光晕/呼吸/视差全静，演示定格终态。
+   - 移动端（isMobile）→ 砍鼠标视差与激进 rotateX，网格压平，纵向单列排布。
    ============================================================ */
 
 export function ActOne({
@@ -38,209 +48,148 @@ export function ActOne({
 
   return (
     <section
-      aria-label="推门进入自习室"
+      aria-label="推门进入学习工作室"
       className="relative flex min-h-[100svh] w-full flex-col items-center justify-center overflow-hidden"
       style={{
-        // 场景底：深色区渐变（弃死黑平面），四周径向压暗成「房间」。
+        // 场景底：三层径向雾（--scene-* 跟随主题：浅=晨光亮场 / 暗=夜航暗场）。
         background:
-          "radial-gradient(120% 90% at 50% 30%, #1a2130 0%, #12171f 45%, #0a0c10 100%)",
+          "radial-gradient(120% 90% at 50% 30%, var(--scene-bg-1) 0%, var(--scene-bg-2) 45%, var(--scene-bg-3) 100%)",
       }}
     >
-      {/* —— 推门进场（moment 5）：整场从暗到亮 + 光缝推开，一次性开场编排。
-           复用 <DoorOpen>（与「点亮」同族语言）；reduce-motion 直接终态亮场。
-           包裹整场景层（含网格/光晕/内容），sr-only 导航留在其外恒可达。 —— */}
+      {/* 推门进场：整场从暗到亮 + 光缝推开，一次性开场编排。reduce-motion 直接终态。 */}
       <DoorOpen className="absolute inset-0 flex flex-col items-center justify-center">
-      {/* —— 氛围底图：深夜自习室推门实拍（studyroom-act1-hero）。铺满、object-cover，
-           压在网格/光晕/内容之下，作场景「实景底」。静态图无动画，reduce-motion 亦正常显示。
-           上方叠一层暗化 + 径向暗角，压住图的高光、维持深色沉浸调，保证台灯光晕/红点/文案
-           仍是视觉焦点、文字对比度充足。 —— */}
-      <img
-        src="/marketing/studyroom-act1-hero.jpg"
-        alt=""
-        aria-hidden
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-45"
-        loading="eager"
-        decoding="async"
-      />
-      {/* 图上暗化 + 径向暗角遮罩：图作氛围底，此层确保深色调与文字可读（叠在图与网格之间）。 */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{
-          background:
-            "radial-gradient(120% 90% at 50% 30%, rgba(16,20,28,0.55) 0%, rgba(12,16,22,0.78) 52%, rgba(8,10,14,0.94) 100%)",
-        }}
-      />
-
-      {/* —— 透视网格地板：CSS 3D，rotateX 铺向远方，径向遮罩渐隐到黑 —— */}
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%]"
-        style={{
-          transformStyle: "preserve-3d",
-          transform: `perspective(680px) rotateX(${isMobile ? 66 : 60}deg)`,
-          transformOrigin: "50% 100%",
-          backgroundImage:
-            "linear-gradient(rgba(139,152,178,0.14) 1px, transparent 1px), linear-gradient(90deg, rgba(139,152,178,0.14) 1px, transparent 1px)",
-          backgroundSize: "56px 56px",
-          // 网格向远方与两侧渐隐，只留中央一小片「被灯照到」的地面。
-          maskImage:
-            "radial-gradient(70% 62% at 50% 92%, #000 0%, rgba(0,0,0,0.35) 46%, transparent 78%)",
-          WebkitMaskImage:
-            "radial-gradient(70% 62% at 50% 92%, #000 0%, rgba(0,0,0,0.35) 46%, transparent 78%)",
-        }}
-      />
-
-      {/* —— 台灯光晕：画面唯一光源，大径向渐变 + 呼吸（reduce-motion 静态）—— */}
-      <motion.div
-        aria-hidden
-        className={`pointer-events-none absolute left-1/2 top-[26%] h-[520px] w-[520px] -translate-x-1/2 rounded-full ${
-          motionOk ? "lamp-breathe" : ""
-        }`}
-        style={{
-          x: glowX,
-          y: glowY,
-          background:
-            "radial-gradient(circle, rgba(255,214,150,0.30) 0%, rgba(255,190,120,0.12) 34%, transparent 66%)",
-          filter: "blur(8px)",
-        }}
-      />
-      {/* 红色专注信号小点（克制，唯一红）：像桌上一盏待机指示灯的微光。 */}
-      <span
-        aria-hidden
-        className={`pointer-events-none absolute left-1/2 top-[24%] h-2 w-2 -translate-x-1/2 rounded-full ${
-          motionOk ? "focus-dot" : ""
-        }`}
-        style={{ background: "var(--red)", boxShadow: "0 0 12px 2px rgba(252,1,26,0.6)" }}
-      />
-
-      {/* —— 场景内容层：随鼠标整体倾斜（视差容器）—— */}
-      <motion.div
-        className="relative z-[1] flex w-full max-w-[720px] flex-col items-center px-6 text-center"
-        style={{
-          rotateX: rotX,
-          rotateY: rotY,
-          transformPerspective: 1200,
-          transformStyle: "preserve-3d",
-        }}
-      >
-        {/* 顶部微标：进入自习室的仪式语 */}
-        <motion.p
-          className="mono mb-6 text-[11px] uppercase tracking-[0.22em] text-[var(--ink-on-dark-3)]"
-          initial={motionOk ? { opacity: 0, y: 8 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-        >
-          TIDE · 深夜自习室
-        </motion.p>
-
-        {/* 主文案：真实 DOM（SEO/LCP）。N=真实/合理在线数，server 传入。 */}
-        <motion.h1
-          className="text-balance text-[30px] font-bold leading-[1.28] tracking-[-0.01em] text-[var(--ink-on-dark)] sm:text-[42px]"
-          initial={motionOk ? { opacity: 0, y: 14 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
-        >
-          凌晨一点，还有{" "}
-          <span className="relative whitespace-nowrap text-[var(--red)]">
-            <span className="mono num-pop text-[34px] font-black sm:text-[48px]">
-              {onlineCount.toLocaleString()}
-            </span>{" "}
-            人
-          </span>
-          <br className="hidden sm:block" />
-          在这里自习
-        </motion.h1>
-
-        <motion.p
-          className="mt-5 max-w-[460px] text-[15px] leading-[1.85] text-[var(--ink-on-dark-2)]"
-          initial={motionOk ? { opacity: 0, y: 12 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
-        >
-          推开门，找一张亮着灯的书桌坐下。说出你想学的，AI 当场为你造一门课，
-          边学边记、到点复习。这一夜，你不是一个人在学。
-        </motion.p>
-
-        {/* —— 悬浮输入框：首屏即产品。提交跳造课（复用 /create?prompt=）——
-            输入框 + 其 useState 抽入 <HeroPromptInput>：按键只重渲该子组件，
-            第一幕视差/进场 motion 子树不再参与 reconcile。进场编排（这层
-            motion.div）保留在此，占位/样式/提交行为不变。 */}
+        {/* —— 透视网格地板：CSS 3D，rotateX 铺向远方，径向遮罩渐隐 —— */}
         <motion.div
-          className="mt-8 w-full max-w-[520px]"
-          initial={motionOk ? { opacity: 0, y: 12 } : false}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.24 }}
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%]"
+          style={{
+            transformStyle: "preserve-3d",
+            transform: `perspective(680px) rotateX(${isMobile ? 66 : 60}deg)`,
+            transformOrigin: "50% 100%",
+            backgroundImage:
+              "linear-gradient(var(--scene-grid) 1px, transparent 1px), linear-gradient(90deg, var(--scene-grid) 1px, transparent 1px)",
+            backgroundSize: "56px 56px",
+            maskImage:
+              "radial-gradient(70% 62% at 50% 92%, #000 0%, rgba(0,0,0,0.35) 46%, transparent 78%)",
+            WebkitMaskImage:
+              "radial-gradient(70% 62% at 50% 92%, #000 0%, rgba(0,0,0,0.35) 46%, transparent 78%)",
+          }}
+        />
+
+        {/* —— 台灯光晕：画面主光源，大径向渐变 + 呼吸（reduce-motion 静态）—— */}
+        <motion.div
+          aria-hidden
+          className={`pointer-events-none absolute left-1/2 top-[24%] h-[520px] w-[520px] -translate-x-1/2 rounded-full xl:h-[640px] xl:w-[640px] ${
+            motionOk ? "lamp-breathe" : ""
+          }`}
+          style={{ x: glowX, y: glowY, background: "var(--scene-lamp)", filter: "blur(8px)" }}
+        />
+        {/* 红色专注信号小点（克制，唯一红）：像桌上一盏待机指示灯的微光。 */}
+        <span
+          aria-hidden
+          className={`pointer-events-none absolute left-1/2 top-[22%] h-2 w-2 -translate-x-1/2 rounded-full ${
+            motionOk ? "focus-dot" : ""
+          }`}
+          style={{ background: "var(--red)", boxShadow: "0 0 12px 2px rgba(252,1,26,0.6)" }}
+        />
+
+        {/* —— 场景内容层：随鼠标整体倾斜（视差容器）。宽屏 max-w 阶梯放宽。 —— */}
+        <motion.div
+          className="relative z-[1] flex w-full max-w-[720px] flex-col items-center px-6 text-center lg:max-w-[1040px] lg:px-10 xl:max-w-[1200px] 2xl:max-w-[1360px]"
+          style={{
+            rotateX: rotX,
+            rotateY: rotY,
+            transformPerspective: 1200,
+            transformStyle: "preserve-3d",
+          }}
         >
-          <HeroPromptInput />
-          {/* 信任行：真实课程量作社会证明锚（真实 DOM）。 */}
-          <p className="mono mt-4 text-[12px] text-[var(--ink-on-dark-3)]">
-            已有{" "}
-            <span className="font-bold text-[var(--ink-on-dark-2)]">{totalCourses}</span>{" "}
-            门课程在架 · 免费体验，无需登录
-          </p>
+          {/* 宽屏双列：左文案 + 右演示并排铺开；移动/窄屏单列纵向。 */}
+          <div className="flex w-full flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-14 lg:text-left xl:gap-20">
+            {/* —— 左：文案 + 输入框 —— */}
+            <div className="flex w-full flex-col items-center lg:flex-1 lg:items-start">
+              {/* 顶部微标 */}
+              <motion.p
+                className="mono mb-5 text-[11px] uppercase tracking-[0.22em] text-[var(--scene-ink-3)] lg:text-[12px]"
+                initial={motionOk ? { opacity: 0, y: 8 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+              >
+                TIDE · AI 学习工作室
+              </motion.p>
+
+              {/* 主文案：真实 DOM（SEO/LCP）。温暖有力的「一句话造课」主张。 */}
+              <motion.h1
+                className="text-balance text-[30px] font-bold leading-[1.24] tracking-[-0.015em] text-[var(--scene-ink)] sm:text-[42px] lg:text-[58px] lg:leading-[1.14] xl:text-[74px] 2xl:text-[84px]"
+                initial={motionOk ? { opacity: 0, y: 14 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
+              >
+                说出想学的,
+                <br />
+                <span className="text-[var(--red)]">AI 当场为你造一门课</span>
+              </motion.h1>
+
+              {/* 社会证明副文案：保留「N 位同学一起学」的社会证明，去压抑感。 */}
+              <motion.p
+                className="mt-5 max-w-[460px] text-[15px] leading-[1.85] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[520px] lg:text-[17px] xl:max-w-[600px] xl:text-[19px]"
+                initial={motionOk ? { opacity: 0, y: 12 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
+              >
+                一句话,几秒钟,一门为你量身编排的课就摆上书桌。
+                此刻还有{" "}
+                <span className="whitespace-nowrap font-semibold text-[var(--scene-ink)]">
+                  <span className="mono num-pop text-[var(--red)]">
+                    {onlineCount.toLocaleString()}
+                  </span>{" "}
+                  位同学
+                </span>{" "}
+                正在一起学,你不是一个人。
+              </motion.p>
+
+              {/* —— 悬浮输入框：首屏即产品。提交跳造课（复用 /create?prompt=）—— */}
+              <motion.div
+                className="mt-8 w-full max-w-[520px] lg:mt-9 lg:max-w-[560px] xl:max-w-[620px]"
+                initial={motionOk ? { opacity: 0, y: 12 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.24 }}
+              >
+                <HeroPromptInput />
+                {/* 信任行：真实课程量作社会证明锚（真实 DOM）。 */}
+                <p className="mono mt-4 text-[12px] text-[var(--scene-ink-3)] lg:text-[13px]">
+                  已有{" "}
+                  <span className="font-bold text-[var(--scene-ink-2)]">{totalCourses}</span>{" "}
+                  门课程在架 · 免费体验,无需登录
+                </p>
+              </motion.div>
+            </div>
+
+            {/* —— 右：书桌上的屏 = 真实 UI 产品演示（<DeskDemo>）——
+                桌面/宽屏并排展示；移动端为控 LCP 与竖屏节奏折入下方（单列时仍显示）。 */}
+            <motion.div
+              className="w-full max-w-[460px] lg:max-w-[520px] lg:flex-1 xl:max-w-[620px] 2xl:max-w-[720px]"
+              style={{ transform: immersive ? "translateZ(40px)" : undefined }}
+              initial={motionOk ? { opacity: 0, y: 20 } : false}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.34 }}
+            >
+              <DeskDemo />
+            </motion.div>
+          </div>
         </motion.div>
 
-        {/* —— 书桌上的屏幕：内嵌 hero-product-demo-loop（AmbientVideo，poster 先行）——
-            桌面沉浸态才展示这块「远处桌上的发光屏」，避免与输入框争首屏焦点；
-            移动端为控 LCP 与竖屏节奏，此屏折入第二幕。 */}
-        {!isMobile && (
-          <motion.div
-            className="relative mt-12 w-full max-w-[460px]"
-            style={{ transform: "translateZ(40px)" }}
-            initial={motionOk ? { opacity: 0, y: 20 } : false}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.34 }}
-          >
-            {/* 屏幕面板：深色边框 + 底部投影，像一台立在桌上的显示器 */}
-            <div
-              className="relative aspect-[16/10] w-full overflow-hidden rounded-[14px] border border-[var(--hairline-on-dark)]"
-              style={{
-                background: "var(--video-grad)",
-                boxShadow: "0 30px 60px -30px rgba(0,0,0,0.8), 0 0 60px -20px rgba(255,200,140,0.25)",
-              }}
-            >
-              <AmbientVideo
-                src="/videos/marketing/hero-product-demo-loop.mp4"
-                poster="/marketing/desk-screen-demo.jpg"
-              />
-              {/* 屏面反光高光，让它像「亮着的屏」而非贴图 */}
-              <div
-                aria-hidden
-                className="pointer-events-none absolute inset-0"
-                style={{
-                  background:
-                    "linear-gradient(160deg, rgba(255,255,255,0.10), transparent 42%)",
-                }}
-              />
-            </div>
-            {/* 屏下桌面：一条暖色台灯反光带，把屏「坐实」在桌面上 */}
-            <div
-              aria-hidden
-              className="mx-auto mt-2 h-6 w-[86%] rounded-[50%]"
-              style={{ background: "radial-gradient(ellipse, rgba(255,200,140,0.16), transparent 70%)" }}
-            />
-          </motion.div>
-        )}
-      </motion.div>
-
-      {/* —— 向下滚动提示：把用户引向第二幕「走近书桌」—— */}
-      <motion.div
-        className="absolute bottom-6 left-1/2 z-[1] -translate-x-1/2"
-        initial={motionOk ? { opacity: 0 } : false}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1, duration: 0.8 }}
-      >
-        <span className="flex flex-col items-center gap-1 text-[var(--ink-on-dark-3)]">
-          <span className="mono text-[10px] uppercase tracking-[0.18em]">走近书桌</span>
-          <ArrowDown
-            size={16}
-            weight="bold"
-            aria-hidden
-            className={motionOk ? "scroll-hint" : ""}
-          />
-        </span>
-      </motion.div>
+        {/* —— 向下滚动提示：把用户引向第二幕「走近书桌」—— */}
+        <motion.div
+          className="absolute bottom-6 left-1/2 z-[1] -translate-x-1/2"
+          initial={motionOk ? { opacity: 0 } : false}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1, duration: 0.8 }}
+        >
+          <span className="flex flex-col items-center gap-1 text-[var(--scene-ink-3)]">
+            <span className="mono text-[10px] uppercase tracking-[0.18em]">走近书桌</span>
+            <ArrowDown size={16} weight="bold" aria-hidden className={motionOk ? "scroll-hint" : ""} />
+          </span>
+        </motion.div>
       </DoorOpen>
 
       {/* 无障碍/SEO 补充：把关键导航以真实链接埋入，即便沉浸层出问题也可达 */}
