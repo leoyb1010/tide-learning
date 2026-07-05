@@ -8,6 +8,7 @@
 #if os(macOS)
 import SwiftUI
 import Observation
+import AppKit
 
 @Observable @MainActor
 final class MacMenuBarViewModel {
@@ -18,8 +19,18 @@ final class MacMenuBarViewModel {
     func load() async {
         loading = true; error = nil
         defer { loading = false }
-        do { data = try await API.shared.get("/api/desk", as: MacDeskData.self) }
+        do {
+            data = try await API.shared.get("/api/desk", as: MacDeskData.self)
+            // M5：拉到最新待复习数后刷新 Dock 徽标（>0 显数字，否则清空）。
+            Self.updateDockBadge(dueReviewCount: data?.dueReviewCount ?? 0)
+        }
         catch { self.error = (error as? APIError)?.errorDescription ?? "加载失败" }
+    }
+
+    /// 刷新 Dock 图标右上角徽标。dueReviewCount>0 显数字，否则清空（"" 隐藏）。
+    /// static + @MainActor：App 启动兜底拉一次时也可直接调，无需持有 VM 实例。
+    static func updateDockBadge(dueReviewCount: Int) {
+        NSApp.dockTile.badgeLabel = dueReviewCount > 0 ? "\(dueReviewCount)" : ""
     }
 }
 

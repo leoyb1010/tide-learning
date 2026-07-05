@@ -62,8 +62,9 @@ targets:
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_ENTITLEMENTS: YoudaoStudio/YoudaoStudioMac.entitlements
-        # 不设 ASSETCATALOG_COMPILER_APPICON_NAME：现有 AppIcon 仅 iOS 平台条目，
-        # Mac 内测暂不需要图标；catalog 仍随 Resources 编译（共享图片资源可用）。
+        # M5：启用 Mac 应用图标。AppIcon catalog 增补 mac idiom（复用 1024 PNG 的 512@2x 槽），
+        # iOS 平台条目不变、互不影响。若日后破坏 iOS build，删此行并回退 Contents.json 即可。
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     sources:
       - path: YoudaoStudio
         excludes:
@@ -84,6 +85,12 @@ targets:
         CFBundleDisplayName: "有道自习室"
         LSMinimumSystemVersion: "14.0"
         NSHumanReadableCopyright: "© 有道自习室"
+        # M5 深链：注册自定义 scheme youdaostudio://（供 onOpenURL 解析跳转）。
+        # youdaostudio://note/<id> | course/<slug> | review | exam | desk 等。
+        CFBundleURLTypes:
+          - CFBundleURLName: com.youdao.studio.mac
+            CFBundleURLSchemes:
+              - youdaostudio
         # ATS：允许本地/局域网 http 明文连接（联调用 localhost:3100）。
         # 生产走 https 正式域名不受影响；NSAllowsLocalNetworking 只放行本地网络。
         NSAppTransportSecurity:

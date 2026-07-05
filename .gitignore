@@ -26,3 +26,4 @@ ios/**/DerivedData/
 ios/**/*.xcodeproj/
 ios/**/xcuserdata/
 ios/**/.DS_Store
+dist/

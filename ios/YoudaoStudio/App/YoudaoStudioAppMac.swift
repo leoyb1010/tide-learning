@@ -5,6 +5,7 @@
 // 并把占位设置面板升级为真实账号面板。
 #if os(macOS)
 import SwiftUI
+import UserNotifications
 
 @main
 struct YoudaoStudioAppMac: App {
@@ -17,6 +18,12 @@ struct YoudaoStudioAppMac: App {
     // 命令按钮「记一条 ⌘N」放进持有 @Environment(\.openWindow) 的小 wrapper（NewNoteCommandButton），
     // 保证 App 里能编过（见 .commands）。
 
+    init() {
+        // M5：冷启动尽早接管前台通知展示（willPresent 返回 banner/sound/badge），
+        // 否则 App 在前台时系统默认不弹横幅。
+        UNUserNotificationCenter.current().delegate = MacNotifications.shared
+    }
+
     var body: some Scene {
         // 主窗设 id:"main"，供菜单栏「打开主窗」用 openWindow(id:"main") 前置。
         WindowGroup(id: "main") {
@@ -26,6 +33,17 @@ struct YoudaoStudioAppMac: App {
                 .tint(Studio.red)
                 .frame(minWidth: 900, minHeight: 600)
                 .task { await auth.bootstrap() }
+                // M5：App 启动即拉一次 /api/desk 刷新 Dock 徽标 + 安排每日复习提醒。
+                // task(id:isLoggedIn)：登录态从未登录→已登录时再跑一次，保证登录后即时生效。
+                .task(id: auth.isLoggedIn) {
+                    await MacNotifications.shared.enableReviewReminder()
+                    await refreshDockBadge()
+                }
+                // M5 深链：youdaostudio://note/... | course/... | review | exam | desk 等
+                // → 设 router.selection 跳对应 section（详情跳转简化为跳到对应 tab）。
+                .onOpenURL { url in
+                    handleDeepLink(url)
+                }
         }
         .windowStyle(.titleBar)
 
@@ -64,10 +82,20 @@ struct YoudaoStudioAppMac: App {
         }
         .windowStyle(.titleBar)
 
+        // M5「关于」独立小窗（openWindow(id:"about") 打开）。固定尺寸、不可缩放。
+        Window("关于 有道自习室", id: "about") {
+            MacAboutView()
+                .tint(Studio.red)
+        }
+        .windowStyle(.titleBar)
+        .windowResizability(.contentSize)
+        .defaultPosition(.center)
+
         .commands {
             // 命令菜单雏形：账号相关（退出登录）。M1 可扩展更多命令。
+            // M5：「关于」按钮打开独立 About 窗（用持有 openWindow 的 wrapper）。
             CommandGroup(replacing: .appInfo) {
-                Button("关于 有道自习室") { }
+                AboutCommandButton()
             }
             // 文件菜单「记一条 ⌘N」：openWindow 需 View 环境，故用持有 @Environment(\.openWindow)
             // 的 wrapper 承载（App struct 内不能直接取 openWindow）。
@@ -87,6 +115,58 @@ struct YoudaoStudioAppMac: App {
             MacSettingsPlaceholder()
                 .environment(auth)
                 .tint(Studio.red)
+        }
+    }
+
+    // MARK: - M5 辅助
+
+    /// 拉一次 /api/desk 刷新 Dock 徽标（App 启动 / 登录后兜底）。
+    /// 未登录时跳过（无 token，/api/desk 会 401）。失败静默（徽标非关键）。
+    @MainActor
+    private func refreshDockBadge() async {
+        guard auth.isLoggedIn else {
+            MacMenuBarViewModel.updateDockBadge(dueReviewCount: 0)
+            return
+        }
+        if let data = try? await API.shared.get("/api/desk", as: MacDeskData.self) {
+            MacMenuBarViewModel.updateDockBadge(dueReviewCount: data.dueReviewCount)
+        }
+    }
+
+    /// 解析深链并跳转到对应 section。仅认自定义 scheme youdaostudio://。
+    /// host 决定目标；详情类（note/course）简化为跳到对应 tab，不深入具体 id（最小可用）。
+    @MainActor
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "youdaostudio" else { return }
+        // youdaostudio://note/<id> → host = "note"；youdaostudio://review → host = "review"。
+        let host = url.host?.lowercased()
+        let target: MacSection?
+        switch host {
+        case "note", "notes":       target = .notes
+        case "course", "courses":   target = .courses
+        case "desk", "home":        target = .desk
+        case "create", "compose":   target = .create
+        case "profile", "me":       target = .profile
+        case "market":              target = .market
+        case "review":              target = .review
+        case "exam":                target = .exam
+        default:                    target = nil
+        }
+        if let target {
+            router.selection = target.rawValue
+            NSApp.activate(ignoringOtherApps: true)
+        }
+    }
+}
+
+/// 「关于 有道自习室」命令按钮 wrapper：持有 @Environment(\.openWindow)，供 .commands 使用。
+/// App struct 内无法直接取 openWindow，故封装为 View 放进 CommandGroup(replacing:.appInfo)。
+struct AboutCommandButton: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("关于 有道自习室") {
+            openWindow(id: "about")
+            NSApp.activate(ignoringOtherApps: true)
         }
     }
 }

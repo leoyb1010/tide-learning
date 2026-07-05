@@ -47,6 +47,11 @@ struct SplashMac: View {
 /// 主界面：NavigationSplitView（侧边栏 + detail）。
 struct MacMainView: View {
     @Environment(TabRouter.self) private var router
+    // M5 窗口恢复：记住上次选中的 section（rawValue）。SceneStorage 随窗口场景持久化，
+    // 冷启动 / 窗口重建时自动带回。默认 0（书桌）。
+    @SceneStorage("lastMacSection") private var lastSection: Int = 0
+    /// 是否已从 SceneStorage 恢复过（避免恢复动作被后续写回覆盖，仅在 onAppear 恢复一次）。
+    @State private var restored = false
 
     var body: some View {
         // 侧边栏选中态桥接 TabRouter.selection：
@@ -55,7 +60,8 @@ struct MacMainView: View {
         @Bindable var router = router
         let selectionBinding = Binding<MacSection>(
             get: { MacSection(rawValue: router.selection) ?? .desk },
-            set: { router.selection = $0.rawValue }
+            // set 同时写回 router 与 SceneStorage：选中态变化即持久化，下次冷启动恢复。
+            set: { router.selection = $0.rawValue; lastSection = $0.rawValue }
         )
 
         NavigationSplitView {
@@ -64,6 +70,16 @@ struct MacMainView: View {
             detail(for: selectionBinding.wrappedValue)
                 .frame(minWidth: 640, minHeight: 520)
                 .background(Studio.bg)
+        }
+        // 冷启动恢复：把上次记住的 section 写回 router.selection。仅执行一次，
+        // 之后深链 / 侧栏点选可自由覆盖。用 onAppear（此时 @State router 已就绪，
+        // 避免在 @State 初始化时机读 SceneStorage 的限制）。
+        .onAppear {
+            guard !restored else { return }
+            restored = true
+            if let section = MacSection(rawValue: lastSection) {
+                router.selection = section.rawValue
+            }
         }
     }
 
