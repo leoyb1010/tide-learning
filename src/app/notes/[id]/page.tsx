@@ -40,6 +40,10 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
   // 序列化为可传给 client 组件的普通对象（Date → ISO 字符串）
   return (
     <div className="mx-auto max-w-[760px] space-y-6">
+      {/* relative z-10：把详情主体（含导出下拉）抬到「AI 一键多转」面板之上。该面板是
+          studio-rise 动效元素（transform 自成 stacking context）且在 DOM 中更晚，默认会
+          盖住上方就近弹出的导出菜单。此处在同级抬升整棵子树，是跨 stacking context 的根因修复。 */}
+      <div className="relative z-10">
       <NoteDetail
         note={{
           id: note.id,
@@ -58,6 +62,7 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
           tags: note.tags.map((t) => t.tag),
         }}
       />
+      </div>
       {hasBody && <NoteTransformPanel noteId={note.id} noteTitle={note.title} />}
     </div>
   );

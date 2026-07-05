@@ -98,7 +98,15 @@ export function ExportMenu({
     : "studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]";
 
   return (
-    <div ref={boxRef} className="relative">
+    // 打开时把触发器容器抬进一个高于同级的堆叠上下文：详情页下方的「AI 一键多转」面板
+    // 因 studio-rise 动效带 transform 会自成 stacking context，作为更晚的 DOM 兄弟会盖住
+    // 本菜单（绝对定位 + z-dropdown 仅在自身上下文内比较，跨上下文失效）。给容器加就近的
+    // relative + z-dropdown 使整棵菜单子树浮出，任意复用场景通用。关闭时不占层级。
+    <div
+      ref={boxRef}
+      className="relative"
+      style={open ? { zIndex: "var(--z-dropdown)" } : undefined}
+    >
       <button
         ref={triggerRef}
         type="button"
