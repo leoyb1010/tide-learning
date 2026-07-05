@@ -25,7 +25,11 @@ const COVER_NAME = "course-cover";
 const COVER_ATTR = "data-vt-cover";
 
 type WithStartViewTransition = Document & {
-  startViewTransition?: (cb: () => void) => { finished: Promise<void> };
+  startViewTransition?: (cb: () => void) => {
+    finished: Promise<void>;
+    ready: Promise<void>;
+    updateCallbackDone: Promise<void>;
+  };
 };
 
 export function ViewTransitions() {
@@ -81,7 +85,11 @@ export function ViewTransitions() {
         router.push(href);
       });
       // 转场结束（或被打断）后清名，防止残留影响后续任意导航。
+      // ready/updateCallbackDone 在转场被跳过（快速连点/新导航打断）时会 reject——
+      // 三个 promise 全部兜住，否则控制台出现未处理的「Transition was skipped」。
       transition.finished.finally(clearCoverName).catch(() => {});
+      transition.ready.catch(() => {});
+      transition.updateCallbackDone.catch(() => {});
     }
 
     document.addEventListener("click", onClick);

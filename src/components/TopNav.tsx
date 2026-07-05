@@ -128,8 +128,8 @@ export function TopNav({ user }: { user: NavUser | null }) {
     <>
       <CommandK />
       <header
-        className="sticky top-0 border-b border-[var(--border)] backdrop-blur-xl"
-        style={{ zIndex: "var(--z-sticky)", background: "color-mix(in srgb, var(--bg) 80%, transparent)" }}
+        className="sticky top-0 border-b border-[var(--border)] backdrop-blur-md"
+        style={{ zIndex: "var(--z-sticky)", background: "color-mix(in srgb, var(--bg) 88%, transparent)" }}
       >
         <div className="mx-auto flex h-[60px] max-w-[1320px] items-center gap-3 px-4 sm:px-6">
           {/* Logo */}

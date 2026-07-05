@@ -353,7 +353,7 @@ export function HomeFunnel({
               </Link>
               <Link
                 href="/pricing"
-                className="inline-flex min-h-[48px] items-center gap-2 rounded-[14px] border px-6 py-3 text-[15px] font-bold text-[var(--scene-ink)] backdrop-blur-sm transition-colors hover:border-[var(--red)] lg:rounded-[16px] lg:px-8 lg:py-4 lg:text-[18px]"
+                className="inline-flex min-h-[48px] items-center gap-2 rounded-[14px] border px-6 py-3 text-[15px] font-bold text-[var(--scene-ink)] transition-colors hover:border-[var(--red)] lg:rounded-[16px] lg:px-8 lg:py-4 lg:text-[18px]"
                 style={{ borderColor: "var(--scene-hairline)", background: "var(--scene-card-2)" }}
               >
                 查看方案

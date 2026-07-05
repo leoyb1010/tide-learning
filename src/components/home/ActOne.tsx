@@ -1,8 +1,8 @@
 "use client";
 
-import { motion, useTransform } from "framer-motion";
+import { motion, useTransform, type MotionValue } from "framer-motion";
 import Link from "next/link";
-import { ArrowDown } from "@phosphor-icons/react/dist/ssr";
+import { ArrowDown, Cards, NotePencil, Flame } from "@phosphor-icons/react/dist/ssr";
 import { DoorOpen } from "@/components/motion";
 import { useStudyRoom } from "./StudyRoomContext";
 import { HeroPromptInput } from "./HeroPromptInput";
@@ -82,7 +82,7 @@ export function ActOne({
           className={`pointer-events-none absolute left-1/2 top-[24%] h-[520px] w-[520px] -translate-x-1/2 rounded-full xl:h-[640px] xl:w-[640px] ${
             motionOk ? "lamp-breathe" : ""
           }`}
-          style={{ x: glowX, y: glowY, background: "var(--scene-lamp)", filter: "blur(8px)" }}
+          style={{ x: glowX, y: glowY, background: "var(--scene-lamp)" }}
         />
         {/* 红色专注信号小点（克制，唯一红）：像桌上一盏待机指示灯的微光。 */}
         <span
@@ -119,14 +119,16 @@ export function ActOne({
 
               {/* 主文案：真实 DOM（SEO/LCP）。温暖有力的「一句话造课」主张。 */}
               <motion.h1
-                className="text-balance text-[30px] font-bold leading-[1.24] tracking-[-0.015em] text-[var(--scene-ink)] sm:text-[42px] lg:text-[58px] lg:leading-[1.14] xl:text-[74px] 2xl:text-[84px]"
+                className="text-balance text-[30px] font-bold leading-[1.24] tracking-[-0.015em] text-[var(--scene-ink)] sm:text-[42px] lg:text-[58px] lg:leading-[1.14] xl:text-[66px] 2xl:text-[76px]"
                 initial={motionOk ? { opacity: 0, y: 14 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
               >
                 说出想学的,
                 <br />
-                <span className="text-[var(--red)]">AI 当场为你造一门课</span>
+                <span className="text-[var(--red)]">
+                  AI 当场为你造<span className="whitespace-nowrap">一门课</span>
+                </span>
               </motion.h1>
 
               {/* 社会证明副文案：保留「N 位同学一起学」的社会证明，去压抑感。 */}
@@ -192,6 +194,11 @@ export function ActOne({
         </motion.div>
       </DoorOpen>
 
+      {/* —— 邻座工位：房间四周浮着几张「别人正在学」的桌面小卡（仅宽屏沉浸态）。
+          直挂 section（包含块=整幕），四角定位不受 DoorOpen 的居中布局影响；
+          不同深度随鼠标反向视差 + floatY 缓浮。纯装饰 aria-hidden，降级不渲染。 —— */}
+      {immersive && <AmbientDesks px={px} py={py} />}
+
       {/* 无障碍/SEO 补充：把关键导航以真实链接埋入，即便沉浸层出问题也可达 */}
       <Link href="/create" className="sr-only">
         免费体验 AI 造课
@@ -200,5 +207,81 @@ export function ActOne({
         浏览全部课程
       </Link>
     </section>
+  );
+}
+
+/* ============================================================
+   AmbientDesks —— 第一幕四周的「邻座工位」浮卡（仅宽屏沉浸态）
+   三张真实产品面小卡：复习卡到期 / 笔记刚记下 / 连学天数。
+   不同 --depth 随鼠标反向轻移（比主场景慢），像房间里更远的桌子；
+   缓慢 floatY 浮动错开相位。纯 transform/opacity，aria-hidden。
+   ============================================================ */
+function AmbientDesks({ px, py }: { px: MotionValue<number>; py: MotionValue<number> }) {
+  // 反向视差：远处物体移动更慢且与视线相反，深度感由幅度差营造。
+  const x1 = useTransform(px, [-1, 1], [10, -10]);
+  const y1 = useTransform(py, [-1, 1], [7, -7]);
+  const x2 = useTransform(px, [-1, 1], [16, -16]);
+  const y2 = useTransform(py, [-1, 1], [11, -11]);
+  const x3 = useTransform(px, [-1, 1], [7, -7]);
+  const y3 = useTransform(py, [-1, 1], [5, -5]);
+
+  const cardStyle = {
+    borderColor: "var(--scene-hairline)",
+    background: "var(--scene-card)",
+    boxShadow: "var(--scene-card-shadow-sm)",
+  } as const;
+
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 hidden xl:block">
+      {/* 左上角 · 复习卡到期（邻座的卡片盒）——主文案块之上的留白带 */}
+      <motion.div
+        className="absolute left-[2%] top-[9%] w-[168px] rounded-[14px] border p-3 opacity-75"
+        style={{ x: x1, y: y1, ...cardStyle, animation: "floatY 7s ease-in-out infinite" }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-[8px]" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
+            <Cards size={14} weight="fill" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold" style={{ color: "var(--scene-ink)" }}>3 张复习卡到期</p>
+            <p className="mono text-[9px]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 口语实战</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 右下 · 刚记下的笔记（邻座的笔记本）——演示屏之下的留白带 */}
+      <motion.div
+        className="absolute bottom-[6%] right-[2%] w-[190px] rounded-[14px] border p-3 opacity-75"
+        style={{ x: x2, y: y2, ...cardStyle, animation: "floatY 8.5s ease-in-out 1.2s infinite" }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-[8px]" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
+            <NotePencil size={14} weight="fill" />
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-[11px] font-bold" style={{ color: "var(--scene-ink)" }}>“原来分镜是这么拆的”</p>
+            <p className="mono text-[9px]" style={{ color: "var(--scene-ink-3)" }}>刚刚 · 截帧笔记</p>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* 右上 · 连学天数（邻座的火苗）——演示屏之上的留白带 */}
+      <motion.div
+        className="absolute right-[5%] top-[10%] w-[142px] rounded-[14px] border p-3 opacity-75"
+        style={{ x: x3, y: y3, ...cardStyle, animation: "floatY 9.5s ease-in-out 2.4s infinite" }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="grid h-7 w-7 place-items-center rounded-[8px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
+            <Flame size={14} weight="fill" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[11px] font-bold" style={{ color: "var(--scene-ink)" }}>
+              连学 <span className="mono">28</span> 天
+            </p>
+            <p className="mono text-[9px]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 亮着灯</p>
+          </div>
+        </div>
+      </motion.div>
+    </div>
   );
 }

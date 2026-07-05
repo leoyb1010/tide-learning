@@ -25,8 +25,10 @@ export function HeroPromptInput() {
   return (
     <form onSubmit={submit} className="w-full">
       {/* 背景/描边/阴影由 .hero-prompt 提供（主题跟随 --scene-*，浅暗两态都不显硬边）。
+          注意不加 backdrop-blur：输入框叠在呼吸的台灯光晕上，backdrop-filter 会随
+          背后每帧变化持续重采样，是首屏帧率黑洞；半透明底色本身已足够融合。
           宽屏内边距/字号随视口放大，与第一幕响应式阶梯同步。 */}
-      <div className="hero-prompt group relative flex items-center gap-2 rounded-[16px] p-2 pl-4 backdrop-blur-md lg:gap-2.5 lg:rounded-[18px] lg:p-2.5 lg:pl-5">
+      <div className="hero-prompt group relative flex items-center gap-2 rounded-[16px] p-2 pl-4 lg:gap-2.5 lg:rounded-[18px] lg:p-2.5 lg:pl-5">
         <Sparkle
           size={18}
           weight="fill"

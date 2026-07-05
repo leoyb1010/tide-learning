@@ -193,20 +193,18 @@ export function DeskDemo() {
                   exit={motionOk ? { opacity: 0, y: -10 } : undefined}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                 >
-                  {/* 进度条 + 流光 */}
+                  {/* 进度条 + 流光（scaleX 合成层动画，不触发布局/重绘） */}
                   <div
                     className="demo-progress-sheen relative h-1.5 w-full overflow-hidden rounded-full lg:h-2"
                     style={{ background: "var(--scene-hairline)" }}
                   >
                     <motion.div
-                      className="h-full rounded-full"
+                      className="h-full w-full origin-left rounded-full"
                       style={{ background: "var(--track-ai)" }}
                       initial={false}
                       animate={{
-                        width:
-                          state.phase === "typing"
-                            ? "6%"
-                            : `${8 + (state.step / STEPS.length) * 88}%`,
+                        scaleX:
+                          state.phase === "typing" ? 0.06 : 0.08 + (state.step / STEPS.length) * 0.88,
                       }}
                       transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
                     />

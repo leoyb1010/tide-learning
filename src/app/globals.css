@@ -380,11 +380,6 @@ body::before {
 }
 
 /* ---------- 动效关键帧 ---------- */
-@keyframes accent-mesh {
-  0%   { transform: translate(0,0) scale(1); }
-  50%  { transform: translate(-3%, 2%) scale(1.08); }
-  100% { transform: translate(0,0) scale(1); }
-}
 @keyframes shimmer {
   100% { transform: translateX(100%); }
 }
@@ -425,10 +420,12 @@ body::before {
 .studio-rise { animation: riseIn .28s var(--ease-out-expo) both; }
 .studio-slide { animation: slideIn .3s var(--ease-out-expo) both; }
 
-/* §10.1 签名动效「点亮 Light-Up」——自习室隐喻的动效化，全站唯一记忆点 */
-@keyframes lightUp { 0%{opacity:.4;filter:brightness(.7)} 60%{opacity:1;filter:brightness(1.12)} 100%{opacity:1;filter:brightness(1)} }
+/* §10.1 签名动效「点亮 Light-Up」——自习室隐喻的动效化，全站唯一记忆点。
+   性能铁律：只动 transform/opacity（合成层）。原版动 filter:brightness 会让大面积
+   卡片逐帧重绘（paint），是全局掉帧主因之一，已改为透明度+微位移表达「点亮」。 */
+@keyframes lightUp { 0%{opacity:.35;transform:translateY(4px)} 60%{opacity:1;transform:translateY(0)} 100%{opacity:1;transform:translateY(0)} }
 @keyframes lightSweep { 0%{transform:translateX(-120%)} 100%{transform:translateX(220%)} }
-@keyframes cardPowerOn { 0%{opacity:0;transform:scale(.98)} 55%{opacity:1;filter:brightness(1.1)} 100%{opacity:1;transform:scale(1);filter:brightness(1)} }
+@keyframes cardPowerOn { 0%{opacity:0;transform:scale(.985)} 55%{opacity:1} 100%{opacity:1;transform:scale(1)} }
 .studio-lightup { animation: lightUp .5s var(--ease-out-expo) both; }
 .studio-poweron { animation: cardPowerOn .45s var(--ease-out-expo) both; }
 /* 开灯扫光：叠在容器上的一道柔光横扫（配 overflow-hidden 使用） */
@@ -504,10 +501,12 @@ body::before {
 }
 .hover-sheen:hover::after { transform: translateX(120%); }
 
-/* 4) 材质海拔工具类（L1/L2/L3 直接可用） */
+/* 4) 材质海拔工具类（L1/L2/L3 直接可用）。
+   注：L3 底色为不透明 --surface，backdrop-filter 毫无视觉贡献却让每个浮层
+   常驻昂贵的模糊合成层（滚动/动画时整层重采样），已移除。 */
 .elev-1 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--card), var(--inner-hi); }
 .elev-2 { background: var(--surface); border: 1px solid var(--border2); box-shadow: var(--card-hover), var(--inner-hi); }
-.elev-3 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--lift); backdrop-filter: blur(12px); }
+.elev-3 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--lift); }
 
 /* ============================================================
    卡片网格对齐规范（问题③）—— 全站网格卡「同行等高、底栏贴底」的统一基线。
@@ -1011,17 +1010,17 @@ body::before {
     opacity var(--dur-fast) var(--ease-out-expo),
     filter var(--dur-fast) var(--ease-out-expo);
 }
-/* 组内任一卡 hover 时，先把整组的卡压暗虚化（聚光灯的「暗场」）。 */
+/* 组内任一卡 hover 时，先把整组的卡压暗（聚光灯的「暗场」）。
+   性能：只动 opacity（合成层）。原版还叠 filter:saturate/brightness，
+   hover 移动时整个网格逐帧重绘，是书架抽屉掉帧主因，已去除。 */
 .shelf-grid:has(.shelf-card:hover) .shelf-card-body,
 .shelf-grid:has(.shelf-card:focus-within) .shelf-card-body {
-  opacity: .5;
-  filter: saturate(.72) brightness(.96);
+  opacity: .55;
 }
 /* 被 hover / 聚焦的那张卡回到全亮并上浮高光（聚光灯的「亮点」）。 */
 .shelf-card:hover .shelf-card-body,
 .shelf-card:focus-within .shelf-card-body {
   opacity: 1 !important;
-  filter: none !important;
   transform: translateY(-4px) scale(1.03);
   box-shadow: var(--lift);
   border-color: var(--red-soft-border);
@@ -1037,7 +1036,6 @@ body::before {
   .shelf-grid:has(.shelf-card:hover) .shelf-card-body,
   .shelf-grid:has(.shelf-card:focus-within) .shelf-card-body {
     opacity: 1 !important;
-    filter: none !important;
   }
   .shelf-card:hover .shelf-card-body,
   .shelf-card:focus-within .shelf-card-body {
@@ -1188,23 +1186,68 @@ body::before {
   .confetti-layer { display: none !important; }
 }
 
-/* 网格状有机渐变背景（mesh，非 lila） */
-.mesh-bg {
-  position: absolute; inset: 0; overflow: hidden;
+/* ============================================================
+   AI 生产线舞台（GenStage）—— 造课/导入「生成中」可视化
+   深色蓝图舞台：静态网格底 + 智性辉光；站点轨道 rail 随阶段生长；
+   正在生产的节卡有激光扫描；产物徽标（讲义/测验/复习卡）逐个弹入。
+   性能铁律：全部 transform/opacity（合成层），网格/辉光为静态背景零逐帧成本；
+   reduce-motion 统一降级为静态直显。
+   ============================================================ */
+.gen-stage {
+  position: relative;
+  background: var(--ai-grad);
+  isolation: isolate;
 }
-.mesh-bg::before, .mesh-bg::after {
-  content: ""; position: absolute; border-radius: 50%;
-  filter: blur(36px); will-change: transform;
+/* 蓝图网格：静态双向细线，径向渐隐（不动画，零重绘） */
+.gen-stage::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+  background-image:
+    linear-gradient(rgba(139,152,178,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(139,152,178,.08) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: radial-gradient(130% 100% at 50% 0%, #000 26%, transparent 92%);
+  -webkit-mask-image: radial-gradient(130% 100% at 50% 0%, #000 26%, transparent 92%);
 }
-.mesh-bg::before {
-  width: 46%; height: 60%; top: -10%; right: -6%;
-  background: radial-gradient(circle, rgba(252,1,26,0.16), transparent 70%);
-  animation: accent-mesh 18s var(--ease-out-expo) infinite;
+/* 顶部智性辉光：静态径向紫光 + 一线红（AI 材质语言，与 --ai-grad 同族） */
+.gen-stage::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1;
+  background: radial-gradient(58% 42% at 50% 0%, rgba(123,92,240,.18), transparent 72%);
 }
-.mesh-bg::after {
-  width: 40%; height: 55%; bottom: -14%; left: -8%;
-  background: radial-gradient(circle, rgba(252,1,26,0.10), transparent 70%);
-  animation: accent-mesh 22s var(--ease-out-expo) infinite reverse;
+/* 站点轨道连接线填充：scaleX 从左生长（transform-only） */
+.gen-rail-fill { transform-origin: left; transition: transform .7s var(--ease-out-expo); }
+/* 站点圆环 active 呼吸：transform scale 脉动 */
+@keyframes genStationPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+.gen-station-active { animation: genStationPulse 1.6s ease-in-out infinite; }
+/* 正在生产的节卡：激光扫描（伪元素 translateX 横掠） */
+@keyframes genLaser { 0% { transform: translateX(-130%); } 100% { transform: translateX(380%); } }
+.gen-writing-row { position: relative; overflow: hidden; }
+.gen-writing-row::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 34%; pointer-events: none;
+  background: linear-gradient(100deg, transparent, rgba(252,1,26,.12) 44%, rgba(123,92,240,.14) 56%, transparent);
+  animation: genLaser 1.8s var(--ease-out-expo) infinite;
+}
+/* 产物徽标（讲义/测验/复习卡）：完成瞬间逐个弹入（--i 递延） */
+@keyframes genArtifactPop { from { opacity: 0; transform: scale(.4) translateY(3px); } 60% { opacity: 1; transform: scale(1.18); } to { opacity: 1; transform: none; } }
+.gen-artifact { animation: genArtifactPop .42s var(--ease-spring) both; animation-delay: calc(var(--i, 0) * 90ms); }
+/* 分节进度格：当前格内流光横掠 */
+.gen-seg { position: relative; overflow: hidden; }
+.gen-seg-active::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
+  transform: translateX(-100%);
+  animation: genLaser 1.4s linear infinite;
+}
+/* 节卡逐张上机位：入场落位（一次性） */
+@keyframes genRowIn { from { opacity: 0; transform: translateY(10px) scale(.985); } to { opacity: 1; transform: none; } }
+.gen-row-in { animation: genRowIn .46s var(--ease-out-expo) both; animation-delay: calc(var(--i, 0) * 55ms); }
+/* 装订完成印记：舞台落幕时中心徽章弹出 */
+@keyframes genSealPop { 0% { opacity: 0; transform: scale(.5) rotate(-10deg); } 60% { opacity: 1; transform: scale(1.1) rotate(2deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
+.gen-seal { animation: genSealPop .55s var(--ease-spring) both; }
+@media (prefers-reduced-motion: reduce) {
+  .gen-station-active, .gen-seal { animation: none !important; }
+  .gen-writing-row::after, .gen-seg-active::after { animation: none !important; display: none !important; }
+  .gen-artifact, .gen-row-in { animation: none !important; opacity: 1 !important; transform: none !important; }
+  .gen-rail-fill { transition: none !important; }
 }
 
 /* Skeleton 微光扫过（相位由 --i 错开，形成浪扫过列表） */
@@ -1463,12 +1506,26 @@ body::before {
    传达「AI 正在思考」的活性，而非孤零一个转圈。全部 transform/opacity/filter
    合成友好；reduce-motion 统一降级为静态（文件末与本块各自兜底）。
    ============================================================ */
-/* 智性光核：深色 --ai-grad 圆核，红紫智性光缓缓明灭（呼吸），像 AI 在运转 */
+/* 智性光核：深色 --ai-grad 圆核，红紫智性光缓缓明灭（呼吸），像 AI 在运转。
+   性能：光晕拆到 ::after 用 opacity/transform 呼吸（合成层）；本体只 scale。
+   原版逐帧动 box-shadow 需整块重绘，是生成剧场掉帧点，已根治。 */
 @keyframes aiCorePulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(252,1,26,.28), 0 0 22px -6px rgba(123,92,240,.5); }
-  50%      { transform: scale(1.045); box-shadow: 0 0 0 7px rgba(252,1,26,0), 0 0 30px -4px rgba(123,92,240,.75); }
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.05); }
 }
-.ai-core { animation: aiCorePulse 2s var(--ease-out-expo) infinite; }
+@keyframes aiCoreGlow {
+  0%, 100% { opacity: .45; transform: scale(1); }
+  50%      { opacity: .95; transform: scale(1.14); }
+}
+.ai-core {
+  animation: aiCorePulse 2s var(--ease-out-expo) infinite;
+  box-shadow: 0 0 0 4px rgba(252,1,26,.08), 0 0 24px -4px rgba(123,92,240,.55);
+}
+.ai-core::after {
+  content: ""; position: absolute; inset: -7px; border-radius: inherit; pointer-events: none;
+  background: radial-gradient(circle, rgba(123,92,240,.30), transparent 70%);
+  animation: aiCoreGlow 2s ease-in-out infinite;
+}
 /* 核内星芒缓旋（智性感，非机械匀速——用 expo 缓动的往返微摆） */
 @keyframes aiCoreSpin { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
 .ai-core-spark { animation: aiCoreSpin 3.2s var(--ease-out-expo) infinite; }
@@ -1495,7 +1552,7 @@ body::before {
 }
 .outline-write-in { animation: outlineWriteIn .42s var(--ease-tide) both; }
 @media (prefers-reduced-motion: reduce) {
-  .ai-core, .ai-core-spark, .ai-think-dot { animation: none !important; }
+  .ai-core, .ai-core::after, .ai-core-spark, .ai-think-dot { animation: none !important; }
   .ai-scan::after { animation: none !important; display: none !important; }
   .outline-write-in { animation: none !important; }
 }
@@ -1634,13 +1691,17 @@ body::before {
 .demo-progress-sheen::after { content: ""; position: absolute; inset: 0; width: 40%;
   background: linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent);
   animation: demoProgressSheen 1.5s var(--ease-out-expo) infinite; }
-/* AI 生成面板斜向智能流光：极缓，像模型在「思考」 */
-@keyframes demoAiFlow { 0% { background-position: 0% 50%; } 100% { background-position: 200% 50%; } }
-.demo-ai-flow { background-image: linear-gradient(115deg,
-    transparent 30%, rgba(123,92,240,.10) 45%, rgba(252,1,26,.08) 55%, transparent 70%);
-  background-size: 200% 100%; animation: demoAiFlow 3.4s ease-in-out infinite; }
+/* AI 生成面板斜向智能流光：极缓，像模型在「思考」。
+   性能：改为 ::before 宽层 translateX 漂移（合成层）。原版动 background-position
+   会让整块演示屏逐帧重绘。宿主需 overflow-hidden（组件已有）。 */
+@keyframes demoAiFlow { 0% { transform: translateX(-26%); } 100% { transform: translateX(26%); } }
+.demo-ai-flow { overflow: hidden; }
+.demo-ai-flow::before { content: ""; position: absolute; top: 0; bottom: 0; left: -50%; width: 200%;
+  background-image: linear-gradient(115deg,
+    transparent 34%, rgba(123,92,240,.10) 46%, rgba(252,1,26,.08) 54%, transparent 66%);
+  animation: demoAiFlow 3.4s ease-in-out infinite alternate; will-change: transform; }
 @media (prefers-reduced-motion: reduce) {
   .demo-caret { animation: none !important; opacity: 1 !important; }
   .demo-progress-sheen::after { animation: none !important; display: none !important; }
-  .demo-ai-flow { animation: none !important; }
+  .demo-ai-flow::before { animation: none !important; display: none !important; }
 }

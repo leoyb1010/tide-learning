@@ -28,6 +28,7 @@ import { ArchiveStamp } from "@/components/motion";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
 import { ProgressRing, Spinner, useGenPolling, type GenProgress } from "@/components/GenProgress";
+import { GenStage, TypewriterText, type GenStageLesson, type GenStageLessonState } from "@/components/GenStage";
 
 /**
  * 剧场恢复用：由 /create server component 预取的「我正在生成中的课」摘要。
@@ -159,12 +160,14 @@ export function CreateStudio({
 
   const busy = phase !== "idle" && phase !== "done";
 
-  // 首页输入框带来的 ?prompt=xxx → 预填生成输入框（仅首次）
+  // 首页输入框带来的 ?prompt=xxx → 预填生成输入框；?tab=import → 直落导入 Tab（仅首次）
   useEffect(() => {
     const q = searchParams.get("prompt");
     if (q && q.trim()) {
       setPrompt(q.trim().slice(0, 500));
       setTab("generate");
+    } else if (searchParams.get("tab") === "import") {
+      setTab("import");
     }
     // 仅在挂载时读一次；searchParams 引用稳定
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -493,26 +496,6 @@ export function CreateStudio({
     }
   }
 
-  // 步骤条数据（造课 vs 升维文案不同）
-  const steps = useMemo(() => {
-    if (source === "import") {
-      return [
-        { key: "understand", label: "读懂你的资料" },
-        { key: "outline", label: "拆分主题章节" },
-        { key: "lessons", label: "逐章升维写作" },
-      ];
-    }
-    return [
-      { key: "understand", label: "理解你的需求" },
-      { key: "outline", label: "搭建课程大纲" },
-      { key: "lessons", label: "逐节撰写讲解" },
-    ];
-  }, [source]);
-
-  // 阶段序号（用于步骤条 done/active 判定）
-  const phaseOrder: Record<Phase, number> = { idle: 0, understand: 1, outline: 2, lessons: 3, done: 4 };
-  const curOrder = phaseOrder[phase];
-
   const inTheater = phase !== "idle";
 
   // 恢复入口：点「回到剧场」→ 切到恢复分支（水合 + 轮询）。
@@ -781,8 +764,6 @@ export function CreateStudio({
       ) : (
         <TheaterPanel
           source={source}
-          steps={steps}
-          curOrder={curOrder}
           phase={phase}
           lessons={lessons}
           writingIndex={writingIndex}
@@ -797,59 +778,17 @@ export function CreateStudio({
 }
 
 /* ============================================================
-   TypewriterText —— 造课打字机（节标题逐字浮现 + 光标闪烁）
-   ------------------------------------------------------------
-   备课剧场里当前正在写的节标题逐字打出，把等待变成「看 AI 写作」的表演。
-   - 纯客户端、纯计算，无任何 server import；只依赖 React state + 定时器。
-   - text 变化（切到下一节）即从头重打。
-   - reduce-motion：直接给出完整文字、不显示光标（.tw-caret CSS 已隐藏）。
-   - 卸载/文本切换时清定时器，无泄漏。
+   TypewriterText 已抽到 @/components/GenStage 共享（即时剧场 /
+   恢复剧场 / 生产位共用），此处不再保留本地副本。
    ============================================================ */
-function TypewriterText({ text, speed = 45 }: { text: string; speed?: number }) {
-  const [shown, setShown] = useState("");
-  const reduceRef = useRef(false);
-
-  useEffect(() => {
-    // 一次性读取用户动效偏好；reduce 时直接落全文，跳过逐字。
-    reduceRef.current =
-      typeof window !== "undefined" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (reduceRef.current || !text) {
-      setShown(text);
-      return;
-    }
-
-    setShown("");
-    let i = 0;
-    // 用 Array.from 以码点为单位推进，避免把中文/emoji 拆坏。
-    const chars = Array.from(text);
-    const timer = window.setInterval(() => {
-      i += 1;
-      setShown(chars.slice(0, i).join(""));
-      if (i >= chars.length) window.clearInterval(timer);
-    }, speed);
-    return () => window.clearInterval(timer);
-  }, [text, speed]);
-
-  const typing = !reduceRef.current && shown.length < Array.from(text).length;
-
-  return (
-    <span className="font-semibold text-[var(--ink)]">
-      {shown}
-      {/* 光标：写作中闪烁，打完自动隐；reduce-motion 下 CSS 直接不显示 */}
-      <span className="tw-caret" data-typing={typing} aria-hidden="true" />
-    </span>
-  );
-}
 
 /* ============================================================
-   剧场进行面板：步骤条 + 大纲逐条浮现 + 逐节写作进度
+   剧场进行面板：AI 生产线舞台（GenStage）+ 转入后台入口
+   深色蓝图舞台上四站轨道 + 生产位节卡 + 分节进度格，
+   即时剧场（前端状态机驱动）用本包裹；恢复剧场共用 GenStage。
    ============================================================ */
 function TheaterPanel({
   source,
-  steps,
-  curOrder,
   phase,
   lessons,
   writingIndex,
@@ -857,8 +796,6 @@ function TheaterPanel({
   onExit,
 }: {
   source: "generate" | "import";
-  steps: { key: string; label: string }[];
-  curOrder: number;
   phase: Phase;
   lessons: OutlineLesson[];
   writingIndex: number;
@@ -867,211 +804,47 @@ function TheaterPanel({
   onExit: () => void;
 }) {
   const total = lessons.length;
-  const doneCount = lessons.filter((l) => l.state === "done" || l.state === "failed").length;
-  const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
+  // 站点映射：understand=1 / outline=2 / lessons=3（全 settle 后仍由 done 页接管，无需 4）
+  const stationIndex: 1 | 2 | 3 | 4 = phase === "understand" ? 1 : phase === "outline" ? 2 : 3;
+  const writingLesson = phase === "lessons" ? lessons[writingIndex] : undefined;
+
+  const stageLessons: GenStageLesson[] = lessons.map((l) => ({
+    id: l.id,
+    title: l.title,
+    state: (l.state ?? "pending") as GenStageLessonState,
+  }));
 
   return (
-    <div className="studio-rise mt-5 w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-6">
-      {/* —— 顶部「转入后台」入口：课已落库 generating 态，退出不中断后台生成 —— */}
-      {canExit && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3.5 py-2.5">
-          <span className="flex min-w-0 items-center gap-2 text-[12.5px] text-[var(--red-ink)]">
-            <Books size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
-            <span className="truncate font-semibold">已放入书架，正在后台生成</span>
-          </span>
-          <button
-            type="button"
-            onClick={onExit}
-            className="studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[10px] bg-[var(--surface)] px-3.5 py-2.5 text-[12.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:text-[var(--ink)]"
-          >
-            <ArrowUUpLeft size={14} weight="bold" />
-            转入后台
-          </button>
-        </div>
-      )}
-
-      {/* —— 三步步骤条 —— */}
-      <ol className="flex flex-col gap-2.5">
-        {steps.map((s, i) => {
-          const order = i + 1; // 1=understand 2=outline 3=lessons
-          const state: "done" | "active" | "todo" = curOrder > order ? "done" : curOrder === order ? "active" : "todo";
-          return (
-            <li key={s.key} className="flex items-center gap-3">
-              <span
-                className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold transition-colors ${
-                  state === "done"
-                    ? "bg-[var(--red)] text-white"
-                    : state === "active"
-                    ? "border-2 border-[var(--red)] text-[var(--red)]"
-                    : "border border-[var(--border2)] text-[var(--ink4)]"
-                }`}
-              >
-                {state === "done" ? (
-                  <Check size={13} weight="bold" />
-                ) : state === "active" ? (
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-[var(--red)]" />
-                ) : (
-                  order
-                )}
-              </span>
-              <span
-                className={`text-[14px] font-semibold ${
-                  state === "todo" ? "text-[var(--ink4)]" : "text-[var(--ink)]"
-                }`}
-              >
-                {s.label}
-              </span>
-              {state === "active" && order < 3 && (
-                <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[var(--red)] border-t-transparent" />
-              )}
-            </li>
-          );
-        })}
-      </ol>
-
-      {/* —— 大纲逐条浮现（.outline-write-in 递延入场，像被逐条「写下」） —— */}
-      {total > 0 && (
-        <div className="mt-5 border-t border-[var(--border)] pt-4">
-          <div className="mb-2.5 flex items-center justify-between">
-            <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
-              {source === "import" ? "升维章节" : "课程大纲"} · {total} 节
-            </span>
-            {phase === "lessons" && (
-              <span key={doneCount} className="num-pop mono text-[11px] font-semibold text-[var(--ink2)]">
-                <span className="text-[var(--ink)]">{doneCount}</span>/{total}
-              </span>
-            )}
-          </div>
-
-          {/* 逐节写作时的当前节提示：节标题逐字浮现（打字机），把等待变成看 AI 写作。
-              key=writingIndex 使切到下一节时重挂载、从头重打。 */}
-          {phase === "lessons" && writingIndex < total && lessons[writingIndex]?.state === "writing" && (
-            <p className="mb-3 text-[13px] text-[var(--ink2)]">
-              正在写第 <span key={writingIndex} className="num-pop mono font-semibold text-[var(--red)]">{writingIndex + 1}/{total}</span> 节：
-              <TypewriterText key={`tw-${writingIndex}`} text={lessons[writingIndex].title} />
-            </p>
-          )}
-
-          <ul className="flex flex-col gap-1.5">
-            {lessons.map((l, i) => (
-              <li
-                key={l.id}
-                className={`outline-write-in flex items-center gap-2.5 rounded-[10px] border px-3 py-2 transition-colors duration-200 ${
-                  l.state === "writing"
-                    ? // 正在写的这行自己发光：提亮到 surface + 一道红左边框，和顶部「正在写第 N 节」提示形成注意力接力
-                      "border-[var(--red-soft-border)] border-l-2 border-l-[var(--red)] bg-[var(--surface)] shadow-[var(--card)]"
-                    : "border-[var(--border)] bg-[var(--surface2)]"
-                }`}
-                style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}
-              >
-                <LessonStateIcon state={l.state} index={i} />
-                <span
-                  className={`flex-1 truncate text-[13.5px] ${
-                    l.state === "done"
-                      ? "font-medium text-[var(--ink)]"
-                      : l.state === "failed"
-                      ? "text-[var(--ink2)]"
-                      : l.state === "writing"
-                      ? "font-medium text-[var(--ink)]"
-                      : "text-[var(--ink3)]"
-                  }`}
-                >
-                  {l.title}
-                </span>
-                {l.state === "failed" && (
-                  <span className="mono shrink-0 rounded-full border border-[var(--warn)]/40 bg-[var(--warn-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--ink2)]">
-                    待重试
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-
-          {/* 底部进度条 */}
-          {phase === "lessons" && (
-            <div className="mt-4">
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border2)]">
-                <div
-                  className="h-full rounded-full bg-[var(--red)] transition-all duration-300"
-                  style={{ width: `${pct}%` }}
-                />
-              </div>
-              <p className="mt-2 text-[11.5px] text-[var(--ink3)]">课已放入书架，关闭页面也会在后台继续生成，随时回来看进度。</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* 大纲未回来前的等待态（步骤1/2）：AI 思考可视化——一枚会呼吸的智性光核 +
-          三点思考波，把空等升级成「看 AI 运转」；下方骨架带一道智性扫光预告章节即将填充。 */}
-      {total === 0 && (
-        <div className="mt-5 border-t border-[var(--border)] pt-4">
-          <div className="flex items-center gap-3.5">
-            {/* 智性光核：深色 AI 渐变圆核，红紫光呼吸，核内星芒缓摆（reduce-motion 静态） */}
-            <span
-              className="ai-core relative grid h-11 w-11 shrink-0 place-items-center rounded-full"
-              style={{ background: "var(--ai-grad)" }}
-              aria-hidden="true"
+    <div className="studio-rise mt-5 w-full">
+      <GenStage
+        source={source}
+        stationIndex={stationIndex}
+        lessons={stageLessons}
+        writingLessonId={writingLesson?.state === "writing" ? writingLesson.id : null}
+        caption={
+          total > 0
+            ? "课已放入书架，关闭页面也会在后台继续生成，随时回来看进度。"
+            : "课已放入书架，稍后逐节浮现，关页面也会在后台继续。"
+        }
+        headerRight={
+          canExit ? (
+            <button
+              type="button"
+              onClick={onExit}
+              className="studio-press inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-[10px] border px-3 py-2 text-[12px] font-semibold transition-colors"
+              style={{
+                borderColor: "var(--hairline-on-dark)",
+                background: "rgba(255,255,255,.06)",
+                color: "var(--ink-on-dark-2)",
+              }}
             >
-              <span className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-full bg-[var(--hairline-on-dark)]" />
-              <Sparkle size={19} weight="fill" className="ai-core-spark text-white" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)]">
-                {phase === "understand"
-                  ? source === "import"
-                    ? "正在通读你的资料"
-                    : "正在读懂你的需求"
-                  : source === "import"
-                  ? "正在按主题拆分章节"
-                  : "正在设计课程大纲"}
-                {/* 三点思考波：依次抬落，像 AI 在措辞 */}
-                <span className="inline-flex items-end gap-[3px] pb-[2px]" aria-hidden="true">
-                  {[0, 1, 2].map((i) => (
-                    <span
-                      key={i}
-                      className="ai-think-dot inline-block h-[3px] w-[3px] rounded-full bg-[var(--red)]"
-                      style={{ "--i": i } as CSSProperties}
-                    />
-                  ))}
-                </span>
-              </span>
-              <span className="mt-0.5 block text-[11.5px] text-[var(--ink3)]">
-                课已放入书架，稍后逐节浮现，关页面也会在后台继续
-              </span>
-            </div>
-          </div>
-          {/* 大纲骨架占位（预告即将逐条浮现的章节结构，一道扫光横掠传达「正在填充」） */}
-          <ul className="mt-3.5 flex flex-col gap-1.5" aria-hidden="true">
-            {[0, 1, 2, 3].map((i) => (
-              <li
-                key={i}
-                className="ai-scan flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2"
-              >
-                <span className="skeleton h-[17px] w-[17px] shrink-0 rounded-full" />
-                <span className="skeleton h-3 rounded-full" style={{ width: `${72 - i * 12}%` }} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+              <ArrowUUpLeft size={13} weight="bold" />
+              转入后台
+            </button>
+          ) : undefined
+        }
+      />
     </div>
-  );
-}
-
-/** 单节状态图标：完成 ✓ 用 --ok（绿），失败用 --warn（琥珀），写作中用红（live 生成信号） */
-function LessonStateIcon({ state, index }: { state?: LessonState; index: number }) {
-  if (state === "done")
-    return <CheckCircle key="done" size={17} weight="fill" className="num-pop shrink-0 text-[var(--ok)]" />;
-  if (state === "failed")
-    return <XCircle size={17} weight="fill" className="shrink-0 text-[var(--warn)]" />;
-  if (state === "writing")
-    return <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--red)] border-t-transparent" />;
-  // pending：显示序号
-  return (
-    <span className="mono flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border border-[var(--border2)] text-[10px] font-semibold text-[var(--ink4)]">
-      {index + 1}
-    </span>
   );
 }
 
@@ -1464,6 +1237,23 @@ function RecoveryTheater({
     ? `/courses/${course.slug}/learn/${course.firstLessonId}`
     : `/courses/${course.slug}`;
 
+  // 生产舞台数据：ready→done；当前生成节→writing（无 current 时取第一个未 ready）；其余 pending。
+  // isFailed（后台判定不再继续）时未完节标 failed 提示可续跑。
+  const firstPendingIdx = lessons.findIndex((x) => !x.ready);
+  const stageLessons: GenStageLesson[] = lessons.map((l, i) => {
+    const isCurrent =
+      !l.ready && !isFailed && (currentLessonId ? l.id === currentLessonId : i === firstPendingIdx);
+    const state: GenStageLessonState = l.ready
+      ? "done"
+      : isCurrent
+      ? "writing"
+      : isFailed
+      ? "failed"
+      : "pending";
+    return { id: l.id, title: l.title || `第 ${i + 1} 节`, state };
+  });
+  const writingLessonId = stageLessons.find((l) => l.state === "writing")?.id ?? null;
+
   return (
     <div className="mx-auto flex w-full max-w-[720px] flex-col items-center">
       {/* 顶部：返回 + 课名 + 进度环 */}
@@ -1478,15 +1268,15 @@ function RecoveryTheater({
         </button>
         <div className="min-w-0 flex-1 text-center">
           <div className="mono text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--red)]">
-            {isReady ? "AI STUDIO · 已就绪" : "AI STUDIO · 恢复中"}
+            {isReady ? "AI STUDIO · 已就绪" : "AI STUDIO · 生产中"}
           </div>
         </div>
         <div className="w-[92px] shrink-0" aria-hidden="true" />
       </div>
 
-      <div className="studio-rise w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-6">
+      <div className="studio-rise w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-5">
         {/* 头部：进度环 + 标题 + 状态句 */}
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 px-1 pb-4 pt-1">
           <ProgressRing done={done} total={total} size={56} stroke={5} showLabel={false} />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-[17px] font-extrabold tracking-tight text-[var(--ink)]">{course.title}</h2>
@@ -1514,94 +1304,38 @@ function RecoveryTheater({
 
         {/* 首帧加载 / 错误态 */}
         {loading && !progress ? (
-          <div className="mt-5 flex items-center gap-2.5 border-t border-[var(--border)] pt-4">
+          <div className="flex items-center gap-2.5 border-t border-[var(--border)] px-1 pt-4">
             <Spinner size={16} />
             <span className="text-[13px] font-medium text-[var(--ink2)]">正在同步生成进度…</span>
           </div>
         ) : error && !progress ? (
-          <div className="mt-5 border-t border-[var(--border)] pt-4">
+          <div className="border-t border-[var(--border)] px-1 pt-4">
             <p className="text-[13px] text-[var(--ink2)]">进度暂时拉取失败，页面可见时会自动重试。</p>
           </div>
         ) : (
           <>
-            {/* 章节列表：✓ 已完成 / 转圈 进行中 / 序号 待生成 */}
-            <div className="mt-5 border-t border-[var(--border)] pt-4">
-              <div className="mb-2.5 flex items-center justify-between">
-                <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
-                  {course.isImport ? "升维章节" : "课程大纲"} · {total} 节
-                </span>
-                <span key={done} className="num-pop mono text-[11px] font-semibold text-[var(--ink2)]">
-                  <span className="text-[var(--ink)]">{done}</span>/{total}
-                </span>
-              </div>
-
-              <ul className="flex flex-col gap-1.5">
-                {lessons.map((l, i) => {
-                  // 进行中节：未 ready 且是 currentLessonId（无 current 时取第一个未 ready）。
-                  const firstPendingIdx = lessons.findIndex((x) => !x.ready);
-                  const isCurrent =
-                    !l.ready &&
-                    !isFailed &&
-                    (currentLessonId ? l.id === currentLessonId : i === firstPendingIdx);
-                  return (
-                    <li
-                      key={l.id}
-                      className={`flex items-center gap-2.5 rounded-[10px] border px-3 py-2 transition-colors duration-200 ${
-                        isCurrent
-                          ? "border-[var(--red-soft-border)] border-l-2 border-l-[var(--red)] bg-[var(--surface)] shadow-[var(--card)]"
-                          : "border-[var(--border)] bg-[var(--surface2)]"
-                      }`}
-                    >
-                      {l.ready ? (
-                        <CheckCircle size={17} weight="fill" className="shrink-0 text-[var(--ok)]" />
-                      ) : isCurrent ? (
-                        <Spinner size={16} />
-                      ) : (
-                        <span className="mono flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border border-[var(--border2)] text-[10px] font-semibold text-[var(--ink4)]">
-                          {i + 1}
-                        </span>
-                      )}
-                      {isCurrent && l.title ? (
-                        // 恢复剧场里当前生成中的节：标题同样逐字浮现。key=l.id 使切到下一节才重打，
-                        // 3s 轮询的同节重渲染不重启打字。truncate 会裁掉光标，故此行不截断。
-                        <span className="min-w-0 flex-1 text-[13.5px]">
-                          <TypewriterText key={`rtw-${l.id}`} text={l.title} />
-                        </span>
-                      ) : (
-                        <span
-                          className={`flex-1 truncate text-[13.5px] ${
-                            l.ready
-                              ? "font-medium text-[var(--ink)]"
-                              : isCurrent
-                              ? "font-medium text-[var(--ink)]"
-                              : "text-[var(--ink3)]"
-                          }`}
-                        >
-                          {l.title || `第 ${i + 1} 节`}
-                        </span>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-
-              {/* 底部进度条 */}
-              <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[var(--border2)]">
-                <div className="h-full rounded-full bg-[var(--red)] transition-all duration-300" style={{ width: `${pct}%` }} />
-              </div>
-              {failed > 0 && !isReady && (
-                <p className="mt-2 text-[11.5px] text-[var(--ink3)]">
-                  有 <span className="mono font-semibold text-[var(--ink2)]">{failed}</span> 节暂未写完，可到「我的课」继续生成。
-                </p>
-              )}
-            </div>
+            {/* AI 生产线舞台：与即时剧场共用 GenStage（轮询数据驱动）。
+                恢复态大纲必已存在 → 站点=3 逐节写作；全部就绪 → 站点=4 装订成册。 */}
+            <GenStage
+              source={course.isImport ? "import" : "generate"}
+              stationIndex={isReady ? 4 : 3}
+              lessons={stageLessons}
+              writingLessonId={writingLessonId}
+              caption={
+                isReady
+                  ? undefined
+                  : failed > 0 && !isFailed
+                  ? `有 ${failed} 节暂未写完，完成后可在「我的课」继续生成。`
+                  : "关闭页面后台照常生产，随时回来看进度。"
+              }
+            />
 
             {/* 就绪：开始学习 CTA */}
             {isReady && (
               <button
                 type="button"
                 onClick={() => router.push(startHref)}
-                className="cta-glow studio-press group mt-5 inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
+                className="cta-glow studio-press group mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
               >
                 <BookOpen size={17} weight="fill" />
                 开始学习

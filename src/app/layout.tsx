@@ -164,7 +164,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     };
   }
   return (
-    <html lang="zh-CN" className={`${jakarta.variable} ${notoSC.variable} ${plexMono.variable}`}>
+    // suppressHydrationWarning：下方 anti-FOUC 脚本会在 React 水合前往 <html> 写
+    // data-mode/data-theme/--font-scale（读 localStorage 的用户偏好），服务端渲染的
+    // <html> 无这些属性，React 19 会报 attribute mismatch。这是主题脚本的预期差异，
+    // 只压 <html> 自身的属性对比（不影响子树校验）。
+    <html lang="zh-CN" className={`${jakarta.variable} ${notoSC.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
         {/*
           Anti-FOUC：paint 前从 localStorage 同步主题/字号/亮暗到 <html> dataset，

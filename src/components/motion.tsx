@@ -112,7 +112,6 @@ export function Spotlight({ children, className }: { children: ReactNode; classN
           ["--my" as string]: "-200px",
           background:
             "radial-gradient(220px circle at var(--mx) var(--my), rgba(252,1,26,0.08), transparent 60%)",
-          willChange: "background",
         }}
       />
       {children}
@@ -323,13 +322,13 @@ export function PageTide({ children, keyId }: { children: ReactNode; keyId: stri
    全部 transform/opacity/filter 合成友好、一次性播放不常驻、reduce-motion 终态。
    ============================================================ */
 
-/** 「点亮」曲线：从暗（.55 亮度 / .35 不透明 / 下沉）到亮，60% 处轻微过亮点睛后落定。
-    与 globals.css @keyframes lightUp 同一手感，供 JS 编排（滚动/进场）复用。
+/** 「点亮」曲线：从暗（.35 不透明 / 下沉）到亮落定。
+    性能：只动 opacity/transform（合成层）。原版还动 filter:brightness，
+    大面积卡片逐帧重绘是全局掉帧主因，已移除（视觉上由 opacity 承担明暗）。
     返回新数组（非 readonly），供 framer animate 目标可变类型消费。 */
 function lightUpKeyframes() {
   return {
     opacity: [0.35, 1, 1],
-    filter: ["brightness(0.55)", "brightness(1.12)", "brightness(1)"],
     y: [10, 0, 0],
   };
 }
@@ -353,11 +352,11 @@ export function useLightUp(active?: boolean) {
   const lit = active ?? inView;
 
   const initial = reduce
-    ? { opacity: 1, filter: "brightness(1)", y: 0 }
-    : { opacity: 0.35, filter: "brightness(0.55)", y: 10 };
+    ? { opacity: 1, y: 0 }
+    : { opacity: 0.35, y: 10 };
 
   const animate = reduce
-    ? { opacity: 1, filter: "brightness(1)", y: 0 }
+    ? { opacity: 1, y: 0 }
     : lit
     ? lightUpKeyframes()
     : initial;
@@ -402,7 +401,6 @@ export function LightUp({
       initial={initial}
       animate={animate}
       transition={{ ...transition, delay: reduce ? 0 : delay }}
-      style={{ willChange: reduce ? undefined : "transform, opacity, filter" }}
     >
       {glow && !reduce && (
         <motion.span
@@ -421,8 +419,9 @@ export function LightUp({
 
 /**
  * DoorOpen —— 「推门进场」一次性开场编排（moment 5）。
- * 首屏挂载时播放一次：暗场（暗角合拢 + 场景微缩）→ 推开 → 亮场落定。
- * 只做「场景层」的开门包裹；内部文案的浮现由各自 initial/animate 承担。
+ * 首屏挂载时播放一次：暗场（微缩 + 透明）→ 推开 → 亮场落定。
+ * 性能：只动 opacity/transform；「从暗到亮」由整场 opacity 表达，不再动
+ * filter:brightness（首屏整幕逐帧重绘会吃掉开场帧率）。
  * reduce-motion：直接终态（亮场、无位移），不播放开门。
  *
  * @param children 场景内容（第一幕整场）。
@@ -432,10 +431,9 @@ export function DoorOpen({ children, className }: { children: ReactNode; classNa
   return (
     <motion.div
       className={`relative ${className ?? ""}`}
-      initial={reduce ? false : { opacity: 0, scale: 1.04, filter: "brightness(0.4)" }}
-      animate={{ opacity: 1, scale: 1, filter: "brightness(1)" }}
-      transition={reduce ? { duration: 0 } : { duration: 1.1, ease: EASE }}
-      style={{ willChange: reduce ? undefined : "transform, opacity, filter" }}
+      initial={reduce ? false : { opacity: 0, scale: 1.03 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={reduce ? { duration: 0 } : { duration: 1.0, ease: EASE }}
     >
       {/* 开门光缝：一道从中缝向两侧推开的暖光，只在开场播一次（reduce 不渲染） */}
       {!reduce && (

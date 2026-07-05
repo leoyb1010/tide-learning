@@ -102,7 +102,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
   return (
     <>
       <nav
-        className="fixed inset-x-0 bottom-0 grid grid-cols-5 border-t border-[var(--border)] bg-[var(--surface)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl md:hidden"
+        className="fixed inset-x-0 bottom-0 grid grid-cols-5 border-t border-[var(--border)] bg-[var(--surface)]/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md md:hidden"
         style={{ zIndex: "var(--z-sticky)" }}
       >
         {tabs.map((t) => {
