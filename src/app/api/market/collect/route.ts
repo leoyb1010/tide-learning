@@ -4,7 +4,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { track } from "@/lib/analytics";
-import { getBalance } from "@/lib/credits";
+import { ensureAccount } from "@/lib/credits";
 import { collectFreeCourse, purchaseCourse, FREE_COLLECT_AUTHOR_BONUS } from "@/lib/credit-trade";
 
 export const dynamic = "force-dynamic";
@@ -68,7 +68,9 @@ export async function POST(req: NextRequest) {
       if (!course.authorUserId) throw new AppError("该课程缺少作者信息，暂无法购买", 400);
 
       // 事务外预检余额：不足直接 402 引导充值（事务内还会二次核验防 TOCTOU）。
-      const balance = await getBalance(user.id);
+      // 用 ensureAccount 而非 getBalance：历史用户可能从未建账户，此处惰性补建并补发注册赠送，
+      // 否则老用户余额恒 0、永远迈不过预检。
+      const balance = (await ensureAccount(user.id)).balance;
       if (balance < price) {
         return fail("积分不足，充值后可购买本课", 402);
       }

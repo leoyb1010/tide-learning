@@ -11,20 +11,69 @@ final class NotesViewModel {
     var error: String?
     var loading = false
 
+    /// cursor 分页态：nextCursor 为下一页起点（nil = 没有更多）；total 供「共 N 条」展示。
+    var nextCursor: String?
+    var total: Int?
+    var loadingMore = false
+    /// 加载代际：refresh 会重置 cursor，代际号自增使 in-flight 的旧 loadMore 结果作废。
+    private var loadGeneration = 0
+
     /// 创建独立笔记中的状态（compose sheet）。
     var creating = false
     var createError: String?
 
+    /// 首页加载 / 下拉刷新：重置 cursor，从第一页重新拉。
     func load() async {
         loading = true; error = nil
+        loadGeneration += 1
         defer { loading = false }
         do {
             let resp = try await API.shared.get("/api/notes", as: NotesResponse.self)
             notes = resp.notes
             groups = resp.groups
+            nextCursor = resp.nextCursor
+            total = resp.total
             loaded = true
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? "加载失败"
+        }
+    }
+
+    /// 是否还有下一页。
+    var hasMore: Bool { nextCursor != nil }
+
+    /// 滚动到底自动加载下一页。防抖（loadingMore 闩）+ 按 id 去重 + 代际校验（刷新后丢弃旧页）。
+    func loadMore() async {
+        guard let cursor = nextCursor, !loadingMore, !loading else { return }
+        loadingMore = true
+        let generation = loadGeneration
+        defer { loadingMore = false }
+        do {
+            let resp = try await API.shared.get("/api/notes?cursor=\(cursor)", as: NotesResponse.self)
+            // 等待期间发生过刷新 → 本页数据基于旧 cursor，直接作废。
+            guard generation == loadGeneration else { return }
+            let existing = Set(notes.map(\.id))
+            notes.append(contentsOf: resp.notes.filter { !existing.contains($0.id) })
+            mergeGroups(resp.groups)
+            nextCursor = resp.nextCursor
+            total = resp.total
+        } catch {
+            // 触底加载失败不打断浏览；保留 cursor，下次触底自动重试。
+        }
+    }
+
+    /// 把新页的课程分组并入已有分组（按 courseId 合并、组内按 id 去重）。
+    private func mergeGroups(_ incoming: [NoteGroup]) {
+        for g in incoming {
+            if let idx = groups.firstIndex(where: { $0.courseId == g.courseId }) {
+                let existingIds = Set(groups[idx].items.map(\.id))
+                let merged = groups[idx].items + g.items.filter { !existingIds.contains($0.id) }
+                groups[idx] = NoteGroup(courseId: g.courseId,
+                                        course: groups[idx].course ?? g.course,
+                                        items: merged)
+            } else {
+                groups.append(g)
+            }
         }
     }
 
@@ -60,6 +109,8 @@ final class NotesViewModel {
         courseId: String? = nil,
         tagIds: [String] = []
     ) async -> Bool {
+        // 防双击重复创建：已在提交中直接拒绝（UI 禁用之外的最后闸门，防同一 runloop 双 Task）。
+        guard !creating else { return false }
         creating = true; createError = nil
         defer { creating = false }
         // 可空字段用 Optional 编码；JSONEncoder 默认跳过 nil，不会发多余键。
@@ -79,7 +130,10 @@ final class NotesViewModel {
         )
         do {
             let new = try await API.shared.post("/api/notes", body: body, as: Note.self)
-            notes.insert(new, at: 0)
+            if !notes.contains(where: { $0.id == new.id }) {
+                notes.insert(new, at: 0)
+                if let t = total { total = t + 1 }
+            }
             return true
         } catch {
             createError = (error as? APIError)?.errorDescription ?? "保存失败"
@@ -194,6 +248,26 @@ struct NotesView: View {
             )
     }
 
+    /// 触底自动翻页：仅当出现的是列表最后一项时才拉下一页（去重防抖由 VM 负责）。
+    private func loadMoreIfLast(_ idx: Int, of count: Int) {
+        guard idx == count - 1, vm.hasMore else { return }
+        Task { await vm.loadMore() }
+    }
+
+    /// 分页 footer：加载中转圈；还有更多但未触发时留白占位。
+    @ViewBuilder
+    private var pagingFooter: some View {
+        if vm.loadingMore {
+            HStack {
+                Spacer()
+                ProgressView().controlSize(.small)
+                Text("加载更多…").font(.studio(12)).foregroundStyle(Studio.ink3)
+                Spacer()
+            }
+            .padding(.vertical, 12)
+        }
+    }
+
     // MARK: 全部（pinned 优先列表）
 
     private var allList: some View {
@@ -206,7 +280,9 @@ struct NotesView: View {
                     ForEach(Array(vm.allSorted.enumerated()), id: \.element.id) { idx, note in
                         stagger(idx, NavigationLink(value: note) { NoteCard(note: note) }
                             .buttonStyle(.plain))
+                            .onAppear { loadMoreIfLast(idx, of: vm.allSorted.count) }
                     }
+                    pagingFooter
                 }
                 .padding(.horizontal, 16)
             }
@@ -237,7 +313,9 @@ struct NotesView: View {
                                 .buttonStyle(.plain)
                                 .padding(.bottom, 10)
                         })
+                        .onAppear { loadMoreIfLast(idx, of: vm.timeline.count) }
                     }
+                    pagingFooter
                 }
                 .padding(.horizontal, 16)
             }
@@ -255,9 +333,12 @@ struct NotesView: View {
                     ForEach(Array(vm.galleryNotes.enumerated()), id: \.element.id) { idx, note in
                         stagger(idx, NavigationLink(value: note) { galleryCell(note) }
                             .buttonStyle(.plain))
+                            // 画廊是过滤后的子集，后续页可能才有截帧笔记 → 同样触底翻页。
+                            .onAppear { loadMoreIfLast(idx, of: vm.galleryNotes.count) }
                     }
                 }
                 .padding(.horizontal, 16)
+                pagingFooter
             }
         }
     }
@@ -317,7 +398,10 @@ struct NotesView: View {
                                     .buttonStyle(.plain)
                             }
                         })
+                        // 最后一组出现 → 拉下一页，分组随 mergeGroups 增量并入。
+                        .onAppear { loadMoreIfLast(idx, of: vm.groups.count) }
                     }
+                    pagingFooter
                 }
                 .padding(.horizontal, 16)
             }

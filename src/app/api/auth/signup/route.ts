@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword, createSession } from "@/lib/session";
 import { ok, fail, handle } from "@/lib/api";
 import { track } from "@/lib/analytics";
+import { ensureAccount } from "@/lib/credits";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -37,6 +38,9 @@ export async function POST(req: NextRequest) {
       },
     });
     const sessionToken = await createSession(user.id);
+    // 注册即建积分账户并发放注册赠送（ensureAccount 幂等，含流水）；
+    // 不放进 user.create 事务：赠送失败不应阻断注册，购买预检处还有惰性兜底。
+    await ensureAccount(user.id).catch((e) => console.error("[signup:ensureAccount]", e));
     await track({ eventName: "signup_success", userId: user.id });
     return ok({ id: user.id, nickname: user.nickname, sessionToken });
   });

@@ -135,6 +135,15 @@ export async function POST(req: NextRequest) {
       tagIds?: string[]; // v3.1：创建时批量关联标签（每个标签须属本人，越权铁律）
     };
 
+    // as-cast 不做运行时收窄：字符串字段传入非字符串（如数字）时 ?.trim() 会抛 TypeError 变 500。
+    // 这里统一收窄为 400 客户端错误。
+    for (const k of ["courseId", "lessonId", "title", "contentMd", "kind", "captureUrl", "sourceText", "source", "notebookId"] as const) {
+      if (body[k] != null && typeof body[k] !== "string") return fail(`字段 ${k} 类型错误`);
+    }
+    if (body.timestampSec != null && typeof body.timestampSec !== "number") return fail("字段 timestampSec 类型错误");
+    if (body.tagIds != null && (!Array.isArray(body.tagIds) || body.tagIds.some((t) => typeof t !== "string")))
+      return fail("字段 tagIds 类型错误");
+
     const kind: NoteKind =
       body.kind && (NOTE_KINDS as readonly string[]).includes(body.kind) ? (body.kind as NoteKind) : "text";
 
@@ -244,6 +253,13 @@ export async function POST(req: NextRequest) {
             ? { tags: { create: validTagIds.map((tagId) => ({ tagId })) } }
             : {}),
         },
+        // 响应形状与 GET 列表项对齐（含 tags/course/lesson）：裸 create 不返回关系字段，
+        // 客户端（iOS Note DTO 的非 Optional tags）解码会断
+        include: {
+          course: { select: { title: true, slug: true } },
+          lesson: { select: { title: true } },
+          tags: { include: { tag: { select: { id: true, name: true, color: true } } } },
+        },
       });
       return created;
     });
@@ -256,6 +272,7 @@ export async function POST(req: NextRequest) {
       properties: { course_id: courseId, lesson_id: lessonId, kind, source, has_timestamp: timestampSec != null },
     });
 
-    return ok(note);
+    // 拍平标签结构，与 GET 列表一致
+    return ok({ ...note, tags: note.tags.map((t) => t.tag) });
   });
 }

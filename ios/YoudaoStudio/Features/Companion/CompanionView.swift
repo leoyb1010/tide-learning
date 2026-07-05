@@ -3,22 +3,19 @@ import Observation
 
 // MARK: - DTO（对齐后端 camelCase）
 
-/// POST /api/ai/companion 请求体。有课程上下文时带 courseId/lessonId；history 为已往轮次。
+/// POST /api/ai/companion 请求体。有课程上下文时带 courseId/lessonId。
+/// threadId：首条消息不带（服务端创建 ChatThread），后续消息带上 → 服务端按线程取
+/// 最近历史注入上下文（后端不读客户端上传的 history，记忆以服务端线程为准）。
 private struct CompanionRequest: Encodable {
     let message: String
     let courseId: String?
     let lessonId: String?
-    let history: [CompanionTurn]
+    let threadId: String?
 }
 
-/// 对话历史单轮（发送给后端）。role: "user" | "assistant"。
-private struct CompanionTurn: Encodable {
-    let role: String
-    let content: String
-}
-
-/// POST /api/ai/companion 响应体：{ reply }。
+/// POST /api/ai/companion 响应体：{ threadId, reply }。
 private struct CompanionReply: Decodable {
+    let threadId: String?
     let reply: String
 }
 
@@ -40,7 +37,7 @@ final class CompanionViewModel {
     let courseId: String?
     let lessonId: String?
 
-    /// 本地消息数组（用户发的 + AI 回的）。
+    /// 本地消息数组（用户发的 + AI 回的，仅供展示）。
     var messages: [CompanionMessage] = []
     /// 输入框内容。
     var input = ""
@@ -50,6 +47,9 @@ final class CompanionViewModel {
     var error: String?
     /// 402 积分不足 → 引导充值。
     var needsPaywall = false
+    /// 服务端会话线程 id：首条响应返回后保存，本会话后续消息都带上，
+    /// 服务端才能续用同一 ChatThread 并注入历史（否则每条消息都新建线程，AI 无记忆）。
+    private(set) var threadId: String?
 
     init(courseId: String? = nil, lessonId: String? = nil) {
         self.courseId = courseId
@@ -68,11 +68,6 @@ final class CompanionViewModel {
         error = nil
         needsPaywall = false
 
-        // 组装 history（当前已有的往轮，不含即将发送的这条）。
-        let history = messages.map {
-            CompanionTurn(role: $0.role == .user ? "user" : "assistant", content: $0.text)
-        }
-
         messages.append(CompanionMessage(role: .user, text: text))
         input = ""
         sending = true
@@ -85,14 +80,18 @@ final class CompanionViewModel {
                     message: text,
                     courseId: courseId,
                     lessonId: lessonId,
-                    history: history
+                    threadId: threadId
                 ),
                 as: CompanionReply.self
             )
+            // 保存/续用服务端线程 id，会话期间的后续消息共享同一 ChatThread（AI 记忆）。
+            if let tid = resp.threadId { threadId = tid }
             messages.append(CompanionMessage(role: .assistant, text: resp.reply))
         } catch {
             let apiErr = error as? APIError
             if apiErr?.needsPaywall == true { needsPaywall = true }
+            // 线程在服务端已不存在（404）→ 丢弃本地 threadId，下一条消息重新开线程。
+            if case .notFound = apiErr, threadId != nil { threadId = nil }
             self.error = apiErr?.errorDescription ?? "发送失败，请重试"
         }
     }

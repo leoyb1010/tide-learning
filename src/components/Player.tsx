@@ -172,9 +172,12 @@ export function Player({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [time]);
 
-  // 学完本节（且有下一节、未手动关过、非块课）→ 弹出下一节卡并重置倒计时
+  // 学完本节（且有下一节、未手动关过、非块课）→ 弹出下一节卡并重置倒计时。
+  // 重访已完成课节时 initialProgress 已 >= durationSec，若不排除会在挂载 3 秒后被动跳走——
+  // 只有本次会话内「从未完成推进到完成」才触发。
+  const initiallyCompletedRef = useRef(initialProgress >= lesson.durationSec && lesson.durationSec > 0);
   useEffect(() => {
-    if (lesson.contentType === "ai_block" || !nextHref || nextDismissedRef.current) return;
+    if (lesson.contentType === "ai_block" || !nextHref || nextDismissedRef.current || initiallyCompletedRef.current) return;
     if (time >= lesson.durationSec && lesson.durationSec > 0 && !showNextCard) {
       setNextCountdown(3);
       setShowNextCard(true);

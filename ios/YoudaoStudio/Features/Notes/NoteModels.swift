@@ -72,6 +72,34 @@ struct Note: Decodable, Identifiable, Hashable {
     let lesson: NoteLessonRef?
     let tags: [NoteTag]
 
+    private enum CodingKeys: String, CodingKey {
+        case id, courseId, lessonId, title, excerpt, contentMd, source, kind
+        case captureUrl, pinned, notebookId, createdAt, updatedAt, course, lesson, tags
+    }
+
+    /// 防御性解码：POST /api/notes 创建响应是裸 DB 行（不带 tags/course/lesson 关系字段），
+    /// 与 GET 列表形态不一致。关系字段与可缺省标量一律 decodeIfPresent 兜底，
+    /// 避免 keyNotFound 导致「服务端已建笔记但客户端报解析失败」。
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        courseId = try c.decodeIfPresent(String.self, forKey: .courseId)
+        lessonId = try c.decodeIfPresent(String.self, forKey: .lessonId)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        excerpt = try c.decodeIfPresent(String.self, forKey: .excerpt)
+        contentMd = try c.decodeIfPresent(String.self, forKey: .contentMd)
+        source = try c.decodeIfPresent(NoteSource.self, forKey: .source) ?? .unknown
+        kind = try c.decodeIfPresent(NoteKind.self, forKey: .kind) ?? .unknown
+        captureUrl = try c.decodeIfPresent(String.self, forKey: .captureUrl)
+        pinned = try c.decodeIfPresent(Bool.self, forKey: .pinned) ?? false
+        notebookId = try c.decodeIfPresent(String.self, forKey: .notebookId)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        course = try c.decodeIfPresent(NoteCourseRef.self, forKey: .course)
+        lesson = try c.decodeIfPresent(NoteLessonRef.self, forKey: .lesson)
+        tags = try c.decodeIfPresent([NoteTag].self, forKey: .tags) ?? []
+    }
+
     /// 展示标题：空 → "未命名"。
     var displayTitle: String {
         let t = (title ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -85,10 +113,14 @@ struct Note: Decodable, Identifiable, Hashable {
     }
 }
 
-/// GET /api/notes 返回体。
+/// GET /api/notes 返回体（cursor 分页：limit 默认 30 / max 50）。
+/// nextCursor 为下一页起点 note id（无更多则 null）；total 为满足过滤条件的总条数。
+/// 两字段 Optional：兼容旧后端缺省，缺键不致解码失败。
 struct NotesResponse: Decodable {
     let notes: [Note]
     let groups: [NoteGroup]
+    let nextCursor: String?
+    let total: Int?
 }
 
 /// 按课程分组（groups[]）。后端形态：{courseId, course:{title,slug}, items:[]}。

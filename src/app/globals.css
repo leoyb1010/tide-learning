@@ -287,8 +287,12 @@
     --shadow-soft: var(--card);
   }
 }
-/* 手动强制暗色（右上角切换 → data-theme=dark），复用同一套暗色值 */
-:root[data-theme="dark"] {
+/* 手动强制暗色（右上角切换 → data-theme=dark），复用同一套暗色值。
+   深海模式（data-theme=deep）也必须挂完整暗色基座：此前只覆盖 --surface-* 别名，
+   浅色系统下 --bg/--ink/--color-paper* 仍是亮色值 → 全站黑底白卡混色。
+   deep 专属覆盖在下方后置块中，级联后写覆盖生效。 */
+:root[data-theme="dark"],
+:root[data-theme="deep"] {
   color-scheme: dark;
   --bg:#0e1116; --bg2:#12151b; --surface:#191d25; --surface2:#20252f; --surface-inset:#20252f;
   --border:#2b3350; --border2:#39415e;

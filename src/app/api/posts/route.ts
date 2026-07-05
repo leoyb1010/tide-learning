@@ -123,11 +123,14 @@ export async function GET(req: NextRequest) {
     const type = POST_TYPES.includes(typeParam as PostType) ? (typeParam as PostType) : undefined;
     const sort = url.searchParams.get("sort") === "hot" ? "hot" : "recent";
     const tag = url.searchParams.get("tag")?.trim().replace(/^#+/, "").slice(0, 20) || undefined;
+    // ?userId= 按作者过滤（个人主页「TA 的帖子」消费；iOS 已在传，此前被静默忽略返回全站流）
+    const userId = url.searchParams.get("userId")?.trim() || undefined;
 
     const posts = await prisma.post.findMany({
       where: {
         status: "approved",
         ...(type ? { type } : {}),
+        ...(userId ? { userId } : {}),
         // SQLite JSON 存的是字符串，用 contains 近似过滤话题（含引号避免子串误命中）
         ...(tag ? { topicTags: { contains: `"${tag}"` } } : {}),
       },

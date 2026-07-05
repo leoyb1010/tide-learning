@@ -4,8 +4,50 @@ import AVKit
 
 // MARK: - DTO
 
-/// GET /api/lessons/[id] 返回的章节。字段对齐后端 camelCase。
-struct Lesson: Decodable, Identifiable {
+/// GET /api/lessons/[id] 的 data 是聚合对象（真值源 src/lib/queries.ts getLessonForUser）：
+/// { snapshot, access, course, track, lesson, outline, prevLessonId, nextLessonId }。
+/// 课时本体嵌在 `lesson`；`lesson` 里没有 courseId，课程归属取 `course.id`。
+/// 仅声明 UI 需要的字段，其余后端字段忽略。可选性已按真实响应核对：
+/// access / course / lesson / outline 恒存在；prevLessonId / nextLessonId 首末节为 null。
+struct LessonAggregate: Decodable {
+    /// 服务端访问判定。付费节无权益时为 false，且 videoUrl/articleMd/blocksJson 一律为 null。
+    let access: Bool
+    let course: CourseRef
+    let lesson: LessonPayload
+    let outline: [OutlineItem]
+    let prevLessonId: String?
+    let nextLessonId: String?
+
+    /// 归属课程（后端返回完整 course 对象，此处仅取 id/title）。
+    struct CourseRef: Decodable {
+        let id: String
+        let title: String
+    }
+
+    /// 章节本体（data.lesson）。summary/liveStartAt/subtitles 等未消费字段不声明。
+    struct LessonPayload: Decodable {
+        let id: String
+        let title: String
+        let contentType: Lesson.ContentType
+        let durationSec: Int
+        let isFree: Bool
+        let videoUrl: String?
+        let articleMd: String?
+        let blocksJson: String?
+    }
+
+    /// 大纲项（可用于「上一节/下一节」等导航）。
+    struct OutlineItem: Decodable, Identifiable {
+        let id: String
+        let title: String
+        let isFree: Bool
+        let durationSec: Int
+        let current: Bool
+    }
+}
+
+/// 学习台 UI 模型：由 LessonAggregate 平铺而来。
+struct Lesson: Identifiable {
     let id: String
     let title: String
     let contentType: ContentType
@@ -14,8 +56,8 @@ struct Lesson: Decodable, Identifiable {
     let videoUrl: String?
     let articleMd: String?
     let blocksJson: String?
-    /// 归属课程（记笔记时上报 courseId；后端可能返回，缺省兜底空串）。
-    let courseId: String?
+    /// 归属课程 id（记笔记时上报；取自聚合响应的 course.id）。
+    let courseId: String
 
     enum ContentType: String, Decodable {
         case video, article, ai_block
@@ -55,7 +97,25 @@ final class LearnViewModel {
         loading = true; error = nil; needsPaywall = false
         defer { loading = false }
         do {
-            let l = try await API.shared.get("/api/lessons/\(lessonId)", as: Lesson.self)
+            let agg = try await API.shared.get("/api/lessons/\(lessonId)", as: LessonAggregate.self)
+            // 服务端判无权益：内容字段已被置空，直接走付费墙
+            //（避免渲染空内容，更避免空文章把完课哨兵一并渲染出来误标完成）。
+            guard agg.access else {
+                needsPaywall = true
+                return
+            }
+            let p = agg.lesson
+            let l = Lesson(
+                id: p.id,
+                title: p.title,
+                contentType: p.contentType,
+                durationSec: p.durationSec,
+                isFree: p.isFree,
+                videoUrl: p.videoUrl,
+                articleMd: p.articleMd,
+                blocksJson: p.blocksJson,
+                courseId: agg.course.id
+            )
             lesson = l
             if l.contentType == .ai_block {
                 blocks = BlockDocument.parse(l.blocksJson).blocks
@@ -106,6 +166,7 @@ final class LearnViewModel {
         let trimmed = contentMd.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return "笔记内容不能为空" }
         let body = NoteBody(
+            // 课程归属来自聚合响应的 course.id（章节本体不含 courseId）。
             courseId: lesson?.courseId ?? "",
             lessonId: lessonId,
             contentMd: trimmed,
@@ -370,7 +431,8 @@ private struct ArticleLessonView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            // Lazy：末尾完课哨兵只有真正滚到底部才被创建，避免首帧即标完成。
+            LazyVStack(alignment: .leading, spacing: 16) {
                 LessonHeader(lesson: lesson, completed: vm.completed)
 
                 if let md = lesson.articleMd, !md.isEmpty {
@@ -577,7 +639,8 @@ private struct BlockLessonView: View {
 
     private var scroller: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
+            // Lazy：末尾完课哨兵只有真正滚到底部才被创建，避免首帧即标完成。
+            LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(Array(vm.blocks.enumerated()), id: \.element.id) { idx, block in
                     BlockCardView(block: block)
                         .opacity(appeared || reduceMotion ? 1 : 0)

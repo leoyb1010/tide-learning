@@ -259,9 +259,10 @@ struct CourseDetailView: View {
                 withAnimation(reduceMotion ? nil : StudioMotion.smooth) { lessonsAppeared = true }
             }
 
-            // 订阅说服门（有锁定章节时出现）
-            if d.lessons.contains(where: { !$0.isFree }) {
-                subscribeGate(lockedCount: d.lessons.filter { !$0.isFree }.count)
+            // 订阅说服门（有「不可访问」章节时出现；口径与行级解锁一致：canAccess 缺省退回 isFree）
+            let lockedCount = d.lessons.filter { !($0.canAccess ?? $0.isFree) }.count
+            if lockedCount > 0 {
+                subscribeGate(lockedCount: lockedCount)
             }
 
             // 学员评价：真实评分聚合 + 列表 + 写评价入口（学过才可评）。
@@ -334,37 +335,39 @@ struct CourseDetailView: View {
 
     @ViewBuilder
     private func lessonRow(_ lesson: CourseLesson, index: Int) -> some View {
-        if lesson.isFree {
-            // 免费章节 → 直接进学习台
+        // 解锁判定以后端 canAccess 为准（订阅/买断等权益由服务端算好）；canAccess 缺省时退回 isFree。
+        let unlocked = lesson.canAccess ?? lesson.isFree
+        if unlocked {
+            // 可访问章节（免费试学或已解锁）→ 直接进学习台
             NavigationLink { LearnView(lessonId: lesson.id) } label: {
-                lessonRowContent(lesson, index: index)
+                lessonRowContent(lesson, index: index, unlocked: true)
             }
             .buttonStyle(.plain)
             .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
             .pressable(scale: 0.98, haptic: false)
         } else {
-            // 付费章节 → 点击弹订阅引导（越权/解锁由后端保证）
+            // 不可访问章节 → 点击弹订阅引导（越权/解锁由后端保证）
             Button {
                 Haptics.warning()
                 vm.promptPaywall()
             } label: {
-                lessonRowContent(lesson, index: index)
+                lessonRowContent(lesson, index: index, unlocked: false)
             }
             .buttonStyle(.plain)
             .pressable(scale: 0.98, haptic: false)
         }
     }
 
-    private func lessonRowContent(_ lesson: CourseLesson, index: Int) -> some View {
+    private func lessonRowContent(_ lesson: CourseLesson, index: Int, unlocked: Bool) -> some View {
         HStack(spacing: 12) {
             Text(String(format: "%02d", index))
                 .font(.mono(13, .bold))
-                .foregroundStyle(lesson.isFree ? Studio.ink : Studio.ink4)
+                .foregroundStyle(unlocked ? Studio.ink : Studio.ink4)
                 .frame(width: 26, alignment: .leading)
             VStack(alignment: .leading, spacing: 3) {
                 Text(lesson.title)
                     .font(.studio(14, .semibold))
-                    .foregroundStyle(lesson.isFree ? Studio.ink : Studio.ink2)
+                    .foregroundStyle(unlocked ? Studio.ink : Studio.ink2)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                 HStack(spacing: 8) {
@@ -378,10 +381,10 @@ struct CourseDetailView: View {
                 }
             }
             Spacer(minLength: 8)
-            // 免费=红播放键（关键行动信号），锁定=中性锁
-            Image(systemName: lesson.isFree ? "play.circle.fill" : "lock.fill")
-                .font(.system(size: lesson.isFree ? 22 : 15))
-                .foregroundStyle(lesson.isFree ? Studio.red : Studio.ink4)
+            // 可访问=红播放键（关键行动信号），锁定=中性锁
+            Image(systemName: unlocked ? "play.circle.fill" : "lock.fill")
+                .font(.system(size: unlocked ? 22 : 15))
+                .foregroundStyle(unlocked ? Studio.red : Studio.ink4)
         }
         .padding(.vertical, 8)
         .contentShape(Rectangle())

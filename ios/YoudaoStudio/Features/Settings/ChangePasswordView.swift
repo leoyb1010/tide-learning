@@ -3,10 +3,12 @@ import Observation
 
 // MARK: - DTO
 
-/// POST /api/account/change-password { currentPassword, newPassword }
+/// POST /api/account/change-password { currentPassword, newPassword, confirmPassword }
+/// 后端无条件校验 newPassword === confirmPassword，confirmPassword 必传（缺省恒判「两次不一致」）。
 private struct ChangePasswordBody: Encodable {
     let currentPassword: String
     let newPassword: String
+    let confirmPassword: String
 }
 
 // MARK: - ViewModel
@@ -20,10 +22,13 @@ final class ChangePasswordViewModel {
     var error: String?
     var done = false
 
-    /// 客户端校验：非空、长度、两次一致。
+    /// 客户端校验：非空、强度（对齐后端：≥8 位且含字母和数字）、两次一致。
     private func validate() -> String? {
         if current.isEmpty || next.isEmpty || confirm.isEmpty { return "请完整填写所有密码" }
-        if next.count < 6 { return "新密码至少 6 位" }
+        if next.count < 8 { return "新密码至少 8 位" }
+        if next.rangeOfCharacter(from: .letters) == nil || next.rangeOfCharacter(from: .decimalDigits) == nil {
+            return "新密码需同时包含字母和数字"
+        }
         if next != confirm { return "两次输入的新密码不一致" }
         if next == current { return "新密码不能与当前密码相同" }
         return nil
@@ -35,7 +40,9 @@ final class ChangePasswordViewModel {
         defer { loading = false }
         do {
             _ = try await API.shared.post("/api/account/change-password",
-                                          body: ChangePasswordBody(currentPassword: current, newPassword: next),
+                                          body: ChangePasswordBody(currentPassword: current,
+                                                                   newPassword: next,
+                                                                   confirmPassword: confirm),
                                           as: EmptyResponse.self)
             done = true
         } catch {
@@ -58,7 +65,7 @@ struct ChangePasswordView: View {
 
                 VStack(spacing: 12) {
                     secureField("当前密码", text: $vm.current)
-                    secureField("新密码（至少 6 位）", text: $vm.next)
+                    secureField("新密码（至少 8 位，含字母和数字）", text: $vm.next)
                     secureField("确认新密码", text: $vm.confirm)
                 }
                 .studioCard(padding: 16)

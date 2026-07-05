@@ -88,33 +88,74 @@ final class NoteDetailViewModel {
         }
     }
 
-    struct AIResponse: Decodable { let title: String?; let content: String }
+    // MARK: AI 三端点契约 DTO（对齐后端真实请求/响应）
 
-    /// 总结 → /api/ai/note-summary；复习卡/大纲 → /api/ai/note-transform。
+    /// POST /api/ai/note-summary 请求：{ noteIds:[String], mode:"summary"|"flashcards" }。
+    private struct SummaryBody: Encodable { let noteIds: [String]; let mode: String }
+    /// note-summary 响应：{ summary:[String], flashcards?:[{q,a}] }（LLM 产物，宽松解码）。
+    private struct SummaryResponse: Decodable { let summary: [String]? }
+
+    /// POST /api/ai/note-transform 请求：{ noteIds:[String], action:"outline"|"actions"|"translate"|"weekly" }。
+    private struct TransformBody: Encodable { let noteIds: [String]; let action: String }
+    /// note-transform 响应：{ action, markdown, items }（outline 走 markdown）。
+    private struct TransformResponse: Decodable { let markdown: String?; let items: [String]? }
+
+    /// POST /api/ai/review-card 请求（批量生成分支）：{ noteIds:[String] }。
+    private struct ReviewCardBody: Encodable { let noteIds: [String] }
+    /// review-card 响应：{ cards:[{id,front,back,...}], count }。只取展示所需字段。
+    private struct ReviewCardResponse: Decodable {
+        struct Card: Decodable { let front: String; let back: String }
+        let cards: [Card]?
+        let count: Int?
+    }
+
+    /// AI 整理三动作，各走各的后端端点：
+    /// - 总结  → POST /api/ai/note-summary   { noteIds, mode:"summary" } → { summary:[要点] }
+    /// - 大纲  → POST /api/ai/note-transform { noteIds, action:"outline" } → { markdown }
+    /// - 复习卡 → POST /api/ai/review-card    { noteIds } → { cards:[{front,back}] }（生成并落库）
+    /// 三端点均以 noteIds 数组定位笔记（服务端强制 userId 重拉，防越权）。
     func runAI(_ action: NoteAIAction) async {
         aiRunning = true; aiError = nil; aiResult = nil; aiTitle = nil
         defer { aiRunning = false }
         do {
-            let resp: AIResponse
             switch action {
             case .summary:
-                struct Body: Encodable { let noteId: String }
-                resp = try await API.shared.post(
+                let resp = try await API.shared.post(
                     "/api/ai/note-summary",
-                    body: Body(noteId: noteId),
-                    as: AIResponse.self
+                    body: SummaryBody(noteIds: [noteId], mode: "summary"),
+                    as: SummaryResponse.self
                 )
-            case .reviewCards, .outline:
-                struct Body: Encodable { let noteId: String; let mode: String }
-                let mode = action == .reviewCards ? "review_cards" : "outline"
-                resp = try await API.shared.post(
+                let points = (resp.summary ?? [])
+                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                    .filter { !$0.isEmpty }
+                guard !points.isEmpty else { throw APIError.message("AI 未返回总结内容，请稍后重试") }
+                aiTitle = "总结"
+                aiResult = points.map { "- \($0)" }.joined(separator: "\n")
+
+            case .outline:
+                let resp = try await API.shared.post(
                     "/api/ai/note-transform",
-                    body: Body(noteId: noteId, mode: mode),
-                    as: AIResponse.self
+                    body: TransformBody(noteIds: [noteId], action: "outline"),
+                    as: TransformResponse.self
                 )
+                let md = (resp.markdown ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !md.isEmpty else { throw APIError.message("AI 未返回大纲内容，请稍后重试") }
+                aiTitle = "大纲"
+                aiResult = md
+
+            case .reviewCards:
+                let resp = try await API.shared.post(
+                    "/api/ai/review-card",
+                    body: ReviewCardBody(noteIds: [noteId]),
+                    as: ReviewCardResponse.self
+                )
+                let cards = resp.cards ?? []
+                guard !cards.isEmpty else { throw APIError.message("AI 未返回复习卡，请稍后重试") }
+                aiTitle = "复习卡"
+                aiResult = cards.enumerated()
+                    .map { i, c in "**Q\(i + 1)：\(c.front)**\n\n答：\(c.back)" }
+                    .joined(separator: "\n\n")
             }
-            aiTitle = resp.title ?? action.rawValue
-            aiResult = resp.content
         } catch {
             aiError = (error as? APIError)?.errorDescription ?? "AI 整理失败"
         }

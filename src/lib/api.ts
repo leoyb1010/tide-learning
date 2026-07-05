@@ -26,6 +26,8 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
       return res;
     }
     if (e instanceof AppError) return fail(e.message, e.status);
+    // 畸形请求体（req.json() 解析失败抛 SyntaxError）：客户端错误，收敛为 400 而非 500
+    if (e instanceof SyntaxError) return fail("请求体格式错误", 400);
     // 其余：记录服务端日志，返回通用文案，避免泄露数据结构 / 配置
     console.error("[api:internal]", e instanceof Error ? e.stack ?? e.message : e);
     return fail("服务异常，请稍后再试", 500);
