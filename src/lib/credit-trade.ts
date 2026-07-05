@@ -1,0 +1,276 @@
+import { prisma } from "./db";
+import { AppError } from "./errors";
+import { ensureAccount } from "./credits";
+
+/**
+ * 集市交易闭环（S4 §问题⑪）—— 积分作货币的课程买卖记账层（server-only）。
+ *
+ * 与 credits.ts 的分工：
+ *   - credits.ts 管「用户 ↔ 系统」的单边流水（充值 / 月赠 / LLM 扣费 / 注册赠送）。
+ *   - credit-trade.ts 管「买家 ↔ 作者」的**双边交易**：一次购买同时产生买家扣款(course_purchase)
+ *     与作者入账(course_sale_income)两条流水，必须原子成对发生，否则出现「扣了钱作者没收到」
+ *     或「作者收到了买家没扣」的对账黑洞。故核心 purchaseCourse 在**单个 $transaction** 内
+ *     完成：幂等二次确认 → 买家扣款 → 作者入账 → 建学习起始记录，任一失败整体回滚。
+ *
+ * 记账铁律（对齐 credits.ts）：
+ *   - CreditLedger 不可变，balanceAfter 存快照，sum(delta)===balance 可对账。
+ *   - 越权：所有 where 带 userId；买家只能用自己的余额，作者入账落到 course.authorUserId。
+ *   - 幂等：以「买家已有该课学习起始记录」为水位线，事务内二次确认，杜绝并发重复扣款。
+ */
+
+// —— 交易分成配置（后续可迁 AppConfig 表）——
+/** 付费课作者分成比例：售价的 70% 归作者，30% 为平台抽成（不落任何账户，等于销毁=通缩）。 */
+export const AUTHOR_REVENUE_SHARE = 0.7;
+/** 免费课被拿走时给作者的小额创作激励（鼓励持续供给；走 course_sale_income，refId 关联课程）。 */
+export const FREE_COLLECT_AUTHOR_BONUS = 2;
+
+/** 流水类型常量（集中定义，避免各处拼写漂移；与 CreditLedger.type 字符串契约对齐）。 */
+export const LEDGER_TYPE = {
+  /** 买家购买付费课，扣积分（delta<0）。refId=courseId。 */
+  COURSE_PURCHASE: "course_purchase",
+  /** 作者售出收益 / 免费课被拿走的创作激励，入积分（delta>0）。refId=courseId。 */
+  COURSE_SALE_INCOME: "course_sale_income",
+} as const;
+
+/** 据售价算作者应得收益（向下取整，保证平台抽成非负；免费课单独走 bonus 不经此）。 */
+export function authorShareOf(priceCredits: number): number {
+  return Math.max(0, Math.floor(priceCredits * AUTHOR_REVENUE_SHARE));
+}
+
+/**
+ * 作者售出入账（**独立**给作者加分 + 写 course_sale_income 流水）。原子：更新余额 + 写流水。
+ *
+ * 用途：
+ *   1) 免费课被拿走时的创作激励（小额 bonus，买家侧无扣款，故独立调用）。
+ *   2) （若未来有买家外的入账入口）作者收益补录。
+ * 注意：**付费购买的作者入账不走此函数**——它必须与买家扣款在同一事务，见 purchaseCourse 内联实现，
+ *   避免「买家事务提交、作者入账另起事务失败」的半成交。此函数用于买家侧无对应扣款的单边入账。
+ *
+ * @param authorId 收益归属作者 userId。
+ * @param courseId 关联课程（流水 refId，可对账「这门课给作者赚了多少」）。
+ * @param amount 入账积分（必须为正）。
+ * @param reason 展示文案。
+ * @returns 作者新余额。
+ */
+export async function earnFromSale(
+  authorId: string,
+  courseId: string,
+  amount: number,
+  reason: string,
+): Promise<number> {
+  if (amount <= 0) throw new AppError("收益金额必须为正", 400);
+  await ensureAccount(authorId);
+  return prisma.$transaction(async (tx) => {
+    const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: authorId } });
+    const balanceAfter = acc.balance + amount;
+    await tx.creditAccount.update({
+      where: { userId: authorId },
+      data: { balance: balanceAfter, totalEarned: acc.totalEarned + amount },
+    });
+    await tx.creditLedger.create({
+      data: {
+        userId: authorId,
+        delta: amount,
+        type: LEDGER_TYPE.COURSE_SALE_INCOME,
+        refId: courseId,
+        reason,
+        balanceAfter,
+      },
+    });
+    return balanceAfter;
+  });
+}
+
+/** purchaseCourse 结果：status 区分首次成交 / 幂等命中；balance 为买家操作后余额（UI 回显）。 */
+export interface PurchaseResult {
+  status: "purchased" | "already_owned";
+  /** 买家操作后余额（幂等命中时为当前余额，未扣款）。 */
+  balance: number;
+  /** 本次实扣积分（幂等命中为 0）。 */
+  spent: number;
+  /** 关联的学习起始记录所在 lessonId（供 collect 复用书架落地逻辑）。 */
+  firstLessonId: string;
+}
+
+/**
+ * 购买付费课（**核心交易事务**）：买家扣款 + 作者入账 + 建学习起始记录，单事务原子完成。
+ *
+ * 前置校验（调用方已做的不重复，此处只做与「钱」强相关的）：
+ *   - 课付费（price>0）由调用方判定；免费课不走此函数（走 collect 免费分支）。
+ *   - 余额充足由调用方先用 assertCanAfford 预检并返回 402（本函数事务内也二次核验，防 TOCTOU）。
+ *
+ * 幂等：以「买家在该课 firstLesson 的 LearningProgress」为唯一水位线，事务内二次确认——
+ *   已拥有 → 直接返回 already_owned、不扣款、不重复给作者入账（对账安全）。
+ *
+ * 越权：买家扣款 where userId=buyerId；作者入账 where userId=authorId（作者≠买家由调用方保证）。
+ *
+ * 并发：LearningProgress @@unique([userId, lessonId]) 是最终防线——两条并发购买请求，
+ *   事务提交时唯一约束只会让一条建成起始记录；另一条 create 抛错被外层捕获视作 already_owned，
+ *   保证「至多扣一次款」。（事务内先二次 findUnique 已挡住绝大多数；unique 兜并发窗口。）
+ *
+ * @param buyerId 买家 userId（用自己的余额，越权铁律）。
+ * @param authorId 作者 userId（收益归属；调用方已保证 !== buyerId）。
+ * @param courseId 课程 id。
+ * @param firstLessonId 课程第 1 节 lessonId（建学习起始记录 = 进书架）。
+ * @param priceCredits 售价（正整数，调用方已判定 >0）。
+ * @param courseTitle 课程标题（流水展示文案）。
+ */
+export async function purchaseCourse(args: {
+  buyerId: string;
+  authorId: string;
+  courseId: string;
+  firstLessonId: string;
+  priceCredits: number;
+  courseTitle: string;
+}): Promise<PurchaseResult> {
+  const { buyerId, authorId, courseId, firstLessonId, priceCredits, courseTitle } = args;
+  if (priceCredits <= 0) throw new AppError("付费课售价必须为正", 400);
+  if (buyerId === authorId) throw new AppError("不能购买自己的课", 400);
+
+  const authorShare = authorShareOf(priceCredits);
+
+  // 两账户先确保存在（事务外惰性建账，含注册赠送；避免事务内触发多写）。
+  await ensureAccount(buyerId);
+  await ensureAccount(authorId);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // —— 幂等二次确认：买家是否已拥有（起始记录已存在）——
+      const existing = await tx.learningProgress.findUnique({
+        where: { userId_lessonId: { userId: buyerId, lessonId: firstLessonId } },
+        select: { id: true },
+      });
+      if (existing) {
+        const acc = await tx.creditAccount.findUnique({
+          where: { userId: buyerId },
+          select: { balance: true },
+        });
+        return {
+          status: "already_owned" as const,
+          balance: acc?.balance ?? 0,
+          spent: 0,
+          firstLessonId,
+        };
+      }
+
+      // —— 买家扣款（TOCTOU 二次核验余额，不足抛 402 回滚整笔）——
+      const buyerAcc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: buyerId } });
+      if (buyerAcc.balance < priceCredits) {
+        throw new AppError("积分不足，充值后可购买本课", 402);
+      }
+      const buyerBalanceAfter = buyerAcc.balance - priceCredits;
+      await tx.creditAccount.update({
+        where: { userId: buyerId },
+        data: { balance: buyerBalanceAfter, totalSpent: buyerAcc.totalSpent + priceCredits },
+      });
+      await tx.creditLedger.create({
+        data: {
+          userId: buyerId,
+          delta: -priceCredits,
+          type: LEDGER_TYPE.COURSE_PURCHASE,
+          refId: courseId,
+          reason: `购买《${courseTitle}》`,
+          balanceAfter: buyerBalanceAfter,
+        },
+      });
+
+      // —— 作者入账（同事务，与扣款成对；分成的 30% 平台抽成不入任何账户）——
+      if (authorShare > 0) {
+        const authorAcc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: authorId } });
+        const authorBalanceAfter = authorAcc.balance + authorShare;
+        await tx.creditAccount.update({
+          where: { userId: authorId },
+          data: { balance: authorBalanceAfter, totalEarned: authorAcc.totalEarned + authorShare },
+        });
+        await tx.creditLedger.create({
+          data: {
+            userId: authorId,
+            delta: authorShare,
+            type: LEDGER_TYPE.COURSE_SALE_INCOME,
+            refId: courseId,
+            reason: `售出《${courseTitle}》收益`,
+            balanceAfter: authorBalanceAfter,
+          },
+        });
+      }
+
+      // —— 成交计数（销量真值口径：仅付费成交 +1）——
+      await tx.course.update({
+        where: { id: courseId },
+        data: { salesCount: { increment: 1 } },
+      });
+
+      // —— 建学习起始记录 = 进买家书架（复用 collect 的 fork 落地语义 + 幂等水位线）——
+      await tx.learningProgress.create({
+        data: { userId: buyerId, courseId, lessonId: firstLessonId, progressSec: 0 },
+      });
+
+      return {
+        status: "purchased" as const,
+        balance: buyerBalanceAfter,
+        spent: priceCredits,
+        firstLessonId,
+      };
+    });
+  } catch (e) {
+    // 并发窗口：unique([userId,lessonId]) 兜底——另一条并发购买已建起始记录，本条 create 撞唯一约束回滚。
+    // 视作幂等命中（已拥有），返回当前余额、未扣款（该事务已整体回滚，扣款也一并撤销）。
+    if (e instanceof AppError) throw e; // 402/400 等业务错误照常上抛
+    const acc = await prisma.creditAccount.findUnique({
+      where: { userId: buyerId },
+      select: { balance: true },
+    });
+    return { status: "already_owned", balance: acc?.balance ?? 0, spent: 0, firstLessonId };
+  }
+}
+
+/**
+ * 作者收益概览（「我的收益」数据查询，UI 由 Phase2 做）。越权铁律：where userId=authorId。
+ *
+ * 返回：
+ *   - totalIncome: 累计售课收益（course_sale_income 流水 delta 求和）。
+ *   - salesCount: 累计成交笔数（付费成交，Course.salesCount 求和）。
+ *   - courses: 每门已上架课的 { courseId, title, priceCredits, salesCount, income }。
+ *
+ * 注：income 按流水精确求和（含免费课 bonus），非用 salesCount*share 估算，保证与账本一致。
+ */
+export async function getAuthorEarnings(authorId: string): Promise<{
+  totalIncome: number;
+  totalSales: number;
+  courses: Array<{
+    courseId: string;
+    slug: string;
+    title: string;
+    priceCredits: number | null;
+    salesCount: number;
+    income: number;
+  }>;
+}> {
+  // 作者已上架的课（含 slug/定价与成交计数）。slug 供收益卡链接回商品页。
+  const courses = await prisma.course.findMany({
+    where: { authorUserId: authorId, sharedStatus: "shared" },
+    select: { id: true, slug: true, title: true, priceCredits: true, salesCount: true },
+  });
+  // 售课收益流水（越权铁律：userId=authorId）；按 refId(courseId) 归集到每门课。
+  const incomeRows = await prisma.creditLedger.groupBy({
+    by: ["refId"],
+    where: { userId: authorId, type: LEDGER_TYPE.COURSE_SALE_INCOME },
+    _sum: { delta: true },
+  });
+  const incomeByCourse = new Map<string, number>();
+  for (const r of incomeRows) {
+    if (r.refId) incomeByCourse.set(r.refId, r._sum.delta ?? 0);
+  }
+
+  const courseRows = courses.map((c) => ({
+    courseId: c.id,
+    slug: c.slug,
+    title: c.title,
+    priceCredits: c.priceCredits,
+    salesCount: c.salesCount,
+    income: incomeByCourse.get(c.id) ?? 0,
+  }));
+  const totalIncome = courseRows.reduce((s, c) => s + c.income, 0);
+  const totalSales = courseRows.reduce((s, c) => s + c.salesCount, 0);
+  return { totalIncome, totalSales, courses: courseRows };
+}

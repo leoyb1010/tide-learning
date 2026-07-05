@@ -2,17 +2,20 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
-import { FireSimple, ClockCounterClockwise } from "@phosphor-icons/react";
+import { FireSimple, ClockCounterClockwise, Star, Coins } from "@phosphor-icons/react";
 import { MARKET_SORTS, normalizeSort, type MarketSort } from "@/lib/market-view";
 
 const ICONS: Record<MarketSort, React.ComponentType<{ size?: number; weight?: "fill" | "bold" | "regular" }>> = {
   hot: FireSimple,
   new: ClockCounterClockwise,
+  rated: Star,
+  price: Coins,
 };
 
 /**
- * MarketSortTabs —— 集市排序切换（client）。
- * 最热(拿走多) / 最新。改写 URL ?sort= 触发 server 重排（保 SEO + 可分享 + 刷新保持）。
+ * MarketSortTabs —— 交易市场排序切换（client, S4 §问题⑪·①）。
+ * 热销(成交多) / 最新 / 口碑(评分高) / 价格(升序)。改写 URL ?sort= 触发 server 重排
+ *   （保 SEO + 可分享 + 刷新保持）。默认 hot 删除 sort 参数（干净 URL）。
  * 铁律：仅 router 导航，不引 server 链。当前项红点睛（唯一强调），reduce-motion 靠 CSS 全局降级。
  */
 export function MarketSortTabs() {
@@ -24,7 +27,7 @@ export function MarketSortTabs() {
   function pick(next: MarketSort) {
     if (next === current) return;
     const sp = new URLSearchParams(params.toString());
-    if (next === "hot") sp.delete("sort");
+    if (next === "hot") sp.delete("sort"); // hot 为默认，去参数保持干净可分享 URL
     else sp.set("sort", next);
     const qs = sp.toString();
     startTransition(() => {
@@ -47,7 +50,7 @@ export function MarketSortTabs() {
             role="tab"
             aria-selected={active}
             onClick={() => pick(s.key)}
-            className={`studio-press inline-flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-3.5 py-2 text-[13px] font-semibold transition-all ${
+            className={`studio-press inline-flex min-h-[40px] items-center gap-1.5 rounded-[10px] px-3 py-2 text-[13px] font-semibold transition-all ${
               active
                 ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card-hover),var(--inner-hi)]"
                 : "text-[var(--ink3)] hover:text-[var(--ink)]"

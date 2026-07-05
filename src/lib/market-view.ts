@@ -4,6 +4,7 @@
  */
 
 import { trackGradientVar } from "@/lib/tracks";
+import { deriveCourseRating } from "@/lib/course-rating";
 
 /** 摊位卡视图模型（server 组装，透传给 client 卡片；结构即 v4.0 摊位契约）。 */
 export interface MarketStall {
@@ -19,6 +20,12 @@ export interface MarketStall {
   collectCount: number;
   /** 累计学习人数（Course.learnersCount 真值，交易气息补充信号）。 */
   learnersCount: number;
+  /** 售价（积分）：null 或 0 = 免费；>0 = 付费。UI 据此出价签 / 「免费」标。 */
+  priceCredits: number | null;
+  /** 是否付费（priceCredits>0 的派生量，view 层给 UI 少算一次）。 */
+  isPaid: boolean;
+  /** 累计成交数（付费被购买次数；免费拿走不计入，销量真值口径）。 */
+  salesCount: number;
   /** 当前登录用户是否已把此课拿到书架（决定 CTA 初始态）。 */
   collectedByMe: boolean;
   /** 是否本人摊位（自己造的课不出「拿走」，显示「你的摊位」）。 */
@@ -34,17 +41,52 @@ export interface MarketStall {
   };
 }
 
-/** 排序键：最热（拿走多）/ 最新。URL searchParam 契约。 */
-export type MarketSort = "hot" | "new";
+/**
+ * 排序键（交易市场维度）：
+ *   hot   = 热销（成交/拿走多，交易市场默认看热货）
+ *   new   = 最新（上新时间倒序）
+ *   rated = 口碑（评分高优先，占位评分派生，见 deriveCourseRating）
+ *   price = 价格（免费优先→积分从低到高，让囊中羞涩者先看得起的）
+ * URL searchParam 契约；iOS GET /api/market 复用同集合。
+ */
+export type MarketSort = "hot" | "new" | "rated" | "price";
+
+/** 合法排序键集合（用于 GET /api/market 归一化，避免各处硬编码字符串漂移）。 */
+export const MARKET_SORT_KEYS: readonly MarketSort[] = ["hot", "new", "rated", "price"] as const;
 
 export const MARKET_SORTS: { key: MarketSort; label: string }[] = [
-  { key: "hot", label: "最热" },
+  { key: "hot", label: "热销" },
   { key: "new", label: "最新" },
+  { key: "rated", label: "口碑" },
+  { key: "price", label: "价格" },
 ];
 
-/** 把任意入参规整为合法排序键，非法值回落"最热"（交易市场默认看热货）。 */
+/** 把任意入参规整为合法排序键，非法值回落"热销"（交易市场默认看热货）。兼容 iOS 旧值 newest→new。 */
 export function normalizeSort(raw: string | undefined | null): MarketSort {
-  return raw === "new" ? raw : "hot";
+  if (raw === "newest") return "new";
+  return (MARKET_SORT_KEYS as readonly string[]).includes(raw ?? "")
+    ? (raw as MarketSort)
+    : "hot";
+}
+
+/**
+ * 价签文案（交易市场统一口径）：免费课 → "免费"；付费课 → "N 积分"。
+ * priceCredits null/0 一律视免费（与 schema「null=免费」及 collect 端点分支一致）。
+ * 纯展示，不做任何折算；数字缩写不介入（价格通常小，全量展示更可信）。
+ */
+export function formatPrice(priceCredits: number | null): { free: boolean; label: string; amount: number } {
+  const amount = priceCredits ?? 0;
+  if (amount <= 0) return { free: true, label: "免费", amount: 0 };
+  return { free: false, label: `${amount} 积分`, amount };
+}
+
+/**
+ * 成交热度文案（交易市场「销量」口径）：
+ *   付费课看 salesCount（真实成交）；免费课看 collectCount（被拿走数，等价成交气息）。
+ * 二者取更能代表「有多少人入袋」的那个，统一驱动卡片/详情的「N 人入手」信号。
+ */
+export function tradeVolume(stall: Pick<MarketStall, "isPaid" | "salesCount" | "collectCount">): number {
+  return stall.isPaid ? stall.salesCount : stall.collectCount;
 }
 
 /**
@@ -72,17 +114,31 @@ export function stallGradientVar(category: string): string {
 }
 
 /**
- * 客户端排序：卡片"拿走"乐观更新后，切排序 tab 无需回服务端，
- * 直接在已加载的摊位数组上稳定重排（同分保原序，交互零延迟）。
- * 纯函数、不改原数组。
+ * 交易市场排序（server 页与 iOS API 共用；纯函数、不改原数组、同分保稳定原序）。
+ *   hot   → 成交热度降序（tradeVolume：付费看销量、免费看拿走数）
+ *   new   → 上新时间降序
+ *   rated → 占位评分降序（deriveCourseRating，同课稳定，避免抖动）
+ *   price → 价格升序（免费=0 排最前，付费按积分从低到高，价同再按热度）
  */
 export function sortStalls(stalls: MarketStall[], sort: MarketSort): MarketStall[] {
   const arr = stalls.map((s, i) => ({ s, i }));
   arr.sort((a, b) => {
     if (sort === "new") {
       if (b.s.createdAtMs !== a.s.createdAtMs) return b.s.createdAtMs - a.s.createdAtMs;
+    } else if (sort === "rated") {
+      const ra = deriveCourseRating(a.s.id, a.s.learnersCount).score;
+      const rb = deriveCourseRating(b.s.id, b.s.learnersCount).score;
+      if (rb !== ra) return rb - ra;
+      // 同分再按成交热度，避免评分并列时纯靠原序
+      if (tradeVolume(b.s) !== tradeVolume(a.s)) return tradeVolume(b.s) - tradeVolume(a.s);
+    } else if (sort === "price") {
+      const pa = a.s.priceCredits ?? 0;
+      const pb = b.s.priceCredits ?? 0;
+      if (pa !== pb) return pa - pb; // 升序：免费/低价在前
+      if (tradeVolume(b.s) !== tradeVolume(a.s)) return tradeVolume(b.s) - tradeVolume(a.s);
     } else {
-      if (b.s.collectCount !== a.s.collectCount) return b.s.collectCount - a.s.collectCount;
+      // hot（默认）：成交热度降序
+      if (tradeVolume(b.s) !== tradeVolume(a.s)) return tradeVolume(b.s) - tradeVolume(a.s);
     }
     return a.i - b.i; // 同分：保稳定原序
   });

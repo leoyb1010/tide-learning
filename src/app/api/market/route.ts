@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { ok, handle } from "@/lib/api";
 import { getCurrentUser } from "@/lib/session";
 import { buildMarketStalls } from "@/lib/market-data";
-import { sortStalls, type MarketSort } from "@/lib/market-view";
+import { sortStalls, normalizeSort } from "@/lib/market-view";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,8 @@ export const dynamic = "force-dynamic";
  * 数据：sharedStatus="shared" 的用户造课 → 摊位数组。
  *   collectCount = 去重学习用户数，**排除作者本人**（与 collect 端点、Web 集市页一致）。
  * 越权：getCurrentUser()（可空，游客也能看集市）→ collectedByMe/mine 严格 where userId=当前用户。
- * 排序：?sort=hot（默认，最热=collectCount desc）| newest / new（最新=createdAtMs desc）。
+ * 排序：?sort=hot（默认，热销）| new（最新）| rated（口碑）| price（价格升序）；
+ *   兼容 iOS 旧值 newest→new。归一化与 Web /market 共用 normalizeSort，语义完全一致。
  *
  * 返回：ok({ items: MarketStall[] })。
  */
@@ -26,9 +27,8 @@ export async function GET(req: NextRequest) {
 
     const stalls = await buildMarketStalls(user?.id ?? null);
 
-    // 排序：接受 hot / newest / new；非法值回落最热（与 Web 交易市场默认一致）。
-    const raw = req.nextUrl.searchParams.get("sort");
-    const sort: MarketSort = raw === "newest" || raw === "new" ? "new" : "hot";
+    // 排序：hot / new / rated / price（兼容旧 newest）；非法值回落热销（与 Web 交易市场默认一致）。
+    const sort = normalizeSort(req.nextUrl.searchParams.get("sort"));
     const items = sortStalls(stalls, sort);
 
     return ok({ items });

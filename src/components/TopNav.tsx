@@ -5,9 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   House, GraduationCap, Sparkle, NotePencil, CardsThree,
-  MagnifyingGlass, Moon, Sun, Play, List, X, CaretDown,
+  MagnifyingGlass, Moon, Sun, Play, List, X,
   Storefront, PaperPlaneTilt, Medal, Crown, Gear, SignOut, SquaresFour, Coins,
-  ClockCounterClockwise, CaretRight,
+  ClockCounterClockwise, CaretRight, CaretDown,
 } from "@phosphor-icons/react/dist/ssr";
 import { useMode } from "./ModeProvider";
 import { NotifBell } from "./NotifBell";
@@ -26,7 +26,7 @@ const ADMIN_ROLES = ["admin", "content_manager", "demand_moderator", "support", 
  * 全宽内容区（内容自身居中）。移动端：logo + 汉堡抽屉 + 保留底部 Tab（由 MobileTabs 提供）。
  */
 
-// 主导航（横排一线）：书桌/首页 + 核心学习入口 + 社区下拉
+// 主导航（横排一线）：书桌/首页 + 核心学习入口 + 社区 / 集市（⑫ 拆平级，与其余主项同级）。
 interface NavLink { href: string; label: string; Icon: typeof House }
 
 function primaryLinks(loggedIn: boolean): NavLink[] {
@@ -36,34 +36,27 @@ function primaryLinks(loggedIn: boolean): NavLink[] {
     { href: "/create", label: "AI 造课", Icon: Sparkle },
     { href: "/notes", label: "笔记馆", Icon: NotePencil },
     { href: "/review", label: "复习室", Icon: CardsThree },
+    // ⑫：社区广场 / 课程集市从「社区下拉」拆出，升为平级主导航项（重要程度对齐其余主项）。
+    { href: "/demands", label: "社区广场", Icon: PaperPlaneTilt },
+    { href: "/market", label: "课程集市", Icon: Storefront },
   ];
 }
-
-// 社区下拉的子项
-const COMMUNITY_LINKS: NavLink[] = [
-  { href: "/demands", label: "社区广场", Icon: PaperPlaneTilt },
-  { href: "/market", label: "课程集市", Icon: Storefront },
-];
 
 export function TopNav({ user }: { user: NavUser | null }) {
   const pathname = usePathname();
   const { resolvedDark, toggleColorScheme } = useMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false); // 头像下拉
-  const [commOpen, setCommOpen] = useState(false); // 社区下拉
   const [resumeOpen, setResumeOpen] = useState(false); // v3.0 续学胶囊下拉
   const menuRef = useRef<HTMLDivElement>(null);
-  const commRef = useRef<HTMLDivElement>(null);
   const resumeRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null); // 移动抽屉面板：focus trap 边界
   const hamburgerRef = useRef<HTMLButtonElement>(null); // 汉堡按钮：抽屉关闭后还焦锚点
   // 下拉开合的 ref 镜像：供「挂载一次」的事件委托在回调内即时读取，
-  // 避免把 menuOpen/commOpen 塞进 effect 依赖导致每次开合都重绑监听器。
+  // 避免把 menuOpen 塞进 effect 依赖导致每次开合都重绑监听器。
   const menuOpenRef = useRef(false);
-  const commOpenRef = useRef(false);
   const resumeOpenRef = useRef(false);
   menuOpenRef.current = menuOpen;
-  commOpenRef.current = commOpen;
   resumeOpenRef.current = resumeOpen;
 
   const loggedIn = Boolean(user);
@@ -75,17 +68,15 @@ export function TopNav({ user }: { user: NavUser | null }) {
     if (href === "/" || href === "/desk") return pathname === href;
     return pathname.startsWith(href);
   };
-  const communityActive = pathname.startsWith("/demands") || pathname.startsWith("/market");
 
   // 点击外部关闭下拉：挂载一次的事件委托（空依赖只绑一次），
   // 回调内经 ref 判断当前开合，仅在确有下拉打开且点到外部时才 setState。
   useEffect(() => {
     function onClick(e: MouseEvent) {
-      // 三个下拉都关着：什么都不做，避免每次点击的无谓状态更新。
-      if (!menuOpenRef.current && !commOpenRef.current && !resumeOpenRef.current) return;
+      // 两个下拉都关着：什么都不做，避免每次点击的无谓状态更新。
+      if (!menuOpenRef.current && !resumeOpenRef.current) return;
       const target = e.target as Node;
       if (menuOpenRef.current && menuRef.current && !menuRef.current.contains(target)) setMenuOpen(false);
-      if (commOpenRef.current && commRef.current && !commRef.current.contains(target)) setCommOpen(false);
       if (resumeOpenRef.current && resumeRef.current && !resumeRef.current.contains(target)) setResumeOpen(false);
     }
     document.addEventListener("mousedown", onClick);
@@ -96,7 +87,6 @@ export function TopNav({ user }: { user: NavUser | null }) {
   useEffect(() => {
     setDrawerOpen(false);
     setMenuOpen(false);
-    setCommOpen(false);
     setResumeOpen(false);
   }, [pathname]);
 
@@ -150,15 +140,18 @@ export function TopNav({ user }: { user: NavUser | null }) {
             </span>
           </Link>
 
-          {/* 主导航（桌面横排） */}
+          {/* 主导航（桌面横排）：全部主项平级一线，社区广场 / 课程集市已与其余项同级（⑫）。
+              lg 以下窄桌面把靠后的项（社区/集市）收进汉堡抽屉，避免横排挤压；lg 起全展开。 */}
           <nav className="hidden items-center gap-0.5 md:flex">
-            {links.map((l) => {
+            {links.map((l, i) => {
               const active = isActive(l.href);
+              // 前 5 项（书桌/课程库/AI造课/笔记馆/复习室）始终显示；社区/集市在 md–lg 收起、lg 起显示。
+              const lateItem = i >= 5;
               return (
                 <Link
                   key={l.href}
                   href={l.href}
-                  className={`rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${
+                  className={`rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${lateItem ? "hidden lg:block" : ""} ${
                     active ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
                   }`}
                 >
@@ -166,30 +159,6 @@ export function TopNav({ user }: { user: NavUser | null }) {
                 </Link>
               );
             })}
-            {/* 社区下拉 */}
-            <div ref={commRef} className="relative">
-              <button
-                onClick={() => setCommOpen((o) => !o)}
-                aria-expanded={commOpen}
-                aria-haspopup="menu"
-                className={`flex items-center gap-1 rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${
-                  communityActive ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
-                }`}
-              >
-                社区
-                <CaretDown size={11} weight="bold" className={`transition-transform ${commOpen ? "rotate-180" : ""}`} />
-              </button>
-              {commOpen && (
-                <div role="menu" className="studio-rise absolute left-0 top-[calc(100%+6px)] w-[180px] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--lift)]">
-                  {COMMUNITY_LINKS.map((l) => (
-                    <Link key={l.href} href={l.href} className="flex items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]">
-                      <l.Icon size={16} weight="fill" className="text-[var(--ink3)]" />
-                      {l.label}
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </div>
           </nav>
 
           {/* 右侧工具区 */}
@@ -372,7 +341,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
               </button>
             </div>
             <nav className="flex flex-col gap-1">
-              {[...links, ...COMMUNITY_LINKS].map((l) => (
+              {links.map((l) => (
                 <Link key={l.href} href={l.href} className={`flex items-center gap-3 rounded-[11px] px-3 py-2.5 text-[14px] font-semibold ${isActive(l.href) ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)]"}`}>
                   <l.Icon size={18} weight={isActive(l.href) ? "fill" : "regular"} /> {l.label}
                 </Link>

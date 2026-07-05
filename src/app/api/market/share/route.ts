@@ -17,6 +17,21 @@ function hitBlocklist(text: string): boolean {
   return BLOCKLIST.some((w) => text.includes(w));
 }
 
+// 集市定价上限（防误填天价 / 溢出；1 万积分足够覆盖精品课，超出视为脏输入）。
+const MAX_PRICE_CREDITS = 10_000;
+
+/**
+ * 规整上架定价入参：undefined/null → 保持免费（返回 0）；数字向下取整并夹到 [0, MAX]。
+ * 非法输入（NaN/负数/非数字）一律回落 0（免费），绝不因定价字段脏而拒绝上架主流程。
+ * 返回值语义：0 = 免费（落库写 null），>0 = 付费积分。
+ */
+function normalizePriceCredits(raw: unknown): number {
+  if (raw === undefined || raw === null) return 0;
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.min(MAX_PRICE_CREDITS, Math.floor(n));
+}
+
 // LLM 审核三态结果（对齐 posts route）。
 interface ModerationResult {
   verdict: "approved" | "rejected" | "pending";
@@ -40,9 +55,14 @@ export async function POST(req: NextRequest) {
     // 高成本 AI 审核，按用户限流（每小时 20 次分享操作足够）
     assertUserRateLimit(user.id, "market_share", 20, 3_600_000);
 
-    const body = (await req.json().catch(() => null)) as { courseId?: string } | null;
+    const body = (await req.json().catch(() => null)) as
+      | { courseId?: string; priceCredits?: number | null }
+      | null;
     const courseId = body?.courseId?.trim();
     if (!courseId) return fail("缺少课程参数");
+    // 定价：作者上架时可设「免费(0/缺省)」或「N 积分」；规整后 0=免费(落库 null)，>0=付费。
+    const price = normalizePriceCredits(body?.priceCredits);
+    const priceForDb = price > 0 ? price : null;
 
     // 越权铁律：where 直接锁 authorUserId=user.id，非本人课查不出。
     const course = await prisma.course.findFirst({
@@ -54,6 +74,11 @@ export async function POST(req: NextRequest) {
       return fail("仅可分享你 AI 生成或导入的课程");
     }
     if (course.sharedStatus === "shared") {
+      // 已上架：允许作者仅调整定价（不重跑 AI 审核，标题/简介未变）。仅当传了 priceCredits 才写。
+      if (body?.priceCredits !== undefined) {
+        await prisma.course.update({ where: { id: course.id }, data: { priceCredits: priceForDb } });
+        return ok({ status: "shared", priceCredits: priceForDb, message: "已更新集市定价" });
+      }
       return ok({ status: "shared", message: "这门课已在集市展示" });
     }
 
@@ -98,7 +123,8 @@ export async function POST(req: NextRequest) {
     }
 
     const sharedStatus = verdict === "approved" ? "shared" : verdict === "pending" ? "pending" : "rejected";
-    await prisma.course.update({ where: { id: course.id }, data: { sharedStatus } });
+    // 定价随上架一并落库（rejected 也写：作者改文案重提时定价已在，无需二次填）。
+    await prisma.course.update({ where: { id: course.id }, data: { sharedStatus, priceCredits: priceForDb } });
     await track({ eventName: "market_share", userId: user.id, properties: { courseId: course.id, verdict } });
 
     if (verdict === "rejected") {

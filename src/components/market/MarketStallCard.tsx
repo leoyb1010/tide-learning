@@ -12,14 +12,19 @@ import {
   UsersThree,
   ArrowRight,
   Gift,
+  Coins,
+  Handbag,
   CheckCircle,
   SealCheck,
+  Package,
 } from "@phosphor-icons/react";
 import { CoverBg } from "@/components/ui";
+import { RatingStars } from "@/components/RatingStars";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
 import { trackLabel, trackGradientVar } from "@/lib/tracks";
-import { abbrevCount, sellerBadge, type MarketStall } from "@/lib/market-view";
+import { deriveCourseRating } from "@/lib/course-rating";
+import { abbrevCount, sellerBadge, formatPrice, tradeVolume, type MarketStall } from "@/lib/market-view";
 
 /** 摊主等级徽章配色（tier 1-4，越高越暖，克制不喧宾夺主）。 */
 const BADGE_TONE: Record<1 | 2 | 3 | 4, { fg: string; bg: string; bd: string }> = {
@@ -30,15 +35,17 @@ const BADGE_TONE: Record<1 | 2 | 3 | 4, { fg: string; bg: string; bd: string }> 
 };
 
 /**
- * MarketStallCard —— 集市「摊位卡」（client，v4.0 交易市场重设计）。
+ * MarketStallCard —— 集市「橱窗商品卡」（client, S4 交易市场重设计 §问题⑪·①②③）。
  *
- * 摊位隐喻：卖家(摊主)立在卡上，交易气息数字(N 人拿走 / N 在学)，价签(免费拿走)，
- * 封面赛道渐变 + 材质精致，hover 抬升 + hover-sheen。
+ * 交易市场隐喻：橱窗式陈列，每卡是一件「商品」——封面 + 标题 + 摊主(店主感) + **价签(免费/N积分)**
+ *   + **成交/评分** + CTA。点卡进**商品详情页**（/market/[slug]，看评价/大纲/店铺/价格），
+ *   不直接进学习台；确认购买/拿走后才进学习（闭环在详情页的 <MarketBuyPanel>）。
  *
- * 互动：
- *  - 「拿走」→ POST /api/market/collect → 乐观更新(拿走数+1、CTA 变「去学习」)
- *    + 微动效(课本飞入袋) + Toast「去书架」跳 /desk?shelf=1。已在书架/本人摊位不出「拿走」。
- *  - 卡片主体点进课程详情看大纲。
+ * 卡上互动（快捷通道，降低摩擦）：
+ *  - 免费课「免费拿走」→ 卡上直接 POST /api/market/collect + 乐观更新(成交+1、CTA 变「去学习」)
+ *    + 入袋动效 + Toast「去书架」。付费课不在卡上直接扣款——「查看购买」跳详情页确认，
+ *    避免误触扣积分（大额操作需商品页确认层）。
+ *  - 本人摊位显示「你的摊位」。
  *
  * 铁律：本文件 "use client"，只 fetch API + 客户端埋点，不引 server 链。
  * 动效全部 transform/opacity；reduce-motion 下 useReducedMotion 关位移，飞书动效降级为即时切换。
@@ -57,32 +64,35 @@ export function MarketStallCard({
 
   // 拿走态：已拿走则 CTA 直接是「去学习」。
   const [collected, setCollected] = useState(stall.collectedByMe);
-  const [collectCount, setCollectCount] = useState(stall.collectCount);
-  const [flying, setFlying] = useState(false); // 课本入袋动效开关
+  // 成交热度乐观值（免费课看拿走数、付费课看销量，统一口径见 tradeVolume）。
+  const [volume, setVolume] = useState(tradeVolume(stall));
+  const [flying, setFlying] = useState(false); // 入袋动效开关
 
   const isAi = stall.origin === "ai_generated";
-  const detailHref = `/courses/${stall.slug}`;
+  const price = formatPrice(stall.priceCredits);
+  const detailHref = `/market/${stall.slug}`;
 
   const badge = useMemo(() => sellerBadge(stall.collectCount), [stall.collectCount]);
   const badgeTone = BADGE_TONE[badge.tier];
+  const rating = useMemo(() => deriveCourseRating(stall.id, stall.learnersCount), [stall.id, stall.learnersCount]);
   const sellerInitial = stall.seller.nickname.slice(0, 1) || "学";
 
-  // ---------- 拿走（免费 fork 到书架）----------
-  async function collect(e: React.MouseEvent) {
+  // ---------- 免费拿走（卡上快捷 fork 到书架；付费课不走此路，跳详情页确认）----------
+  async function collectFree(e: React.MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     if (inFlight.current) return;
     if (!isLoggedIn) {
       toast("登录后可把课拿到书架", { tone: "info" });
-      router.push("/login?next=/market");
+      router.push(`/login?next=/market/${stall.slug}`);
       return;
     }
     inFlight.current = true;
 
-    // 乐观：先播入袋动效 + 数字 +1 + CTA 切「去学习」。
+    // 乐观：先播入袋动效 + 成交 +1 + CTA 切「去学习」。
     setFlying(true);
     setCollected(true);
-    setCollectCount((c) => c + 1);
+    setVolume((c) => c + 1);
 
     try {
       const res = await fetch("/api/market/collect", {
@@ -97,27 +107,28 @@ export function MarketStallCard({
       if (!json.ok) {
         // 回滚乐观态。
         setCollected(stall.collectedByMe);
-        setCollectCount(stall.collectCount);
+        setVolume(tradeVolume(stall));
         toast(json.error, { tone: "warn" });
         return;
       }
       if (json.data.already) {
-        // 服务端幂等命中：本就在书架。若之前不是"我拿走的"，说明本地曾误 +1，回落基线；
-        // 否则数字维持乐观值。CTA 已切"去学习"，保持不变。
-        if (!stall.collectedByMe) setCollectCount(stall.collectCount);
+        // 服务端幂等命中：本就在书架。若之前不是"我拿走的"，说明本地曾误 +1，回落基线。
+        if (!stall.collectedByMe) setVolume(tradeVolume(stall));
         toast(json.data.message, { tone: "info" });
       } else {
-        toast(json.data.message, { tone: "success", action: { label: "去书架", onClick: () => router.push("/desk?shelf=1") } });
+        toast(json.data.message, {
+          tone: "success",
+          action: { label: "去书架", onClick: () => router.push("/desk?shelf=1") },
+        });
         track("market_collect", { course_id: stall.id });
       }
       router.refresh();
     } catch {
       setCollected(stall.collectedByMe);
-      setCollectCount(stall.collectCount);
+      setVolume(tradeVolume(stall));
       toast("网络异常，请重试", { tone: "warn" });
     } finally {
       inFlight.current = false;
-      // 动效收尾（reduce 下瞬时结束）。
       window.setTimeout(() => setFlying(false), reduce ? 0 : 720);
     }
   }
@@ -126,22 +137,20 @@ export function MarketStallCard({
     <Link
       href={detailHref}
       className="hover-sheen studio-lift group relative flex h-full flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg)] hover:border-[var(--border2)]"
-      aria-label={`查看课程《${stall.title}》大纲`}
+      aria-label={`查看商品《${stall.title}》· ${price.label}`}
     >
-      {/* ——— 封面：赛道渐变(底) + 橱窗背景图 + 融合/暗化层；徽标 + 价签 + 拿走热度 ——— */}
+      {/* ——— 封面橱窗：赛道渐变(底) + 背景图 + 融合/暗化层；徽标 + 价签 + 成交热度 ——— */}
       <CoverBg
         color={stall.coverColor}
         imageSrc={stall.coverSrc}
         alt={stall.title}
         className="aspect-[16/9] w-full"
       >
-        {/* 融合层：赛道渐变以低透明叠在橱窗图上，让不同赛道色调仍可区分（橱窗质感 + 保持赛道识别）。 */}
         <span
           aria-hidden
           className="pointer-events-none absolute inset-0 opacity-30 mix-blend-multiply"
           style={{ background: trackGradientVar(stall.category) }}
         />
-        {/* 暗化/渐隐层：顶部与底部各压一道暗角，保证左右上下四角的徽标/价签/拿走数在任何橱窗图上都够对比度。 */}
         <span
           aria-hidden
           className="pointer-events-none absolute inset-0"
@@ -157,21 +166,34 @@ export function MarketStallCard({
           {isAi ? "AI 造课" : "整理导入"}
         </div>
 
-        {/* 价签：免费拿走（预留积分价样式；MVP 全免费） */}
-        <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[0.68rem] font-extrabold text-[var(--ok)] shadow-[0_1px_3px_rgba(35,41,53,.2)] backdrop-blur-sm">
-          <Gift size={12} weight="fill" />
-          免费拿走
+        {/* 价签：免费 / N 积分（交易市场核心信号，颜色区分：免费绿 / 付费红） */}
+        <div
+          className={`absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[0.68rem] font-extrabold shadow-[0_1px_3px_rgba(35,41,53,.2)] backdrop-blur-sm ${
+            price.free ? "text-[var(--ok)]" : "text-[var(--red)]"
+          }`}
+        >
+          {price.free ? (
+            <>
+              <Gift size={12} weight="fill" />
+              免费
+            </>
+          ) : (
+            <>
+              <Coins size={12} weight="fill" />
+              <span className="mono">{price.amount}</span> 积分
+            </>
+          )}
         </div>
 
-        {/* 拿走热度气泡（左下，交易气息） */}
-        {collectCount > 0 && (
+        {/* 成交热度气泡（左下，交易气息） */}
+        {volume > 0 && (
           <div className="absolute bottom-3 left-3 flex items-center gap-1 rounded-full bg-[var(--ink)]/50 px-2.5 py-1 text-[0.66rem] font-semibold text-white backdrop-blur-sm">
-            <BookmarkSimple size={11} weight="fill" />
-            <span className="mono">{abbrevCount(collectCount)}</span> 人拿走
+            <Package size={11} weight="fill" />
+            <span className="mono">{abbrevCount(volume)}</span> 人{stall.isPaid ? "入手" : "拿走"}
           </div>
         )}
 
-        {/* 课本入袋动效：一枚小书从封面飞向价签方向（入袋隐喻）。 */}
+        {/* 入袋动效：一枚购物袋从封面飞向价签方向（入袋隐喻）。 */}
         <AnimatePresence>
           {flying && !reduce && (
             <motion.span
@@ -182,7 +204,7 @@ export function MarketStallCard({
               transition={{ duration: 0.72, times: [0, 0.25, 0.6, 1], ease: "easeInOut" }}
               className="pointer-events-none absolute left-1/2 top-1/2 grid h-9 w-9 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-[10px] bg-white text-[var(--red)] shadow-[var(--lift)]"
             >
-              <BookmarkSimple size={18} weight="fill" />
+              <Handbag size={18} weight="fill" />
             </motion.span>
           )}
         </AnimatePresence>
@@ -190,8 +212,12 @@ export function MarketStallCard({
 
       {/* ——— 卡身 ——— */}
       <div className="flex flex-1 flex-col p-4">
-        <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">
-          {trackLabel(stall.category)}
+        <div className="flex items-center justify-between gap-2">
+          <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">
+            {trackLabel(stall.category)}
+          </div>
+          {/* 评分（占位派生，示例标注见详情页 RatingStars） */}
+          <RatingStars score={rating.score} count={rating.count} showCount={false} size={12} className="shrink-0" />
         </div>
         <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[var(--ink)]">
           {stall.title}
@@ -203,6 +229,7 @@ export function MarketStallCard({
         {/* 摊主：头像 + 昵称 + 等级徽章（摊主立在卡上） */}
         <div className="mt-3 flex items-center gap-2 rounded-[12px] bg-[var(--surface-inset)] px-2.5 py-2 shadow-[var(--inner-hi)]">
           {stall.seller.avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               src={stall.seller.avatarUrl}
               alt=""
@@ -229,11 +256,11 @@ export function MarketStallCard({
           </span>
         </div>
 
-        {/* 交易气息数字条：拿走 · 学习人数 */}
+        {/* 交易气息数字条：成交 · 学习人数 */}
         <div className="mt-3 flex items-center gap-3 text-[11.5px] text-[var(--ink3)]">
-          <span className="flex items-center gap-1" title="被拿走到书架的人数">
-            <BookmarkSimple size={13} weight="fill" className="text-[var(--ink4)]" />
-            <span className="mono text-[var(--ink2)]">{abbrevCount(collectCount)}</span> 拿走
+          <span className="flex items-center gap-1" title={stall.isPaid ? "付费成交数" : "被拿走到书架的人数"}>
+            <Package size={13} weight="fill" className="text-[var(--ink4)]" />
+            <span className="mono text-[var(--ink2)]">{abbrevCount(volume)}</span> {stall.isPaid ? "成交" : "拿走"}
           </span>
           {stall.learnersCount > 0 && (
             <>
@@ -246,7 +273,7 @@ export function MarketStallCard({
           )}
         </div>
 
-        {/* ——— 拿走 CTA（关键红，唯一强调）——— */}
+        {/* ——— CTA（关键红，唯一强调）——— */}
         <div className="mt-auto pt-3.5">
           {stall.mine ? (
             <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)]">
@@ -267,15 +294,22 @@ export function MarketStallCard({
               已在书架 · 去学习
               <ArrowRight size={14} weight="bold" />
             </button>
-          ) : (
+          ) : price.free ? (
+            // 免费课：卡上直接快捷拿走（零摩擦）
             <button
               type="button"
-              onClick={collect}
+              onClick={collectFree}
               className="cta-glow studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
             >
-              <BookmarkSimple size={15} weight="fill" />
+              <Gift size={15} weight="fill" />
               免费拿走
             </button>
+          ) : (
+            // 付费课：跳详情页确认购买（避免卡上误触扣积分）
+            <span className="cta-glow studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all group-hover:brightness-105">
+              <Handbag size={15} weight="fill" />
+              <span className="mono">{price.amount}</span> 积分 · 查看购买
+            </span>
           )}
         </div>
       </div>

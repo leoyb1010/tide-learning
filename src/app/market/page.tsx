@@ -4,18 +4,21 @@ import {
   Sparkle,
   SignIn,
   TrendUp,
-  BookmarkSimple,
+  Package,
   Confetti,
   ArrowRight,
 } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { buildMarketStalls } from "@/lib/market-data";
+import { getAuthorEarnings } from "@/lib/credit-trade";
 import { MarketStallCard } from "@/components/market/MarketStallCard";
 import { MarketSortTabs } from "@/components/market/MarketSortTabs";
+import { SellerEarningsCard } from "@/components/market/SellerEarningsCard";
 import {
   normalizeSort,
   sortStalls,
   abbrevCount,
+  tradeVolume,
   type MarketStall,
 } from "@/lib/market-view";
 
@@ -30,13 +33,18 @@ function startOfTodayMs(): number {
 }
 
 /**
- * /market —— 课程集市「交易市场」（server, v4.0 重设计）。
+ * /market —— 课程集市「交易市场」（server, S4 交易市场重设计 §问题⑪）。
  *
- * 结构：今日集市氛围条 + 摊位卡网格（stagger 进场）+ 排序切换 + 空态引导。
- * 数据：sharedStatus="shared" 的用户造课；每课派生 拿走数(去重学习用户，排除作者本人)/学习人数/摊主。
- *   排序 ?sort=hot|new 由 URL 驱动，server 端重排。
- * 越权：登录用户预取"我拿走过哪些课"（where userId=我）决定 CTA 初始态；自己的课标"你的摊位"。
- * 铁律：本 server 组件只查库 + 组装视图模型，交互(拿走/排序)全在 client 子组件。
+ * 定位：线上精品市集——橱窗式陈列，每卡是可交易的「商品」（价签/成交/评分/店主），
+ *   点卡进商品详情页（/market/[slug]）看评价/大纲/店铺，确认购买/拿走后才进学习。
+ *
+ * 结构：交易氛围条（今日上新/最热/累计成交）+ 我的收益入口（有在架课时）+ 排序（热销/最新/口碑/价格）
+ *   + 橱窗商品网格（stagger 进场）+ 空态引导。
+ * 数据：sharedStatus="shared" 的用户造课；每课派生 拿走数/销量/摊主/价格。
+ *   排序 ?sort=hot|new|rated|price 由 URL 驱动，server 端重排。
+ * 越权：登录用户预取「我拿走过哪些课」（where userId=我）决定 CTA 初始态；自己的课标「你的摊位」；
+ *   收益入口用 getAuthorEarnings(where userId=我)。
+ * 铁律：本 server 组件只查库 + 组装视图模型，交互（购买/拿走/排序）全在 client 子组件。
  */
 export default async function MarketPage({
   searchParams,
@@ -49,17 +57,22 @@ export default async function MarketPage({
   // 摊位视图模型：与 GET /api/market 共用同一份组装逻辑（src/lib/market-data.ts），
   // 保证 Web 与 iOS 集市字段/语义完全一致（拿走数排除作者本人、越权铁律 where userId）。
   const stalls: MarketStall[] = await buildMarketStalls(user?.id ?? null);
-
   const sorted = sortStalls(stalls, sort);
 
-  // ——— 今日集市氛围数据 ———
+  // 我的集市收益（仅登录用户查一次；无在架课时不渲染入口）。越权铁律：where userId=我。
+  const earnings = user ? await getAuthorEarnings(user.id) : null;
+  const hasStalls = Boolean(earnings && earnings.courses.length > 0);
+
+  // ——— 交易氛围数据 ———
   const todayStart = startOfTodayMs();
   const newTodayCount = stalls.filter((s) => s.createdAtMs >= todayStart).length;
-  const totalCollects = stalls.reduce((sum, s) => sum + s.collectCount, 0);
+  // 累计成交 = 全市成交热度之和（付费看销量、免费看拿走数，统一 tradeVolume 口径）。
+  const totalTrades = stalls.reduce((sum, s) => sum + tradeVolume(s), 0);
   const hottest = stalls.reduce<MarketStall | null>(
-    (best, s) => (!best || s.collectCount > best.collectCount ? s : best),
+    (best, s) => (!best || tradeVolume(s) > tradeVolume(best) ? s : best),
     null,
   );
+  const hottestVolume = hottest ? tradeVolume(hottest) : 0;
 
   return (
     <div className="studio-rise mx-auto flex w-full max-w-[1280px] flex-col gap-6">
@@ -75,11 +88,11 @@ export default async function MarketPage({
           <h1 className="text-[26px] font-extrabold tracking-tight text-[var(--ink)]">课程集市</h1>
         </div>
         <p className="text-[14px] text-[var(--ink2)]">
-          同学们用 AI 摆出的课摊，逛一逛，看中就免费拿走到自己的书架。
+          同学们用 AI 摆出的课摊，逛一逛，看中就拿走或购买到你的书架。
         </p>
       </header>
 
-      {/* ——— 今日集市氛围条 ——— */}
+      {/* ——— 交易氛围条 ——— */}
       {stalls.length > 0 && (
         <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-3">
           {/* 今日上新 */}
@@ -114,9 +127,9 @@ export default async function MarketPage({
             </span>
             <span className="min-w-0 flex-1">
               <span className="mono block text-[10px] uppercase tracking-[0.1em] text-[var(--ink4)]">最热门课</span>
-              {hottest && hottest.collectCount > 0 ? (
+              {hottest && hottestVolume > 0 ? (
                 <Link
-                  href={`/courses/${hottest.slug}`}
+                  href={`/market/${hottest.slug}`}
                   className="block truncate text-[14px] font-bold text-[var(--ink)] transition-colors hover:text-[var(--red)]"
                   title={hottest.title}
                 >
@@ -128,28 +141,33 @@ export default async function MarketPage({
             </span>
           </div>
 
-          {/* 累计被拿走 */}
+          {/* 累计成交 */}
           <div
             style={{ "--i": 2 } as React.CSSProperties}
             className="elev-1 flex items-center gap-3 rounded-[14px] px-4 py-3"
           >
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[var(--info-soft)]">
-              <BookmarkSimple size={17} weight="fill" className="text-[var(--info)]" />
+              <Package size={17} weight="fill" className="text-[var(--info)]" />
             </span>
             <span className="min-w-0">
-              <span className="mono block text-[10px] uppercase tracking-[0.1em] text-[var(--ink4)]">累计被拿走</span>
+              <span className="mono block text-[10px] uppercase tracking-[0.1em] text-[var(--ink4)]">累计成交</span>
               <span className="block text-[14px] font-bold text-[var(--ink)]">
-                <span className="mono">{abbrevCount(totalCollects)}</span> 次
+                <span className="mono">{abbrevCount(totalTrades)}</span> 次入手
               </span>
             </span>
           </div>
         </div>
       )}
 
+      {/* ——— 我的集市收益（有在架课时）——— */}
+      {hasStalls && earnings && (
+        <SellerEarningsCard earnings={earnings} />
+      )}
+
       {/* ——— 未登录引导 ——— */}
       {!user && stalls.length > 0 && (
         <div className="flex flex-col items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-5 py-4 shadow-[var(--inner-hi)] sm:flex-row">
-          <p className="text-[13.5px] text-[var(--ink2)]">登录后可把喜欢的课免费拿到你的书架。</p>
+          <p className="text-[13.5px] text-[var(--ink2)]">登录后可把喜欢的课拿到你的书架，付费课用积分购买。</p>
           <Link
             href="/login?next=/market"
             className="cta-glow studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105"
@@ -183,14 +201,14 @@ export default async function MarketPage({
       ) : (
         <>
           {/* ——— 排序切换 ——— */}
-          <div className="flex items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-[13px] text-[var(--ink3)]">
-              共 <span className="mono text-[var(--ink)]">{stalls.length}</span> 个课摊
+              共 <span className="mono text-[var(--ink)]">{stalls.length}</span> 件商品在架
             </p>
             <MarketSortTabs />
           </div>
 
-          {/* ——— 摊位卡网格：stagger 递延进场 ——— */}
+          {/* ——— 橱窗商品网格：stagger 递延进场 ——— */}
           <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sorted.map((stall, idx) => (
               <div key={stall.id} style={{ "--i": idx } as React.CSSProperties}>

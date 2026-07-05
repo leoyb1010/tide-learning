@@ -943,88 +943,108 @@ body::before {
 }
 
 /* ============================================================
-   书桌·书架弹层（DeskShelf）—— 木质材质浮层 + 3D 书架进场
-   面板/头部/主体用材质渐变模拟木背板（暂无真实木纹图，用 token 渐变 + 内高光）。
-   .deskshelf-stage 承接 .shelf-row 的 3D；reduce-motion 下退成平铺网格。
+   书桌·书架抽屉（DeskShelf ⑨ 重设计）—— 侧滑抽屉 + 封面卡瀑布 + hover 聚光
+   打开：桌面从右滑入贴右缘，移动从底滑起（媒体查询切换进场轨迹）；丝滑高级。
+   内容：封面卡网格（.shelf-grid / .shelf-card），hover 聚焦某卡、同组其它卡虚化。
+   全部 reduce-motion 降级为静态直显（无位移、无虚化、无缩放，仅保留描边/海拔反馈）。
    ============================================================ */
 
-/* 面板外壳：书桌木背板质感——中性木灰渐变 + 内顶高光，压深阴影已由内联 --lift 给。 */
-.deskshelf-panel {
-  background:
-    linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
+/* 抽屉进场：桌面从右缘平滑推入。forwards + 静息可见（对齐 Dialog 铁律：
+   动画时钟冻结也退回可见态，浮层永不卡在屏外）。 */
+@keyframes shelfDrawerInRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
-/* 头部/Tab 轨：略深一阶材质条 + 内顶高光，像书架顶檐横木。 */
-.deskshelf-rail {
-  background:
-    linear-gradient(180deg, var(--surface2) 0%, var(--surface) 100%);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.5);
+@keyframes shelfDrawerInUp {
+  from { opacity: 0; transform: translateY(32px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-@media (prefers-color-scheme: dark) {
-  .deskshelf-rail { box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.shelf-drawer-in { opacity: 1; animation: shelfDrawerInRight .34s var(--ease-out-expo) forwards; }
+/* 移动端（无侧缘可贴）：抽屉占满宽，从底部滑起更自然。 */
+@media (max-width: 640px) {
+  .shelf-drawer-in { max-width: 100% !important; border-left: none; animation-name: shelfDrawerInUp; }
 }
-/* 书架主体：木背板——细纵纹渐变叠在基面上，营造背墙藏书感（纯 CSS，无位图）。 */
-.deskshelf-body {
-  background:
-    repeating-linear-gradient(90deg,
-      color-mix(in srgb, var(--ink) 3%, transparent) 0px,
-      color-mix(in srgb, var(--ink) 3%, transparent) 1px,
-      transparent 1px, transparent 13px),
-    linear-gradient(180deg, var(--surface2) 0%, var(--surface-inset) 100%);
+@media (prefers-reduced-motion: reduce) {
+  .shelf-drawer-in { animation: none !important; }
 }
 
-/* 书桌上的「我的书架」入口小卡：木质材质——暖木灰渐变叠细纵纹，模拟书架侧木。
-   基面仍走 surface token（跟随亮暗），木纹用极低对比的墨色纵条，克制不抢戏。 */
-.desk-shelf-entry {
-  background:
-    repeating-linear-gradient(90deg,
-      color-mix(in srgb, var(--ink) 4%, transparent) 0px,
-      color-mix(in srgb, var(--ink) 4%, transparent) 1px,
-      transparent 1px, transparent 9px),
-    linear-gradient(180deg, var(--surface) 0%, var(--surface2) 100%);
+/* ⑨ 书桌上的「我的书架」入口胶囊：干净克制——去网格纹理，单层 surface 基面（跟随亮暗）
+   + 内顶高光（由内联 --inner-hi 给）。整卡抬升由 .studio-lift 承担，材质不抢戏。
+   图标微交互：hover 时书本轻微翻起 + 提亮，精致而不喧宾。 */
+.shelf-entry-icon {
+  transition:
+    transform var(--dur-fast) var(--ease-spring),
+    filter var(--dur-fast) var(--ease-out-expo);
 }
-.desk-shelf-entry::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background: linear-gradient(160deg, transparent 42%, rgba(255,255,255,.14) 50%, transparent 58%);
-  transform: translateX(-120%);
-  transition: transform .6s var(--ease-out-expo);
-  pointer-events: none;
+.group:hover .shelf-entry-icon {
+  transform: rotate(-6deg) scale(1.06);
+  filter: brightness(1.04);
 }
-.desk-shelf-entry:hover::before { transform: translateX(120%); }
 @media (prefers-reduced-motion: reduce) {
-  .desk-shelf-entry::before { display: none !important; }
+  .shelf-entry-icon { transition: none !important; }
+  .group:hover .shelf-entry-icon { transform: none !important; filter: none !important; }
+}
+
+/* 封面卡瀑布：hover 聚光——当组内有卡被 hover，非 hover 的卡降不透明度 + 去饱和虚化，
+   被 hover 的卡回满 + 上浮 + 高光描边，形成聚焦感。用 :has 侦测组内 hover（现代浏览器）。 */
+.shelf-card-body {
+  transition:
+    transform var(--dur-fast) var(--ease-out-expo),
+    box-shadow var(--dur-fast) var(--ease-out-expo),
+    border-color var(--dur-fast) var(--ease-out-expo),
+    opacity var(--dur-fast) var(--ease-out-expo),
+    filter var(--dur-fast) var(--ease-out-expo);
+}
+/* 组内任一卡 hover 时，先把整组的卡压暗虚化（聚光灯的「暗场」）。 */
+.shelf-grid:has(.shelf-card:hover) .shelf-card-body,
+.shelf-grid:has(.shelf-card:focus-within) .shelf-card-body {
+  opacity: .5;
+  filter: saturate(.72) brightness(.96);
+}
+/* 被 hover / 聚焦的那张卡回到全亮并上浮高光（聚光灯的「亮点」）。 */
+.shelf-card:hover .shelf-card-body,
+.shelf-card:focus-within .shelf-card-body {
+  opacity: 1 !important;
+  filter: none !important;
+  transform: translateY(-4px) scale(1.03);
+  box-shadow: var(--lift);
+  border-color: var(--red-soft-border);
+  z-index: 2;
+}
+/* 封面在 hover 时轻微推近，强化「浮起」。 */
+.shelf-card-cover { transition: transform var(--dur-normal) var(--ease-out-expo); }
+.shelf-card:hover .shelf-card-cover { transform: scale(1.05); }
+
+@media (prefers-reduced-motion: reduce) {
+  .shelf-card-body { transition: box-shadow .2s var(--ease-out-expo), border-color .2s var(--ease-out-expo) !important; }
+  /* 降级：不做虚化/缩放/位移，仅以描边 + 海拔作为静态聚焦反馈。 */
+  .shelf-grid:has(.shelf-card:hover) .shelf-card-body,
+  .shelf-grid:has(.shelf-card:focus-within) .shelf-card-body {
+    opacity: 1 !important;
+    filter: none !important;
+  }
+  .shelf-card:hover .shelf-card-body,
+  .shelf-card:focus-within .shelf-card-body {
+    transform: none !important;
+    box-shadow: var(--card-hover) !important;
+  }
+  .shelf-card-cover,
+  .shelf-card:hover .shelf-card-cover { transition: none !important; transform: none !important; }
 }
 
 /* 悬浮操作面板：进场轻浮（配 group-hover 的 opacity 过渡，位移已用 translate 定位）。 */
-.deskshelf-actions { transform-origin: bottom center; }
+.shelf-card-actions { transform-origin: top center; }
+@media (prefers-reduced-motion: reduce) {
+  .shelf-card-actions { transition: none !important; }
+}
 
-/* 骨架书本呼吸（加载态）：低对比明暗脉动，reduce-motion 静止。 */
+/* 骨架卡呼吸（加载态）：低对比明暗脉动，reduce-motion 静止。 */
 .deskshelf-skel-book { animation: deskshelfSkel 1.3s ease-in-out infinite; }
 @keyframes deskshelfSkel {
   0%, 100% { opacity: .55; }
   50%      { opacity: .85; }
 }
-
-/* reduce-motion 降级：3D 书架 → 平铺网格。
-   关掉透视/预设 3D，隔板本体从「靠底横排 + 横滚」退成自动换行的网格；
-   .book-spine 自身的 3D/落位已在上方书架视图块的 reduce 分支里降级，这里补容器层。 */
 @media (prefers-reduced-motion: reduce) {
-  .deskshelf-stage.shelf-row { perspective: none; }
-  .deskshelf-stage .shelf-plank { overflow: visible; }
-  .deskshelf-stage .shelf-plank > div {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-    align-items: stretch;
-    min-height: 0 !important;
-  }
-  /* 平铺态下书脊统一高度、占满格宽，成规整网格卡（不再错落立书）。 */
-  .deskshelf-stage .book-spine {
-    width: 100% !important;
-    height: 168px !important;
-  }
-  .deskshelf-actions { transition: none !important; }
   .deskshelf-skel-book { animation: none !important; opacity: .7; }
 }
 

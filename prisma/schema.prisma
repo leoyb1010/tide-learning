@@ -115,6 +115,13 @@ model Course {
   visibility       String    @default("public")   // public / private / unlisted
   // —— 课程集市：分享到社区的审核状态 ——
   sharedStatus     String    @default("private")  // private / pending / shared / rejected
+  // —— 课程集市：定价（S4 交易闭环 §问题⑪）——
+  // priceCredits: 上架集市时作者设定的售价（积分）。null 或 0 = 免费 fork（保持原免费拿走语义）；
+  //   >0 = 付费课，买家扣积分、作者入账（走 CreditLedger course_purchase / course_sale_income）。
+  //   用「null=免费」而非独立 isPaid 布尔：单字段即可表达「免费 / N 积分」，少一个可能与价格打架的冗余源。
+  //   派生的 isPaid（priceCredits>0）在 view 层算，不落库，避免两个真值源不一致。
+  priceCredits     Int?      // 集市售价（积分）；null/0=免费，>0=付费
+  salesCount       Int       @default(0) // 累计成交数（付费被购买次数；免费拿走不计入，销量口径 = 真实成交）
   genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
   sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
   instructorName   String?

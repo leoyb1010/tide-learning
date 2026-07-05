@@ -12,6 +12,7 @@
 import { prisma } from "@/lib/db";
 import { marketStallCoverSrc } from "@/lib/tracks";
 import { sellerBadge, type MarketStall } from "@/lib/market-view";
+import { deriveCourseRating, type CourseRating } from "@/lib/course-rating";
 
 /** 集市取货上限（与原 Web page 的 take:60 一致）。 */
 const MARKET_TAKE = 60;
@@ -38,6 +39,8 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
       origin: true,
       authorUserId: true,
       learnersCount: true,
+      priceCredits: true,
+      salesCount: true,
       createdAt: true,
     },
   });
@@ -110,6 +113,9 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
       origin: c.origin,
       collectCount,
       learnersCount: c.learnersCount,
+      priceCredits: c.priceCredits,
+      isPaid: (c.priceCredits ?? 0) > 0,
+      salesCount: c.salesCount,
       collectedByMe: myCollectedSet.has(c.id),
       mine: Boolean(viewerId && c.authorUserId === viewerId),
       createdAtMs: c.createdAt.getTime(),
@@ -121,4 +127,166 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
       },
     };
   });
+}
+
+/** 商品详情页大纲预览的单节形状（只出展示所需字段，不泄露正文/直链）。 */
+export interface StallLessonPreview {
+  id: string;
+  title: string;
+  summary: string | null;
+  durationSec: number;
+  isFree: boolean;
+  sortOrder: number;
+}
+
+/** 摊主「店铺」聚合信号（商品页塑造「店主」代入感：在架几门、累计成交、店龄）。 */
+export interface StallSellerShop {
+  /** 该摊主在集市在架（shared）的课数。 */
+  stallCount: number;
+  /** 该摊主全部在架课的累计被拿走数（去重学习者，排除作者本人）。 */
+  totalCollects: number;
+  /** 该摊主全部在架课的累计付费成交数（salesCount 之和）。 */
+  totalSales: number;
+  /** 摊主等级（sellerBadge tier，按 totalCollects 派生，与卡片口径一致）。 */
+  level: number;
+}
+
+/** 商品详情视图模型：摊位本体 + 大纲预览 + 店铺信号 + 占位评分。 */
+export interface StallDetail {
+  stall: MarketStall;
+  lessons: StallLessonPreview[];
+  shop: StallSellerShop;
+  rating: CourseRating;
+  /** 课程简介（description 优先，subtitle 兜底），商品页正文展示。 */
+  description: string | null;
+}
+
+/**
+ * 商品详情页数据（server-only）：按 slug 取一门在架课，组装成「商品」视图。
+ *
+ * 与集市列表共用 buildMarketStalls 的语义（拿走数排除作者本人、collectedByMe/mine
+ * 严格 where userId），此处只额外补：大纲预览（章节标题/时长/是否免费）、
+ * 摊主店铺聚合（在架几门/累计成交）、占位评分。
+ *
+ * 可见性铁律：只暴露 sharedStatus="shared" 的课（在集市在售的才算「商品」）；
+ *   非在架课返回 null（页面 notFound），杜绝拿未上架课的商品页当泄露入口。
+ *
+ * @param slug 课程 slug。
+ * @param viewerId 当前登录用户 id；游客传 null（collectedByMe/mine 恒 false）。
+ * @returns 商品详情视图模型；课不存在 / 未在架 → null。
+ */
+export async function buildStallDetail(
+  slug: string,
+  viewerId: string | null,
+): Promise<StallDetail | null> {
+  const course = await prisma.course.findFirst({
+    where: { slug, sharedStatus: "shared" },
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      subtitle: true,
+      description: true,
+      category: true,
+      coverColor: true,
+      origin: true,
+      authorUserId: true,
+      learnersCount: true,
+      priceCredits: true,
+      salesCount: true,
+      createdAt: true,
+      lessons: {
+        orderBy: { sortOrder: "asc" },
+        select: { id: true, title: true, summary: true, durationSec: true, isFree: true, sortOrder: true },
+      },
+    },
+  });
+  if (!course) return null;
+
+  // 本课拿走数（去重学习者，排除作者本人）——与列表口径一致。
+  const collectRows = await prisma.learningProgress.groupBy({
+    by: ["userId"],
+    where: { courseId: course.id },
+  });
+  const collectCount = collectRows.filter((r) => r.userId !== course.authorUserId).length;
+
+  // 当前用户是否已拿走（越权铁律：where userId=我）。
+  let collectedByMe = false;
+  if (viewerId) {
+    const mine = await prisma.learningProgress.findFirst({
+      where: { userId: viewerId, courseId: course.id },
+      select: { id: true },
+    });
+    collectedByMe = Boolean(mine);
+  }
+
+  // 摊主信息 + 店铺聚合（该作者全部在架课的成交/拿走）。
+  const author = course.authorUserId
+    ? await prisma.user.findUnique({
+        where: { id: course.authorUserId },
+        select: { id: true, nickname: true, avatarUrl: true },
+      })
+    : null;
+
+  let shop: StallSellerShop = { stallCount: 0, totalCollects: 0, totalSales: 0, level: 1 };
+  if (course.authorUserId) {
+    const sellerCourses = await prisma.course.findMany({
+      where: { authorUserId: course.authorUserId, sharedStatus: "shared" },
+      select: { id: true, salesCount: true },
+    });
+    const sellerIds = sellerCourses.map((c) => c.id);
+    // 该摊主全部在架课的去重学习者（排除摊主本人），逐课累加为店铺总拿走。
+    const rows =
+      sellerIds.length > 0
+        ? await prisma.learningProgress.groupBy({
+            by: ["courseId", "userId"],
+            where: { courseId: { in: sellerIds } },
+          })
+        : [];
+    let totalCollects = 0;
+    for (const r of rows) {
+      if (r.userId === course.authorUserId) continue;
+      totalCollects += 1;
+    }
+    const totalSales = sellerCourses.reduce((s, c) => s + c.salesCount, 0);
+    shop = {
+      stallCount: sellerCourses.length,
+      totalCollects,
+      totalSales,
+      level: sellerBadge(totalCollects).tier,
+    };
+  }
+
+  const stall: MarketStall = {
+    id: course.id,
+    slug: course.slug,
+    title: course.title,
+    subtitle: course.subtitle ?? course.description ?? null,
+    category: course.category,
+    coverColor: course.coverColor,
+    coverSrc: marketStallCoverSrc(course.slug, course.category ?? ""),
+    origin: course.origin,
+    collectCount,
+    learnersCount: course.learnersCount,
+    priceCredits: course.priceCredits,
+    isPaid: (course.priceCredits ?? 0) > 0,
+    salesCount: course.salesCount,
+    collectedByMe,
+    mine: Boolean(viewerId && course.authorUserId === viewerId),
+    createdAtMs: course.createdAt.getTime(),
+    seller: {
+      id: course.authorUserId,
+      nickname: author?.nickname ?? "匿名同学",
+      avatarUrl: author?.avatarUrl ?? null,
+      level: shop.level,
+    },
+  };
+
+  return {
+    stall,
+    lessons: course.lessons,
+    shop,
+    rating: deriveCourseRating(course.id, course.learnersCount),
+    description: course.description ?? course.subtitle ?? null,
+  };
 }

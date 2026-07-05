@@ -285,17 +285,18 @@ export function StudyDesk({
       <section style={{ "--i": 2 } as CSSProperties}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="text-[15px] font-bold tracking-[-0.01em] text-[var(--ink)]">我的书桌</h2>
-          {/* 精致「我的书架」入口：木质材质小卡 + 书本图标 + 藏书总数角标。
-              点击召唤 DeskShelf 弹层（按需拉书架明细）。克制不喧宾夺主，与三卡同一节奏。 */}
+          {/* ⑨ 精致「我的书架」入口：干净克制的胶囊，去网格纹理，改单层 surface 材质 + 内顶高光。
+              图标随 hover 轻微书本翻起（.shelf-entry-icon），整卡 studio-lift 抬升，融入书桌节奏不突兀。
+              点击召唤 DeskShelf 抽屉（按需拉书架明细）。藏书总数角标点睛。 */}
           <button
             type="button"
             onClick={() => setShelfOpen(true)}
             aria-haspopup="dialog"
             aria-expanded={shelfOpen}
             aria-label={`打开我的书架，共 ${shelfCount} 册`}
-            className="desk-shelf-entry studio-lift group relative inline-flex h-11 items-center gap-2 overflow-hidden rounded-[12px] border border-[var(--border2)] pl-2.5 pr-3.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card),var(--inner-hi)]"
+            className="shelf-entry studio-lift group relative inline-flex h-11 items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] pl-2.5 pr-3.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:text-[var(--ink)]"
           >
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[9px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)] transition-transform group-hover:scale-105">
+            <span className="shelf-entry-icon flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]">
               <Books size={15} weight="fill" />
             </span>
             <span>我的书架</span>

@@ -26,26 +26,30 @@ import {
 import type { MyShelf, ShelfCategory, ShelfCourse } from "@/lib/shelf";
 
 /**
- * §书桌·书架弹层（DeskShelf）—— 从书桌入口召唤的「我的书架」全屏浮层（client）。
+ * §书桌·书架抽屉（DeskShelf）—— ⑨ 重设计：从书桌入口召唤的「我的书架」侧滑抽屉（client）。
  *
- * 数据取舍：书桌首屏不带书架数据（避免拖慢 SSR）。本弹层打开时才 fetch
+ * 打开方式（⑨）：不再是居中弹窗 + 竖排 3D 书脊堆叠。改为
+ * 桌面从右侧平滑推出的抽屉（drawer），移动端从底部滑起的抽屉——丝滑高级、聚焦当下。
+ * 内容改「封面卡瀑布」：每门课一张封面卡（真实封面图 + 进度 + 赛道），网格铺陈，
+ * 比竖排书脊更易扫读、更现代。
+ *
+ * hover 聚焦（⑨）：鼠标移到某张卡，该卡放大浮起 + 高光描边，同层其它卡轻微虚化降饱和，
+ * 形成「聚光灯」聚焦感（.shelf-grid / .shelf-card 承担，reduce-motion 降级为仅描边反馈）。
+ *
+ * 数据取舍：书桌首屏不带书架数据（避免拖慢 SSR）。本抽屉打开时才 fetch
  * GET /api/shelf 按需拉全量（requireUser + 越权隔离在服务端做）。首帧显示骨架，
- * 拉到后按五个分类归组、以 3D 书架呈现。
+ * 拉到后按五个分类归组渲染。
  *
- * 浮层机制（对齐 Dialog）：Portal 逃逸到 body、scrim + 面板涨潮进场、Esc/点外部关闭、
- * focus trap、滚动锁。层级用 --z-modal。
+ * 浮层机制（对齐 Dialog / 旧版）：Portal 逃逸到 body、scrim + 抽屉滑入进场、Esc/点外部关闭、
+ * focus trap、滚动锁、关闭还焦。层级用 --z-modal。
  *
- * 分类 Tab：全部 / AI 造课 / 导入的 / 在学中 / 已完成 / 集市淘的。切 Tab 只做前端筛选，
- * 不重新请求。每本书复用课程库书架的 3D 书脊材质（.book-spine / .shelf-plank，见 globals.css
- * 书架视图块）——书脊竖排书名 + 赛道色 + 按课时映射厚度，hover 抽出前倾。
- *
- * hover 悬浮操作：继续学（进课程页）/ 进度环 / 分享到集市（自造课）/ 删除（自造课，去管理页）。
- * 空态：该分类无课时给引导（去造课 / 去课程库）。
+ * 分类 Tab：全部 / AI 造课 / 导入的 / 在学中 / 集市淘的 / 已完成。切 Tab 只做前端筛选，不重新请求。
+ * hover 操作沿用：继续学（进课程页）/ 分享到集市（自造课）/ 删除（自造课，去管理页）。
+ * 空态：该分类无课给引导（去造课 / 去课程库或集市）。
  *
  * 边界铁律：本文件为纯 client，只 import 类型（@/lib/shelf 的 type）与 UI；数据经 fetch 取，
  * 不触任何 server 链（next/headers/session/prisma/queries…）。
- * 动效全部 prefers-reduced-motion 降级（3D 书架 → 平铺网格，见 globals.css .book-spine 降级块 +
- * 本组件 .deskshelf-stage 降级）。触达 ≥44px。零 em-dash。
+ * 动效全部 prefers-reduced-motion 降级。触达 ≥44px。零 em-dash。
  */
 
 /* —— 分类 Tab 定义（顺序即用户要的自定义分类顺序）—— */
@@ -63,7 +67,7 @@ const TABS: TabDef[] = [
   { key: "completed", label: "已完成" },
 ];
 
-/* —— 分类分层板的顺序（「全部」视图下从上到下的隔板）与文案 —— */
+/* —— 分类分组的顺序（「全部」视图下从上到下的分组）与文案 —— */
 const SECTION_ORDER: { key: ShelfCategory; label: string; blurb: string }[] = [
   { key: "ai_created", label: "AI 造课", blurb: "我说需求、AI 造出来的课" },
   { key: "imported", label: "导入的", blurb: "从外部导入、归我所有的课" },
@@ -72,28 +76,17 @@ const SECTION_ORDER: { key: ShelfCategory; label: string; blurb: string }[] = [
   { key: "completed", label: "已完成", blurb: "每一节都学完了，值得回看" },
 ];
 
-/* —— 赛道 → 书脊双色（与 CourseShelf 的 SPINE_COLORS 一致，保证书桌/课程库视觉统一）—— */
-const SPINE_COLORS: Record<string, { a: string; b: string; ink: string }> = {
-  ai_skill: { a: "#7b5cf0", b: "#4a2fc0", ink: "#f4f0ff" },
-  english_oral: { a: "#2ba578", b: "#166849", ink: "#eafff6" },
-  english_foundation: { a: "#2ba578", b: "#166849", ink: "#eafff6" },
-  silver_english: { a: "#e0843c", b: "#b0501f", ink: "#fff4ea" },
-  life: { a: "#3b8dd6", b: "#245a97", ink: "#eaf4ff" },
-  default: { a: "#5b6474", b: "#2d3440", ink: "#eef1f6" },
+/* —— 赛道 → 封面渐变兜底双色（无封面图时用赛道气质的渐变占位；与课程库/书桌视觉统一）—— */
+const TRACK_TINT: Record<string, { a: string; b: string }> = {
+  ai_skill: { a: "#7b5cf0", b: "#4a2fc0" },
+  english_oral: { a: "#2ba578", b: "#166849" },
+  english_foundation: { a: "#2ba578", b: "#166849" },
+  silver_english: { a: "#e0843c", b: "#b0501f" },
+  life: { a: "#3b8dd6", b: "#245a97" },
+  default: { a: "#5b6474", b: "#2d3440" },
 };
-function spineFor(category?: string) {
-  return SPINE_COLORS[category ?? "default"] ?? SPINE_COLORS.default;
-}
-/** 书脊厚度：按课时数在 46–128px 间映射（触达下限；课多书厚）。与 CourseShelf 同口径。 */
-function spineWidth(lessonsCount: number): number {
-  const min = 46;
-  const max = 128;
-  const w = min + Math.min(lessonsCount, 24) * 3.6;
-  return Math.round(Math.max(min, Math.min(max, w)));
-}
-/** 书脊高度：随课时轻微错落，避免等高呆板。 */
-function spineHeight(lessonsCount: number): number {
-  return 232 + (lessonsCount % 5) * 8;
+function tintFor(category?: string) {
+  return TRACK_TINT[category ?? "default"] ?? TRACK_TINT.default;
 }
 
 /* —— API 返回形状（对齐 /api/shelf 的 ok({ shelf, total })）—— */
@@ -178,7 +171,7 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
     if (open) setTab("all");
   }, [open]);
 
-  /* 当前 Tab 下要展示的分层板（「全部」= 全部非空分类；单类 = 只该类）。 */
+  /* 当前 Tab 下要展示的分组（「全部」= 全部非空分类；单类 = 只该类）。 */
   const sections = useMemo(() => {
     if (!shelf) return [];
     const wanted = tab === "all" ? SECTION_ORDER : SECTION_ORDER.filter((s) => s.key === tab);
@@ -202,7 +195,7 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
 
   return createPortal(
     <div
-      className="fixed inset-0 flex items-stretch justify-center sm:items-center sm:p-4"
+      className="fixed inset-0 flex items-stretch justify-end"
       style={{ zIndex: "var(--z-modal)" }}
       role="dialog"
       aria-modal="true"
@@ -211,14 +204,13 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
       {/* scrim：点外部关闭 */}
       <div className="dialog-scrim-in absolute inset-0 bg-ink-950/55 backdrop-blur-[2px]" onClick={onClose} />
 
-      {/* 面板：木质材质外框 + 涨潮进场。移动端全屏、桌面端居中大卡。 */}
+      {/* 抽屉面板：桌面从右滑入贴右缘、移动从底滑起占满宽。丝滑推出 = .shelf-drawer-in。 */}
       <div
         ref={panelRef}
-        className="deskshelf-panel dialog-panel-in relative flex w-full max-w-[1040px] flex-col overflow-hidden border border-[var(--border2)] shadow-[var(--lift)] sm:rounded-[22px]"
-        style={{ maxHeight: "92dvh" }}
+        className="shelf-drawer-in relative ml-auto flex h-full w-full max-w-[560px] flex-col overflow-hidden border-l border-[var(--border2)] bg-[var(--bg2)] shadow-[var(--lift)]"
       >
-        {/* 头部：木纹条 + 标题 + 总册数 + 关闭 */}
-        <header className="deskshelf-rail relative flex shrink-0 items-center gap-3 border-b border-[var(--border)] px-4 py-3.5 sm:px-6">
+        {/* 头部：标题 + 总册数 + 关闭 */}
+        <header className="relative flex shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 shadow-[var(--inner-hi)] sm:px-5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]">
             <Books size={18} weight="fill" />
           </span>
@@ -246,7 +238,7 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
         {/* 分类 Tab：横向可滚动，当前项红点睛。 */}
         <nav
           aria-label="书架分类"
-          className="deskshelf-rail flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[var(--border)] px-3 py-2.5 [scrollbar-width:none] sm:px-5"
+          className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 [scrollbar-width:none] sm:px-4"
         >
           {TABS.map((t) => {
             const count =
@@ -284,8 +276,8 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
           })}
         </nav>
 
-        {/* 书架主体：材质木背景 + 分层板。 */}
-        <div className="deskshelf-body min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-6 sm:py-6">
+        {/* 抽屉主体：封面卡瀑布。 */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5 sm:py-5">
           {state === "loading" && <ShelfSkeleton />}
           {state === "error" && <ShelfError onRetry={load} />}
           {state === "ready" && shelf && (
@@ -319,7 +311,7 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
 }
 
 /* ============================================================
-   一层分层板：隔板标题 + 3D 书架（复用 .shelf-plank / .book-spine 材质）
+   一组分类：分组标题 + 封面卡瀑布（.shelf-grid：hover 聚光，非 hover 卡虚化）
    ============================================================ */
 function ShelfSection({
   cat,
@@ -340,8 +332,8 @@ function ShelfSection({
   if (items.length === 0) return null;
 
   return (
-    <section aria-label={`${label} 书架`} className="flex flex-col" style={{ "--i": indexBase } as CSSProperties}>
-      <div className="mb-2 flex items-end justify-between gap-3 px-0.5">
+    <section aria-label={`${label}`} className="flex flex-col" style={{ "--i": indexBase } as CSSProperties}>
+      <div className="mb-2.5 flex items-end justify-between gap-3 px-0.5">
         <div className="flex items-center gap-2.5">
           <span className="h-4 w-1.5 rounded-full bg-[var(--red)]" aria-hidden />
           <div className="flex flex-col">
@@ -354,24 +346,20 @@ function ShelfSection({
         </span>
       </div>
 
-      {/* 隔板本体：透视容器（.shelf-row）+ 材质底托（.shelf-plank）。书靠底、可横向翻找。 */}
-      <div className="deskshelf-stage shelf-row">
-        <div className="shelf-plank overflow-x-auto overflow-y-visible px-4 pb-3.5 pt-6 [scrollbar-width:thin]">
-          <div className="flex items-end gap-2.5" style={{ minHeight: 240 }}>
-            {items.map((c, idx) => (
-              <ShelfBook key={c.id} course={c} cat={cat} index={idx} onNavigate={onNavigate} />
-            ))}
-          </div>
-        </div>
+      {/* 卡瀑布：hover 某卡聚焦、同组其它卡虚化（.shelf-grid 承接聚光逻辑）。 */}
+      <div className="shelf-grid grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+        {items.map((c, idx) => (
+          <ShelfCard key={c.id} course={c} cat={cat} index={idx} onNavigate={onNavigate} />
+        ))}
       </div>
     </section>
   );
 }
 
 /* ============================================================
-   单本书：3D 书脊（.book-spine）+ hover 悬浮操作面板
+   单张封面卡：真实封面图 + 进度 + 赛道，hover 浮起高光 + 悬浮操作
    ============================================================ */
-function ShelfBook({
+function ShelfCard({
   course,
   cat,
   index,
@@ -382,106 +370,87 @@ function ShelfBook({
   index: number;
   onNavigate: () => void;
 }) {
-  const spine = spineFor(course.category);
-  const width = spineWidth(course.lessonsCount);
-  const height = spineHeight(course.lessonsCount);
+  const tint = tintFor(course.category);
   // 自造/导入课可分享与删除（去管理页）；其余（在学/淘的/已完成）不给这两个操作。
   const owned = cat === "ai_created" || cat === "imported";
-  // 生成态：generating（生成中）/ failed（部分待续）→ 书脊标「生成中」，hover 面板转「查看进度」。
+  // 生成态：generating（生成中）/ failed（部分待续）→ 卡上标「生成中/待续」，主操作转「查看进度」。
   const generating = course.genStatus === "generating";
   const genFailed = course.genStatus === "failed";
   const notReady = generating || genFailed;
+  const genPct = course.lessonsCount > 0 ? Math.round((course.genDone / course.lessonsCount) * 100) : 0;
 
   return (
-    <div className="group/book relative shrink-0" style={{ width }}>
-      {/* 书脊本体：整块可点 = 继续学（进课程页）。复用 .book-spine 3D 抽书材质。 */}
+    <div className="shelf-card group/card relative" style={{ "--i": index } as CSSProperties}>
+      {/* 卡主体：整块可点 = 进课程页。 */}
       <Link
         href={`/courses/${course.slug}`}
         onClick={onNavigate}
         aria-label={`${course.title}，${course.categoryLabel}，${course.lessonsCount} 节，进度 ${course.progress}%`}
-        className="book-spine relative flex flex-col overflow-hidden rounded-t-[6px] rounded-b-[3px] focus:outline-none"
-        style={
-          {
-            width,
-            height,
-            "--i": index,
-            "--spine-a": spine.a,
-            "--spine-b": spine.b,
-          } as CSSProperties
-        }
+        className="shelf-card-body block overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft-border)]"
       >
-        {/* 顶：赛道标 + 已完成星标 */}
-        <div className="relative flex items-center justify-between gap-1 px-2 pt-2.5">
-          <span
-            className="mono truncate text-[8.5px] font-semibold uppercase tracking-[0.1em]"
-            style={{ color: spine.ink, opacity: 0.72 }}
-          >
+        {/* 封面：真实封面图，赛道渐变兜底。已完成星标 / 生成态旗标叠在封面上。 */}
+        <div
+          className="relative aspect-[16/10] w-full overflow-hidden"
+          style={{ background: `linear-gradient(150deg, ${tint.a}, ${tint.b})` }}
+        >
+          <img
+            src={course.coverSrc}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="shelf-card-cover h-full w-full object-cover"
+          />
+          {/* 底部暗角，保证角标可读 */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
+          {/* 赛道标（左上） */}
+          <span className="absolute left-2 top-2 rounded-full bg-black/35 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-white/90 backdrop-blur-sm">
             {course.categoryLabel}
           </span>
-          {course.progress >= 100 && !notReady && (
-            <Sparkle size={11} weight="fill" style={{ color: spine.ink }} aria-hidden />
-          )}
-        </div>
-
-        {/* 生成态徽标：书脊顶部一枚「生成中 N/总」/「待续」小旗，让书架也能一眼看出这本还在写 */}
-        {notReady && (
-          <div className="relative mx-2 mt-1.5 flex items-center justify-center gap-1 rounded-full bg-black/28 px-1.5 py-0.5 backdrop-blur-sm">
-            {generating && <CircleNotch size={9} weight="bold" className="animate-spin" style={{ color: spine.ink }} />}
-            <span className="mono text-[8.5px] font-bold tracking-wide" style={{ color: spine.ink, opacity: 0.95 }}>
+          {/* 生成态旗标 / 已完成星标（右上） */}
+          {notReady ? (
+            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9.5px] font-bold text-white backdrop-blur-sm">
+              {generating && <CircleNotch size={9} weight="bold" className="animate-spin" />}
               {generating ? `生成中 ${course.genDone}/${course.lessonsCount}` : `待续 ${course.genDone}/${course.lessonsCount}`}
             </span>
-          </div>
-        )}
-
-        {/* 书名竖排（书脊灵魂） */}
-        <div className="relative flex flex-1 items-center justify-center px-1 py-2">
-          <span
-            className="line-clamp-4 max-h-full text-[15px] font-bold leading-[1.15] tracking-tight"
-            style={{
-              writingMode: "vertical-rl",
-              textOrientation: "mixed",
-              color: spine.ink,
-              textShadow: "0 1px 2px rgba(0,0,0,.28)",
-            }}
-          >
-            {course.title}
+          ) : (
+            course.progress >= 100 && (
+              <span className="absolute right-2 top-2 grid h-6 w-6 place-items-center rounded-full bg-[var(--red)] text-white shadow-[0_2px_6px_-1px_rgba(252,1,26,0.5)]">
+                <Sparkle size={12} weight="fill" />
+              </span>
+            )
+          )}
+          {/* 课时数（左下） */}
+          <span className="mono absolute bottom-2 left-2 text-[10px] font-semibold text-white/90">
+            {course.lessonsCount} 节
+          </span>
+          {/* 进度%（右下） */}
+          <span className="mono absolute bottom-2 right-2 text-[10.5px] font-bold text-white">
+            {notReady ? `${genPct}%` : `${course.progress}%`}
           </span>
         </div>
 
-        {/* 底：课时数 + 进度条（书脊下端一道细进度，实证在学深度） */}
-        <div className="relative px-2 pb-2.5">
-          <div
-            className="mb-1.5 h-px w-full"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,.42), transparent)" }}
-          />
-          <div className="flex items-center justify-between">
-            <span className="mono text-[9px] font-semibold tracking-wide" style={{ color: spine.ink, opacity: 0.68 }}>
-              {course.lessonsCount} 节
-            </span>
-            <span className="mono text-[9px] font-bold" style={{ color: spine.ink, opacity: 0.9 }}>
-              {course.progress}%
-            </span>
-          </div>
-          {/* 书脊底部进度线 */}
-          <div className="mt-1 h-[3px] w-full overflow-hidden rounded-full bg-black/25">
+        {/* 卡底：标题 + 进度条 */}
+        <div className="p-2.5">
+          <p className="line-clamp-2 min-h-[2.4em] text-[12.5px] font-semibold leading-[1.2] tracking-tight text-[var(--ink)]">
+            {course.title}
+          </p>
+          <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--surface-inset)]">
             <div
-              className="h-full rounded-full"
-              style={{ width: `${course.progress}%`, background: "rgba(255,255,255,.85)" }}
+              className="h-full rounded-full bg-[var(--red)]"
+              style={{ width: `${notReady ? genPct : course.progress}%` }}
             />
           </div>
         </div>
       </Link>
 
-      {/* hover / focus 悬浮操作面板：抽书时从书顶浮出。
-          continue = 主操作（书脊本身已可点，这里给显式按钮 + 进度环）；
+      {/* hover / focus 悬浮操作面板：从卡顶浮出。
+          continue = 主操作（卡本身已可点，这里给显式按钮 + 进度环）；
           自造课额外给 分享到集市 / 删除（去 /me/courses 管理页，不在书桌直接删）。 */}
-      <div className="deskshelf-actions pointer-events-none absolute left-1/2 top-0 z-10 w-[188px] -translate-x-1/2 -translate-y-[calc(100%+8px)] opacity-0 transition-opacity duration-200 group-hover/book:pointer-events-auto group-hover/book:opacity-100 group-focus-within/book:pointer-events-auto group-focus-within/book:opacity-100">
-        <div className="elev-3 flex flex-col gap-1.5 rounded-[14px] p-2.5">
-          {/* 标题 + 进度环（生成中 → 环显生成进度、副行显生成态；就绪 → 环显学习进度） */}
-          <div className="flex items-center gap-2.5 px-0.5">
-            <ProgressRing
-              pct={notReady ? (course.lessonsCount > 0 ? Math.round((course.genDone / course.lessonsCount) * 100) : 0) : course.progress}
-            />
+      <div className="shelf-card-actions pointer-events-none absolute left-1/2 top-1.5 z-10 w-[calc(100%-12px)] max-w-[220px] -translate-x-1/2 opacity-0 transition-opacity duration-200 group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100">
+        <div className="elev-3 flex flex-col gap-1.5 rounded-[13px] p-2">
+          {/* 标题 + 进度环 */}
+          <div className="flex items-center gap-2 px-0.5">
+            <ProgressRing pct={notReady ? genPct : course.progress} />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-semibold text-[var(--ink)]">{course.title}</p>
               <p className="mono text-[10px] text-[var(--ink4)]">
@@ -493,7 +462,7 @@ function ShelfBook({
               </p>
             </div>
           </div>
-          {/* 主操作：生成中/待续 → 去造课页看进度（课还没写完，先别进空课）；否则继续学/再看。 */}
+          {/* 主操作：生成中/待续 → 去造课页看进度；否则继续学/再看。 */}
           {notReady ? (
             <Link
               href="/create"
@@ -576,7 +545,7 @@ function ProgressRing({ pct }: { pct: number }) {
 }
 
 /* ============================================================
-   空态引导：该分类无课 → 去造课 / 去课程库
+   空态引导：该分类无课 → 去造课 / 去课程库或集市
    ============================================================ */
 function EmptyGuide({ kind, onNavigate }: { kind: "all" | ShelfCategory; onNavigate: () => void }) {
   const copy: Record<"all" | ShelfCategory, { title: string; sub: string }> = {
@@ -627,15 +596,20 @@ function ShelfSkeleton() {
     <div className="flex flex-col gap-6" aria-live="polite" aria-busy="true">
       <span className="sr-only">正在打开书架</span>
       {[0, 1].map((row) => (
-        <div key={row} className="flex flex-col gap-2">
+        <div key={row} className="flex flex-col gap-2.5">
           <div className="h-4 w-32 rounded-full bg-[var(--surface-inset)]" />
-          <div className="shelf-plank flex items-end gap-2.5 px-4 pb-3.5 pt-6" style={{ minHeight: 240 }}>
-            {[0, 1, 2, 3, 4].map((b) => (
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            {[0, 1, 2, 3, 4, 5].map((b) => (
               <div
                 key={b}
-                className="deskshelf-skel-book rounded-t-[6px] rounded-b-[3px] bg-[var(--surface-inset)]"
-                style={{ width: 56 + (b % 3) * 18, height: 232 + (b % 4) * 8 }}
-              />
+                className="deskshelf-skel-book overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)]"
+              >
+                <div className="aspect-[16/10] w-full bg-[var(--surface-inset)]" />
+                <div className="space-y-2 p-2.5">
+                  <div className="h-3 w-4/5 rounded-full bg-[var(--surface-inset)]" />
+                  <div className="h-[3px] w-full rounded-full bg-[var(--surface-inset)]" />
+                </div>
+              </div>
             ))}
           </div>
         </div>
