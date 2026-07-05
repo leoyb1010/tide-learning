@@ -152,12 +152,28 @@ export async function getMyCourseReview(
 }
 
 /**
- * 当前用户是否学过该课（有任一 LearningProgress 即算）——评价资格判定。
+ * 当前用户是否「实质学过」该课——评价资格判定。
  * 越权铁律：严格 where userId=我。API 与详情页共用此判定，口径一致。
+ *
+ * 只有「存在 LearningProgress」不够：购买/免费拿走的瞬间会为课程各节建起始记录
+ * （progressSec=0、completedAt/lastSlideIndex 均为空），刚买一秒未学即满足会让评价门形同虚设、
+ * 可刷评污染集市口碑。故收紧为「有任一节真正播放/翻页过」：
+ *   progressSec > 阈值(30秒) 或 completedAt 非空 或 lastSlideIndex 非空。
+ * 三者任一成立即算真实学过，纯 progressSec=0 的购买起始记录不满足。
  */
+const LEARNED_PROGRESS_THRESHOLD_SEC = 30;
+
 export async function hasLearnedCourse(courseId: string, userId: string): Promise<boolean> {
   const row = await prisma.learningProgress.findFirst({
-    where: { userId, courseId },
+    where: {
+      userId,
+      courseId,
+      OR: [
+        { progressSec: { gt: LEARNED_PROGRESS_THRESHOLD_SEC } },
+        { completedAt: { not: null } },
+        { lastSlideIndex: { not: null } },
+      ],
+    },
     select: { id: true },
   });
   return Boolean(row);

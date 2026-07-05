@@ -263,6 +263,13 @@ struct CourseDetailView: View {
             if d.lessons.contains(where: { !$0.isFree }) {
                 subscribeGate(lockedCount: d.lessons.filter { !$0.isFree }.count)
             }
+
+            // 学员评价：真实评分聚合 + 列表 + 写评价入口（学过才可评）。
+            // key 用真实课程 id（后端 id/slug 皆解析），登录态决定写入口可见性。
+            CourseReviewsSection(
+                courseKey: d.course.id,
+                isLoggedIn: AuthManager.shared.isLoggedIn
+            )
         }
         .padding(16)
     }

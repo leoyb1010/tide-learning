@@ -76,11 +76,16 @@ export function BlockRenderer({
   blocks,
   courseId,
   sceneBg,
+  onReachEnd,
 }: {
   blocks: (Block & { id: string })[];
   courseId?: string;
   /** SceneBlock 赛道场景背景图路径（public 绝对路径）。由 Player 按 course.category 解析后传入；无则 scene 保持纯渐变兜底。 */
   sceneBg?: string;
+  /** 滚动模式完课信号：最后一个块进入视口时触发一次（IntersectionObserver 观察末块）。
+   *  翻页模式靠 BlockSlideshow 的 onComplete 上报，滚动模式无页序，用「读到末块」等价完课语义。
+   *  父组件用 useCallback 稳定；本组件仅在末块首次进视口时调用一次（一次性，进后即断连）。 */
+  onReachEnd?: () => void;
 }) {
   if (!blocks || blocks.length === 0) {
     return (
@@ -89,10 +94,11 @@ export function BlockRenderer({
       </div>
     );
   }
+  const lastIndex = blocks.length - 1;
   return (
     <div className="flex flex-col gap-6 sm:gap-7">
       {blocks.map((block, i) => (
-        <Reveal key={block.id} index={i}>
+        <Reveal key={block.id} index={i} onReachEnd={i === lastIndex ? onReachEnd : undefined}>
           <div data-block-id={block.id} className="scroll-mt-24">
             <BlockSwitch block={block} courseId={courseId} sceneBg={sceneBg} />
           </div>
@@ -108,14 +114,28 @@ export function BlockRenderer({
    - reduce-motion：直接 shown=true，无 transform/transition。
    - 交错：同屏多块按 index 递延（上限 5 档，避免长列表尾块延迟过久）。
    ============================================================ */
-function Reveal({ children, index }: { children: React.ReactNode; index: number }) {
+function Reveal({
+  children,
+  index,
+  onReachEnd,
+}: {
+  children: React.ReactNode;
+  index: number;
+  /** 仅末块传入：本块首次进视口时触发一次完课信号（复用同一 IntersectionObserver）。 */
+  onReachEnd?: () => void;
+}) {
   const reduce = useReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
+  // 末块完课回调用 ref 持有最新值，避免把 onReachEnd 塞进 IO effect 依赖导致观察器重挂。
+  const onReachEndRef = useRef(onReachEnd);
+  onReachEndRef.current = onReachEnd;
 
   useEffect(() => {
     if (reduce) {
       setShown(true);
+      // reduce-motion / 无 IO 环境下直接显示，此时末块也视为「已读到」，同步触发完课信号。
+      onReachEndRef.current?.();
       return;
     }
     const el = ref.current;
@@ -126,6 +146,8 @@ function Reveal({ children, index }: { children: React.ReactNode; index: number 
         for (const e of entries) {
           if (e.isIntersecting) {
             setShown(true);
+            // 末块进视口即触发完课信号（onReachEnd 仅末块非空）。IO 进后即断连，天然一次性。
+            onReachEndRef.current?.();
             io.disconnect();
             break;
           }

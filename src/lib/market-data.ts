@@ -6,7 +6,8 @@
  * 铁律：
  *   - 拿走数（collectCount）= 有该课学习记录的去重用户数，**排除作者本人**
  *     （与 collect 端点禁自收藏一致，与 Web 集市页上轮修的逻辑一致）。
- *   - 「我拿走过哪些」严格 where userId=当前用户（越权铁律）；游客传 null 时跳过。
+ *   - 「我是否已拥有」以 CoursePurchase（所有权真值源）判定，严格 where userId=当前用户（越权铁律）；
+ *     游客传 null 时跳过。免费预览进度（LearningProgress）不再算「已拥有」。
  */
 
 import { prisma } from "@/lib/db";
@@ -68,12 +69,13 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
     collectCountMap.set(r.courseId, (collectCountMap.get(r.courseId) ?? 0) + 1);
   }
 
-  // 我拿走过哪些课（越权铁律：where userId=我）——决定 CTA 初始态。游客跳过。
+  // 我拥有哪些课（所有权真值源 CoursePurchase；越权铁律：where userId=我）——决定 CTA 初始态
+  // （已在书架/去学习 vs 购买按钮）。免费预览进度不再算「已拥有」。游客跳过。
   const myCollectedSet = new Set<string>();
   if (viewerId && courseIds.length > 0) {
-    const mine = await prisma.learningProgress.groupBy({
-      by: ["courseId"],
+    const mine = await prisma.coursePurchase.findMany({
       where: { userId: viewerId, courseId: { in: courseIds } },
+      select: { courseId: true },
     });
     for (const r of mine) myCollectedSet.add(r.courseId);
   }
@@ -226,11 +228,12 @@ export async function buildStallDetail(
   });
   const collectCount = collectRows.filter((r) => r.userId !== course.authorUserId).length;
 
-  // 当前用户是否已拿走（越权铁律：where userId=我）。
+  // 当前用户是否已拥有本课（所有权真值源 CoursePurchase；越权铁律：where userId=我）。
+  // 决定商品页 CTA（已在书架/去学习 vs 购买按钮）；免费预览进度不再算「已拥有」。
   let collectedByMe = false;
   if (viewerId) {
-    const mine = await prisma.learningProgress.findFirst({
-      where: { userId: viewerId, courseId: course.id },
+    const mine = await prisma.coursePurchase.findUnique({
+      where: { userId_courseId: { userId: viewerId, courseId: course.id } },
       select: { id: true },
     });
     collectedByMe = Boolean(mine);

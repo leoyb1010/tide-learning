@@ -181,6 +181,9 @@ final class NotebookDetailViewModel {
 
 struct NotebookDetailView: View {
     @State private var vm: NotebookDetailViewModel
+    /// 复用笔记馆的创建逻辑（记一条 sheet 依赖 NotesViewModel.create）。
+    @State private var notesVM = NotesViewModel()
+    @State private var showCompose = false
     private let fallbackTitle: String
 
     init(notebookId: String, title: String) {
@@ -204,6 +207,24 @@ struct NotebookDetailView: View {
         .navigationDestination(for: Note.self) { note in
             NoteDetailView(noteId: note.id)
         }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    Haptics.light(); showCompose = true
+                } label: {
+                    Label("记一条", systemImage: "plus").font(.studio(14, .semibold))
+                }
+                .tint(Studio.red)
+            }
+        }
+        .sheet(isPresented: $showCompose) {
+            // 预选当前笔记本；保存成功后刷新本页列表，让新笔记即时出现。
+            ComposeNoteSheet(
+                vm: notesVM,
+                presetNotebookId: vm.notebookId,
+                onCreated: { Task { await vm.load() } }
+            )
+        }
         .task { if !vm.loaded { await vm.load() } }
         .refreshable { await vm.load() }
     }
@@ -211,7 +232,11 @@ struct NotebookDetailView: View {
     private func content(_ detail: NotebookDetail) -> some View {
         ScrollView {
             if detail.notes.isEmpty {
-                EmptyStateView(title: "笔记本还是空的", subtitle: "把笔记归入这里集中管理")
+                EmptyStateView(
+                    title: "笔记本还是空的",
+                    subtitle: "把笔记归入这里集中管理",
+                    actionTitle: "记一条"
+                ) { showCompose = true }
             } else {
                 LazyVStack(spacing: 10) {
                     ForEach(detail.notes) { note in

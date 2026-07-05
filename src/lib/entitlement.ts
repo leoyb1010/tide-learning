@@ -204,7 +204,19 @@ export function canAccessTrack(track: string, snapshot: EntitlementSnapshot): bo
   return snapshot.accessibleTracks.includes(track);
 }
 
-/** 服务端判断某章节是否可学：免费章节任何人可学；付费章节需订阅且覆盖该赛道。 */
-export function canAccessLesson(track: string, isFree: boolean, snapshot: EntitlementSnapshot): boolean {
-  return isFree || canAccessTrack(track, snapshot);
+/**
+ * 服务端判断某章节是否可学。三条放行路径，任一满足即可：
+ *   1) 免费章节（isFree）——任何人可学；
+ *   2) 已购买本课（owned=true，买家持有该课 CoursePurchase 记录）——买断放行**全部**章节，
+ *      不再受赛道订阅门约束（修 P0 买断失能）；
+ *   3) 订阅覆盖该赛道（canAccessTrack）。
+ * owned 由调用方按 (userId, courseId) 查 CoursePurchase 得出；不传（如游客/未知）默认 false。
+ */
+export function canAccessLesson(
+  track: string,
+  isFree: boolean,
+  snapshot: EntitlementSnapshot,
+  owned = false,
+): boolean {
+  return isFree || owned || canAccessTrack(track, snapshot);
 }

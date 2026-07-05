@@ -34,6 +34,19 @@ export function canViewCourse(
   return !!viewerUserId && course.authorUserId === viewerUserId;
 }
 
+/**
+ * 是否已购买本课（CoursePurchase 所有权真值源）——买断放行的判据。
+ * 越权铁律：严格 where userId=我。游客（userId 为空）恒 false，不查库。
+ */
+export async function hasPurchasedCourse(courseId: string, userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  const row = await prisma.coursePurchase.findUnique({
+    where: { userId_courseId: { userId, courseId } },
+    select: { id: true },
+  });
+  return Boolean(row);
+}
+
 /** 课程卡数据（§6.2 字段）。 */
 export async function listCourses(opts?: { category?: string; sort?: string; q?: string | string[] }) {
   // q 支持单串或多关键词（语义搜索场景4：LLM 扩展的同义词组）——任一词命中 title/subtitle 即召回
@@ -119,6 +132,8 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
   // 归属/可见性门：他人的私有课对当前访问者视为不存在（越权读取修复）。
   if (!canViewCourse(course, userId)) return null;
   const snapshot = await resolveEntitlement(userId);
+  // 买断真值源：已购本课（CoursePurchase）则全部章节放行（不走赛道订阅门）。越权铁律：where userId=我。
+  const owned = await hasPurchasedCourse(course.id, userId);
 
   return {
     course,
@@ -133,7 +148,7 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
       contentType: l.contentType,
       durationSec: l.durationSec,
       isFree: l.isFree,
-      canAccess: canAccessLesson(course.category, l.isFree, snapshot),
+      canAccess: canAccessLesson(course.category, l.isFree, snapshot, owned),
     })),
     updateLogs: course.updateLogs.map((u) => ({
       ...u,
@@ -155,7 +170,9 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   // 归属/可见性门：他人的私有课的章节对当前访问者视为不存在（越权读取修复）。
   if (!canViewCourse(lesson.course, userId)) return null;
   const snapshot = await resolveEntitlement(userId);
-  const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot);
+  // 买断真值源：已购本课（CoursePurchase）则本节放行（不走赛道订阅门，修 P0 买断失能）。越权铁律：where userId=我。
+  const owned = await hasPurchasedCourse(lesson.course.id, userId);
+  const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned);
 
   const siblings = lesson.course.lessons;
   const idx = siblings.findIndex((l) => l.id === lesson.id);

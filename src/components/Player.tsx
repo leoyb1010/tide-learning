@@ -393,12 +393,18 @@ export function Player({
   // 页进度落到独立的 lastSlideIndex（kind:"slide"），与视频/模拟播放的 progressSec 隔离，
   // 两个视图的续读锚点互不覆盖。completed 在末页触发，落库为完课。翻页去抖：仅在页码变化时上报。
   const blockPageRef = useRef(initialSlidePage);
+  // 本节是否已上报过完课（翻页到末页 / 滚动读到末块）。翻页与滚动两模式共享此哨兵，
+  // 保证同一节课的 completed 只 POST 一次，避免切换排布方式时重复上报完课。
+  const blockCompletedRef = useRef(false);
   const reportBlockPage = useCallback((pageIndex: number, totalPages: number) => {
     if (!isLoggedIn || !access) return;
     const page = pageIndex + 1; // 1-indexed
     if (page === blockPageRef.current) return; // 同页重复上报去抖
     blockPageRef.current = page;
-    const completed = page >= totalPages && totalPages > 0;
+    const reachedEnd = page >= totalPages && totalPages > 0;
+    // completed 仅在首次到末页时置真：已上报过则本次只更新页序、不再重复 POST completed。
+    const completed = reachedEnd && !blockCompletedRef.current;
+    if (reachedEnd) blockCompletedRef.current = true;
     fetch("/api/progress", {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -413,6 +419,22 @@ export function Player({
     setNextCountdown(3);
     setShowNextCard(true);
   }, [nextHref]);
+
+  // 滚动模式完课：滚动读到末块（BlockRenderer.onReachEnd）时上报一次完课并弹下一节卡，
+  // 与翻页模式末页完课语义一致。与翻页共享 blockCompletedRef 去抖：本节已上报过完课
+  // （翻页到末页 / 已滚到末块）则跳过，保证同节不重复 POST completed。
+  // 走 kind:"slide" 落 completedAt 且不污染视频 progressSec；progressSec:1 仅作占位（末块无页序语义）。
+  const reportScrollComplete = useCallback(() => {
+    if (!isLoggedIn || !access) return;
+    if (blockCompletedRef.current) return; // 本节已上报过完课，去抖
+    blockCompletedRef.current = true;
+    fetch("/api/progress", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }),
+    }).catch(() => {});
+    onBlockComplete();
+  }, [isLoggedIn, access, lesson.id, onBlockComplete]);
 
   // 工具按钮命中区扩展：透明 44x44 伪元素外扩，视觉尺寸不变（WCAG 2.5.5 目标尺寸）。
   const hit44 = "relative after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']";
@@ -864,9 +886,9 @@ export function Player({
                         notePanel={canCreateNote ? slideNoteEditor : undefined}
                       />
                     ) : (
-                      // 滚动模式：保留原长列表叙事（Reveal 交错浮现）
+                      // 滚动模式：保留原长列表叙事（Reveal 交错浮现）+ 末块进视口完课上报（与翻页完课语义一致）
                       <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-6">
-                        <BlockRenderer blocks={blocks} courseId={courseId} sceneBg={sceneBgSrc} />
+                        <BlockRenderer blocks={blocks} courseId={courseId} sceneBg={sceneBgSrc} onReachEnd={reportScrollComplete} />
                       </div>
                     )}
                   </div>

@@ -408,46 +408,198 @@ private struct ArticleLessonView: View {
     }
 }
 
-// MARK: - ai_block
+// MARK: - ai_block（翻页 / 滚动 双模式）
+
+/// 块课件学习模式：翻页（一屏一块，滑动手势前进）/ 滚动（连续纵向）。
+/// 对齐 web 块课件翻页优化：iOS 用左右滑动手势翻页，保证一屏不需额外滚动。
+private enum BlockReadMode: String, CaseIterable, Identifiable {
+    case page = "翻页"
+    case scroll = "滚动"
+    var id: String { rawValue }
+    var icon: String { self == .page ? "book.pages" : "list.bullet" }
+}
 
 private struct BlockLessonView: View {
     let lesson: Lesson
     let vm: LearnViewModel
 
+    /// 默认翻页模式（对齐 web 块课件默认翻页体验）。
+    @State private var mode: BlockReadMode = .page
+    @State private var pageIndex = 0
     @State private var appeared = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                LessonHeader(lesson: lesson, completed: vm.completed)
-
-                if vm.blocks.isEmpty {
-                    EmptyStateView(title: "暂无内容", icon: "square.stack.3d.up")
-                } else {
-                    ForEach(Array(vm.blocks.enumerated()), id: \.element.id) { idx, block in
-                        BlockCardView(block: block)
-                            .opacity(appeared || reduceMotion ? 1 : 0)
-                            .offset(y: appeared || reduceMotion ? 0 : 14)
-                            .animation(
-                                reduceMotion ? nil
-                                : StudioMotion.smooth.delay(Double(min(idx, 8)) * 0.05),
-                                value: appeared
-                            )
+        Group {
+            if vm.blocks.isEmpty {
+                ScrollView {
+                    VStack(spacing: 14) {
+                        LessonHeader(lesson: lesson, completed: vm.completed)
+                        EmptyStateView(title: "暂无内容", icon: "square.stack.3d.up")
                     }
-                    Color.clear.frame(height: 1)
-                        .onAppear {
-                            Task {
-                                let was = vm.completed
-                                await vm.markCompleted()
-                                if !was, vm.completed { Haptics.success() }
-                            }
-                        }
+                    .padding(16)
+                }
+            } else {
+                VStack(spacing: 0) {
+                    // 顶部：章节头 + 模式切换（翻页/滚动）。
+                    VStack(alignment: .leading, spacing: 12) {
+                        LessonHeader(lesson: lesson, completed: vm.completed)
+                        modeToggle
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+                    .padding(.bottom, 10)
+
+                    if mode == .page { pager } else { scroller }
                 }
             }
-            .padding(16)
         }
         .onAppear { appeared = true }
+    }
+
+    // MARK: 模式切换条
+
+    private var modeToggle: some View {
+        HStack(spacing: 4) {
+            ForEach(BlockReadMode.allCases) { m in
+                let on = m == mode
+                Button {
+                    guard m != mode else { return }
+                    Haptics.selection()
+                    withAnimation(reduceMotion ? nil : StudioMotion.smooth) { mode = m }
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: m.icon).font(.system(size: 11, weight: .semibold))
+                        Text(m.rawValue).font(.studio(12.5, on ? .semibold : .medium))
+                    }
+                    .foregroundStyle(on ? Studio.ink : Studio.ink3)
+                    .frame(maxWidth: .infinity, minHeight: 34)
+                    .background {
+                        if on {
+                            RoundedRectangle(cornerRadius: 8, style: .continuous).fill(Studio.surface)
+                                .shadow(color: .black.opacity(0.08), radius: 4, y: 1)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(3)
+        .background(Studio.surfaceInset)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+
+    // MARK: 翻页模式（TabView .page，一屏一块，滑动前进）
+
+    private var pager: some View {
+        VStack(spacing: 10) {
+            TabView(selection: $pageIndex) {
+                ForEach(Array(vm.blocks.enumerated()), id: \.element.id) { idx, block in
+                    ScrollView {
+                        BlockCardView(block: block)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 8)
+                    }
+                    .tag(idx)
+                }
+            }
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            .animation(reduceMotion ? nil : StudioMotion.smooth, value: pageIndex)
+            // 翻到最后一页即视为读完（补完成触觉）。
+            .onChange(of: pageIndex) { _, idx in
+                if idx >= vm.blocks.count - 1 {
+                    Task {
+                        let was = vm.completed
+                        await vm.markCompleted()
+                        if !was, vm.completed { Haptics.success() }
+                    }
+                }
+            }
+
+            pagerFooter
+                .padding(.horizontal, 16)
+                .padding(.bottom, 6)
+        }
+    }
+
+    /// 页脚：进度点 + 上一/下一，配合滑动手势双通道翻页。
+    private var pagerFooter: some View {
+        HStack(spacing: 12) {
+            Button {
+                guard pageIndex > 0 else { return }
+                Haptics.light()
+                withAnimation(reduceMotion ? nil : StudioMotion.smooth) { pageIndex -= 1 }
+            } label: {
+                Image(systemName: "chevron.left").font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(pageIndex > 0 ? Studio.ink : Studio.ink4)
+                    .frame(width: 40, height: 40)
+                    .background(Studio.surface).clipShape(Circle())
+                    .overlay(Circle().strokeBorder(Studio.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .disabled(pageIndex <= 0)
+
+            // 进度点（>12 块退化为「n / total」文案，避免点过密）。
+            if vm.blocks.count <= 12 {
+                HStack(spacing: 5) {
+                    ForEach(0..<vm.blocks.count, id: \.self) { i in
+                        Circle()
+                            .fill(i == pageIndex ? Studio.red : Studio.border2)
+                            .frame(width: i == pageIndex ? 7 : 5, height: i == pageIndex ? 7 : 5)
+                            .animation(reduceMotion ? nil : StudioMotion.pop, value: pageIndex)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+            } else {
+                Text("\(pageIndex + 1) / \(vm.blocks.count)")
+                    .font(.mono(12, .semibold)).foregroundStyle(Studio.ink2)
+                    .frame(maxWidth: .infinity)
+            }
+
+            Button {
+                guard pageIndex < vm.blocks.count - 1 else { return }
+                Haptics.light()
+                withAnimation(reduceMotion ? nil : StudioMotion.smooth) { pageIndex += 1 }
+            } label: {
+                Image(systemName: "chevron.right").font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(pageIndex < vm.blocks.count - 1 ? .white : Studio.ink4)
+                    .frame(width: 40, height: 40)
+                    .background(pageIndex < vm.blocks.count - 1 ? Studio.red : Studio.surface2)
+                    .clipShape(Circle())
+                    .overlay(Circle().strokeBorder(pageIndex < vm.blocks.count - 1 ? Color.clear : Studio.border, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .disabled(pageIndex >= vm.blocks.count - 1)
+        }
+    }
+
+    // MARK: 滚动模式（连续纵向，保留原交错进场）
+
+    private var scroller: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                ForEach(Array(vm.blocks.enumerated()), id: \.element.id) { idx, block in
+                    BlockCardView(block: block)
+                        .opacity(appeared || reduceMotion ? 1 : 0)
+                        .offset(y: appeared || reduceMotion ? 0 : 14)
+                        .animation(
+                            reduceMotion ? nil
+                            : StudioMotion.smooth.delay(Double(min(idx, 8)) * 0.05),
+                            value: appeared
+                        )
+                }
+                Color.clear.frame(height: 1)
+                    .onAppear {
+                        Task {
+                            let was = vm.completed
+                            await vm.markCompleted()
+                            if !was, vm.completed { Haptics.success() }
+                        }
+                    }
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 16)
+        }
     }
 }
 

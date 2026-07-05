@@ -56,6 +56,7 @@ model User {
   notifications  Notification[]
   devices        Device[]
   courseReviews  CourseReview[]
+  coursePurchases CoursePurchase[]
 
   @@index([role])
 }
@@ -144,6 +145,7 @@ model Course {
   notes      Note[]
   calendar   ContentCalendar[]
   reviews    CourseReview[]
+  purchases  CoursePurchase[]
 
   @@index([sharedStatus, lastUpdatedAt]) // 课程集市列表：按分享状态过滤 + 时间排序
 }
@@ -244,6 +246,26 @@ model CourseReview {
 
   @@unique([userId, courseId]) // 一人一课一评：重复提交走 upsert
   @@index([courseId, createdAt]) // 评价列表：按课过滤 + 时间排序
+}
+
+// ---------- 课程购买 / 所有权真值源（交易系统根因修复）----------
+// 独立的「谁拥有哪门课」真值源，与 LearningProgress（免费节进度）解耦：
+//   - 所有权判据：买家/免费拿走者持有该课一条 CoursePurchase 记录 = 拥有本课全部章节。
+//   - 幂等真值源：@@unique([userId, courseId]) 一人一课一条——重复购买撞唯一约束即「已拥有」，
+//     不再用「免费节 LearningProgress」判幂等（免费预览不再污染所有权 / 白拿付费课）。
+//   - priceCredits：购买当时价格快照（付费=正整数售价，免费拿走=0），作对账/收益溯源锚点。
+// 与 LearningProgress 的分工：LearningProgress 管「学到哪」（进度/续读），CoursePurchase 管「有没有」（所有权）。
+model CoursePurchase {
+  id           String   @id @default(cuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  priceCredits Int      // 购买当时价格快照：付费=售价，免费拿走=0
+  createdAt    DateTime @default(now())
+
+  @@unique([userId, courseId]) // 一人一课一条：天然幂等 + 所有权真值源
+  @@index([courseId])
 }
 
 // ---------- §9.4 笔记（2.0：捕捉 + 资产化）----------

@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { track } from "@/lib/analytics";
 import { getBalance } from "@/lib/credits";
-import { earnFromSale, purchaseCourse, FREE_COLLECT_AUTHOR_BONUS } from "@/lib/credit-trade";
+import { collectFreeCourse, purchaseCourse, FREE_COLLECT_AUTHOR_BONUS } from "@/lib/credit-trade";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +14,8 @@ export const dynamic = "force-dynamic";
  * 入参：{ courseId }
  *
  * 分支（按课程 priceCredits）：
- *   - 免费课（priceCredits null 或 0）：沿用原免费 fork（建学习起始记录 = 进书架），
- *     并给作者小额创作激励（FREE_COLLECT_AUTHOR_BONUS，走 course_sale_income 流水，鼓励持续供给）。
+ *   - 免费课（priceCredits null 或 0）：collectFreeCourse 事务——建 CoursePurchase(0) 所有权真值源、
+ *     进书架、作者小额创作激励（FREE_COLLECT_AUTHOR_BONUS，走 course_sale_income）原子完成。
  *   - 付费课（priceCredits>0）：走 purchaseCourse 事务——买家扣积分、作者入账、建起始记录原子完成；
  *     余额不足返回 402 引导充值；已拥有幂等返回。
  *
@@ -24,9 +24,8 @@ export const dynamic = "force-dynamic";
  *   - 该课 sharedStatus="shared"（在集市在售）。
  *   - 非自己造的课（authorUserId !== user.id；自己的课在书架已属造课层）。
  *
- * fork/幂等机制（MVP，不拷贝课程数据）：给买家在该课「第 1 节 lesson」建一条起始
- * LearningProgress（progressSec=0），天然进入「collected」层，进度按 userId 独立。
- * LearningProgress 的 @@unique([userId, lessonId]) 天然给幂等（重复拿走/购买不重复扣款）。
+ * 所有权 / 幂等真值源：CoursePurchase @@unique([userId, courseId])——一人一课一条，重复拿走/购买撞
+ * 唯一约束即「已拥有」，不重复扣款 / 不重复发激励。进度 LearningProgress 只管「学到哪」，不再判所有权。
  * 埋点：course_collect（免费）/ course_purchase（付费）。
  */
 export async function POST(req: NextRequest) {
@@ -107,38 +106,20 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // ============ 免费分支：原免费 fork + 作者小额创作激励 ============
-    // 幂等判断：起始记录（第 1 节 LearningProgress）是否已存在。
-    const existing = await prisma.learningProgress.findUnique({
-      where: { userId_lessonId: { userId: user.id, lessonId: firstLesson.id } },
-      select: { id: true },
+    // ============ 免费分支：所有权真值源 CoursePurchase + 进书架 + 作者激励原子 ============
+    // 幂等 / 所有权以 CoursePurchase 为唯一真值源；作者创作激励绑定「购买记录首次创建成功」，
+    // 与进书架同事务原子（进了书架作者必到账，杜绝漏发）。免费预览进度不再参与判定。
+    const result = await collectFreeCourse({
+      collectorId: user.id,
+      authorId: course.authorUserId,
+      courseId: course.id,
+      firstLessonId: firstLesson.id,
+      authorBonus: FREE_COLLECT_AUTHOR_BONUS,
+      courseTitle: course.title,
     });
-    if (existing) {
-      return ok({ status: "collected", already: true, message: "这门课已在你的书架" });
-    }
 
-    // 建起始记录（progressSec=0）。并发下唯一约束兜底：竞争失败也视作已拿走。
-    try {
-      await prisma.learningProgress.create({
-        data: { userId: user.id, courseId: course.id, lessonId: firstLesson.id, progressSec: 0 },
-      });
-    } catch {
+    if (result.status === "already_owned") {
       return ok({ status: "collected", already: true, message: "这门课已在你的书架" });
-    }
-
-    // 免费课被拿走：给作者小额创作激励（首次拿走才给，与起始记录同为幂等——上面 create 成功即首次）。
-    // 独立于书架落地（earnFromSale 自有事务）：激励发放失败不应阻断用户已成功进书架的主流程，故容错吞掉。
-    if (course.authorUserId && FREE_COLLECT_AUTHOR_BONUS > 0) {
-      try {
-        await earnFromSale(
-          course.authorUserId,
-          course.id,
-          FREE_COLLECT_AUTHOR_BONUS,
-          `《${course.title}》被拿走·创作激励`,
-        );
-      } catch (e) {
-        console.error("[market/collect] free collect author bonus failed:", e);
-      }
     }
 
     await track({ eventName: "course_collect", userId: user.id, properties: { courseId: course.id } });

@@ -50,17 +50,35 @@ final class NotesViewModel {
     /// 笔记本入口用：有 notebookId 的笔记计数（NotebookView 负责真实网格）。
     var notebookCount: Int { notes.filter { $0.notebookId != nil }.count }
 
-    /// 创建独立笔记（不传 courseId）。
-    func create(title: String, contentMd: String) async -> Bool {
+    /// 创建独立笔记，支持智能化字段：归入笔记本 / 关联标签 / 软关联课程。
+    /// notebookId/courseId 为空则不传；tagIds 空则不传（对齐 web POST /api/notes 语义）。
+    /// 软关联课程（仅 courseId、无 lessonId）不解锁章节内容，后端只校验课程可浏览。
+    func create(
+        title: String,
+        contentMd: String,
+        notebookId: String? = nil,
+        courseId: String? = nil,
+        tagIds: [String] = []
+    ) async -> Bool {
         creating = true; createError = nil
         defer { creating = false }
-        struct Body: Encodable { let title: String; let contentMd: String }
+        // 可空字段用 Optional 编码；JSONEncoder 默认跳过 nil，不会发多余键。
+        struct Body: Encodable {
+            let title: String
+            let contentMd: String
+            let notebookId: String?
+            let courseId: String?
+            let tagIds: [String]?
+        }
+        let body = Body(
+            title: title,
+            contentMd: contentMd,
+            notebookId: notebookId,
+            courseId: courseId,
+            tagIds: tagIds.isEmpty ? nil : tagIds
+        )
         do {
-            let new = try await API.shared.post(
-                "/api/notes",
-                body: Body(title: title, contentMd: contentMd),
-                as: Note.self
-            )
+            let new = try await API.shared.post("/api/notes", body: body, as: Note.self)
             notes.insert(new, at: 0)
             return true
         } catch {
@@ -392,13 +410,24 @@ private struct NotesTabBar: View {
     }
 }
 
-// MARK: - 记一条 sheet
+// MARK: - 记一条 sheet（智能化：标题 / 正文 / 笔记本 / 标签 / 关联课程）
 
-private struct ComposeNoteSheet: View {
+struct ComposeNoteSheet: View {
     @Bindable var vm: NotesViewModel
+    /// 从笔记本详情页进入时预选的笔记本 id（其它入口为 nil）。
+    var presetNotebookId: String? = nil
+    /// 保存成功回调（笔记本详情页据此刷新自身列表）。
+    var onCreated: (() -> Void)? = nil
+
     @Environment(\.dismiss) private var dismiss
+    @State private var options = ComposeOptionsLoader()
+
     @State private var title = ""
     @State private var contentMd = ""
+    @State private var selectedNotebookId: String?
+    @State private var selectedCourseId: String?
+    @State private var selectedTagIds: Set<String> = []
+    @State private var didApplyPreset = false
     @FocusState private var contentFocused: Bool
 
     private var canSave: Bool {
@@ -409,8 +438,7 @@ private struct ComposeNoteSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("标题").font(.studio(12, .semibold)).foregroundStyle(Studio.ink3)
+                    fieldGroup("标题") {
                         TextField("未命名", text: $title)
                             .font(.studio(16, .semibold))
                             .foregroundStyle(Studio.ink)
@@ -419,12 +447,11 @@ private struct ComposeNoteSheet: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     }
 
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("正文").font(.studio(12, .semibold)).foregroundStyle(Studio.ink3)
+                    fieldGroup("正文") {
                         TextEditor(text: $contentMd)
                             .font(.studio(15))
                             .foregroundStyle(Studio.ink)
-                            .frame(minHeight: 220)
+                            .frame(minHeight: 180)
                             .scrollContentBackground(.hidden)
                             .padding(10)
                             .background(Studio.surface2)
@@ -432,17 +459,28 @@ private struct ComposeNoteSheet: View {
                             .focused($contentFocused)
                     }
 
-                    if let err = vm.createError {
-                        HStack(spacing: 6) {
-                            Image(systemName: "exclamationmark.circle.fill").font(.system(size: 12))
-                            Text(err).font(.studio(13))
+                    // 智能化三件套：笔记本 / 标签 / 关联课程。空数据源自动隐藏对应块。
+                    NotebookPicker(
+                        notebooks: options.options.notebooks,
+                        selectedId: $selectedNotebookId
+                    )
+                    TagMultiPicker(
+                        tags: options.options.tags,
+                        selectedIds: $selectedTagIds,
+                        creating: options.creatingTag,
+                        onCreate: { name in
+                            if let tag = await options.createTag(name: name) {
+                                selectedTagIds.insert(tag.id)
+                            }
                         }
-                        .foregroundStyle(Studio.redInk)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(10)
-                        .background(Studio.redSoft)
-                        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Studio.redSoftBorder, lineWidth: 1))
+                    )
+                    CourseAssociationPicker(
+                        courses: options.options.courses,
+                        selectedId: $selectedCourseId
+                    )
+
+                    if let err = vm.createError {
+                        errorBanner(err)
                     }
                 }
                 .padding(16)
@@ -458,20 +496,65 @@ private struct ComposeNoteSheet: View {
                     if vm.creating {
                         ProgressView().controlSize(.small)
                     } else {
-                        Button("保存") {
-                            Task {
-                                let ok = await vm.create(title: title, contentMd: contentMd)
-                                if ok { Haptics.success(); dismiss() }
-                                else { Haptics.error() }
-                            }
-                        }
-                        .font(.studio(15, .semibold))
-                        .tint(Studio.red)
-                        .disabled(!canSave)
+                        Button("保存") { Task { await save() } }
+                            .font(.studio(15, .semibold))
+                            .tint(Studio.red)
+                            .disabled(!canSave)
                     }
                 }
             }
+            .task {
+                await options.load()
+                applyPresetIfNeeded()
+            }
             .onAppear { contentFocused = true }
         }
+    }
+
+    private func save() async {
+        let ok = await vm.create(
+            title: title,
+            contentMd: contentMd,
+            notebookId: selectedNotebookId,
+            courseId: selectedCourseId,
+            tagIds: Array(selectedTagIds)
+        )
+        if ok {
+            Haptics.success()
+            onCreated?()
+            dismiss()
+        } else {
+            Haptics.error()
+        }
+    }
+
+    /// 预选笔记本：仅当该本存在于选项里才落选（避免选到不属于本人的本）。
+    private func applyPresetIfNeeded() {
+        guard !didApplyPreset, let preset = presetNotebookId else { return }
+        didApplyPreset = true
+        if options.options.notebooks.contains(where: { $0.id == preset }) {
+            selectedNotebookId = preset
+        }
+    }
+
+    @ViewBuilder
+    private func fieldGroup<Content: View>(_ label: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label).font(.studio(12, .semibold)).foregroundStyle(Studio.ink3)
+            content()
+        }
+    }
+
+    private func errorBanner(_ err: String) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "exclamationmark.circle.fill").font(.system(size: 12))
+            Text(err).font(.studio(13))
+        }
+        .foregroundStyle(Studio.redInk)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(Studio.redSoft)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Studio.redSoftBorder, lineWidth: 1))
     }
 }

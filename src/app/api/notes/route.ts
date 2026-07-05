@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser, getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, canAccessLesson } from "@/lib/entitlement";
+import { hasPurchasedCourse } from "@/lib/queries";
 import { track } from "@/lib/analytics";
 import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
@@ -162,7 +163,9 @@ export async function POST(req: NextRequest) {
         select: { id: true, courseId: true, isFree: true, course: { select: { category: true } } },
       });
       if (!lesson || lesson.courseId !== body.courseId) return fail("章节不存在", 404);
-      if (!canAccessLesson(lesson.course.category, lesson.isFree, snapshot)) {
+      // 买断放行：已购本课（CoursePurchase 所有权真值源）则可记笔记，不走赛道订阅门（修 P0 买断失能）。
+      const owned = await hasPurchasedCourse(lesson.courseId, user.id);
+      if (!canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned)) {
         throw new AppError("该章节需订阅后才能记录笔记", 403);
       }
       courseId = body.courseId!;
