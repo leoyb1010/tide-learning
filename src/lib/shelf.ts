@@ -18,6 +18,10 @@ export interface ShelfCourse {
   origin: string; // official / ai_generated / user_imported
   progress: number; // 完课百分比 0-100（完课 lesson 数 / 总 lesson 数）
   coverSrc: string; // 真实封面图路径
+  // —— 生成态（仅自造/导入课有意义；官方/淘来课恒为 ready）——
+  // 让书架也能展示「生成中」的课（与 /me/courses 一致），生成完自动变就绪。
+  genStatus: string; // generating / ready / failed（其它/官方课 → ready）
+  genDone: number; // 已生成节数（blocksJson 非空），生成态进度分子
 }
 
 /** 书架全量（五个分类，每类一组课）。 */
@@ -46,7 +50,10 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
       title: true,
       category: true,
       origin: true,
+      genStatus: true,
       _count: { select: { lessons: true } },
+      // 已生成节数（blocksJson 非空）：作为「生成中」进度分子。只在有生成态时用到，取轻量字段。
+      lessons: { where: { blocksJson: { not: null } }, select: { id: true } },
     },
   });
 
@@ -93,6 +100,14 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
   for (const c of myAuthoredCourses) {
     const agg = byCourse.get(c.id);
     const total = c._count.lessons;
+    const genDone = c.lessons.length; // blocksJson 非空的节数（上面 where 已过滤）
+    // 生成态归一：显式 generating/failed 照旧；无显式态但仍有空节视为生成中；否则就绪。
+    const genStatus =
+      c.genStatus === "generating" || c.genStatus === "failed"
+        ? c.genStatus
+        : genDone < total
+        ? "generating"
+        : "ready";
     const view: ShelfCourse = {
       id: c.id,
       slug: c.slug,
@@ -103,6 +118,8 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
       origin: c.origin,
       progress: pct(agg?.completedLessons ?? 0, total),
       coverSrc: resolveCoverSrc(c.slug, c.category, c.id),
+      genStatus,
+      genDone,
     };
     if (c.origin === "ai_generated") shelf.ai_created.push(view);
     else shelf.imported.push(view);
@@ -125,6 +142,9 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
       origin: c.origin,
       progress: pct(done, total),
       coverSrc: resolveCoverSrc(c.slug, c.category, c.id),
+      // 学习记录派生的课（官方在学/集市淘来/已完成）恒为就绪：能学=已生成，无生成态展示。
+      genStatus: "ready",
+      genDone: total,
     };
 
     // 学完：课有 lesson 且每节都完课。放最高优先级，不再进 learning/collected。

@@ -93,6 +93,7 @@ export function Player({
   const savedRef = useRef(initialProgress);
   const videoRef = useRef<HTMLVideoElement>(null);
   const noteRef = useRef<NoteEditorHandle>(null);
+  const slideNoteRef = useRef<NoteEditorHandle>(null); // 翻页课件全屏笔记浮层专用（独立于侧栏/Sheet 的 noteRef）
   // prep / review 全屏面板的边界：Tab focus trap 用（两者同一时刻至多挂一个）。
   const focusPanelRef = useRef<HTMLDivElement>(null);
   // 仅当 videoUrl 指向真实媒体（.mp4/.m3u8/.webm）时用 <video>；
@@ -545,6 +546,13 @@ export function Player({
     <NoteEditor ref={noteRef} courseId={courseId} lessonId={lesson.id} getCurrentTime={getCurrentTime} onSeek={seek} initialNotes={initialNotes} canCreate={canCreateNote} />
   );
 
+  // 翻页课件「全屏调笔记」用的独立笔记编辑器：走独立 ref（slideNoteRef），
+  // 不与桌面侧栏 / 移动 Sheet 的 noteEditor 争抢同一个 noteRef（同一 ref 被多实例挂载会互相覆盖）。
+  // 块课无视频时间轴，getCurrentTime 恒为 0（无时间戳锚定语义），采集能力（文本笔记）原样复用。
+  const slideNoteEditor = (
+    <NoteEditor ref={slideNoteRef} courseId={courseId} lessonId={lesson.id} getCurrentTime={getCurrentTime} onSeek={seek} initialNotes={initialNotes} canCreate={canCreateNote} />
+  );
+
   // 番茄钟进度（已过 / 总时长）
   const pomodoroTotal = pomodoroMin * 60;
   const pomodoroPct = pomodoroTotal > 0 ? ((pomodoroTotal - remainingSec) / pomodoroTotal) * 100 : 0;
@@ -770,7 +778,7 @@ export function Player({
           <Paywall remainingLessons={remainingLessons} courseTitle={courseTitle} isLoggedIn={isLoggedIn} />
         </div>
       ) : (
-        <div className={`grid gap-4 ${focus ? "" : "lg:grid-cols-[1fr_360px]"}`}>
+        <div className={`grid gap-4 xl:gap-5 ${focus ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
           {/* 左：视频/图文 */}
           <div className={focus ? "mx-auto w-full max-w-4xl" : ""}>
             {isBlockLesson ? (
@@ -811,8 +819,8 @@ export function Player({
                 ) : (
                   // 图文课件：翻页（黑板式单屏，默认）/ 滚动（长列表）二选一。
                   <div>
-                    {/* 排布切换段控件：翻页 / 滚动 */}
-                    <div className="mb-3 flex items-center justify-end">
+                    {/* 排布切换段控件：翻页 / 滚动。压缩上下留白，把纵向空间让给学习画面。 */}
+                    <div className="mb-2 flex items-center justify-end">
                       <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
                         <button
                           type="button"
@@ -853,6 +861,7 @@ export function Player({
                         initialIndex={initialSlidePage > 0 ? initialSlidePage - 1 : 0}
                         onSlideChange={reportBlockPage}
                         onComplete={onBlockComplete}
+                        notePanel={canCreateNote ? slideNoteEditor : undefined}
                       />
                     ) : (
                       // 滚动模式：保留原长列表叙事（Reveal 交错浮现）

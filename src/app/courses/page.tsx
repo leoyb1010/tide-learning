@@ -2,7 +2,7 @@ import { Suspense } from "react";
 import { MagnifyingGlass, Compass } from "@phosphor-icons/react/dist/ssr";
 import { listCourses } from "@/lib/queries";
 import { expandSearchKeywords } from "@/lib/llm";
-import { CourseCard } from "@/components/CourseCard";
+import { CoursePreviewCard } from "@/components/CoursePreviewCard";
 import { CourseFilterBar } from "@/components/CourseFilterBar";
 import { CourseLibraryView } from "@/components/CourseLibraryView";
 import { Button } from "@/components/ui";
@@ -76,7 +76,10 @@ export default async function CoursesPage({
             <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {courses.map((c, i) => (
                 <div key={c.id} className="h-full" style={{ "--i": i } as React.CSSProperties}>
-                  <CourseCard course={c} />
+                  {/* 两段式（问题⑯①）：点课程卡先弹预览气泡（评分/简介/N节·时长/作者/卖点），
+                      卡上「进入学习」再进详情。CoursePreviewCard 是 client，复用 CourseCardFace 视觉，
+                      server page 只负责把课程数据传进去，不越界。 */}
+                  <CoursePreviewCard course={c} />
                 </div>
               ))}
             </div>

@@ -21,6 +21,7 @@ import {
   PlayCircle,
   ArrowRight,
   ArrowClockwise,
+  CircleNotch,
 } from "@phosphor-icons/react";
 import type { MyShelf, ShelfCategory, ShelfCourse } from "@/lib/shelf";
 
@@ -386,6 +387,10 @@ function ShelfBook({
   const height = spineHeight(course.lessonsCount);
   // 自造/导入课可分享与删除（去管理页）；其余（在学/淘的/已完成）不给这两个操作。
   const owned = cat === "ai_created" || cat === "imported";
+  // 生成态：generating（生成中）/ failed（部分待续）→ 书脊标「生成中」，hover 面板转「查看进度」。
+  const generating = course.genStatus === "generating";
+  const genFailed = course.genStatus === "failed";
+  const notReady = generating || genFailed;
 
   return (
     <div className="group/book relative shrink-0" style={{ width }}>
@@ -413,10 +418,20 @@ function ShelfBook({
           >
             {course.categoryLabel}
           </span>
-          {course.progress >= 100 && (
+          {course.progress >= 100 && !notReady && (
             <Sparkle size={11} weight="fill" style={{ color: spine.ink }} aria-hidden />
           )}
         </div>
+
+        {/* 生成态徽标：书脊顶部一枚「生成中 N/总」/「待续」小旗，让书架也能一眼看出这本还在写 */}
+        {notReady && (
+          <div className="relative mx-2 mt-1.5 flex items-center justify-center gap-1 rounded-full bg-black/28 px-1.5 py-0.5 backdrop-blur-sm">
+            {generating && <CircleNotch size={9} weight="bold" className="animate-spin" style={{ color: spine.ink }} />}
+            <span className="mono text-[8.5px] font-bold tracking-wide" style={{ color: spine.ink, opacity: 0.95 }}>
+              {generating ? `生成中 ${course.genDone}/${course.lessonsCount}` : `待续 ${course.genDone}/${course.lessonsCount}`}
+            </span>
+          </div>
+        )}
 
         {/* 书名竖排（书脊灵魂） */}
         <div className="relative flex flex-1 items-center justify-center px-1 py-2">
@@ -462,34 +477,51 @@ function ShelfBook({
           自造课额外给 分享到集市 / 删除（去 /me/courses 管理页，不在书桌直接删）。 */}
       <div className="deskshelf-actions pointer-events-none absolute left-1/2 top-0 z-10 w-[188px] -translate-x-1/2 -translate-y-[calc(100%+8px)] opacity-0 transition-opacity duration-200 group-hover/book:pointer-events-auto group-hover/book:opacity-100 group-focus-within/book:pointer-events-auto group-focus-within/book:opacity-100">
         <div className="elev-3 flex flex-col gap-1.5 rounded-[14px] p-2.5">
-          {/* 标题 + 进度环 */}
+          {/* 标题 + 进度环（生成中 → 环显生成进度、副行显生成态；就绪 → 环显学习进度） */}
           <div className="flex items-center gap-2.5 px-0.5">
-            <ProgressRing pct={course.progress} />
+            <ProgressRing
+              pct={notReady ? (course.lessonsCount > 0 ? Math.round((course.genDone / course.lessonsCount) * 100) : 0) : course.progress}
+            />
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-semibold text-[var(--ink)]">{course.title}</p>
               <p className="mono text-[10px] text-[var(--ink4)]">
-                {course.categoryLabel} · {course.lessonsCount} 节
+                {notReady
+                  ? generating
+                    ? `生成中 · ${course.genDone}/${course.lessonsCount} 节`
+                    : `待续 · ${course.genDone}/${course.lessonsCount} 节`
+                  : `${course.categoryLabel} · ${course.lessonsCount} 节`}
               </p>
             </div>
           </div>
-          {/* 继续学 */}
-          <Link
-            href={`/courses/${course.slug}`}
-            onClick={onNavigate}
-            className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
-          >
-            {course.progress >= 100 ? (
-              <>
-                <ArrowClockwise size={14} weight="bold" />
-                再看一遍
-              </>
-            ) : (
-              <>
-                <PlayCircle size={15} weight="fill" />
-                {course.progress > 0 ? "继续学" : "开始学"}
-              </>
-            )}
-          </Link>
+          {/* 主操作：生成中/待续 → 去造课页看进度（课还没写完，先别进空课）；否则继续学/再看。 */}
+          {notReady ? (
+            <Link
+              href="/create"
+              onClick={onNavigate}
+              className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+            >
+              {generating ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : <ArrowClockwise size={14} weight="bold" />}
+              {generating ? "查看进度" : "继续生成"}
+            </Link>
+          ) : (
+            <Link
+              href={`/courses/${course.slug}`}
+              onClick={onNavigate}
+              className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+            >
+              {course.progress >= 100 ? (
+                <>
+                  <ArrowClockwise size={14} weight="bold" />
+                  再看一遍
+                </>
+              ) : (
+                <>
+                  <PlayCircle size={15} weight="fill" />
+                  {course.progress > 0 ? "继续学" : "开始学"}
+                </>
+              )}
+            </Link>
+          )}
           {/* 自造/导入课：分享到集市 + 删除（去管理页操作，边界内不建删除端点） */}
           {owned && (
             <div className="flex items-center gap-1.5">

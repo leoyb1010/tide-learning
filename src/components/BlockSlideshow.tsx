@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   CaretLeft,
@@ -9,6 +17,9 @@ import {
   CornersIn,
   Check,
   FlagCheckered,
+  NotePencil,
+  Keyboard,
+  X,
 } from "@phosphor-icons/react";
 import type { BlockWithId } from "@/lib/slides";
 import { groupBlocksToSlides, slideKindLabel, type Slide } from "@/lib/slides";
@@ -24,8 +35,16 @@ import { BlockSwitch } from "./BlockRenderer";
  * 复用：每页内部仍用 BlockRenderer 的单块渲染逻辑（BlockSwitch），只是容器从长列表换成单屏页。
  * 翻卡 / quiz 判分等块内交互原样保留（各块自持 state）。
  *
+ * 一页就是一页（不滚）：舞台固定高度（桌面/移动各一档，全屏用视口档），页内内容垂直居中；
+ * 若某页内容超出舞台高度，用 transform:scale 等比缩到一屏（clamp 到 [0.68,1]），而非页内滚动。
+ * 这样翻页时各页宽高统一、单屏一眼看完，消除「翻页后需上下滚动看同一页」。
+ *
+ * 键盘（学习台快捷键）：← 上一页 · → / 空格 下一页 · F 全屏 · N 记笔记 · Esc 退出全屏 · ? 快捷键帮助。
+ * 全屏调笔记：传入 notePanel 时，右下角常驻「记笔记」浮钮 + N 键呼出笔记浮层（全屏 DOM 子树内，
+ * 原生全屏也可用），记完关闭回到学习，不打断翻页节奏。
+ *
  * 无障碍 / 降级：
- *   - reduce-motion：转场退化为「即时切换」（无位移，opacity 也不做长动画）。
+ *   - reduce-motion：转场退化为「即时切换」（无位移，opacity 也不做长动画），自适应缩放不加过渡。
  *   - 所有翻页控件命中区 ≥ 44px；页码用 aria-live 播报；键盘可全程操作。
  *   - 深色黑板页正文走 on-dark token（对比达标）。
  */
@@ -36,6 +55,7 @@ export function BlockSlideshow({
   initialIndex = 0,
   onSlideChange,
   onComplete,
+  notePanel,
 }: {
   blocks: BlockWithId[];
   courseId?: string;
@@ -47,6 +67,11 @@ export function BlockSlideshow({
   onSlideChange?: (index: number, total: number) => void;
   /** 抵达并停留最后一页时触发一次（用于完课）。 */
   onComplete?: () => void;
+  /**
+   * 笔记面板节点（通常是 Player 的 NoteEditor）。传入后：右下角出现「记笔记」浮钮、N 键呼出笔记浮层。
+   * 面板渲染在本组件 rootRef 子树内，故原生全屏时也能呼出。不传则无笔记入口（纯翻页）。
+   */
+  notePanel?: ReactNode;
 }) {
   const reduce = useReducedMotion();
   const slides = useMemo<Slide[]>(() => groupBlocksToSlides(blocks), [blocks]);
@@ -59,8 +84,15 @@ export function BlockSlideshow({
   // 翻页方向：+1 下一页（新页从右滑入），-1 上一页（从左滑入）。驱动转场方向。
   const [dir, setDir] = useState(1);
   const [fullscreen, setFullscreen] = useState(false);
+  const [noteOpen, setNoteOpen] = useState(false); // 笔记浮层开合（仅 notePanel 存在时有意义）
+  const [helpOpen, setHelpOpen] = useState(false); // 快捷键帮助浮层（? 键）
   const rootRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false); // 完课只触发一次
+
+  // 自适应缩放：测量「舞台可用高度」vs「本页内容自然高度」，超出则等比缩到一屏（不滚）。
+  const stageRef = useRef<HTMLDivElement>(null); // 舞台可视区（固定高度、居中容器）
+  const contentRef = useRef<HTMLDivElement>(null); // 本页内容（自然高度，被缩放的对象）
+  const [fitScale, setFitScale] = useState(1);
 
   // index 越界保护（blocks 变化导致页数缩水时夹回）
   const safeIndex = Math.min(index, Math.max(0, total - 1));
@@ -91,13 +123,27 @@ export function BlockSlideshow({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeIndex, total]);
 
-  // 键盘导航：← 上一页 / → 或空格 下一页。焦点在输入类元件内时不劫持（不干扰块内答题/输入）。
+  // 键盘（学习台快捷键）：← 上一页 · → / 空格 下一页 · F 全屏 · N 记笔记 · Esc 退出全屏/关浮层 · ? 帮助。
+  // 焦点在输入类元件内时只保留 Esc（关浮层），其余不劫持，避免干扰块内答题 / 笔记输入。
   const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   onKeyRef.current = (e: KeyboardEvent) => {
     const tag = (e.target as HTMLElement)?.tagName;
-    if (tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT") return;
+    const typing = tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT";
+    // Esc 优先：先关帮助 / 笔记浮层，再退原生全屏（原生全屏 Esc 由浏览器接管，这里兜 CSS 兜底态）。
+    if (e.key === "Escape") {
+      if (helpOpen) { e.preventDefault(); setHelpOpen(false); return; }
+      if (noteOpen) { e.preventDefault(); setNoteOpen(false); return; }
+      // 原生全屏的 Esc 由浏览器接管退出（fullscreenchange 会同步 state）；这里只兜「CSS 满屏兜底态」的退出，
+      // 避免在原生全屏已退出后误触发再次进入全屏。
+      if (fullscreen && !document.fullscreenElement) { e.preventDefault(); setFullscreen(false); return; }
+      return;
+    }
+    if (typing) return; // 输入中：除 Esc 外全部让行
     if (e.key === "ArrowLeft") { e.preventDefault(); goPrev(); }
-    else if (e.key === "ArrowRight") { e.preventDefault(); goNext(); }
+    else if (e.key === "ArrowRight" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); goNext(); }
+    else if (e.key === "f" || e.key === "F") { e.preventDefault(); void toggleFullscreen(); }
+    else if (notePanel && (e.key === "n" || e.key === "N")) { e.preventDefault(); setNoteOpen((v) => !v); }
+    else if (e.key === "?" || (e.key === "/" && e.shiftKey)) { e.preventDefault(); setHelpOpen((v) => !v); }
   };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => onKeyRef.current(e);
@@ -127,6 +173,46 @@ export function BlockSlideshow({
     document.addEventListener("fullscreenchange", onFs);
     return () => document.removeEventListener("fullscreenchange", onFs);
   }, []);
+
+  // 自适应缩放（一页不滚的核心）：舞台是固定高度盒；内容以自然高度渲染，
+  // 若其高度超过舞台，按 舞台高/内容高 等比缩小到刚好一屏（clamp 到 [0.68, 1]，太小则达底不再缩，
+  // 极端超长页仍可读且不至于缩成蚂蚁）。measure 用 scrollHeight（不含缩放），故先复位再测。
+  const measureFit = useCallback(() => {
+    const stage = stageRef.current;
+    const content = contentRef.current;
+    if (!stage || !content) return;
+    const avail = stage.clientHeight;
+    // content 的自然高度：scrollHeight 不受 transform:scale 影响，可直接作分母。
+    const natural = content.scrollHeight;
+    if (avail <= 0 || natural <= 0) { setFitScale(1); return; }
+    const next = natural > avail ? Math.max(0.68, avail / natural) : 1;
+    // 量化到 3 位小数，避免亚像素抖动导致的无效重渲染。
+    setFitScale((prev) => (Math.abs(prev - next) > 0.004 ? Number(next.toFixed(3)) : prev));
+  }, []);
+
+  // 换页 / 全屏切换后重测（内容变了）。用 useEffect（非 useLayoutEffect）避免 SSR 告警；
+  // 首帧默认 fitScale=1，超高页会有一帧全尺寸后即缩到位（transition 平滑，无突兀闪跳）。
+  useEffect(() => {
+    measureFit();
+    // 字体 / 图片异步就位后再测一次（图片加载会改变自然高度）。
+    const raf = requestAnimationFrame(measureFit);
+    return () => cancelAnimationFrame(raf);
+  }, [safeIndex, fullscreen, measureFit]);
+
+  // 视口 / 舞台尺寸变化（窗口缩放、移动端旋转、块内交互展开）时重测。
+  useEffect(() => {
+    const stage = stageRef.current;
+    const content = contentRef.current;
+    if (!stage || !content || typeof ResizeObserver === "undefined") {
+      const onResize = () => measureFit();
+      window.addEventListener("resize", onResize);
+      return () => window.removeEventListener("resize", onResize);
+    }
+    const ro = new ResizeObserver(() => measureFit());
+    ro.observe(stage);
+    ro.observe(content);
+    return () => ro.disconnect();
+  }, [measureFit, safeIndex]);
 
   if (total === 0) {
     return (
@@ -175,10 +261,36 @@ export function BlockSlideshow({
         >
           <span className="text-[var(--red-ink)]">{safeIndex + 1}</span> / {total}
         </span>
+        {/* 快捷键帮助（? 键或点击）。命中区 ≥44px（after 伪元素外扩）。 */}
+        <button
+          type="button"
+          onClick={() => setHelpOpen((v) => !v)}
+          className="studio-press relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+          aria-label="键盘快捷键"
+          aria-expanded={helpOpen}
+        >
+          <Keyboard size={16} />
+        </button>
+        {/* 记笔记（N 键或点击）：仅当宿主传入 notePanel 时出现。 */}
+        {notePanel && (
+          <button
+            type="button"
+            onClick={() => setNoteOpen((v) => !v)}
+            className={`studio-press relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] ${
+              noteOpen
+                ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
+            }`}
+            aria-label={noteOpen ? "关闭笔记" : "记笔记"}
+            aria-expanded={noteOpen}
+          >
+            <NotePencil size={16} />
+          </button>
+        )}
         <button
           type="button"
           onClick={toggleFullscreen}
-          className="studio-press grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+          className="studio-press relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
           aria-label={fullscreen ? "退出全屏" : "全屏播放"}
         >
           {fullscreen ? <CornersIn size={16} /> : <CornersOut size={16} />}
@@ -186,7 +298,8 @@ export function BlockSlideshow({
       </div>
 
       {/* 黑板/纸面单屏舞台：一次一页，framer-motion 方向转场。
-          min-h 给单屏舒适高度；内部超高的少数页可自身滚动（overflow-y-auto），不撑破舞台。 */}
+          舞台固定高度（桌面/移动/全屏各一档），各页宽高统一；本页内容垂直居中，
+          超出时用 fitScale 等比缩到一屏 —— 消除页内上下滚动，「学习一页就是一页」。 */}
       <div className="relative flex-1">
         <AnimatePresence mode="wait" custom={dir}>
           <motion.div
@@ -198,14 +311,16 @@ export function BlockSlideshow({
             transition={reduce ? { duration: 0.12 } : { type: "spring", stiffness: 260, damping: 30, mass: 0.9 }}
             style={{ transformOrigin: dir > 0 ? "left center" : "right center", willChange: "transform, opacity" }}
             className={`flex ${
-              fullscreen ? "min-h-[calc(100vh-160px)]" : "min-h-[440px] sm:min-h-[520px]"
+              fullscreen
+                ? "h-[calc(100vh-150px)]"
+                : "h-[460px] sm:h-[540px]"
             } flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] ${
               isDarkBoard ? "slide-board" : "slide-paper"
             }`}
           >
-            {/* 页眉「粉笔标」：语义标签 + 页序，黑板页走 on-dark 配色 */}
+            {/* 页眉「粉笔标」：语义标签 + 页序，黑板页走 on-dark 配色。shrink-0 不被内容压缩。 */}
             <div
-              className={`flex items-center gap-2 border-b px-5 py-3 ${
+              className={`flex shrink-0 items-center gap-2 border-b px-5 py-3 ${
                 isDarkBoard ? "border-white/10" : "border-[var(--border)]"
               }`}
             >
@@ -228,15 +343,30 @@ export function BlockSlideshow({
               </span>
             </div>
 
-            {/* 页内容：居中限宽，纵向排布本页块（通常 1-3 块）。复用 BlockSwitch 单块渲染。
-                slide-stagger：每次换页 motion.div 按 key 重挂，页内块按 --i 逐个上浮（reduce-motion 静态直显）。 */}
-            <div className="flex flex-1 items-center overflow-y-auto px-4 py-6 sm:px-8 sm:py-8">
-              <div className={`mx-auto flex w-full max-w-3xl flex-col gap-5 sm:gap-6 ${reduce ? "" : "slide-stagger"}`}>
-                {current.blocks.map((block, bi) => (
-                  <div key={block.id} data-block-id={block.id} style={{ "--i": bi } as CSSProperties}>
-                    <BlockSwitch block={block} courseId={courseId} sceneBg={sceneBg} />
-                  </div>
-                ))}
+            {/* 舞台可视区（固定高度、居中、不滚动）。内容以自然高度渲染并按 fitScale 等比缩到一屏。
+                stageRef 量可用高度、contentRef 量内容自然高度。overflow-hidden 兜底极端页不外溢。 */}
+            <div
+              ref={stageRef}
+              className="relative flex flex-1 items-center justify-center overflow-hidden px-4 py-5 sm:px-8 sm:py-7"
+            >
+              <div
+                ref={contentRef}
+                className="w-full"
+                style={{
+                  transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
+                  transformOrigin: "center center",
+                  transition: reduce ? undefined : "transform .28s var(--ease-out-expo)",
+                }}
+              >
+                {/* 页内容：居中限宽，纵向排布本页块（通常 1-3 块）。复用 BlockSwitch 单块渲染。
+                    slide-stagger：每次换页 motion.div 按 key 重挂，页内块按 --i 逐个上浮（reduce-motion 静态直显）。 */}
+                <div className={`mx-auto flex w-full max-w-3xl flex-col gap-5 sm:gap-6 ${reduce ? "" : "slide-stagger"}`}>
+                  {current.blocks.map((block, bi) => (
+                    <div key={block.id} data-block-id={block.id} style={{ "--i": bi } as CSSProperties}>
+                      <BlockSwitch block={block} courseId={courseId} sceneBg={sceneBg} />
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </motion.div>
@@ -304,6 +434,131 @@ export function BlockSlideshow({
           已翻完全部 {total} 页
         </div>
       )}
+
+      {/* 全屏时的「记笔记」浮钮：右下角常驻，随时呼出笔记不打断学习。触达 56px。
+          非全屏时顶部已有笔记按钮，这里只在全屏补一个更醒目的浮钮。 */}
+      {notePanel && fullscreen && !noteOpen && (
+        <button
+          type="button"
+          onClick={() => setNoteOpen(true)}
+          className="studio-press cta-glow fixed bottom-6 right-6 grid h-14 w-14 place-items-center rounded-full bg-[var(--red)] text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,.5)] transition-transform hover:scale-105"
+          style={{ zIndex: "calc(var(--z-focus) + 1)" }}
+          aria-label="记笔记 (N)"
+        >
+          <NotePencil size={22} weight="fill" />
+        </button>
+      )}
+
+      {/* 笔记浮层：全屏 DOM 子树内（原生全屏也可用）。桌面右侧抽屉、移动端底部抽屉。
+          复用宿主传入的 notePanel（NoteEditor 采集能力原样保留）。z 用 focus+1，压过舞台但让位 toast。 */}
+      {notePanel && (
+        <AnimatePresence>
+          {noteOpen && (
+            <>
+              <motion.div
+                className="fixed inset-0 bg-black/45"
+                style={{ zIndex: "calc(var(--z-focus) + 1)" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: reduce ? 0 : 0.2 }}
+                onClick={() => setNoteOpen(false)}
+                aria-hidden
+              />
+              <motion.div
+                role="dialog"
+                aria-modal="true"
+                aria-label="学习笔记"
+                className="slide-note-drawer elev-3 fixed inset-x-0 bottom-0 flex max-h-[80vh] flex-col overflow-hidden rounded-t-[var(--radius-card)] sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[380px] sm:rounded-none sm:rounded-l-[var(--radius-card)]"
+                style={{ zIndex: "calc(var(--z-focus) + 2)" }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={reduce ? { duration: 0.12 } : { duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+              >
+                <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-4 py-3">
+                  <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)]">
+                    <NotePencil size={15} className="text-[var(--red)]" /> 学习笔记
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setNoteOpen(false)}
+                    className="studio-press relative grid h-9 w-9 place-items-center rounded-[10px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
+                    aria-label="关闭笔记"
+                  >
+                    <X size={16} weight="bold" />
+                  </button>
+                </div>
+                {/* 移动端底抽屉时给个抓手；桌面隐藏。 */}
+                <div className="mx-auto mt-1.5 h-1 w-9 shrink-0 rounded-full bg-[var(--border2)] sm:hidden" aria-hidden />
+                <div className="min-h-0 flex-1 overflow-hidden">{notePanel}</div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
+      )}
+
+      {/* 快捷键帮助浮层：? 键或点击键盘图标呼出。列出学习台所有快捷键。 */}
+      <AnimatePresence>
+        {helpOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/40"
+              style={{ zIndex: "calc(var(--z-focus) + 3)" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduce ? 0 : 0.18 }}
+              onClick={() => setHelpOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="键盘快捷键"
+              className="elev-3 fixed left-1/2 top-1/2 w-[min(92vw,360px)] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] p-5"
+              style={{ zIndex: "calc(var(--z-focus) + 4)" }}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 6 }}
+              transition={reduce ? { duration: 0.12 } : { type: "spring", stiffness: 320, damping: 30 }}
+            >
+              <div className="mb-3 flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[var(--ink)]">
+                  <Keyboard size={16} className="text-[var(--red)]" /> 键盘快捷键
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setHelpOpen(false)}
+                  className="studio-press relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+                  aria-label="关闭"
+                >
+                  <X size={15} weight="bold" />
+                </button>
+              </div>
+              <dl className="space-y-2">
+                {(
+                  [
+                    ["← / →", "上一页 / 下一页"],
+                    ["空格", "下一页"],
+                    ["F", "全屏 / 退出全屏"],
+                    ...(notePanel ? [["N", "记笔记"] as const] : []),
+                    ["Esc", "退出全屏 / 关闭浮层"],
+                    ["?", "显示 / 隐藏本帮助"],
+                  ] as const
+                ).map(([keyLabel, desc]) => (
+                  <div key={keyLabel} className="flex items-center justify-between gap-3">
+                    <kbd className="mono shrink-0 rounded-[7px] border border-[var(--border)] bg-[var(--surface-inset)] px-2 py-1 text-[12px] font-semibold text-[var(--ink2)]">
+                      {keyLabel}
+                    </kbd>
+                    <span className="text-right text-[13px] text-[var(--ink3)]">{desc}</span>
+                  </div>
+                ))}
+              </dl>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

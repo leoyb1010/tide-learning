@@ -188,6 +188,7 @@ export async function POST(req: NextRequest) {
     return ok({
       courseId: created.course.id,
       slug: created.course.slug,
+      title: created.course.title, // 供前端「可退出」横幅显示真实课名（附加字段，不改既有契约）
       lessons: created.lessons,
     });
   });

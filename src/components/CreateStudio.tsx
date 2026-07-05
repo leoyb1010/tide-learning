@@ -186,6 +186,30 @@ export function CreateStudio({
     setSummary(null);
   }
 
+  // —— 造课发起后的「已落库课」引用：用于「可退出」时把它加进生产中横幅，退出不丢记录 ——
+  // 大纲一回来即记下（课此刻已是 DB 里的 generating 态课），退出剧场后顶部横幅据此显示进度。
+  const [liveGen, setLiveGen] = useState<GeneratingCourse | null>(null);
+
+  /**
+   * 可退出：在逐节写作途中主动离开剧场。
+   * 关键契约——服务端 after() 已在响应返回后接管逐节生成（与前端 writeLessons 幂等并跑），
+   * 故退出只是「停止在前端围观」，后台照常把课写完；课早已落库为 generating 态，绝不丢记录。
+   * 退出后回到编辑态，顶部「生产中横幅」接手显示进度（liveGen 注入 activeGen）。
+   */
+  function exitTheater() {
+    if (liveGen) {
+      track("gen_theater_exit", { course_id: liveGen.id, source });
+      // 从已关闭集合里移除（若之前关过），确保横幅能重新出现。
+      setDismissedGen((prev) => {
+        const next = new Set(prev);
+        next.delete(liveGen.id);
+        return next;
+      });
+    }
+    resetTheater();
+    toast("已转入后台生成，可在此查看进度", { tone: "info" });
+  }
+
   /**
    * 逐节写作循环（造课与导入共用）：对每个 lesson 依次 POST /api/ai/generate-lesson，
    * 单节失败标 failed 不阻断整体；返回成功节数。
@@ -318,11 +342,23 @@ export function CreateStudio({
         }
         throw new Error(json?.error || "生成失败");
       }
-      const data = json.data as { courseId: string; slug: string; lessons: OutlineLesson[] };
+      const data = json.data as { courseId: string; slug: string; title?: string; lessons: OutlineLesson[] };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("大纲为空，请调整需求重试");
 
-      // 大纲逐条浮现（.studio-slide 由渲染层按 index 递延）
+      // 课此刻已落库为 generating 态（generate-course 事务已建 Course + 空节 + course_gen job，
+      // 且 after() 后台已接管生成）。记下它，供「可退出」后顶部横幅接手显示进度、绝不丢记录。
+      setLiveGen({
+        id: data.courseId,
+        slug: data.slug,
+        title: data.title || outline[0]?.title || data.slug,
+        isImport: false,
+        total: outline.length,
+        done: 0,
+        firstLessonId: outline[0].id,
+      });
+
+      // 大纲逐条浮现（.outline-write-in 由渲染层按 index 递延）
       const initial = outline.map((l) => ({ id: l.id, title: l.title, state: "pending" as LessonState }));
       setLessons(initial);
       await delay(360);
@@ -347,6 +383,7 @@ export function CreateStudio({
         cards: succeeded,
         videos: genVideo ? videos : undefined,
       });
+      setLiveGen(null); // 已到完成页：闭环由完成页「已放入书架」接管，撤下顶部生产中横幅候选
       setPhase("done");
       if (succeeded < outline.length) {
         toast(`已生成 ${succeeded}/${outline.length} 节，个别章节可在完成页重试`, { tone: "warn" });
@@ -410,9 +447,20 @@ export function CreateStudio({
         }
         throw new Error(json?.error || "整理失败");
       }
-      const data = json.data as { courseId: string; slug: string; lessons: OutlineLesson[] };
+      const data = json.data as { courseId: string; slug: string; title?: string; lessons: OutlineLesson[] };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("未能从资料中拆出章节，请调整后重试");
+
+      // 导入的课同样已落库为 generating 态 + after() 后台接管；记下供「可退出」横幅接手。
+      setLiveGen({
+        id: data.courseId,
+        slug: data.slug,
+        title: data.title || importTitle.trim() || outline[0]?.title || data.slug,
+        isImport: true,
+        total: outline.length,
+        done: 0,
+        firstLessonId: outline[0].id,
+      });
 
       const initial = outline.map((l) => ({ id: l.id, title: l.title, state: "pending" as LessonState }));
       setLessons(initial);
@@ -432,6 +480,7 @@ export function CreateStudio({
         cards: succeeded,
         chars,
       });
+      setLiveGen(null); // 已到完成页：闭环由完成页「已放入书架」接管，撤下顶部生产中横幅候选
       setPhase("done");
       if (succeeded < outline.length) {
         toast(`已升维 ${succeeded}/${outline.length} 章，个别章节可在报告页重试`, { tone: "warn" });
@@ -472,8 +521,14 @@ export function CreateStudio({
     setRecoverCourse(c);
   }, []);
 
-  // 生产中横幅数据：排除本次会话已关掉的课；剧场进行中(inTheater)或已在恢复分支则不再顶部提示。
-  const activeGen = generatingCourses.filter((c) => !dismissedGen.has(c.id));
+  // 生产中横幅数据：合并「服务端预取的生成中课」+「本次会话刚发起、已退出剧场的 liveGen」，
+  // 去重（liveGen 优先，标题更新）、排除本次会话已关掉的课。剧场进行中(inTheater)或恢复分支不顶部提示。
+  const activeGen = useMemo(() => {
+    const merged = new Map<string, GeneratingCourse>();
+    for (const c of generatingCourses) merged.set(c.id, c);
+    if (liveGen) merged.set(liveGen.id, liveGen); // 覆盖：liveGen 携带本次会话的真实标题
+    return Array.from(merged.values()).filter((c) => !dismissedGen.has(c.id));
+  }, [generatingCourses, liveGen, dismissedGen]);
 
   // —— 恢复剧场分支：接管整个主体，从服务端进度水合并轮询 ——
   if (recoverCourse) {
@@ -731,6 +786,10 @@ export function CreateStudio({
           phase={phase}
           lessons={lessons}
           writingIndex={writingIndex}
+          // 逐节写作阶段允许「转入后台」：课已落库为 generating 态、after() 后台照常写完，
+          // 退出只是不再围观。仅在有 liveGen（大纲已落库）且正逐节写作时给退出入口。
+          canExit={phase === "lessons" && !!liveGen}
+          onExit={exitTheater}
         />
       )}
     </div>
@@ -794,6 +853,8 @@ function TheaterPanel({
   phase,
   lessons,
   writingIndex,
+  canExit,
+  onExit,
 }: {
   source: "generate" | "import";
   steps: { key: string; label: string }[];
@@ -801,6 +862,9 @@ function TheaterPanel({
   phase: Phase;
   lessons: OutlineLesson[];
   writingIndex: number;
+  /** 是否可「转入后台」退出（逐节写作阶段且课已落库）。 */
+  canExit: boolean;
+  onExit: () => void;
 }) {
   const total = lessons.length;
   const doneCount = lessons.filter((l) => l.state === "done" || l.state === "failed").length;
@@ -808,6 +872,24 @@ function TheaterPanel({
 
   return (
     <div className="studio-rise mt-5 w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-6">
+      {/* —— 顶部「转入后台」入口：课已落库 generating 态，退出不中断后台生成 —— */}
+      {canExit && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3.5 py-2.5">
+          <span className="flex min-w-0 items-center gap-2 text-[12.5px] text-[var(--red-ink)]">
+            <Books size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
+            <span className="truncate font-semibold">已放入书架，正在后台生成</span>
+          </span>
+          <button
+            type="button"
+            onClick={onExit}
+            className="studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[10px] bg-[var(--surface)] px-3.5 py-2.5 text-[12.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:text-[var(--ink)]"
+          >
+            <ArrowUUpLeft size={14} weight="bold" />
+            转入后台
+          </button>
+        </div>
+      )}
+
       {/* —— 三步步骤条 —— */}
       <ol className="flex flex-col gap-2.5">
         {steps.map((s, i) => {
@@ -847,7 +929,7 @@ function TheaterPanel({
         })}
       </ol>
 
-      {/* —— 大纲逐条浮现（.studio-slide 递延入场） —— */}
+      {/* —— 大纲逐条浮现（.outline-write-in 递延入场，像被逐条「写下」） —— */}
       {total > 0 && (
         <div className="mt-5 border-t border-[var(--border)] pt-4">
           <div className="mb-2.5 flex items-center justify-between">
@@ -874,13 +956,13 @@ function TheaterPanel({
             {lessons.map((l, i) => (
               <li
                 key={l.id}
-                className={`studio-slide flex items-center gap-2.5 rounded-[10px] border px-3 py-2 transition-colors duration-200 ${
+                className={`outline-write-in flex items-center gap-2.5 rounded-[10px] border px-3 py-2 transition-colors duration-200 ${
                   l.state === "writing"
                     ? // 正在写的这行自己发光：提亮到 surface + 一道红左边框，和顶部「正在写第 N 节」提示形成注意力接力
                       "border-[var(--red-soft-border)] border-l-2 border-l-[var(--red)] bg-[var(--surface)] shadow-[var(--card)]"
                     : "border-[var(--border)] bg-[var(--surface2)]"
                 }`}
-                style={{ animationDelay: `${Math.min(i, 8) * 55}ms` }}
+                style={{ animationDelay: `${Math.min(i, 8) * 60}ms` }}
               >
                 <LessonStateIcon state={l.state} index={i} />
                 <span
@@ -914,33 +996,57 @@ function TheaterPanel({
                   style={{ width: `${pct}%` }}
                 />
               </div>
-              <p className="mt-2 text-[11.5px] text-[var(--ink3)]">生成中请勿关闭页面，全部完成后进入完成页。</p>
+              <p className="mt-2 text-[11.5px] text-[var(--ink3)]">课已放入书架，关闭页面也会在后台继续生成，随时回来看进度。</p>
             </div>
           )}
         </div>
       )}
 
-      {/* 大纲未回来前的等待态（步骤1/2）：贴合大纲布局的骨架预览，而非孤零一句 */}
+      {/* 大纲未回来前的等待态（步骤1/2）：AI 思考可视化——一枚会呼吸的智性光核 +
+          三点思考波，把空等升级成「看 AI 运转」；下方骨架带一道智性扫光预告章节即将填充。 */}
       {total === 0 && (
         <div className="mt-5 border-t border-[var(--border)] pt-4">
-          <div className="flex items-center gap-2.5">
-            <span className="h-4 w-4 shrink-0 animate-spin rounded-full border-2 border-[var(--red)] border-t-transparent" />
-            <span className="text-[13px] font-medium text-[var(--ink2)]">
-              {phase === "understand"
-                ? source === "import"
-                  ? "正在通读你的资料…"
-                  : "正在读懂你的需求…"
-                : source === "import"
-                ? "正在按主题拆分章节…"
-                : "正在设计课程大纲…"}
+          <div className="flex items-center gap-3.5">
+            {/* 智性光核：深色 AI 渐变圆核，红紫光呼吸，核内星芒缓摆（reduce-motion 静态） */}
+            <span
+              className="ai-core relative grid h-11 w-11 shrink-0 place-items-center rounded-full"
+              style={{ background: "var(--ai-grad)" }}
+              aria-hidden="true"
+            >
+              <span className="pointer-events-none absolute inset-x-0 top-0 h-px rounded-full bg-[var(--hairline-on-dark)]" />
+              <Sparkle size={19} weight="fill" className="ai-core-spark text-white" />
             </span>
+            <div className="min-w-0 flex-1">
+              <span className="flex items-center gap-1.5 text-[13.5px] font-semibold text-[var(--ink)]">
+                {phase === "understand"
+                  ? source === "import"
+                    ? "正在通读你的资料"
+                    : "正在读懂你的需求"
+                  : source === "import"
+                  ? "正在按主题拆分章节"
+                  : "正在设计课程大纲"}
+                {/* 三点思考波：依次抬落，像 AI 在措辞 */}
+                <span className="inline-flex items-end gap-[3px] pb-[2px]" aria-hidden="true">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="ai-think-dot inline-block h-[3px] w-[3px] rounded-full bg-[var(--red)]"
+                      style={{ "--i": i } as CSSProperties}
+                    />
+                  ))}
+                </span>
+              </span>
+              <span className="mt-0.5 block text-[11.5px] text-[var(--ink3)]">
+                课已放入书架，稍后逐节浮现，关页面也会在后台继续
+              </span>
+            </div>
           </div>
-          {/* 大纲骨架占位（预告即将逐条浮现的章节结构） */}
+          {/* 大纲骨架占位（预告即将逐条浮现的章节结构，一道扫光横掠传达「正在填充」） */}
           <ul className="mt-3.5 flex flex-col gap-1.5" aria-hidden="true">
             {[0, 1, 2, 3].map((i) => (
               <li
                 key={i}
-                className="flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2"
+                className="ai-scan flex items-center gap-2.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2"
               >
                 <span className="skeleton h-[17px] w-[17px] shrink-0 rounded-full" />
                 <span className="skeleton h-3 rounded-full" style={{ width: `${72 - i * 12}%` }} />

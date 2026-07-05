@@ -525,6 +525,22 @@ body::before {
 }
 
 /* ============================================================
+   课程预览气泡 · 两段式（课程库点卡先弹预览，再「进入学习」进详情）。
+   桌面：居中浮卡走 dialogPanelIn（复用上方进场）。
+   移动：底部弹层，从下缘滑起（previewSheetIn）。
+   同 Dialog 铁律：forwards + 静息态可见，动画时钟冻结也退回可见态；
+   reduce-motion 一律直显（无位移无缩放）。
+   ============================================================ */
+@keyframes previewSheetIn {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.preview-sheet-in { opacity: 1; animation: previewSheetIn .32s var(--ease-tide) forwards; }
+@media (prefers-reduced-motion: reduce) {
+  .preview-sheet-in { animation: none !important; }
+}
+
+/* ============================================================
    Lightbox 灯箱（广场缩略图放大）—— 同 Dialog 走纯 CSS 进场（Portal-to-body 稳定）。
    深色 scrim 淡入 + 图片轻缩放涌入。切图时用 .lightbox-img-in 重放缩放。
    forwards 静息即可见（同 Dialog 铁律：动画时钟冻结也退回可见态）。
@@ -655,6 +671,18 @@ body::before {
 }
 @media (prefers-reduced-motion: reduce) {
   .slide-progress-fill { transition: none; }
+}
+
+/* 全屏调笔记浮层：从屏幕边缘滑入（移动端底部、桌面右侧），reduce-motion 降级为纯淡入不位移。
+   framer 只驱动 opacity，位移交给这条 CSS 动画，桌面/移动方向由断点切换。 */
+.slide-note-drawer { animation: slideNoteUp .26s var(--ease-out-expo) both; }
+@media (min-width: 640px) {
+  .slide-note-drawer { animation: slideNoteRight .26s var(--ease-out-expo) both; }
+}
+@keyframes slideNoteUp { from { transform: translateY(14%); } to { transform: translateY(0); } }
+@keyframes slideNoteRight { from { transform: translateX(6%); } to { transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .slide-note-drawer { animation: none !important; }
 }
 
 /* ============================================================
@@ -1390,6 +1418,50 @@ body::before {
 @media (prefers-reduced-motion: reduce) {
   /* 降级：无逐字、无闪烁——TypewriterText 直接渲染整句，光标不再出现。 */
   .tw-caret { animation: none !important; display: none !important; }
+}
+
+/* ============================================================
+   AI 思考可视化（v3.2 备课剧场升级 · 大纲未回来前的等待态）
+   ------------------------------------------------------------
+   把「正在设计大纲」的空等，升级成一枚会呼吸的智性光核 + 三点思考波，
+   传达「AI 正在思考」的活性，而非孤零一个转圈。全部 transform/opacity/filter
+   合成友好；reduce-motion 统一降级为静态（文件末与本块各自兜底）。
+   ============================================================ */
+/* 智性光核：深色 --ai-grad 圆核，红紫智性光缓缓明灭（呼吸），像 AI 在运转 */
+@keyframes aiCorePulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(252,1,26,.28), 0 0 22px -6px rgba(123,92,240,.5); }
+  50%      { transform: scale(1.045); box-shadow: 0 0 0 7px rgba(252,1,26,0), 0 0 30px -4px rgba(123,92,240,.75); }
+}
+.ai-core { animation: aiCorePulse 2s var(--ease-out-expo) infinite; }
+/* 核内星芒缓旋（智性感，非机械匀速——用 expo 缓动的往返微摆） */
+@keyframes aiCoreSpin { 0% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } 100% { transform: rotate(-8deg); } }
+.ai-core-spark { animation: aiCoreSpin 3.2s var(--ease-out-expo) infinite; }
+/* 三点思考波：依次抬落，传达「正在措辞」的节奏（配 --i 递延） */
+@keyframes aiThinkDot {
+  0%, 80%, 100% { transform: translateY(0); opacity: .45; }
+  40%           { transform: translateY(-4px); opacity: 1; }
+}
+.ai-think-dot { animation: aiThinkDot 1.3s var(--ease-tide) infinite; animation-delay: calc(var(--i, 0) * 160ms); }
+/* 骨架条上滑过的一道智性扫光（叠在占位条上，营造「正在填充」的期待） */
+@keyframes aiScanSweep { 0% { transform: translateX(-120%); } 100% { transform: translateX(320%); } }
+.ai-scan { position: relative; overflow: hidden; }
+.ai-scan::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, color-mix(in srgb, var(--red) 22%, transparent) 50%, transparent 80%);
+  transform: translateX(-120%);
+  animation: aiScanSweep 1.8s var(--ease-out-expo) infinite;
+}
+/* 大纲逐条浮现（升级版）：不只淡入，带一道从左推入 + 轻过冲的落定，让每一节像被「写下」 */
+@keyframes outlineWriteIn {
+  0%   { opacity: 0; transform: translateY(8px) translateX(-6px); }
+  70%  { opacity: 1; transform: translateY(0) translateX(2px); }
+  100% { opacity: 1; transform: none; }
+}
+.outline-write-in { animation: outlineWriteIn .42s var(--ease-tide) both; }
+@media (prefers-reduced-motion: reduce) {
+  .ai-core, .ai-core-spark, .ai-think-dot { animation: none !important; }
+  .ai-scan::after { animation: none !important; display: none !important; }
+  .outline-write-in { animation: none !important; }
 }
 
 /* ============================================================

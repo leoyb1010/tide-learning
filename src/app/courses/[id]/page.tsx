@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Play, LockSimple, Check, CaretRight, ShareNetwork } from "@phosphor-icons/react/dist/ssr";
+import { Play, LockSimple, Check, CaretRight, ShareNetwork, Users, Clock, ListChecks, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { getCourseDetail, listCourses } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
@@ -8,9 +8,11 @@ import { Button } from "@/components/ui";
 import { AmbientVideo } from "@/components/AmbientVideo";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
+import { RatingStars } from "@/components/RatingStars";
 import { SharePanel } from "@/components/SharePanel";
 import { TrialBooking } from "@/components/TrialBooking";
 import { formatDurationSec } from "@/lib/format";
+import { deriveCourseRating } from "@/lib/course-rating";
 import { TRACK_MAP, trackGradientVar } from "@/lib/tracks";
 
 // 预告静帧兜底：按赛道选一张定格图，作为通用预告视频的 poster（视频加载前 / reduce-motion 时显示）。
@@ -49,6 +51,9 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const learnedCount = nowIndex === -1 ? Math.max(accessibleCount - 1, 0) : nowIndex;
   const progressPct = lessons.length ? Math.round((learnedCount / lessons.length) * 100) : 0;
   const freeCount = lessons.filter((l) => l.isFree).length;
+  // 评分：schema 暂无真实评价系统（评价系统 S5），用确定性占位派生（同课稳定、SSR/CSR 一致）。
+  // 真实字段就位后把这行换成读 course.rating 即可，下游 UI 不变。
+  const rating = deriveCourseRating(course.id, course.learnersCount);
   // 完课判定：有权访问 + 大纲无「在学/锁定」节（nowIndex === -1 表示每节都可访问且已学过）。
   const courseComplete = hasAccess && lessons.length > 0 && nowIndex === -1;
   const continueHref = hasAccess
@@ -56,6 +61,21 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
     : firstFree
       ? `/courses/${course.slug}/learn/${firstFree.id}`
       : "/pricing";
+  // 头区主 CTA：有权益→进学习台（完课则重温）；无权益有试学→免费试学；否则去订阅。
+  const heroCtaHref = hasAccess
+    ? continueHref
+    : firstFree
+      ? `/courses/${course.slug}/learn/${firstFree.id}`
+      : "/pricing";
+  const heroCtaLabel = hasAccess
+    ? courseComplete
+      ? "重温学习台"
+      : learnedCount > 0
+        ? "继续学习"
+        : "进入学习台"
+    : firstFree
+      ? "免费试学第一章"
+      : "订阅解锁全部";
 
   return (
     <div className="studio-rise space-y-12">
@@ -97,51 +117,88 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             </span>
           </div>
 
-          {/* 课程信息 */}
-          <div>
+          {/* ===== 课程头区（重做，问题⑯②）=====
+              弃「裸标题 + 三个孤立数字」的雏形感：赛道胶囊 + 大标题 + 评分星级 +
+              作者/供给署名 chip + 简介 + 一条高级材质的指标带（节数/时长/在学），
+              层级分明、留白克制、材质走 STUDIO elev。评分数据见下方注释。 */}
+          <header className="flex flex-col gap-3.5">
+            {/* 赛道 + 更新节奏 */}
             <div className="flex flex-wrap items-center gap-2.5">
-              <span className="rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--red)]">
+              <span className="rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--red)]">
                 {categoryLabel}
               </span>
-              <span className="mono text-[12px] text-[var(--ink3)]">
-                {lessons.length} 节{course.updateCadence ? ` · ${course.updateCadence}` : ""}
+              <span className="mono inline-flex items-center gap-1 text-[12px] text-[var(--ink3)]">
+                <span className="h-1.5 w-1.5 rounded-full bg-[var(--ok)]" />
+                {course.updateCadence ?? "持续更新"}
               </span>
             </div>
-            <h1 className="mt-3 text-[32px] font-bold leading-[1.28] tracking-tight text-[var(--ink)]">{course.title}</h1>
-            {course.subtitle && <p className="mt-2 text-[16px] leading-[1.6] text-[var(--ink2)]">{course.subtitle}</p>}
-            {course.description && <p className="mt-3 text-[15px] leading-[1.75] text-[var(--ink2)]">{course.description}</p>}
 
-            {/* 三统计 */}
-            <div className="mt-5 flex flex-wrap gap-x-9 gap-y-3">
-              <Stat value="4.9" label="综合评分" />
-              <Stat value={compactCount(course.learnersCount)} label="在学人数" />
-              <Stat value={durationText} label="总时长" />
+            {/* 标题 */}
+            <h1 className="text-[clamp(26px,4vw,34px)] font-bold leading-[1.24] tracking-tight text-[var(--ink)]">
+              {course.title}
+            </h1>
+
+            {/* 评分 + 作者署名（chip） */}
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              {/* 评分星级：schema 暂无真实评价（评价系统 S5），rating 为确定性占位派生，
+                  标注「示例」诚实不冒充。真实字段就位后直接替换 deriveCourseRating。 */}
+              <RatingStars score={rating.score} count={rating.count} placeholder size={15} />
+              <span className="h-3.5 w-px bg-[var(--border)]" />
+              <span className="inline-flex items-center gap-2 text-[13px] text-[var(--ink2)]">
+                <span
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold text-white"
+                  style={{ background: "linear-gradient(135deg, #a30514, #fc011a)" }}
+                >
+                  {(course.instructorName ?? "T").slice(0, 1)}
+                </span>
+                <span className="font-medium text-[var(--ink)]">{course.instructorName}</span>
+                <span className="text-[var(--ink4)]">讲师</span>
+              </span>
             </div>
 
-            {/* 讲师/供给/审核 */}
-            <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 text-[13px] text-[var(--ink3)]">
-              <span>讲师：{course.instructorName}</span>
-              {course.contributorName && <span>内容供给：{course.contributorName}</span>}
-              {course.reviewerName && <span>审核人：{course.reviewerName}</span>}
-            </div>
-          </div>
+            {/* 简介：副标 + 描述，层级拉开 */}
+            {course.subtitle && (
+              <p className="text-[16px] leading-[1.6] text-[var(--ink)]">{course.subtitle}</p>
+            )}
+            {course.description && (
+              <p className="text-[14.5px] leading-[1.78] text-[var(--ink2)]">{course.description}</p>
+            )}
 
-          {/* 合规声明（健康/防诈骗，§6.3 验收 4） */}
-          {needsCompliance && (
-            <div className="rounded-[16px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] p-5">
-              <p className="text-[13px] font-bold text-[var(--ink)]">内容说明</p>
-              <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink2)]">
-                {course.disclaimer ??
-                  "本课程内容经内容审核人审核，仅用于信息素养与防范意识学习，不构成任何专业建议。"}
-              </p>
-              <p className="mt-1.5 text-[12px] text-[var(--ink3)]">审核人：{course.reviewerName}</p>
-            </div>
-          )}
+            {/* 供给/审核署名（次要，弱化） */}
+            {(course.contributorName || course.reviewerName) && (
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-[var(--ink3)]">
+                {course.contributorName && <span>内容供给：{course.contributorName}</span>}
+                {course.reviewerName && <span>审核人：{course.reviewerName}</span>}
+              </div>
+            )}
 
-          {/* 课程大纲 */}
+            {/* 高级材质指标带：节数 / 时长 / 在学人数，一条 elev 卡收束数据 */}
+            <div className="mt-1 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
+              <HeaderStat icon={<ListChecks size={16} weight="bold" />} value={`${lessons.length}`} unit="节" label="总课时" />
+              <HeaderStat icon={<Clock size={16} weight="bold" />} value={durationText} label="总时长" />
+              <HeaderStat icon={<Users size={16} weight="bold" />} value={compactCount(course.learnersCount)} label="在学人数" />
+            </div>
+
+            {/* 头区醒目 CTA：首屏即可行动。lg 起右侧 sticky 卡承接完整转化，这里在窄屏
+                （aside 沉底）尤其关键——保证学习者一进页面就看得到「开始/继续学习」。
+                触达 h-12(48px)，cta-glow 品牌柔光，reduce-motion 由 .cta-glow 降级。 */}
+            <Link
+              href={heroCtaHref}
+              className="cta-glow group mt-1 inline-flex h-12 w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] text-[15px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)] sm:w-auto sm:px-7 lg:hidden"
+            >
+              {heroCtaLabel}
+              <ArrowRight size={17} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+          </header>
+
+          {/* ===== 课程大纲（上提到首屏，问题⑯③）=====
+              学习者最关心「学什么」，故紧跟头区、不再下滑第二区域才见。 */}
           <div>
             <div className="mb-3 flex items-baseline justify-between">
-              <h2 className="text-[18px] font-bold text-[var(--ink)]">课程大纲</h2>
+              <div className="flex items-baseline gap-2.5">
+                <h2 className="text-[19px] font-bold text-[var(--ink)]">课程大纲</h2>
+                <span className="text-[13px] text-[var(--ink3)]">学什么，一目了然</span>
+              </div>
               <span className="mono text-[12px] text-[var(--ink3)]">已学 {learnedCount}/{lessons.length}</span>
             </div>
             <ul className="stagger overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
@@ -173,6 +230,18 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               })}
             </ul>
           </div>
+
+          {/* 合规声明（健康/防诈骗，§6.3 验收 4）——移到大纲之后（大纲优先占首屏） */}
+          {needsCompliance && (
+            <div className="rounded-[16px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] p-5">
+              <p className="text-[13px] font-bold text-[var(--ink)]">内容说明</p>
+              <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--ink2)]">
+                {course.disclaimer ??
+                  "本课程内容经内容审核人审核，仅用于信息素养与防范意识学习，不构成任何专业建议。"}
+              </p>
+              <p className="mt-1.5 text-[12px] text-[var(--ink3)]">审核人：{course.reviewerName}</p>
+            </div>
+          )}
 
           {/* 更新日志（强化持续更新，§6.3 验收 1） */}
           <div>
@@ -320,11 +389,16 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
 /* ============ 页面专属子组件 ============ */
 
-function Stat({ value, label }: { value: string; label: string }) {
+/** 头区指标带单元：图标 + 数值(+单位) + 标签，居中，供三等分材质带用。 */
+function HeaderStat({ icon, value, unit, label }: { icon: React.ReactNode; value: string; unit?: string; label: string }) {
   return (
-    <div>
-      <div className="mono text-[20px] font-extrabold leading-none tracking-tight text-[var(--ink)]">{value}</div>
-      <div className="mt-1 text-[12px] text-[var(--ink3)]">{label}</div>
+    <div className="flex flex-col items-center gap-1 px-2 py-3.5">
+      <span className="text-[var(--ink3)]">{icon}</span>
+      <div className="mono text-[19px] font-extrabold leading-none tracking-tight text-[var(--ink)]">
+        {value}
+        {unit && <span className="ml-0.5 text-[12px] font-semibold text-[var(--ink3)]">{unit}</span>}
+      </div>
+      <div className="text-[11.5px] text-[var(--ink4)]">{label}</div>
     </div>
   );
 }
