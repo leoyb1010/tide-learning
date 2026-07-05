@@ -55,6 +55,7 @@ model User {
   examAttempts   ExamAttempt[]
   notifications  Notification[]
   devices        Device[]
+  courseReviews  CourseReview[]
 
   @@index([role])
 }
@@ -142,6 +143,7 @@ model Course {
   progress   LearningProgress[]
   notes      Note[]
   calendar   ContentCalendar[]
+  reviews    CourseReview[]
 
   @@index([sharedStatus, lastUpdatedAt]) // 课程集市列表：按分享状态过滤 + 时间排序
 }
@@ -222,6 +224,26 @@ model LearningProgress {
   updatedAt    DateTime  @updatedAt
 
   @@unique([userId, lessonId])
+}
+
+// ---------- 课程评价（S5 评价系统闭环）----------
+// 一人一课一评（@@unique([userId, courseId])）：再次提交为 upsert 覆盖，避免刷分。
+// 评价资格在 API 层校验（须有该课的 LearningProgress，即「学过才可评」），
+// 不落库到本表——资格是行为派生，不是评价本身的字段。
+// rating 1-5 整数星级；comment 可空（允许只打分不写字）。
+model CourseReview {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId  String
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  rating    Int // 1-5 整数星级（API 层夹紧校验）
+  comment   String? // 文字评价，可空（只打分不写字）
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, courseId]) // 一人一课一评：重复提交走 upsert
+  @@index([courseId, createdAt]) // 评价列表：按课过滤 + 时间排序
 }
 
 // ---------- §9.4 笔记（2.0：捕捉 + 资产化）----------

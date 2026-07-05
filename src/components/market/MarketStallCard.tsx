@@ -23,7 +23,6 @@ import { RatingStars } from "@/components/RatingStars";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
 import { trackLabel, trackGradientVar } from "@/lib/tracks";
-import { deriveCourseRating } from "@/lib/course-rating";
 import { abbrevCount, sellerBadge, formatPrice, tradeVolume, type MarketStall } from "@/lib/market-view";
 
 /** 摊主等级徽章配色（tier 1-4，越高越暖，克制不喧宾夺主）。 */
@@ -74,7 +73,7 @@ export function MarketStallCard({
 
   const badge = useMemo(() => sellerBadge(stall.collectCount), [stall.collectCount]);
   const badgeTone = BADGE_TONE[badge.tier];
-  const rating = useMemo(() => deriveCourseRating(stall.id, stall.learnersCount), [stall.id, stall.learnersCount]);
+  // 评分读数据层已算好的字段（S5）：有真实评价读真实、零评价占位派生，卡片不再自行派生。
   const sellerInitial = stall.seller.nickname.slice(0, 1) || "学";
 
   // ---------- 免费拿走（卡上快捷 fork 到书架；付费课不走此路，跳详情页确认）----------
@@ -216,15 +215,17 @@ export function MarketStallCard({
           <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">
             {trackLabel(stall.category)}
           </div>
-          {/* 评分（占位派生，示例标注见详情页 RatingStars） */}
-          <RatingStars score={rating.score} count={rating.count} showCount={false} size={12} className="shrink-0" />
+          {/* 评分（S5）：读数据层 ratingScore，有真实评价读真实、零评价占位派生；卡上不显条数 */}
+          <RatingStars score={stall.ratingScore} count={stall.ratingCount} showCount={false} size={12} className="shrink-0" />
         </div>
-        <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[var(--ink)]">
+        {/* 对齐规范（问题③）：标题固定两行（line-clamp-2 + min-h），副标恒占两行（无则占位），
+            让「摊主条」在同排卡片间对齐成一条基线，消除有无副标导致的错落。 */}
+        <h3 className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-[15px] font-bold leading-snug tracking-tight text-[var(--ink)]">
           {stall.title}
         </h3>
-        {stall.subtitle && (
-          <p className="mt-1 line-clamp-2 text-[13px] leading-[1.55] text-[var(--ink2)]">{stall.subtitle}</p>
-        )}
+        <p className="mt-1 line-clamp-2 min-h-[2.4rem] text-[13px] leading-[1.55] text-[var(--ink2)]">
+          {stall.subtitle || " "}
+        </p>
 
         {/* 摊主：头像 + 昵称 + 等级徽章（摊主立在卡上） */}
         <div className="mt-3 flex items-center gap-2 rounded-[12px] bg-[var(--surface-inset)] px-2.5 py-2 shadow-[var(--inner-hi)]">

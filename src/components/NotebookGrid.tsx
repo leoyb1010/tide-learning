@@ -108,12 +108,14 @@ export default function NotebookGrid() {
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* 对齐规范（问题③）：网格 items-stretch + 卡片 h-full flex-col，同行等高；
+          描述恒占两行（无则占位），「N 条笔记」计数栏 mt-auto 贴底对齐成一条基线。 */}
+      <div className="grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {notebooks.map((nb) => (
           <Link
             key={nb.id}
             href={`/notes/notebook/${nb.id}`}
-            className="studio-lift studio-rise flex flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]"
+            className="studio-lift studio-rise flex h-full flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]"
           >
             <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] text-[20px]">
               {nb.icon ? (
@@ -123,10 +125,10 @@ export default function NotebookGrid() {
               )}
             </div>
             <h3 className="truncate text-[16px] font-bold text-[var(--ink)]">{nb.title}</h3>
-            <p className="mono mt-1 text-[11px] text-[var(--ink4)]">{nb.noteCount} 条笔记</p>
-            {nb.description && (
-              <p className="mt-2 line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink2)]">{nb.description}</p>
-            )}
+            <p className="mt-2 line-clamp-2 min-h-[2.5rem] text-[13px] leading-[1.6] text-[var(--ink2)]">
+              {nb.description || " "}
+            </p>
+            <p className="mono mt-auto pt-3 text-[11px] text-[var(--ink4)]">{nb.noteCount} 条笔记</p>
           </Link>
         ))}
 

@@ -12,7 +12,12 @@
 import { prisma } from "@/lib/db";
 import { marketStallCoverSrc } from "@/lib/tracks";
 import { sellerBadge, type MarketStall } from "@/lib/market-view";
-import { deriveCourseRating, type CourseRating } from "@/lib/course-rating";
+import { deriveCourseRating } from "@/lib/course-rating";
+import {
+  getCourseRatingAggregate,
+  batchCourseRealRatings,
+  type CourseRatingAggregate,
+} from "@/lib/course-review";
 
 /** 集市取货上限（与原 Web page 的 take:60 一致）。 */
 const MARKET_TAKE = 60;
@@ -86,6 +91,10 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
       : [];
   const authorMap = new Map(authors.map((a) => [a.id, a]));
 
+  // 真实评分批量聚合（S5）：一次 groupBy 取所有课的真实均分/条数，避免 N+1。
+  // 无真实评价的课不在 map 中，下方组装时回退 deriveCourseRating 占位派生（同课稳定）。
+  const realRatingMap = await batchCourseRealRatings(courseIds);
+
   // 摊主等级派生：按「摊主在本集市所有摊位的累计被拿走数」分档（sellerBadge tier）。
   // 用已算好的 collectCountMap 就地累加，零额外查询；无作者/无数据回落 tier 1。
   const sellerCollectTotal = new Map<string, number>();
@@ -102,6 +111,9 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
     const sellerLevel = c.authorUserId
       ? sellerBadge(sellerCollectTotal.get(c.authorUserId) ?? 0).tier
       : 1;
+    // 评分：有真实评价读真实聚合；否则回退占位派生（isPlaceholder=true，卡片标「示例」）。
+    const real = realRatingMap.get(c.id);
+    const ph = real ? null : deriveCourseRating(c.id, c.learnersCount);
     return {
       id: c.id,
       slug: c.slug,
@@ -119,6 +131,9 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
       collectedByMe: myCollectedSet.has(c.id),
       mine: Boolean(viewerId && c.authorUserId === viewerId),
       createdAtMs: c.createdAt.getTime(),
+      ratingScore: real ? real.score : ph!.score,
+      ratingCount: real ? real.count : ph!.count,
+      ratingIsPlaceholder: !real,
       seller: {
         id: c.authorUserId,
         nickname: seller?.nickname ?? "匿名同学",
@@ -156,7 +171,8 @@ export interface StallDetail {
   stall: MarketStall;
   lessons: StallLessonPreview[];
   shop: StallSellerShop;
-  rating: CourseRating;
+  /** 评分聚合（S5）：有真实评价读真实均分/条数/分布；零评价回退占位派生（isPlaceholder=true）。 */
+  rating: CourseRatingAggregate;
   /** 课程简介（description 优先，subtitle 兜底），商品页正文展示。 */
   description: string | null;
 }
@@ -257,6 +273,9 @@ export async function buildStallDetail(
     };
   }
 
+  // 评分聚合（S5）：算一次，同时喂给 stall 的 rating* 字段与返回的 rating（详情页头区展示）。
+  const rating = await getCourseRatingAggregate(course.id, course.learnersCount);
+
   const stall: MarketStall = {
     id: course.id,
     slug: course.slug,
@@ -274,6 +293,9 @@ export async function buildStallDetail(
     collectedByMe,
     mine: Boolean(viewerId && course.authorUserId === viewerId),
     createdAtMs: course.createdAt.getTime(),
+    ratingScore: rating.score,
+    ratingCount: rating.count,
+    ratingIsPlaceholder: rating.isPlaceholder,
     seller: {
       id: course.authorUserId,
       nickname: author?.nickname ?? "匿名同学",
@@ -286,7 +308,7 @@ export async function buildStallDetail(
     stall,
     lessons: course.lessons,
     shop,
-    rating: deriveCourseRating(course.id, course.learnersCount),
+    rating,
     description: course.description ?? course.subtitle ?? null,
   };
 }

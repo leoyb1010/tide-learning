@@ -2,6 +2,8 @@ import { prisma } from "./db";
 import { resolveEntitlement, canAccessLesson, type EntitlementSnapshot } from "./entitlement";
 import { rankDemands } from "./demand-score";
 import { TRACK_MAP, trackLabel } from "./tracks";
+import { deriveCourseRating } from "./course-rating";
+import { batchCourseRealRatings } from "./course-review";
 // relativeTime / formatDuration 是零依赖纯日期函数，已迁至 @/lib/format（无 "use client"、
 // 不 import prisma）。此处 re-export 以兼容既有 server 侧引用（desk/me/demands 等）。
 import { relativeTime, formatDuration } from "./format";
@@ -23,7 +25,7 @@ export { relativeTime, formatDuration };
  *   游客（viewerUserId 为空）看不到任何非官方私有课，只能读 shared 或官方课。
  * 不满足即视为不存在（调用方 return null → 页面 notFound / API 404）。
  */
-function canViewCourse(
+export function canViewCourse(
   course: { origin: string; authorUserId: string | null; sharedStatus: string },
   viewerUserId: string | null,
 ): boolean {
@@ -54,28 +56,39 @@ export async function listCourses(opts?: { category?: string; sort?: string; q?:
     },
   });
 
-  const mapped = courses.map((c) => ({
-    id: c.id,
-    slug: c.slug,
-    title: c.title,
-    subtitle: c.subtitle,
-    category: c.category,
-    categoryLabel: CATEGORY_LABELS[c.category],
-    level: c.level,
-    levelLabel: LEVEL_LABELS[c.level],
-    coverColor: c.coverColor,
-    status: c.status,
-    updateText: c.updateLogs[0]
-      ? `${c.updateLogs[0].title} · ${relativeTime(c.updateLogs[0].publishedAt)}`
-      : `${c.updateCadence ?? "持续更新"}`,
-    updateCadence: c.updateCadence,
-    duration: formatDuration(c.totalDurationSec),
-    lessonsCount: c._count.lessons,
-    learnersCount: c.learnersCount,
-    freeLessonsCount: c.lessons.length,
-    isFeatured: c.isFeatured,
-    lastUpdatedAt: c.lastUpdatedAt,
-  }));
+  // 真实评分批量聚合（S5）：一次 groupBy 取所有课的真实均分/条数，无评价的课回退占位派生。
+  const realRatingMap = await batchCourseRealRatings(courses.map((c) => c.id));
+
+  const mapped = courses.map((c) => {
+    const real = realRatingMap.get(c.id);
+    const ph = real ? null : deriveCourseRating(c.id, c.learnersCount);
+    return {
+      id: c.id,
+      slug: c.slug,
+      title: c.title,
+      subtitle: c.subtitle,
+      category: c.category,
+      categoryLabel: CATEGORY_LABELS[c.category],
+      level: c.level,
+      levelLabel: LEVEL_LABELS[c.level],
+      coverColor: c.coverColor,
+      status: c.status,
+      updateText: c.updateLogs[0]
+        ? `${c.updateLogs[0].title} · ${relativeTime(c.updateLogs[0].publishedAt)}`
+        : `${c.updateCadence ?? "持续更新"}`,
+      updateCadence: c.updateCadence,
+      duration: formatDuration(c.totalDurationSec),
+      lessonsCount: c._count.lessons,
+      learnersCount: c.learnersCount,
+      freeLessonsCount: c.lessons.length,
+      isFeatured: c.isFeatured,
+      lastUpdatedAt: c.lastUpdatedAt,
+      // 评分（S5）：有真实评价读真实、零评价占位派生；卡片据 ratingIsPlaceholder 标「示例」。
+      ratingScore: real ? real.score : ph!.score,
+      ratingCount: real ? real.count : ph!.count,
+      ratingIsPlaceholder: !real,
+    };
+  });
 
   switch (opts?.sort) {
     case "newest":

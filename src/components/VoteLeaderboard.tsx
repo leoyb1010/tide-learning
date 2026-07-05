@@ -355,7 +355,8 @@ export function VoteLeaderboard({
       <StarHero demand={star} canVote={canVote} disabledReason={disabledReason} />
 
       {rest.length > 0 && (
-        <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // 对齐规范（问题③）：items-stretch 让同行提案卡等高，卡内 flex-1 + mt-auto 底栏贴底对齐。
+        <div className="stagger grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rest.map((d, i) => (
             <ProposalCard
               key={d.id}

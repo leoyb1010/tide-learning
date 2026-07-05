@@ -23,6 +23,12 @@ export interface CourseCardData {
   status?: string;
   /** 本周新上线/新更新，展示 NEW 角标（A3） */
   isNew?: boolean;
+  /** 评分均分（S5）：有真实评价读真实、零评价占位派生（数据层已算好）。预览气泡可选展示。 */
+  ratingScore?: number;
+  /** 评价条数（S5）：真实条数或占位派生数。 */
+  ratingCount?: number;
+  /** 是否占位评分（无真实评价时 true）：预览气泡据此标「示例」，诚实不冒充。 */
+  ratingIsPlaceholder?: boolean;
 }
 
 /* ============================================================
@@ -86,8 +92,10 @@ export function CourseCardFace({ course }: { course: CourseCardData }) {
           <span className="h-3 w-px bg-[var(--border)]" />
           <span>{course.duration}</span>
         </div>
-        {/* 标题显式提到 17px/leading-snug，与 14px 副标拉开层级；封面→标题→副标→指标四级节奏 */}
-        <h3 className="mt-2 text-[17px] font-bold leading-snug tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">{course.title}</h3>
+        {/* 标题显式提到 17px/leading-snug，与 14px 副标拉开层级；封面→标题→副标→指标四级节奏。
+            对齐规范（问题③）：标题固定两行高度（line-clamp-2 + min-h），一行标题的卡也占两行位，
+            让同排卡的副标基线、底栏基线对齐成一条线，消除长短标题导致的错落。 */}
+        <h3 className="mt-2 line-clamp-2 min-h-[2.75rem] text-[17px] font-bold leading-snug tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">{course.title}</h3>
         {/* 副标始终占一行高度（无则 &nbsp; 占位），让同排卡片标题基线对齐、栅格成一条线 */}
         <p className="mt-1 line-clamp-1 text-sm text-[var(--ink2)]">{course.subtitle || " "}</p>
         <div className="mt-auto flex items-center justify-between border-t border-[var(--border)] pt-3.5 text-[0.78rem]">

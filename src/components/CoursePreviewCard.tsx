@@ -21,8 +21,9 @@ import { TRACK_MAP, trackGradientVar, resolveCoverSrc } from "@/lib/tracks";
    · z-index 走 --z-modal 变量；scrim 走 --z-overlay-scrim 语义之上（浮层整体一层）。
    · 响应式：桌面居中浮卡；移动（sm 以下）底部弹层（items-end + 滑起动画）。
    · 触达：关闭键 44px、主 CTA h-11(44px)；reduce-motion 由 CSS 动画类降级。
-   · 评分/评价数据：schema 暂无真实评价（评价系统 S5），用 deriveCourseRating
-     确定性占位（同课稳定、SSR/CSR 一致），UI 标注「示例」诚实不冒充。
+   · 评分/评价数据（S5 评价系统闭环）：优先读 CourseCardData.ratingScore（数据层聚合，
+     有真实评价读真实、零评价占位派生）；字段缺省时兜底 deriveCourseRating。
+     UI 据 isPlaceholder 标「示例」，诚实不冒充。
    边界：纯 client，只引 client/纯函数模块，不碰 server 链。
    ============================================================ */
 export function CoursePreviewCard({ course }: { course: CourseCardData }) {
@@ -89,7 +90,12 @@ function PreviewOverlay({
 
   if (!host || !open) return null;
 
-  const rating = deriveCourseRating(course.id, course.learnersCount);
+  // 评分（S5）：优先读数据层已算好的字段（有真实评价读真实、零评价占位派生）；
+  // 字段缺省（老调用方未带 rating）时兜底占位派生，保证任何入口都不崩。
+  const rating =
+    course.ratingScore != null
+      ? { score: course.ratingScore, count: course.ratingCount ?? 0, isPlaceholder: course.ratingIsPlaceholder ?? true }
+      : deriveCourseRating(course.id, course.learnersCount);
   const track = course.category ? TRACK_MAP[course.category] : undefined;
   // 作者：列表数据不含讲师名（守住 listCourses 契约不扩字段），用赛道语义给一个可信署名，
   // 详情页再展示真实讲师。核心卖点取赛道 blurb + 目标人群，均为真实业务文案。
@@ -150,7 +156,7 @@ function PreviewOverlay({
         <div className="max-h-[52vh] overflow-y-auto p-4 sm:max-h-none sm:p-5">
           {/* 评分 + 作者 一行 */}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-            <RatingStars score={rating.score} count={rating.count} placeholder size={14} />
+            <RatingStars score={rating.score} count={rating.count} placeholder={rating.isPlaceholder} size={14} />
             <span className="text-[12.5px] text-[var(--ink3)]">{author}</span>
           </div>
 

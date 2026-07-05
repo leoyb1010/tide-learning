@@ -506,6 +506,18 @@ body::before {
 .elev-3 { background: var(--surface); border: 1px solid var(--border); box-shadow: var(--lift); backdrop-filter: blur(12px); }
 
 /* ============================================================
+   卡片网格对齐规范（问题③）—— 全站网格卡「同行等高、底栏贴底」的统一基线。
+   用法约定（三件套，缺一会错落）：
+     1. 网格容器加 .card-grid（= grid + items-stretch，让同行卡拉到最高卡的高度）；
+     2. 卡片根元素加 .card-cell（= flex-col + h-full，把等高传导到卡内，撑满行高）；
+     3. 卡内底部信息栏加 Tailwind 的 mt-auto，吸附到卡底，形成一条对齐基线。
+   标题/描述固定行数（line-clamp-N）与封面固定宽高比（aspect-*）在各卡内联，
+   共同消除「标题一行 vs 两行」「有无描述」导致的高度抖动。
+   —— 直接落在既有 `grid grid-cols-* gap-*` 上，不改列数与间距，仅补等高传导。 */
+.card-grid { display: grid; align-items: stretch; }
+.card-cell { display: flex; flex-direction: column; height: 100%; }
+
+/* ============================================================
    Dialog 模态进场（纯 CSS，替代 framer —— 在 Portal-to-body + 首帧即 present
    的组合下 framer 会把进场冻在 initial 的 opacity:0）。scrim 淡入 + 面板涨潮上浮。
    reduce-motion 下直接显示（无位移无缩放），零闪现。

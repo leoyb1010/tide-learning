@@ -9,10 +9,11 @@ import { AmbientVideo } from "@/components/AmbientVideo";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
 import { RatingStars } from "@/components/RatingStars";
+import { CourseReviews } from "@/components/CourseReviews";
 import { SharePanel } from "@/components/SharePanel";
 import { TrialBooking } from "@/components/TrialBooking";
 import { formatDurationSec } from "@/lib/format";
-import { deriveCourseRating } from "@/lib/course-rating";
+import { getCourseRatingAggregate } from "@/lib/course-review";
 import { TRACK_MAP, trackGradientVar } from "@/lib/tracks";
 
 // 预告静帧兜底：按赛道选一张定格图，作为通用预告视频的 poster（视频加载前 / reduce-motion 时显示）。
@@ -51,9 +52,9 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const learnedCount = nowIndex === -1 ? Math.max(accessibleCount - 1, 0) : nowIndex;
   const progressPct = lessons.length ? Math.round((learnedCount / lessons.length) * 100) : 0;
   const freeCount = lessons.filter((l) => l.isFree).length;
-  // 评分：schema 暂无真实评价系统（评价系统 S5），用确定性占位派生（同课稳定、SSR/CSR 一致）。
-  // 真实字段就位后把这行换成读 course.rating 即可，下游 UI 不变。
-  const rating = deriveCourseRating(course.id, course.learnersCount);
+  // 评分（S5 评价系统闭环）：读真实聚合——有真实评价读真实均分/条数；零评价回退占位派生
+  // （isPlaceholder=true，RatingStars 标「示例」）。随第一条真实评价落地即自动切换，UI 不变。
+  const rating = await getCourseRatingAggregate(course.id, course.learnersCount);
   // 完课判定：有权访问 + 大纲无「在学/锁定」节（nowIndex === -1 表示每节都可访问且已学过）。
   const courseComplete = hasAccess && lessons.length > 0 && nowIndex === -1;
   const continueHref = hasAccess
@@ -140,9 +141,9 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
             {/* 评分 + 作者署名（chip） */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              {/* 评分星级：schema 暂无真实评价（评价系统 S5），rating 为确定性占位派生，
-                  标注「示例」诚实不冒充。真实字段就位后直接替换 deriveCourseRating。 */}
-              <RatingStars score={rating.score} count={rating.count} placeholder size={15} />
+              {/* 评分星级（S5）：读真实聚合。有真实评价→不标「示例」；零评价回退占位派生→标「示例」。
+                  placeholder 由 aggregate.isPlaceholder 驱动，诚实不冒充。 */}
+              <RatingStars score={rating.score} count={rating.count} placeholder={rating.isPlaceholder} size={15} />
               <span className="h-3.5 w-px bg-[var(--border)]" />
               <span className="inline-flex items-center gap-2 text-[13px] text-[var(--ink2)]">
                 <span
@@ -248,6 +249,10 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             <h2 className="mb-3 text-[18px] font-bold text-[var(--ink)]">更新日志</h2>
             <UpdateLog logs={updateLogs} ownerName={course.instructorName} />
           </div>
+
+          {/* 学员评价（S5 评价系统闭环）：真实聚合 + 列表 + 写评价入口（学过才可评）。
+              client 组件自持三态（加载/空/错误），数据走 /api/courses/:id/reviews。 */}
+          <CourseReviews courseId={course.id} isLoggedIn={Boolean(user)} />
 
           {/* 适合谁 / 学完获得 */}
           <div className="grid gap-4 sm:grid-cols-2">

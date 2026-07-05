@@ -820,7 +820,8 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
     : undefined;
 
   return (
-    <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2">
+    // 对齐规范（问题③）：items-stretch + 卡片 h-full flex-col，同行笔记卡等高。
+    <div className="stagger grid grid-cols-1 items-stretch gap-3 sm:grid-cols-2">
       {sorted.map((n, i) => {
         const src = sourceLabel(n);
         const kindMeta = KIND_TAG[n.kind];
@@ -832,7 +833,7 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
             key={n.id}
             href={`/notes/${n.id}`}
             style={{ "--i": Math.min(i, 12), ...cvStyle } as React.CSSProperties}
-            className="hover-sheen studio-lift group block rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+            className="hover-sheen studio-lift group flex h-full flex-col rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
             {/* 顶部元信息：来源标识 · 相对时间 · 置顶/收藏 */}
             <div className="mb-1.5 flex items-center gap-2 text-[12px] text-[var(--ink4)]">
@@ -881,9 +882,9 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
               <p className="mt-1 line-clamp-2 text-[13px] leading-[1.6] text-[var(--ink2)]">{preview}</p>
             )}
 
-            {/* 标签 */}
+            {/* 标签：mt-auto 贴底，让有无标签的同行卡片底部基线对齐（问题③） */}
             {n.tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1">
+              <div className="mt-auto flex flex-wrap gap-1 pt-2">
                 {n.tags.map((t) => (
                   <Badge key={t.id} tone={t.color}>
                     {t.name}

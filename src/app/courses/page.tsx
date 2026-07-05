@@ -73,7 +73,8 @@ export default async function CoursesPage({
         <CourseLibraryView
           courses={courses}
           grid={
-            <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            /* 对齐规范（问题③）：items-stretch 让同行课程卡等高，卡内 CourseCardFace 以 flex-1 + mt-auto 贴底 */
+            <div className="stagger grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {courses.map((c, i) => (
                 <div key={c.id} className="h-full" style={{ "--i": i } as React.CSSProperties}>
                   {/* 两段式（问题⑯①）：点课程卡先弹预览气泡（评分/简介/N节·时长/作者/卖点），

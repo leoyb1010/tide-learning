@@ -208,10 +208,10 @@ export default async function MarketPage({
             <MarketSortTabs />
           </div>
 
-          {/* ——— 橱窗商品网格：stagger 递延进场 ——— */}
-          <div className="stagger grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* ——— 橱窗商品网格：stagger 递延进场；items-stretch + 卡片 h-full 同行等高（问题③）——— */}
+          <div className="stagger grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sorted.map((stall, idx) => (
-              <div key={stall.id} style={{ "--i": idx } as React.CSSProperties}>
+              <div key={stall.id} className="h-full" style={{ "--i": idx } as React.CSSProperties}>
                 <MarketStallCard stall={stall} isLoggedIn={Boolean(user)} />
               </div>
             ))}

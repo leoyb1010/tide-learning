@@ -142,7 +142,7 @@ export default async function MarketProductPage({
             </h1>
             {/* 评分 + 成交 */}
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-              <RatingStars score={rating.score} count={rating.count} placeholder size={15} />
+              <RatingStars score={rating.score} count={rating.count} placeholder={rating.isPlaceholder} size={15} />
               <span className="h-3.5 w-px bg-[var(--border)]" />
               <span className="flex items-center gap-1.5 text-[13px] text-[var(--ink2)]">
                 <Package size={15} weight="fill" className="text-[var(--ink4)]" />

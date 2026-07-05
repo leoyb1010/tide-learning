@@ -15,8 +15,9 @@ import {
   Waves,
   CaretRight,
   ListChecks,
-  PlayCircle,
   ArrowRight,
+  Flame,
+  Fire,
 } from "@phosphor-icons/react/dist/ssr";
 import { VoteButton } from "./VoteButton";
 import { DEMAND_STATUS } from "@/lib/format";
@@ -178,30 +179,42 @@ export function ProposalCard({
   const idx = lifecycleIndex(demand.status);
   const pitch = demand.description?.trim();
   const points = demoPoints(demand.description);
+  // 点燃进度：以本榜领跑票数为 100% 参照（不引入未知阈值字段，沿用 topVotes 契约）。
   const pct = Math.max(6, Math.min(100, Math.round((liveVotes / topVotes) * 100)));
+  // 距领跑还差多少「火力」——众筹造课的追赶目标，给出可感的下一步。
+  const gapToLead = Math.max(0, topVotes - liveVotes);
+  const isLeader = gapToLead === 0;
   const barTransition = voted ? SPRING : { ...SPRING, delay: 0.12 };
   const barInitial = reduce ? false : { width: 0 };
+  // 已上线的提案不再强调「点燃」，收敛为成果态。
+  const launched = demand.status === "launched";
 
   return (
     <article
       style={{ ["--i" as string]: index }}
       className="group relative flex flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)] transition-[transform,box-shadow,border-color] duration-[var(--dur-fast)] [transition-timing-function:var(--ease-out-expo)] hover:-translate-y-1 hover:border-[var(--border2)] hover:shadow-[var(--card-hover)]"
     >
-      {/* 课程封面：赛道渐变 + 主题图标 + 阶段徽章 + 排名章 */}
+      {/* 课程封面：赛道渐变 + 主题图标水印 + 赛道徽章 + 排名章 + 「众筹造课」身份条。
+          材质：顶部内高光 hairline + 底部压暗渐变，让白字与身份条稳稳可读（STUDIO 规格）。 */}
       <div
-        className="hover-sheen relative h-[104px] overflow-hidden"
+        className="hover-sheen relative h-[108px] overflow-hidden"
         style={{ background: gradient }}
       >
         {/* 大主题图标水印 */}
         <Icon
-          size={104}
+          size={112}
           weight="fill"
-          className="pointer-events-none absolute -right-3 -top-2 text-white/15"
+          className="pointer-events-none absolute -right-4 -top-3 text-white/15"
           aria-hidden
         />
         {/* 顶部内高光，增加材质 */}
         <div
           className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[var(--hairline-on-dark)]"
+          aria-hidden
+        />
+        {/* 底部压暗渐变，托住身份条 */}
+        <div
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-black/35 to-transparent"
           aria-hidden
         />
         <div className="relative flex h-full flex-col justify-between p-3.5">
@@ -210,16 +223,22 @@ export function ProposalCard({
               <Icon size={13} weight="fill" />
               {demand.categoryLabel}
             </span>
+            {/* 排名章：前三名点亮暖金奖牌感，其余保持中性白（榜单纵深，不喧宾夺主） */}
             <span
-              className="mono rounded-full bg-white/15 px-2 py-1 text-[11px] font-bold text-white backdrop-blur-sm"
+              className={`mono inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold backdrop-blur-sm ${
+                rank <= 3
+                  ? "bg-[var(--new-bg)] text-[var(--new-ink)] ring-1 ring-white/25"
+                  : "bg-white/15 text-white"
+              }`}
               title={`当前排名第 ${rank}`}
             >
-              #{String(rank).padStart(2, "0")}
+              {rank <= 3 && <Flame size={11} weight="fill" />}#{String(rank).padStart(2, "0")}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/85">
-            <PlayCircle size={14} weight="fill" className="text-white/70" />
-            待孵化课程 · 投票孵化
+          {/* 身份条：众筹造课语义（点燃孵化），与 VoteButton 的火种隐喻一致 */}
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-white/90">
+            <Fire size={14} weight="fill" className="text-white/80" />
+            {launched ? "已点燃成课 · 立即开学" : "众筹造课 · 投票点燃孵化"}
           </div>
         </div>
       </div>
@@ -242,49 +261,88 @@ export function ProposalCard({
           </p>
         )}
 
-        {/* 目标人群 */}
-        {audience && (
-          <div className="mb-3 inline-flex items-center gap-1.5 self-start rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[11.5px] text-[var(--ink2)]">
-            <UsersThree size={13} weight="fill" className="text-[var(--ink4)]" />
-            面向 {audience}
+        {/* 目标人群 + 发起人：一行速览「面向谁 · 谁发起」，克制内嵌 surface-inset 胶囊 */}
+        {(audience || demand.authorNickname) && (
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            {audience && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[11.5px] text-[var(--ink2)]">
+                <UsersThree size={13} weight="fill" className="text-[var(--ink4)]" />
+                面向 {audience}
+              </span>
+            )}
+            {demand.authorNickname && (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[11.5px] text-[var(--ink3)]">
+                <Sparkle size={12} weight="fill" className="text-[var(--ink4)]" />
+                {demand.authorNickname} 发起
+              </span>
+            )}
           </div>
         )}
 
-        {/* 众筹式进度：票数 + 阶段占比 + 领先度进度条 */}
-        <div className="mb-3">
-          <div className="mb-1.5 flex items-baseline justify-between">
+        {/* 点燃进度面板（众筹造课仪式感）：火力值 + 本周新增 + 距领跑目标 + 点燃进度条。
+            与 VoteButton 的「火种 / 火力值」隐喻一致：票数 = 火力值，进度 = 距领跑的点燃度。 */}
+        <div className="mb-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-3">
+          <div className="mb-2 flex items-end justify-between gap-2">
             <span className="flex items-baseline gap-1">
+              <Flame size={16} weight="fill" className="translate-y-[1px] text-[var(--red)]" aria-hidden />
               <motion.span
                 key={liveVotes}
                 initial={reduce ? false : { scale: 1.2 }}
                 animate={{ scale: 1 }}
                 transition={SPRING}
-                className="mono text-[20px] font-extrabold leading-none text-[var(--ink)] tabular-nums"
+                className="mono text-[21px] font-extrabold leading-none text-[var(--ink)] tabular-nums"
               >
                 {liveVotes}
               </motion.span>
-              <span className="text-[12px] text-[var(--ink4)]">票</span>
+              <span className="text-[12px] text-[var(--ink4)]">火力值</span>
               {demand.recentVotes > 0 && (
                 <span
                   className="mono ml-1 inline-flex items-center gap-0.5 text-[11px] font-semibold text-[var(--ok)]"
-                  title="本周新增票数"
+                  title="本周新增火力"
                 >
                   <TrendUp size={11} weight="bold" />↑{demand.recentVotes}
                 </span>
               )}
             </span>
-            <span className="mono text-[11px] text-[var(--ink4)]">
-              {LIFECYCLE[idx]?.label} · {idx + 1}/{LIFECYCLE.length}
+            {/* 距领跑目标：给出可感的下一步；领跑者显「领跑本榜」荣誉 */}
+            <span className="mono shrink-0 text-right text-[11px] leading-tight text-[var(--ink4)]">
+              {launched ? (
+                <span className="font-semibold text-[var(--new-ink)]">已成课</span>
+              ) : isLeader ? (
+                <span className="inline-flex items-center gap-0.5 font-semibold text-[var(--red-ink)]">
+                  <Fire size={11} weight="fill" />领跑本榜
+                </span>
+              ) : (
+                <>
+                  距领跑还差
+                  <br />
+                  <span className="font-bold text-[var(--ink2)]">{gapToLead}</span> 火力
+                </>
+              )}
             </span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-[var(--surface-inset)]">
+          {/* 点燃进度条：火色渐变填充 + 火苗头标记（活跃火力的视觉锚点）。 */}
+          <div className="relative h-2 overflow-hidden rounded-full bg-[var(--surface-inset)] shadow-[var(--inner-hi)]">
             <motion.div
-              className="h-full rounded-full bg-[var(--red)]"
+              className="relative h-full rounded-full bg-gradient-to-r from-[var(--red-active)] to-[var(--red)]"
               initial={barInitial}
               animate={{ width: `${pct}%` }}
               transition={barTransition}
               aria-hidden
-            />
+            >
+              {/* 火苗头：进度条前沿的一点暖光，暗示「火正在烧」（reduce-motion 下为静态亮点） */}
+              <span
+                className="vote-ember absolute right-0 top-1/2 h-2.5 w-2.5 -translate-y-1/2 translate-x-1/4 rounded-full bg-white/85 shadow-[0_0_6px_2px_var(--red)]"
+                aria-hidden
+              />
+            </motion.div>
+          </div>
+          {/* 进度尾注：阶段 + 点燃百分比，给进度一个语义落点 */}
+          <div className="mono mt-1.5 flex items-center justify-between text-[10.5px] text-[var(--ink4)]">
+            <span>
+              {LIFECYCLE[idx]?.label} · {idx + 1}/{LIFECYCLE.length}
+            </span>
+            <span>已点燃 {pct}%</span>
           </div>
         </div>
 

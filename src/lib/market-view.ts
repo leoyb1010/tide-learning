@@ -4,7 +4,6 @@
  */
 
 import { trackGradientVar } from "@/lib/tracks";
-import { deriveCourseRating } from "@/lib/course-rating";
 
 /** 摊位卡视图模型（server 组装，透传给 client 卡片；结构即 v4.0 摊位契约）。 */
 export interface MarketStall {
@@ -32,6 +31,12 @@ export interface MarketStall {
   mine: boolean;
   /** 上新时间戳（毫秒），用于"今日上新"氛围计算与"最新"排序。 */
   createdAtMs: number;
+  /** 评分均分（S5）：有真实评价读真实均分；零评价回退占位派生（数据层已算好，卡片/排序直接读）。 */
+  ratingScore: number;
+  /** 评价条数（S5）：真实条数；零评价为占位派生数。 */
+  ratingCount: number;
+  /** 是否占位评分（无真实评价时 true）：卡片据此标「示例」，诚实不冒充。 */
+  ratingIsPlaceholder: boolean;
   seller: {
     id: string | null;
     nickname: string;
@@ -45,7 +50,7 @@ export interface MarketStall {
  * 排序键（交易市场维度）：
  *   hot   = 热销（成交/拿走多，交易市场默认看热货）
  *   new   = 最新（上新时间倒序）
- *   rated = 口碑（评分高优先，占位评分派生，见 deriveCourseRating）
+ *   rated = 口碑（评分高优先，读 MarketStall.ratingScore：真实评价优先，零评价占位派生）
  *   price = 价格（免费优先→积分从低到高，让囊中羞涩者先看得起的）
  * URL searchParam 契约；iOS GET /api/market 复用同集合。
  */
@@ -117,7 +122,7 @@ export function stallGradientVar(category: string): string {
  * 交易市场排序（server 页与 iOS API 共用；纯函数、不改原数组、同分保稳定原序）。
  *   hot   → 成交热度降序（tradeVolume：付费看销量、免费看拿走数）
  *   new   → 上新时间降序
- *   rated → 占位评分降序（deriveCourseRating，同课稳定，避免抖动）
+ *   rated → 评分降序（读数据层已算好的 ratingScore：有真实评价读真实、零评价占位派生，同课稳定）
  *   price → 价格升序（免费=0 排最前，付费按积分从低到高，价同再按热度）
  */
 export function sortStalls(stalls: MarketStall[], sort: MarketSort): MarketStall[] {
@@ -126,8 +131,8 @@ export function sortStalls(stalls: MarketStall[], sort: MarketSort): MarketStall
     if (sort === "new") {
       if (b.s.createdAtMs !== a.s.createdAtMs) return b.s.createdAtMs - a.s.createdAtMs;
     } else if (sort === "rated") {
-      const ra = deriveCourseRating(a.s.id, a.s.learnersCount).score;
-      const rb = deriveCourseRating(b.s.id, b.s.learnersCount).score;
+      const ra = a.s.ratingScore;
+      const rb = b.s.ratingScore;
       if (rb !== ra) return rb - ra;
       // 同分再按成交热度，避免评分并列时纯靠原序
       if (tradeVolume(b.s) !== tradeVolume(a.s)) return tradeVolume(b.s) - tradeVolume(a.s);
