@@ -58,11 +58,12 @@ export function sellerBadge(collectTotal: number): { label: string; tier: 1 | 2 
   return { label: "新摊主", tier: 1 };
 }
 
-/** 大数缩写：1234 → 1.2k，交易气息数字统一走这套（避免各卡各写）。 */
+/** 大数缩写（中国大陆口径，「万」而非「k」）：<10000 直接展示，≥10000 折算为「N.N万」。
+ *  例：1234 → 1234；12345 → 1.2万；123456 → 12万。交易气息数字统一走这套（避免各卡各写）。 */
 export function abbrevCount(n: number): string {
-  if (n < 1000) return String(n);
-  const k = n / 1000;
-  return `${k >= 10 ? Math.round(k) : k.toFixed(1)}k`;
+  if (n < 10000) return String(n);
+  const w = n / 10000;
+  return `${w >= 10 ? Math.round(w) : w.toFixed(1)}万`;
 }
 
 /** 赛道渐变（代理 tracks.trackGradientVar，保持 market 侧单一 import 面）。 */

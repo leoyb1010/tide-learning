@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/session";
 import { TidalReveal } from "@/components/motion";
 import { EmptyTide } from "@/components/TideIllustration";
 import NotebookAiTidy from "@/components/NotebookAiTidy";
+import NotebookComposeButton from "@/components/NotebookComposeButton";
 import { ExportMenu } from "@/components/ExportMenu";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,8 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
           </div>
 
           <div className="flex items-center gap-2.5">
+            {/* 在此笔记本记一条：预填本笔记本 id，新建即归入（空态/非空态都可见） */}
+            <NotebookComposeButton notebookId={notebook.id} />
             {/* 导出中心：md / html / txt / json / 打印版，导出的是「本笔记本」范围 */}
             {notes.length > 0 && <ExportMenu scope={{ kind: "notebook", notebookId: notebook.id }} label="导出" />}
             {/* AI 整理本笔记本：透传本笔记本下笔记 id，走 /api/ai/note-transform（noteIds 范围） */}
@@ -103,7 +106,8 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
       {notes.length === 0 ? (
         <EmptyTide
           variant="notes"
-          description="这个笔记本还是空的。在笔记馆里把笔记归入本笔记本，它们就会出现在这里。"
+          description="这个笔记本还是空的。点下方按钮直接在此笔记本记一条，或去笔记馆把已有笔记归入本笔记本。"
+          action={<NotebookComposeButton notebookId={notebook.id} variant="ghost" />}
         />
       ) : (
         <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2">

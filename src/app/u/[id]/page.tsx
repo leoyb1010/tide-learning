@@ -192,7 +192,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
           <div className="mt-6 grid grid-cols-3 gap-3">
             <Stat value={`Lv.${level.level}`} label={level.title} />
             <Stat value={`${postCount}`} label="发帖" />
-            <Stat value={`${level.hours >= 1 ? Math.round(level.hours) : level.hours}`} unit="h" label="累计学习" />
+            <Stat value={`${level.hours >= 1 ? Math.round(level.hours) : level.hours}`} unit="小时" label="累计学习" />
           </div>
         )}
       </section>

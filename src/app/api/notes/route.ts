@@ -131,14 +131,19 @@ export async function POST(req: NextRequest) {
       sourceText?: string;
       source?: string; // v2.2：manual(独立笔记) / ai_transform(AI整理落库)；缺省按有无 lesson 推断
       notebookId?: string; // v2.2：归入笔记本（可空）
+      tagIds?: string[]; // v3.1：创建时批量关联标签（每个标签须属本人，越权铁律）
     };
 
     const kind: NoteKind =
       body.kind && (NOTE_KINDS as readonly string[]).includes(body.kind) ? (body.kind as NoteKind) : "text";
 
-    // v2.2：courseId/lessonId 可缺省 → 独立笔记(manual)。二者要么都给(课程内记)，要么都不给(独立)。
-    const isStandalone = !body.courseId && !body.lessonId;
-    if (!isStandalone && (!body.courseId || !body.lessonId)) return fail("课程与章节需同时提供");
+    // 三态归属：
+    //  1) 课程内记(lessonBound)：带 lessonId → 必须同时带 courseId，且校验章节存在 + 有权访问（付费章节需订阅）。
+    //  2) 软关联课程(soft)：仅带 courseId（无 lessonId）→ 独立笔记「快捷关联课程」，不解锁任何章节内容，
+    //     故只校验课程可浏览（published+public/unlisted），不做 entitlement 门槛。source 仍按 manual/ai_transform。
+    //  3) 完全独立(standalone)：二者都不带。
+    const lessonBound = !!body.lessonId;
+    if (lessonBound && !body.courseId) return fail("课程与章节需同时提供");
 
     // 文本笔记必须有正文；截帧/剪藏可只带图或原文
     const hasContent = !!body.contentMd?.trim();
@@ -148,10 +153,10 @@ export async function POST(req: NextRequest) {
 
     const snapshot = await resolveEntitlement(user.id);
 
-    // 课程内笔记：校验章节存在 + 用户有权访问（付费章节需订阅覆盖赛道）。独立笔记跳过。
     let courseId: string | null = null;
     let lessonId: string | null = null;
-    if (!isStandalone) {
+    if (lessonBound) {
+      // 课程内记：校验章节存在 + 用户有权访问（付费章节需订阅覆盖赛道）。
       const lesson = await prisma.lesson.findUnique({
         where: { id: body.lessonId },
         select: { id: true, courseId: true, isFree: true, course: { select: { category: true } } },
@@ -162,7 +167,22 @@ export async function POST(req: NextRequest) {
       }
       courseId = body.courseId!;
       lessonId = body.lessonId!;
+    } else if (body.courseId) {
+      // 软关联：仅确认课程存在且可浏览（不泄露草稿/私有课）。无章节即无内容解锁，故不做 entitlement 校验。
+      const course = await prisma.course.findFirst({
+        where: {
+          id: body.courseId,
+          status: "published",
+          visibility: { in: ["public", "unlisted"] },
+        },
+        select: { id: true },
+      });
+      if (!course) return fail("课程不存在", 404);
+      courseId = course.id;
     }
+
+    // 是否落库为独立笔记（source 推断用）：无 lesson 绑定即独立（软关联课程仍属独立笔记）。
+    const isStandalone = !lessonBound;
 
     // 越权铁律：归入笔记本前校验该本属于当前用户
     let notebookId: string | null = null;
@@ -172,13 +192,29 @@ export async function POST(req: NextRequest) {
       notebookId = nb.id;
     }
 
+    // 越权铁律：创建时关联标签前，按 userId 校验每个标签归属本人。
+    // 只保留「既在请求里、又属本人」的标签 id（去重），过滤越权/不存在的 id。
+    let validTagIds: string[] = [];
+    if (Array.isArray(body.tagIds) && body.tagIds.length > 0) {
+      const requested = Array.from(
+        new Set(body.tagIds.filter((t): t is string => typeof t === "string" && t.length > 0)),
+      );
+      if (requested.length > 0) {
+        const owned = await prisma.noteTag.findMany({
+          where: { id: { in: requested }, userId: user.id },
+          select: { id: true },
+        });
+        validTagIds = owned.map((t) => t.id);
+      }
+    }
+
     const source = body.source === "ai_transform" ? "ai_transform" : isStandalone ? "manual" : "lesson";
     const timestampSec = body.timestampSec ?? null;
     const title = body.title?.trim() || null;
     const sourceText = body.sourceText?.trim() || null;
     const excerpt = buildExcerpt(body.contentMd ?? sourceText ?? "");
 
-    // §7.2：配额校验 + 创建放同一事务，避免并发下越过免费上限
+    // §7.2：配额校验 + 创建 + 标签关联放同一事务，避免并发下越过免费上限、且标签关联原子化随笔记落库
     const note = await prisma.$transaction(async (tx) => {
       if (!snapshot.canCreateNoteUnlimited) {
         const count = await tx.note.count({ where: { userId: user.id, deletedAt: null } });
@@ -186,7 +222,7 @@ export async function POST(req: NextRequest) {
           throw new AppError(`免费用户最多创建 ${snapshot.noteFreeLimit} 篇笔记，订阅后可无限记录`, 402);
         }
       }
-      return tx.note.create({
+      const created = await tx.note.create({
         data: {
           userId: user.id,
           courseId,
@@ -200,8 +236,13 @@ export async function POST(req: NextRequest) {
           kind,
           captureUrl: kind === "capture" ? body.captureUrl ?? null : null,
           sourceText,
+          // 创建时关联标签（已按 userId 校验归属）；空数组则不生成任何 join 行
+          ...(validTagIds.length > 0
+            ? { tags: { create: validTagIds.map((tagId) => ({ tagId })) } }
+            : {}),
         },
       });
+      return created;
     });
 
     // 埋点：按 kind 分流 note_capture / note_clip / note_create

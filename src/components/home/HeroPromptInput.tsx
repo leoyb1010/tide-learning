@@ -24,10 +24,7 @@ export function HeroPromptInput() {
 
   return (
     <form onSubmit={submit} className="w-full">
-      <div
-        className="group flex items-center gap-2 rounded-[16px] border border-[var(--hairline-on-dark)] bg-white/[0.06] p-2 pl-4 backdrop-blur-md transition-colors focus-within:border-[var(--red)]/50"
-        style={{ boxShadow: "0 8px 30px -12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06)" }}
-      >
+      <div className="hero-prompt group relative flex items-center gap-2 rounded-[16px] bg-white/[0.06] p-2 pl-4 backdrop-blur-md">
         <Sparkle size={18} weight="fill" className="shrink-0 text-[var(--red)]" aria-hidden />
         <input
           value={value}

@@ -44,10 +44,11 @@ function trackGrad(category: string): [string, string] {
   return TRACK_GRAD[category] ?? TRACK_DEFAULT;
 }
 
-/** 大数字紧凑格式：12400 → 12.4k（与 page.tsx compactCount 一致）。 */
+/** 大数字紧凑格式（中国大陆口径「万」，与 page.tsx compactCount 一致）：12400 → 1.2万。 */
 function compactCount(n: number): string {
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
+  if (n < 10000) return String(n);
+  const w = n / 10000;
+  return `${w >= 10 ? Math.round(w) : w.toFixed(1)}万`;
 }
 
 /**

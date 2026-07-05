@@ -7,6 +7,8 @@ import {
   Sparkle, CaretDown, ListBullets, ListChecks, Translate, Cards, Copy, Check,
   ListDashes, Notebook as NotebookIcon, PushPin, Plus, FloppyDisk, Camera, Scissors,
   PencilSimple, LinkSimple, Image as ImageIcon, Paperclip, ArrowLeft, CircleNotch,
+  UploadSimple, ArrowClockwise, Warning, X as XIcon, FileText,
+  Tag, BookBookmark, GraduationCap,
 } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, Button, Badge } from "@/components/ui";
@@ -914,35 +916,82 @@ const ENTRY_META: {
   { key: "attach", label: "附件", hint: "PDF / DOCX / TXT 等文件", Icon: Paperclip, tintBg: "var(--warn-soft)", tintFg: "var(--warn)" },
 ];
 
+// ── 「记一条」智能化选项 ──────────────────────────────────────────
+// 归入笔记本 / 标签多选 / 快捷关联课程 三组数据，由 GET /api/notes/compose-options 一次拉齐。
+export interface ComposeNotebookOpt { id: string; title: string; icon: string | null }
+export interface ComposeTagOpt { id: string; name: string; color: string }
+export interface ComposeCourseOpt { id: string; slug: string; title: string }
+export interface ComposeOptions {
+  notebooks: ComposeNotebookOpt[];
+  tags: ComposeTagOpt[];
+  courses: ComposeCourseOpt[];
+}
+
+/**
+ * 弹窗打开时按需拉取 compose-options（client 只 fetch，不 import server 链）。
+ * 未打开时不请求；每次打开都重取，保证新建笔记本/标签后下拉即时刷新。
+ */
+function useComposeOptions(open: boolean) {
+  const [opts, setOpts] = useState<ComposeOptions>({ notebooks: [], tags: [], courses: [] });
+  const [loading, setLoading] = useState(false);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/notes/compose-options").then((r) => r.json());
+      if (res.ok) setOpts(res.data as ComposeOptions);
+    } catch {
+      /* 拉取失败静默：三控件降级为「仅可现场创建标签/不选笔记本课程」，不阻塞记一条主流程 */
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (open) void load();
+  }, [open, load]);
+  // 现场新建标签后把它并入本地 tags（避免整段重拉），供 WritePanel 立即勾选。
+  const addLocalTag = useCallback((t: ComposeTagOpt) => {
+    setOpts((prev) =>
+      prev.tags.some((x) => x.id === t.id) ? prev : { ...prev, tags: [...prev.tags, t] },
+    );
+  }, []);
+  return { opts, loading, addLocalTag };
+}
+
 /**
  * 采集面板：四入口 [随手写][链接导入][图片][附件]。
- * - 随手写：POST /api/notes source=manual（保留原逻辑）。
+ * - 随手写：POST /api/notes source=manual（v3.1 智能化：可选笔记本 / 标签多选 / 快捷关联课程）。
  * - 链接导入：POST /api/notes/import-url，服务端抓取正文落库。
  * - 图片 / 附件：POST /api/notes/attachments（multipart），存 public/uploads 并挂/建笔记。
+ *
+ * prefillNotebookId：笔记本详情页「在此笔记本记一条」预填该笔记本（弹窗仅走随手写，直接落入该本）。
+ * 导出：供笔记本详情页的 client 包装组件（NotebookComposeButton）复用同一弹窗。
  */
-function ComposeDialog({
+export function ComposeDialog({
   open,
   onClose,
   onCreated,
+  prefillNotebookId,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (noteId?: string) => void;
+  prefillNotebookId?: string;
 }) {
   const [entry, setEntry] = useState<CaptureEntry>("menu");
+  const { opts, addLocalTag } = useComposeOptions(open);
 
-  // 打开时回到入口选择面板
+  // 打开时回到入口选择面板；带 prefillNotebookId（来自笔记本详情页）时直接进「随手写」。
   useEffect(() => {
-    if (open) setEntry("menu");
-  }, [open]);
+    if (open) setEntry(prefillNotebookId ? "write" : "menu");
+  }, [open, prefillNotebookId]);
 
   const activeMeta = ENTRY_META.find((e) => e.key === entry);
   const dialogTitle = entry === "menu" ? "记一条" : activeMeta?.label ?? "记一条";
 
   return (
     <Dialog open={open} onClose={onClose} title={dialogTitle}>
-      {/* 非入口页顶部：返回选择 */}
-      {entry !== "menu" && (
+      {/* 非入口页顶部：返回选择（预填笔记本时不显示，避免误跳出定向写入流） */}
+      {entry !== "menu" && !prefillNotebookId && (
         <button
           type="button"
           onClick={() => setEntry("menu")}
@@ -975,7 +1024,14 @@ function ComposeDialog({
         </div>
       )}
 
-      {entry === "write" && <WritePanel onCreated={onCreated} />}
+      {entry === "write" && (
+        <WritePanel
+          onCreated={onCreated}
+          options={opts}
+          onTagCreated={addLocalTag}
+          prefillNotebookId={prefillNotebookId}
+        />
+      )}
       {entry === "link" && <LinkImportPanel onCreated={onCreated} />}
       {entry === "image" && <UploadPanel kind="image" onCreated={onCreated} />}
       {entry === "attach" && <UploadPanel kind="attach" onCreated={onCreated} />}
@@ -983,12 +1039,74 @@ function ComposeDialog({
   );
 }
 
-/** 随手写：title + contentMd → POST /api/notes（source=manual）。 */
-function WritePanel({ onCreated }: { onCreated: (id?: string) => void }) {
+/**
+ * 随手写（v3.1 智能化）：title + contentMd + 归入笔记本 + 标签多选 + 快捷关联课程
+ * → 一次 POST /api/notes（source=manual，带 notebookId?/tagIds?/courseId?）。
+ * 标签支持现场新建：POST /api/note-tags upsert 拿到 id 后并入本地并自动勾选。
+ * 越权隔离由后端负责：notebookId/tagIds/courseId 均按 userId 二次校验（route 已实现）。
+ */
+function WritePanel({
+  onCreated,
+  options,
+  onTagCreated,
+  prefillNotebookId,
+}: {
+  onCreated: (id?: string) => void;
+  options: ComposeOptions;
+  onTagCreated: (t: ComposeTagOpt) => void;
+  prefillNotebookId?: string;
+}) {
   const { toast } = useToast();
   const [title, setTitle] = useState("");
   const [contentMd, setContentMd] = useState("");
   const [saving, setSaving] = useState(false);
+
+  // 三组智能化选择态
+  const [notebookId, setNotebookId] = useState<string>(prefillNotebookId ?? "");
+  const [courseId, setCourseId] = useState<string>("");
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState("");
+  const [creatingTag, setCreatingTag] = useState(false);
+
+  // 预填笔记本变化（不同笔记本详情页复用同一弹窗）时同步默认归属
+  useEffect(() => {
+    setNotebookId(prefillNotebookId ?? "");
+  }, [prefillNotebookId]);
+
+  function toggleTag(id: string) {
+    setSelectedTagIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  // 现场新建标签：note-tags 幂等 upsert；成功后并入本地选项并自动勾选。
+  async function createTag() {
+    const name = newTag.trim();
+    if (!name) return;
+    if (name.length > 20) return toast("标签名过长（≤20 字）", { tone: "warn" });
+    // 已存在同名则直接勾选，不重复建
+    const existing = options.tags.find((t) => t.name === name);
+    if (existing) {
+      if (!selectedTagIds.includes(existing.id)) toggleTag(existing.id);
+      setNewTag("");
+      return;
+    }
+    setCreatingTag(true);
+    try {
+      const res = await fetch("/api/note-tags", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name }),
+      }).then((r) => r.json());
+      if (!res.ok) return toast(res.error ?? "标签创建失败", { tone: "warn" });
+      const tag: ComposeTagOpt = { id: res.data.id, name: res.data.name, color: res.data.color };
+      onTagCreated(tag);
+      setSelectedTagIds((prev) => (prev.includes(tag.id) ? prev : [...prev, tag.id]));
+      setNewTag("");
+    } catch {
+      toast("标签创建失败，请稍后重试", { tone: "warn" });
+    } finally {
+      setCreatingTag(false);
+    }
+  }
 
   async function submit() {
     if (!contentMd.trim()) return toast("笔记内容不能为空", { tone: "warn" });
@@ -997,10 +1115,22 @@ function WritePanel({ onCreated }: { onCreated: (id?: string) => void }) {
       const res = await fetch("/api/notes", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ title: title.trim() || undefined, contentMd: contentMd.trim() }),
+        body: JSON.stringify({
+          title: title.trim() || undefined,
+          contentMd: contentMd.trim(),
+          // 仅在有值时带上，避免污染独立笔记的空归属语义
+          ...(notebookId ? { notebookId } : {}),
+          ...(courseId ? { courseId } : {}),
+          ...(selectedTagIds.length > 0 ? { tagIds: selectedTagIds } : {}),
+        }),
       }).then((r) => r.json());
       if (!res.ok) return toast(res.error ?? "保存失败", { tone: "warn" });
-      track("note_create", { source: "manual" });
+      track("note_create", {
+        source: "manual",
+        has_notebook: !!notebookId,
+        tag_count: selectedTagIds.length,
+        has_course: !!courseId,
+      });
       toast("已记下", { tone: "success" });
       onCreated(res.data?.id);
     } catch {
@@ -1022,9 +1152,104 @@ function WritePanel({ onCreated }: { onCreated: (id?: string) => void }) {
         value={contentMd}
         onChange={(e) => setContentMd(e.target.value)}
         placeholder="随手写点什么…支持 Markdown"
-        rows={7}
+        rows={6}
         className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] leading-[1.7] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
       />
+
+      {/* 归入笔记本 + 快捷关联课程：两个下拉并排 */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <label className="flex flex-col gap-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink3)]">
+            <BookBookmark size={13} weight="fill" className="text-[var(--ink4)]" /> 归入笔记本
+          </span>
+          <select
+            value={notebookId}
+            onChange={(e) => setNotebookId(e.target.value)}
+            className="min-h-[44px] rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)]"
+          >
+            <option value="">未归类</option>
+            {options.notebooks.map((nb) => (
+              <option key={nb.id} value={nb.id}>
+                {nb.icon ? `${nb.icon} ` : ""}
+                {nb.title}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="flex flex-col gap-1.5">
+          <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink3)]">
+            <GraduationCap size={13} weight="fill" className="text-[var(--ink4)]" /> 关联课程
+          </span>
+          <select
+            value={courseId}
+            onChange={(e) => setCourseId(e.target.value)}
+            disabled={options.courses.length === 0}
+            className="min-h-[44px] rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)] disabled:opacity-55"
+          >
+            <option value="">{options.courses.length === 0 ? "暂无在学课程" : "不关联"}</option>
+            {options.courses.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.title}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      {/* 标签多选：已有标签作可勾选胶囊 + 现场新建 */}
+      <div className="flex flex-col gap-2">
+        <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink3)]">
+          <Tag size={13} weight="fill" className="text-[var(--ink4)]" /> 标签
+        </span>
+        {options.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {options.tags.map((t) => {
+              const active = selectedTagIds.includes(t.id);
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => toggleTag(t.id)}
+                  className={`inline-flex min-h-[32px] items-center gap-1 rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors ${
+                    active
+                      ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+                      : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  {active && <Check size={12} weight="bold" />}
+                  {t.name}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <input
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (!creatingTag) void createTag();
+              }
+            }}
+            placeholder="新建标签，回车添加"
+            maxLength={20}
+            className="min-h-[40px] flex-1 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+          />
+          <button
+            type="button"
+            onClick={() => void createTag()}
+            disabled={creatingTag || !newTag.trim()}
+            className="studio-press inline-flex min-h-[40px] items-center gap-1 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-55"
+          >
+            {creatingTag ? <CircleNotch size={13} weight="bold" className="animate-spin" /> : <Plus size={13} weight="bold" />}
+            添加
+          </button>
+        </div>
+      </div>
+
       <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
         <button
           type="button"
@@ -1095,78 +1320,350 @@ function LinkImportPanel({ onCreated }: { onCreated: (id?: string) => void }) {
   );
 }
 
-/** 图片 / 附件：本地选文件 → POST /api/notes/attachments（multipart）。 */
+// 前端可接受的 MIME（与后端 route.ts ALLOWED 保持一致，越权/类型拦截在服务端仍会二次校验）
+const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
+const FILE_MIME = new Set([
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "text/plain",
+  "text/markdown",
+]);
+// 部分系统对 .md/.docx 给不出 type，落回扩展名兜底校验
+const FILE_EXT = new Set(["pdf", "docx", "doc", "txt", "md"]);
+const MAX_UPLOAD = 10 * 1024 * 1024;
+
+function extOf(name: string): string {
+  const i = name.lastIndexOf(".");
+  return i >= 0 ? name.slice(i + 1).toLowerCase() : "";
+}
+
+function humanSize(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
+  return `${(n / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** 客户端预检：类型/大小不符直接给出具体原因（拦在上传前，省一次失败往返）。返回 null 表示通过。 */
+function precheck(f: File, kind: "image" | "attach"): string | null {
+  if (f.size === 0) return "文件内容为空";
+  if (f.size > MAX_UPLOAD) return `文件 ${humanSize(f.size)} 超过 10MB 上限`;
+  const ext = extOf(f.name);
+  if (kind === "image") {
+    if (!IMAGE_MIME.has(f.type) && !["png", "jpg", "jpeg", "webp", "gif"].includes(ext)) {
+      return "仅支持 PNG / JPG / WEBP / GIF 图片";
+    }
+  } else {
+    if (!FILE_MIME.has(f.type) && !FILE_EXT.has(ext)) {
+      return "仅支持 PDF / DOCX / DOC / TXT / MD 文件";
+    }
+  }
+  return null;
+}
+
+type UploadPhase =
+  | { s: "idle" }
+  | { s: "picked"; file: File }
+  | { s: "uploading"; file: File; pct: number }
+  | { s: "done"; noteId?: string; attachment: { fileName: string; mimeType: string; path: string; size: number } }
+  | { s: "error"; file: File; message: string };
+
+/**
+ * 图片 / 附件上传：拖拽 + 点击 + 粘贴三入口 → POST /api/notes/attachments（multipart）。
+ *
+ * 修复原「服务异常」根因：
+ *  1) 原实现用 `.then(r => r.json())`，遇到非 JSON 响应（413 体积超限 / 500 HTML / 网络中断）
+ *     会在 json() 处抛错，被 catch 吞成笼统「上传失败」，后端真实原因看不到。
+ *     现改用 XHR，按 HTTP status 兜底文案，并优先透传后端 `{ ok:false, error }` 的 error。
+ *  2) multipart 绝不手动设 Content-Type —— 交给浏览器带上 boundary（手动设会破坏解析，
+ *     后端 formData() 拿不到 file → 「缺少上传文件」）。XHR 不 setRequestHeader 即天然正确。
+ * 边界：本组件为 client，只 fetch 自有 API，不引任何 server 链。
+ */
 function UploadPanel({ kind, onCreated }: { kind: "image" | "attach"; onCreated: (id?: string) => void }) {
   const { toast } = useToast();
   const inputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [busy, setBusy] = useState(false);
+  const dropRef = useRef<HTMLDivElement>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+  const previewUrlRef = useRef<string | null>(null);
+  const [phase, setPhase] = useState<UploadPhase>({ s: "idle" });
+  const [dragging, setDragging] = useState(false);
 
   const accept = kind === "image" ? "image/png,image/jpeg,image/webp,image/gif" : ".pdf,.docx,.doc,.txt,.md";
   const hint =
     kind === "image"
-      ? "PNG / JPG / WEBP / GIF，≤10MB，将自动挂成一条笔记。"
-      : "PDF / DOCX / TXT / MD，≤10MB。文本类会自动抽取前 2000 字预览。";
+      ? "拖入、点击或粘贴图片。PNG / JPG / WEBP / GIF，≤10MB，将自动挂成一条笔记。"
+      : "拖入或点击选择文件。PDF / DOCX / TXT / MD，≤10MB，文本类会自动抽取前 2000 字预览。";
 
-  function pick(f: File | null) {
+  // 卸载时中止在途请求并回收预览 objectURL，避免内存泄漏
+  useEffect(() => {
+    return () => {
+      xhrRef.current?.abort();
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    };
+  }, []);
+
+  const revokePreview = useCallback(() => {
+    if (previewUrlRef.current) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  }, []);
+
+  // 选定一个文件：预检 → 直接进入上传（拖/粘/点都走这里，体验一致）
+  function accept_(f: File | null | undefined) {
     if (!f) return;
-    if (f.size > 10 * 1024 * 1024) return toast("文件不能超过 10MB", { tone: "warn" });
-    setFile(f);
+    const err = precheck(f, kind);
+    if (err) {
+      toast(err, { tone: "warn" });
+      setPhase({ s: "error", file: f, message: err });
+      return;
+    }
+    upload(f);
   }
 
-  async function submit() {
-    if (!file) return toast("请先选择文件", { tone: "warn" });
-    setBusy(true);
-    try {
-      const fd = new FormData();
-      fd.append("file", file);
-      const res = await fetch("/api/notes/attachments", { method: "POST", body: fd }).then((r) => r.json());
-      if (!res.ok) return toast(res.error ?? "上传失败", { tone: "warn" });
-      track("note_attachment", { is_image: kind === "image" });
-      toast("已上传并保存", { tone: "success" });
-      onCreated(res.data?.noteId);
-    } catch {
-      toast("上传失败，请稍后重试", { tone: "warn" });
-    } finally {
-      setBusy(false);
+  function upload(file: File) {
+    revokePreview();
+    setPhase({ s: "uploading", file, pct: 0 });
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    const xhr = new XMLHttpRequest();
+    xhrRef.current = xhr;
+    xhr.open("POST", "/api/notes/attachments");
+    // 关键：不 setRequestHeader("Content-Type", ...) —— 让浏览器自带 multipart boundary。
+
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.min(99, Math.round((e.loaded / e.total) * 100));
+      setPhase((p) => (p.s === "uploading" ? { ...p, pct } : p));
+    };
+
+    xhr.onload = () => {
+      xhrRef.current = null;
+      // 优先解析后端 JSON body（含真实 error）；非 JSON 时按状态码兜底
+      type AttachmentDto = { fileName: string; mimeType: string; size: number; path: string; summary: string | null };
+      type UploadResp = { ok?: boolean; error?: string; data?: { noteId?: string; attachment?: AttachmentDto } };
+      let body: UploadResp | null = null;
+      try {
+        body = JSON.parse(xhr.responseText) as UploadResp;
+      } catch {
+        body = null;
+      }
+
+      if (xhr.status >= 200 && xhr.status < 300 && body?.ok && body.data?.attachment) {
+        const att = body.data.attachment;
+        setPhase({
+          s: "done",
+          noteId: body.data.noteId,
+          attachment: { fileName: att.fileName, mimeType: att.mimeType, path: att.path, size: att.size },
+        });
+        track("note_attachment", { is_image: kind === "image" });
+        toast("已上传并保存", { tone: "success" });
+        onCreated(body.data.noteId);
+        return;
+      }
+
+      // 失败：透传后端 error，退而求其次按状态码给具体文案（不再是笼统「服务异常」）
+      const msg =
+        body?.error ??
+        (xhr.status === 413
+          ? "文件过大，请压缩后重试（≤10MB）"
+          : xhr.status === 401
+            ? "登录已过期，请重新登录后再上传"
+            : xhr.status === 402
+              ? "已达免费笔记上限，订阅后可无限记录"
+              : xhr.status === 429
+                ? "上传太频繁，请稍后再试"
+                : xhr.status === 0
+                  ? "网络中断，请检查连接后重试"
+                  : `上传失败（HTTP ${xhr.status}）`);
+      setPhase({ s: "error", file, message: msg });
+      toast(msg, { tone: "warn" });
+    };
+
+    xhr.onerror = () => {
+      xhrRef.current = null;
+      const msg = "网络错误，上传未完成，请重试";
+      setPhase({ s: "error", file, message: msg });
+      toast(msg, { tone: "warn" });
+    };
+
+    xhr.onabort = () => {
+      xhrRef.current = null;
+    };
+
+    xhr.send(fd);
+  }
+
+  // ---- 拖拽 ----
+  function onDragOver(e: React.DragEvent) {
+    e.preventDefault();
+    if (phase.s === "uploading") return;
+    if (!dragging) setDragging(true);
+  }
+  function onDragLeave(e: React.DragEvent) {
+    // 仅当离开容器本身（而非子元素）时才灭高亮
+    if (dropRef.current && !dropRef.current.contains(e.relatedTarget as Node)) setDragging(false);
+  }
+  function onDrop(e: React.DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    if (phase.s === "uploading") return;
+    accept_(e.dataTransfer.files?.[0]);
+  }
+  // ---- 粘贴（贴图/贴文件）----
+  function onPaste(e: React.ClipboardEvent) {
+    if (phase.s === "uploading") return;
+    const item = Array.from(e.clipboardData.items).find((it) => it.kind === "file");
+    const f = item?.getAsFile();
+    if (f) {
+      e.preventDefault();
+      accept_(f);
     }
   }
 
-  const Icon = kind === "image" ? ImageIcon : Paperclip;
+  const busy = phase.s === "uploading";
+  const done = phase.s === "done" ? phase : null;
+  const isDoneImage = done ? done.attachment.mimeType.startsWith("image/") : false;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-3" onPaste={onPaste}>
       <input
         ref={inputRef}
         type="file"
         accept={accept}
         className="hidden"
-        onChange={(e) => pick(e.target.files?.[0] ?? null)}
+        onChange={(e) => {
+          accept_(e.target.files?.[0] ?? null);
+          e.target.value = ""; // 允许连续选同一文件重试
+        }}
       />
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        className="flex w-full flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-8 text-center transition-colors hover:border-[var(--ink3)]"
-      >
-        <Icon size={26} weight="bold" className="text-[var(--ink3)]" />
-        {file ? (
-          <span className="mono max-w-full truncate text-[13px] text-[var(--ink)]">{file.name}</span>
-        ) : (
-          <span className="text-[13px] font-semibold text-[var(--ink2)]">点击选择文件</span>
-        )}
-        <span className="text-[12px] leading-[1.5] text-[var(--ink4)]">{hint}</span>
-      </button>
-      <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
-        <button
-          type="button"
-          onClick={submit}
-          disabled={busy || !file}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
-        >
-          {busy ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : <FloppyDisk size={14} weight="bold" />}
-          {busy ? "上传中…" : "上传"}
-        </button>
-      </div>
+
+      {/* 成功态：缩略图 / 文件卡 + 再传一个 */}
+      {done ? (
+        <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--card),var(--inner-hi)]">
+          <div className="flex items-center gap-3">
+            {isDoneImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={done.attachment.path}
+                alt={done.attachment.fileName}
+                className="h-14 w-14 shrink-0 rounded-[10px] border border-[var(--border)] object-cover"
+              />
+            ) : (
+              <span className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-[10px] bg-[var(--surface-inset)] text-[var(--ink3)]">
+                <FileText size={24} weight="bold" />
+              </span>
+            )}
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[13px] font-semibold text-[var(--ink)]">{done.attachment.fileName}</p>
+              <p className="mono mt-0.5 flex items-center gap-1.5 text-[12px] text-[var(--ok)]">
+                <Check size={13} weight="bold" /> 已保存 · {humanSize(done.attachment.size)}
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+            <button
+              type="button"
+              onClick={() => {
+                revokePreview();
+                setPhase({ s: "idle" });
+              }}
+              className="studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] px-4 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--ink3)]"
+            >
+              <Plus size={14} weight="bold" /> 再传一个
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* 拖拽 / 点击 命中区（≥44px；拖入高亮）。上传中/错误也在此区内渲染状态。 */}
+          <div
+            ref={dropRef}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            role="button"
+            tabIndex={0}
+            aria-label={kind === "image" ? "上传图片" : "上传附件"}
+            aria-disabled={busy}
+            onClick={() => !busy && inputRef.current?.click()}
+            onKeyDown={(e) => {
+              if (busy) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                inputRef.current?.click();
+              }
+            }}
+            className={`flex min-h-[44px] w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border border-dashed px-4 py-8 text-center transition-colors ${
+              dragging
+                ? "border-[var(--red)] bg-[var(--red-soft)]"
+                : phase.s === "error"
+                  ? "border-[var(--warn)] bg-[var(--warn-soft)]"
+                  : "border-[var(--border2)] bg-[var(--surface-inset)] hover:border-[var(--ink3)]"
+            }`}
+          >
+            {busy && phase.s === "uploading" ? (
+              <>
+                <CircleNotch size={26} weight="bold" className="animate-spin text-[var(--red)]" />
+                <span className="mono max-w-full truncate text-[13px] text-[var(--ink)]">{phase.file.name}</span>
+                {/* 进度条 */}
+                <div className="mt-1 h-1.5 w-40 max-w-full overflow-hidden rounded-full bg-[var(--border2)]">
+                  <div
+                    className="h-full rounded-full bg-[var(--red)] transition-[width] duration-200"
+                    style={{ width: `${phase.pct}%` }}
+                  />
+                </div>
+                <span className="mono text-[12px] text-[var(--ink3)]">上传中 {phase.pct}%</span>
+              </>
+            ) : phase.s === "error" ? (
+              <>
+                <Warning size={26} weight="fill" className="text-[var(--warn)]" />
+                <span className="text-[13px] font-semibold text-[var(--warn)]">上传失败</span>
+                <span className="max-w-full text-[12px] leading-[1.5] text-[var(--ink2)]">{phase.message}</span>
+              </>
+            ) : (
+              <>
+                <span className="inline-flex h-11 w-11 items-center justify-center text-[var(--ink3)]">
+                  <UploadSimple size={26} weight="bold" />
+                </span>
+                <span className="text-[13px] font-semibold text-[var(--ink2)]">拖入文件，或点击选择</span>
+                <span className="text-[12px] leading-[1.5] text-[var(--ink4)]">{hint}</span>
+              </>
+            )}
+          </div>
+
+          {/* 底部操作条：上传中→取消；错误→重试；空闲→选择文件 */}
+          <div className="flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3">
+            {phase.s === "uploading" ? (
+              <button
+                type="button"
+                onClick={() => xhrRef.current?.abort()}
+                className="studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] border border-[var(--border2)] bg-[var(--surface)] px-4 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--ink3)]"
+              >
+                <XIcon size={14} weight="bold" /> 取消
+              </button>
+            ) : phase.s === "error" ? (
+              <button
+                type="button"
+                onClick={() => upload(phase.file)}
+                className="studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 text-[13px] font-semibold text-[var(--red)] transition-colors"
+              >
+                <ArrowClockwise size={14} weight="bold" /> 重试
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => inputRef.current?.click()}
+                className="studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 text-[13px] font-semibold text-[var(--red)] transition-colors"
+              >
+                <Paperclip size={14} weight="bold" /> 选择文件
+              </button>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

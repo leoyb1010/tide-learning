@@ -1156,6 +1156,21 @@ body::before {
 .tide-md .tide-md-pre { background: var(--color-ink-950); color: #eef4f6; padding: 0.6em 0.8em; border-radius: 8px; overflow-x: auto; margin: 0.4em 0; font-size: 0.85em; }
 .tide-md .tide-md-pre code { font-family: var(--font-mono); background: none; padding: 0; }
 
+/* 长文阅读模式（tide-md-article）：仅供笔记详情等长正文场景 opt-in，
+   基础 .tide-md 的紧凑间距是给 BlockRenderer / 复习 / 摘要等短片段用的，不能全局放大，
+   否则会破坏那些短卡的排版契约。这里只在叠加 .tide-md-article 时给出「呼吸感」的段落/标题间距，
+   把链接导入等长文从「一团堆叠」还原成可读的分段文章。 */
+.tide-md.tide-md-article .tide-md-p { margin: 0.85em 0; }
+.tide-md.tide-md-article .tide-md-p:first-child { margin-top: 0; }
+.tide-md.tide-md-article .tide-md-h { margin: 1.4em 0 0.5em; }
+.tide-md.tide-md-article .tide-md-h:first-child { margin-top: 0; }
+.tide-md.tide-md-article .tide-md-ul,
+.tide-md.tide-md-article .tide-md-ol { margin: 0.7em 0; padding-left: 1.4em; }
+.tide-md.tide-md-article .tide-md-ul li,
+.tide-md.tide-md-article .tide-md-ol li { margin: 0.3em 0; }
+.tide-md.tide-md-article .tide-md-quote { margin: 1em 0; padding: 0.2em 0 0.2em 0.9em; }
+.tide-md.tide-md-article .tide-md-pre { margin: 1em 0; }
+
 /* 深色渐变卡上的 markdown（scene 块「为什么学」故事开场）——
    覆盖上面写死的浅色 ink，改用深色带专用白墨阶，保证在 --video-grad 上可读。 */
 .tide-md.tide-md-on-dark .tide-md-h { color: var(--ink-on-dark); }
@@ -1165,6 +1180,58 @@ body::before {
 .tide-md.tide-md-on-dark .tide-md-code { color: var(--ink-on-dark); background: rgba(255,255,255,.12); }
 .tide-md.tide-md-on-dark strong { color: var(--ink-on-dark); }
 .tide-md.tide-md-on-dark a { color: #ff9aa4; }
+
+/* ============================================================
+   HeroPromptInput（首屏悬浮输入框）优雅聚焦态
+   诉求：浅/深主题下都不要硬边框（原 red/50 边框突兀、hairline 显「黑边」）。
+   静息态：边框极淡，与深色 hero 背景融合，近乎隐形。
+   聚焦态：不加硬描边，改用「柔和红光晕外扩」(box-shadow) + 底部一道呼吸光线，
+           克制地提示「已进入输入」。reduce-motion 下降级为静态柔光（无呼吸）。
+   ============================================================ */
+.hero-prompt {
+  /* 与深色背景融合的极淡描边：白色 6%，几乎看不见的边界，仅给出「这是一块输入区」的轮廓 */
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 8px 30px -12px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  transition: box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.45s ease;
+}
+.hero-prompt::after {
+  /* 底部呼吸光线：静息隐藏，聚焦时点亮并做「吸气—呼气」的透明度脉动 */
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 0;
+  height: 1px;
+  border-radius: 1px;
+  background: linear-gradient(90deg, transparent, var(--red), transparent);
+  opacity: 0;
+  transform: scaleX(0.6);
+  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  pointer-events: none;
+}
+.hero-prompt:focus-within {
+  border-color: rgba(255, 255, 255, 0.12);
+  /* 柔和光晕外扩：一层贴身的极淡红边 + 一层扩散的红雾，无硬边缘 */
+  box-shadow:
+    0 8px 30px -12px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 4px rgba(252, 1, 26, 0.1),
+    0 0 26px -2px rgba(252, 1, 26, 0.28);
+}
+.hero-prompt:focus-within::after {
+  opacity: 1;
+  transform: scaleX(1);
+  animation: hero-prompt-breathe 2.6s ease-in-out infinite;
+}
+@keyframes hero-prompt-breathe {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* 降级：保留静态柔光与底线，取消呼吸脉动与过渡位移 */
+  .hero-prompt, .hero-prompt::after { transition: none; }
+  .hero-prompt:focus-within::after { animation: none; opacity: 0.85; transform: none; }
+}
 
 /* ============================================================
    SharePanel（v3.0 全局分享面板）辅助动效

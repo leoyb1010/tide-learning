@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft, PencilSimple, MapPin, ArrowUpRight, Quotes, CalendarBlank, Clock,
-  ShareNetwork, NotePencil, Sparkle, PencilSimpleLine, LinkSimple,
+  ShareNetwork, NotePencil, Sparkle, PencilSimpleLine, LinkSimple, CaretDown,
 } from "@phosphor-icons/react";
 import { renderMarkdown } from "@/lib/markdown";
 import { mmss } from "@/lib/format";
@@ -66,6 +66,13 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
   const [title, setTitle] = useState(note.title);
   const [contentMd, setContentMd] = useState(note.contentMd);
   const [updatedAt, setUpdatedAt] = useState(note.updatedAt);
+
+  // 长文折叠：链接导入的长正文默认收起，给一个「展开原文」的克制入口，避免详情页被一整篇网页撑爆。
+  // 阈值按字符数估算；短文与非导入笔记不折叠（一次展开后本次会话保持展开）。
+  const LONG_BODY_THRESHOLD = 1600;
+  const isLongImport = note.source === "link_import" && contentMd.trim().length > LONG_BODY_THRESHOLD;
+  const [expanded, setExpanded] = useState(false);
+  const collapsed = isLongImport && !expanded;
 
   // 来源锚点跳转地址（仅课程内笔记有）：点击才跳，弱化课程绑定
   const anchorHref =
@@ -203,10 +210,40 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
 
           {/* 正文（Markdown 渲染） */}
           {contentMd.trim() ? (
-            <div
-              className="tide-md text-[15px] leading-[1.8] text-[var(--ink)]"
-              dangerouslySetInnerHTML={{ __html: renderMarkdown(contentMd) }}
-            />
+            <div className="relative">
+              <div
+                className="tide-md tide-md-article text-[15px] leading-[1.8] text-[var(--ink)]"
+                style={collapsed ? { maxHeight: "42vh", overflow: "hidden" } : undefined}
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(contentMd) }}
+              />
+              {collapsed && (
+                // 底部渐隐罩：暗示「下面还有」，用 surface 底色做到 transparent 的软过渡
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-24"
+                  style={{
+                    background:
+                      "linear-gradient(to bottom, transparent, var(--surface, #fff))",
+                  }}
+                />
+              )}
+              {isLongImport && (
+                <button
+                  type="button"
+                  onClick={() => setExpanded((v) => !v)}
+                  className="studio-press mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                  aria-expanded={expanded}
+                >
+                  <CaretDown
+                    size={14}
+                    weight="bold"
+                    className="transition-transform"
+                    style={{ transform: expanded ? "rotate(180deg)" : undefined }}
+                  />
+                  {expanded ? "收起原文" : "展开原文全文"}
+                </button>
+              )}
+            </div>
           ) : (
             <p className="text-[14px] italic text-[var(--ink4)]">还没有正文，点「编辑」补充内容。</p>
           )}

@@ -401,9 +401,9 @@ function OutlineRow({
   return <div className="cursor-default">{inner}</div>;
 }
 
-/** 大数字紧凑格式：12400 → 12.4k */
+/** 大数字紧凑格式（中国大陆口径「万」）：12400 → 1.2万；<10000 直接展示。 */
 function compactCount(n: number): string {
-  if (n >= 10000) return `${(n / 1000).toFixed(1)}k`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
-  return String(n);
+  if (n < 10000) return String(n);
+  const w = n / 10000;
+  return `${w >= 10 ? Math.round(w) : w.toFixed(1)}万`;
 }
