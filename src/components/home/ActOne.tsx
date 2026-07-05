@@ -2,7 +2,13 @@
 
 import { motion, useTransform, type MotionValue } from "framer-motion";
 import Link from "next/link";
-import { ArrowDown, Cards, NotePencil, Flame } from "@phosphor-icons/react/dist/ssr";
+import {
+  ArrowDown,
+  Flame,
+  Books,
+  Sparkle,
+  FileArrowUp,
+} from "@phosphor-icons/react/dist/ssr";
 import { DoorOpen } from "@/components/motion";
 import { useStudyRoom } from "./StudyRoomContext";
 import { HeroPromptInput } from "./HeroPromptInput";
@@ -10,10 +16,12 @@ import { DeskDemo } from "./DeskDemo";
 
 /* ============================================================
    第一幕 · 推门（首屏，0 滚动）
-   全屏「学习工作室」：3D 透视网格地板（径向渐隐）+ 台灯暖光唯一光源（呼吸），
-   红色专注小点克制点缀。中央真实文案（SEO/LCP），悬浮输入框「说出想学的」
-   → /create?prompt=…。鼠标移动整场景 ±1.5° 视差。桌上的屏内嵌 <DeskDemo>：
-   用产品真实 UI 拼装的造课演示（造课输入→AI生成→课程卡浮现），替代视频。
+   全屏「学习工作室」：教室实景大图作氛围背景（书架=课程库 / 造课台=AI造课 /
+   资料桌=自己课，低透明度 + 场景色蒙版压柔，营造一屋子教室的纵深，亮/暗两版随主题切）
+   + 台灯暖光 + 红色专注小点。左：真实文案（SEO/LCP）+ 三入口 pill + 悬浮输入框
+   「说出想学的」→ /create?prompt=…。右：会动的 <DeskDemo> AI 造课演示
+   （最新四步流程 理解需求→设计大纲→逐节写作→装订成册，前景立在教室背景之上）。
+   鼠标移动整场景 ±1.5° 视差、背景反向轻移。
 
    深浅色（问题⑧-5）：场景底/墨阶/材质全部走 --scene-* token —— 浅色系统下是
    「晨光工作室」高级亮场，暗色系统 / data-theme=dark 下是沉浸夜航暗场，跟随系统。
@@ -56,9 +64,52 @@ export function ActOne({
           "radial-gradient(120% 90% at 50% 30%, var(--scene-bg-1) 0%, var(--scene-bg-2) 45%, var(--scene-bg-3) 100%)",
       }}
     >
+      {/* —— 教室氛围背景层：整幕铺一张自习室实景（书架/造课台/资料桌三区），
+          低透明度 + 边缘渐隐 + 场景色蒙版压柔，营造「一屋子教室」的空间纵深；
+          英文标注被蒙版弱化成氛围纹理，不与前景动画争视线。亮/暗两版随主题切换，
+          随鼠标反向轻微视差（比前景慢，像更远的房间）。aria-hidden 纯装饰。 —— */}
+      {!isMobile && (
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 overflow-hidden"
+          style={{ x: glowX, y: glowY }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/marketing/classroom-hero-triptych.jpg"
+            alt=""
+            className="scene-light-only absolute inset-0 h-full w-full object-cover opacity-[0.34]"
+            style={{
+              maskImage: "radial-gradient(125% 90% at 50% 42%, #000 0%, rgba(0,0,0,.68) 60%, transparent 92%)",
+              WebkitMaskImage: "radial-gradient(125% 90% at 50% 42%, #000 0%, rgba(0,0,0,.68) 60%, transparent 92%)",
+            }}
+          />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/marketing/classroom-hero-triptych-dark.jpg"
+            alt=""
+            className="scene-dark-only absolute inset-0 h-full w-full object-cover opacity-[0.24]"
+            style={{
+              maskImage: "radial-gradient(120% 85% at 50% 42%, #000 0%, rgba(0,0,0,.55) 55%, transparent 88%)",
+              WebkitMaskImage: "radial-gradient(120% 85% at 50% 42%, #000 0%, rgba(0,0,0,.55) 55%, transparent 88%)",
+            }}
+          />
+          {/* 场景色蒙版：把实景压回冷灰蓝基调，与 --scene-* 材质融为一体。
+              中心略放开（让书架/桌子透出来更清楚），四周仍压柔护住前景文字对比。 */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background:
+                "radial-gradient(120% 90% at 50% 32%, color-mix(in srgb, var(--scene-bg-1) 46%, transparent) 0%, color-mix(in srgb, var(--scene-bg-2) 68%, transparent) 48%, var(--scene-bg-3) 100%)",
+            }}
+          />
+        </motion.div>
+      )}
+
       {/* 推门进场：整场从暗到亮 + 光缝推开，一次性开场编排。reduce-motion 直接终态。 */}
       <DoorOpen className="absolute inset-0 flex flex-col items-center justify-center">
-        {/* —— 透视网格地板：CSS 3D，rotateX 铺向远方，径向遮罩渐隐 —— */}
+        {/* —— 透视网格地板：CSS 3D，rotateX 铺向远方，径向遮罩渐隐（移动端保留，
+            桌面已有教室背景图提供纵深，网格再淡一档避免与图打架）—— */}
         <motion.div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%]"
@@ -66,6 +117,7 @@ export function ActOne({
             transformStyle: "preserve-3d",
             transform: `perspective(680px) rotateX(${isMobile ? 66 : 60}deg)`,
             transformOrigin: "50% 100%",
+            opacity: isMobile ? 1 : 0.4,
             backgroundImage:
               "linear-gradient(var(--scene-grid) 1px, transparent 1px), linear-gradient(90deg, var(--scene-grid) 1px, transparent 1px)",
             backgroundSize: "56px 56px",
@@ -117,37 +169,49 @@ export function ActOne({
                 TIDE · AI 学习工作室
               </motion.p>
 
-              {/* 主文案：真实 DOM（SEO/LCP）。温暖有力的「一句话造课」主张。 */}
+              {/* 主文案：真实 DOM（SEO/LCP）。教室主轴——「想学的，这里都能开学」，
+                  只保留一个红色专注词，字号收敛对齐设计系统 display 阶梯。 */}
               <motion.h1
-                className="text-balance text-[30px] font-bold leading-[1.24] tracking-[-0.015em] text-[var(--scene-ink)] sm:text-[42px] lg:text-[58px] lg:leading-[1.14] xl:text-[66px] 2xl:text-[76px]"
+                className="text-balance text-[32px] font-bold leading-[1.18] tracking-[-0.02em] text-[var(--scene-ink)] sm:text-[44px] lg:text-[52px] lg:leading-[1.1] xl:text-[60px]"
                 initial={motionOk ? { opacity: 0, y: 14 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
               >
-                说出想学的,
-                <br />
-                <span className="text-[var(--red)]">
-                  AI 当场为你造<span className="whitespace-nowrap">一门课</span>
-                </span>
+                想学的,
+                <br className="hidden sm:block" />
+                <span className="text-[var(--red)]">这里都能开学</span>
               </motion.h1>
 
-              {/* 社会证明副文案：保留「N 位同学一起学」的社会证明，去压抑感。 */}
+              {/* 副文案：一句话点出「一间自习室，三种开学方式」，接社会证明。 */}
               <motion.p
-                className="mt-5 max-w-[460px] text-[15px] leading-[1.85] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[520px] lg:text-[17px] xl:max-w-[600px] xl:text-[19px]"
+                className="mt-5 max-w-[440px] text-[15px] leading-[1.8] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[500px] lg:text-[17px]"
                 initial={motionOk ? { opacity: 0, y: 12 } : false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
               >
-                一句话,几秒钟,一门为你量身编排的课就摆上书桌。
-                此刻还有{" "}
+                一间自习室,三种开学方式:挑一门现成好课、一句话让 AI 造一门、
+                或把你的资料升维成课。此刻{" "}
                 <span className="whitespace-nowrap font-semibold text-[var(--scene-ink)]">
                   <span className="mono num-pop text-[var(--red)]">
                     {onlineCount.toLocaleString()}
                   </span>{" "}
                   位同学
                 </span>{" "}
-                正在一起学,你不是一个人。
+                正一起学。
               </motion.p>
+
+              {/* 三种开学方式入口 pill：直接回应「课程库 / AI 造课 / 自己课」三种内容。
+                  真实链接、冷灰卡 + 小图标，SSR 直出可点。 */}
+              <motion.div
+                className="mt-5 flex flex-wrap items-center justify-center gap-2 lg:mt-6 lg:justify-start"
+                initial={motionOk ? { opacity: 0, y: 12 } : false}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+              >
+                <EntryPill href="/courses" Icon={Books} label="现成好课" hint="课程库" />
+                <EntryPill href="/create" Icon={Sparkle} label="AI 造课" hint="一句话" accent />
+                <EntryPill href="/create?tab=import" Icon={FileArrowUp} label="资料升维" hint="导入" />
+              </motion.div>
 
               {/* —— 悬浮输入框：首屏即产品。提交跳造课（复用 /create?prompt=）—— */}
               <motion.div
@@ -166,8 +230,9 @@ export function ActOne({
               </motion.div>
             </div>
 
-            {/* —— 右：书桌上的屏 = 真实 UI 产品演示（<DeskDemo>）——
-                桌面/宽屏并排展示；移动端为控 LCP 与竖屏节奏折入下方（单列时仍显示）。 */}
+            {/* —— 右：书桌上的屏 = 会动的 AI 造课演示（<DeskDemo>，最新四步流程：
+                理解需求→设计大纲→逐节写作→装订成册）。前景动画立在教室背景之上，
+                「一屋子教室」的纵深由整幕背景图承担，此处专注展示 AI 造课过程。 */}
             <motion.div
               className="w-full max-w-[460px] lg:max-w-[520px] lg:flex-1 xl:max-w-[620px] 2xl:max-w-[720px]"
               style={{ transform: immersive ? "translateZ(40px)" : undefined }}
@@ -211,10 +276,64 @@ export function ActOne({
 }
 
 /* ============================================================
+   EntryPill —— 首屏「三种开学方式」入口胶囊
+   点出课程库 / AI 造课 / 自己课三种内容，真实链接、SSR 可点。
+   冷灰卡 + 小图标 + 主标签 + mono 提示；accent（AI 造课）走红软底。
+   ============================================================ */
+function EntryPill({
+  href,
+  Icon,
+  label,
+  hint,
+  accent = false,
+}: {
+  href: string;
+  Icon: typeof Books;
+  label: string;
+  hint: string;
+  accent?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className="studio-press group inline-flex min-h-[44px] items-center gap-2 rounded-[13px] border px-3.5 py-2 transition-colors"
+      style={{
+        borderColor: accent
+          ? "color-mix(in srgb, var(--red) 32%, var(--scene-hairline))"
+          : "var(--scene-hairline)",
+        background: accent ? "var(--red-soft)" : "var(--scene-card)",
+        boxShadow: "var(--scene-card-shadow-sm)",
+      }}
+    >
+      <span
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-[9px]"
+        style={{
+          background: accent ? "var(--red)" : "var(--scene-card-2)",
+          color: accent ? "#fff" : "var(--scene-ink-2)",
+        }}
+      >
+        <Icon size={15} weight="fill" />
+      </span>
+      <span className="flex flex-col text-left leading-tight">
+        <span
+          className="text-[13px] font-bold"
+          style={{ color: accent ? "var(--red-ink)" : "var(--scene-ink)" }}
+        >
+          {label}
+        </span>
+        <span className="mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--scene-ink-3)]">
+          {hint}
+        </span>
+      </span>
+    </Link>
+  );
+}
+
+/* ============================================================
    AmbientDesks —— 第一幕四周的「邻座工位」浮卡（仅宽屏沉浸态）
-   三张真实产品面小卡：复习卡到期 / 笔记刚记下 / 连学天数。
-   不同 --depth 随鼠标反向轻移（比主场景慢），像房间里更远的桌子；
-   缓慢 floatY 浮动错开相位。纯 transform/opacity，aria-hidden。
+   三张卡各对应一种开学方式（AI 造课 / 坚持 / 资料升维），文案成句可读，
+   营造「一屋子人在学」的空间感。不同 --depth 随鼠标反向轻移（比主场景慢），
+   像房间里更远的桌子；缓慢 floatY 浮动错开相位。纯 transform/opacity，aria-hidden。
    ============================================================ */
 function AmbientDesks({ px, py }: { px: MotionValue<number>; py: MotionValue<number> }) {
   // 反向视差：远处物体移动更慢且与视线相反，深度感由幅度差营造。
@@ -233,52 +352,56 @@ function AmbientDesks({ px, py }: { px: MotionValue<number>; py: MotionValue<num
 
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 hidden xl:block">
-      {/* 左上角 · 复习卡到期（邻座的卡片盒）——主文案块之上的留白带 */}
+      {/* 左上 · 邻座刚用一句话造好一门课（AI 造课信号）——主文案块之上的留白带 */}
       <motion.div
-        className="absolute left-[2%] top-[9%] w-[168px] rounded-[14px] border p-3 opacity-75"
+        className="absolute left-[2%] top-[9%] w-[214px] rounded-[14px] border p-3 opacity-80"
         style={{ x: x1, y: y1, ...cardStyle, animation: "floatY 7s ease-in-out infinite" }}
       >
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-[8px]" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}>
-            <Cards size={14} weight="fill" />
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
+            <Sparkle size={15} weight="fill" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold" style={{ color: "var(--scene-ink)" }}>3 张复习卡到期</p>
-            <p className="mono text-[9px]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 口语实战</p>
+            <p className="mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 刚刚</p>
+            <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
+              一句话造好了《手机挂号无忧课》
+            </p>
           </div>
         </div>
       </motion.div>
 
-      {/* 右下 · 刚记下的笔记（邻座的笔记本）——演示屏之下的留白带 */}
+      {/* 右下 · 邻座刚把长文导入成课（资料升维信号）——演示屏之下的留白带 */}
       <motion.div
-        className="absolute bottom-[6%] right-[2%] w-[190px] rounded-[14px] border p-3 opacity-75"
+        className="absolute bottom-[6%] right-[2%] w-[220px] rounded-[14px] border p-3 opacity-80"
         style={{ x: x2, y: y2, ...cardStyle, animation: "floatY 8.5s ease-in-out 1.2s infinite" }}
       >
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-[8px]" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
-            <NotePencil size={14} weight="fill" />
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
+            <FileArrowUp size={15} weight="fill" />
           </span>
           <div className="min-w-0">
-            <p className="truncate text-[11px] font-bold" style={{ color: "var(--scene-ink)" }}>“原来分镜是这么拆的”</p>
-            <p className="mono text-[9px]" style={{ color: "var(--scene-ink-3)" }}>刚刚 · 截帧笔记</p>
+            <p className="mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 2 分钟前</p>
+            <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
+              把一篇长文导入,升维成了 6 节课
+            </p>
           </div>
         </div>
       </motion.div>
 
-      {/* 右上 · 连学天数（邻座的火苗）——演示屏之上的留白带 */}
+      {/* 右上 · 邻座连学 28 天（坚持信号，火苗）——演示屏之上的留白带 */}
       <motion.div
-        className="absolute right-[5%] top-[10%] w-[142px] rounded-[14px] border p-3 opacity-75"
+        className="absolute right-[5%] top-[10%] w-[190px] rounded-[14px] border p-3 opacity-80"
         style={{ x: x3, y: y3, ...cardStyle, animation: "floatY 9.5s ease-in-out 2.4s infinite" }}
       >
-        <div className="flex items-center gap-2">
-          <span className="grid h-7 w-7 place-items-center rounded-[8px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
-            <Flame size={14} weight="fill" />
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
+            <Flame size={15} weight="fill" />
           </span>
           <div className="min-w-0">
-            <p className="text-[11px] font-bold" style={{ color: "var(--scene-ink)" }}>
-              连学 <span className="mono">28</span> 天
+            <p className="mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 此刻</p>
+            <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
+              连学 <span className="mono text-[var(--red)]">28</span> 天,今晚也亮着灯
             </p>
-            <p className="mono text-[9px]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 亮着灯</p>
           </div>
         </div>
       </motion.div>

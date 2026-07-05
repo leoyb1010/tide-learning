@@ -4,8 +4,8 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { TrackView } from "@/components/TrackView";
-import { TRACKS, trackGradientVar, trackIconKey } from "@/lib/tracks";
-import type { TrackCardData } from "@/components/home/types";
+import { TRACKS, trackGradientVar, trackIconKey, resolveCoverSrc } from "@/lib/tracks";
+import type { TrackCardData, FeaturedCourse } from "@/components/home/types";
 import { ImmersiveStudyRoom } from "@/components/home/ImmersiveStudyRoom";
 
 /**
@@ -59,6 +59,18 @@ async function MarketingHome() {
     courseCount: courseCountByCat.get(t.key) ?? 0,
   }));
 
+  // 首页课程抽屉（HomeFunnel 01）：取前 10 门真实在架课程，用 resolveCoverSrc
+  // 映射到 public/covers 下真实封面 jpg（8 门专属 + 各赛道封面池，永不落回纯渐变）。
+  const featuredCourses: FeaturedCourse[] = all.slice(0, 10).map((c) => ({
+    slug: c.slug,
+    title: c.title,
+    subtitle: c.subtitle,
+    categoryLabel: c.categoryLabel,
+    gradient: trackGradientVar(c.category),
+    cover: resolveCoverSrc(c.slug, c.category, c.id),
+    lessonsCount: c.lessonsCount,
+  }));
+
   // 第三幕共创 teaser：榜首需求（排序口径与需求广场 listRankedDemands 一致）。
   const demandTeaser = demandTeaserResult.teaser;
 
@@ -85,6 +97,7 @@ async function MarketingHome() {
           onlineCount={onlineCount}
           totalCourses={totalCourses}
           tracks={tracks}
+          featuredCourses={featuredCourses}
           demand={demandTeaser}
           demandCount={demandTeaserResult.count}
           canVote={snapshot.canVote}

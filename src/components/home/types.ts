@@ -17,3 +17,14 @@ export interface TrackCardData {
   iconKey: string; // trackIconKey() 结果
   courseCount: number;
 }
+
+/** 首页课程抽屉卡（HomeFunnel 01 用真实在架课程 + resolveCoverSrc 真实封面）。 */
+export interface FeaturedCourse {
+  slug: string;
+  title: string;
+  subtitle: string | null;
+  categoryLabel: string;
+  gradient: string; // 赛道渐变，作封面加载前底色 / 图失败兜底
+  cover: string; // resolveCoverSrc 结果，public 下真实封面 jpg 路径
+  lessonsCount: number;
+}

@@ -84,11 +84,11 @@ export function trackIconKey(category: string): string {
  * 纯函数、无副作用、无 "use client"：server 与 client 组件都能直接调用。
  */
 const COVER_POOL: Record<string, string[]> = {
-  ai_skill: ["ai-1", "ai-2", "ai-3"],
-  english_oral: ["oral-1", "oral-2", "oral-3"],
-  english_foundation: ["english-1", "english-2"],
-  silver_english: ["silver-1", "silver-2"],
-  life: ["life-1", "life-2"],
+  ai_skill: ["ai-1", "ai-2", "ai-3", "ai-4"],
+  english_oral: ["oral-1", "oral-2", "oral-3", "oral-4"],
+  english_foundation: ["english-1", "english-2", "english-3"],
+  silver_english: ["silver-1", "silver-2", "silver-3"],
+  life: ["life-1", "life-2", "life-3"],
 };
 
 /** category 无对应池时的兜底池（仍是真实封面，非渐变）。 */

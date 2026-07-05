@@ -308,58 +308,40 @@ function ActTwoStatic({ tracks, totalCourses }: { tracks: TrackCardData[]; total
 
 /* ============================================================
    MiniShelf —— 「现成好课桌」上的迷你书架
-   真实赛道渐变作书脊，hover 抽出（transform-only），下方在架总数。
+   用写实书脊排图（book-spines-row.jpg：绿/赭/紫三系布纹书脊立在浅木层板上，
+   冷灰蓝背景，与设计系统同调）。hover 整排轻微推近（transform-only），
+   底部横向渐隐让图与卡片自然衔接。下方在架总数信息条。
    ============================================================ */
 function MiniShelf({ tracks, totalCourses }: { tracks: TrackCardData[]; totalCourses: number }) {
-  // 书脊排布：取前 4 条赛道、每条 2-3 本，宽窄相间，像一格真实书架。
-  // 上限 10 本防溢出（容器再窄由 overflow-hidden 兜底裁切）。
-  const spines = tracks
-    .slice(0, 4)
-    .flatMap((t, ti) =>
-      Array.from({ length: ti % 2 === 0 ? 3 : 2 }, (_, i) => ({
-        key: `${t.key}-${i}`,
-        gradient: t.gradient,
-        label: i === 0 ? t.label : "",
-        h: 72 - ((ti + i) % 3) * 7,
-      })),
-    )
-    .slice(0, 10);
   return (
     <div className="w-full" aria-hidden>
       <div
-        className="flex items-end justify-center gap-[5px] overflow-hidden rounded-[12px] border px-3 pb-0 pt-4"
+        className="group/shelf relative overflow-hidden rounded-[12px] border"
         style={{ borderColor: "var(--scene-hairline)", background: "var(--scene-card-2)" }}
       >
-        {spines.map((s) => (
+        {/* 写实书脊排图：16:9 裁切成一条书架，hover 时整排轻微放大（像凑近看书架） */}
+        <div className="relative aspect-[16/7] w-full overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/textures/book-spines-row.jpg"
+            alt=""
+            aria-hidden
+            loading="lazy"
+            className="h-full w-full origin-bottom object-cover object-bottom transition-transform duration-500 ease-out will-change-transform group-hover/shelf:scale-[1.04]"
+          />
+          {/* 底部极淡渐隐，让书脊底与卡片背景软衔接（不压住书本） */}
           <div
-            key={s.key}
-            className="relative w-[22px] shrink-0 rounded-t-[4px] transition-transform duration-300 ease-out hover:-translate-y-1.5 lg:w-[26px]"
+            aria-hidden
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-6"
             style={{
-              height: s.h,
-              background: s.gradient,
-              boxShadow: "inset -3px 0 6px -3px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.25)",
+              background:
+                "linear-gradient(180deg, transparent, color-mix(in srgb, var(--scene-card-2) 60%, transparent))",
             }}
-          >
-            {s.label && (
-              <span
-                className="absolute inset-x-0 top-2 mx-auto text-center text-[8px] font-bold leading-[1.1] text-white/90"
-                style={{ writingMode: "vertical-rl" }}
-              >
-                {s.label}
-              </span>
-            )}
-          </div>
-        ))}
+          />
+        </div>
       </div>
-      {/* 隔板 */}
-      <div
-        className="h-[7px] rounded-b-[6px]"
-        style={{
-          background: "linear-gradient(180deg, var(--scene-vignette), transparent)",
-          opacity: 0.5,
-        }}
-      />
-      <p className="mono mt-2 text-[10px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>
+
+      <p className="mono mt-2.5 text-[10px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>
         <span className="font-bold" style={{ color: "var(--scene-ink-2)" }}>{totalCourses}</span> 门在架 ·{" "}
         {tracks.length} 条赛道 · 每周上新
       </p>

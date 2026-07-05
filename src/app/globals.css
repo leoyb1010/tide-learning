@@ -236,6 +236,21 @@
 }
 
 /* ============================================================
+   场景图 · 亮暗切换工具类（scene-light-only / scene-dark-only）
+   与 --scene-* 同口径：默认亮，系统暗(且非 data-theme=light) 或 data-theme=dark/deep
+   时切到暗版。用于首屏教室 hero 大图的亮/暗两版切换（纯 CSS，无 JS 闪烁）。
+   ============================================================ */
+.scene-dark-only { display: none; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .scene-light-only { display: none; }
+  :root:not([data-theme="light"]) .scene-dark-only { display: block; }
+}
+:root[data-theme="dark"] .scene-light-only,
+:root[data-theme="deep"] .scene-light-only { display: none; }
+:root[data-theme="dark"] .scene-dark-only,
+:root[data-theme="deep"] .scene-dark-only { display: block; }
+
+/* ============================================================
    暗色模式：跟随系统 prefers-color-scheme:dark（默认），
    或 data-theme=dark 手动强制；data-theme=light 手动强制亮色。
    ============================================================ */

@@ -30,11 +30,14 @@ import { useStudyRoom } from "./StudyRoomContext";
 type Phase = "typing" | "generating" | "revealed";
 
 // 演示脚本：一句话 → AI 生成 → 成品课。选 AI 赛道（紫），点题「一句话造课」。
+// STEPS 与最新造课引擎 GenStage 四站对齐（understand→outline→lessons→done），
+// 过程导向、不写死具体节数（避免与成品卡节数打架），改常量即可，逻辑随 length 自适应。
 const PROMPT = "帮我做一门给完全零基础的人用 AI 做短视频的课";
 const STEPS = [
-  "拆解你的目标与基础",
-  "编排 8 节课的学习路径",
-  "生成讲义、要点与复习卡",
+  "理解你的需求",
+  "设计课程大纲",
+  "逐节写作讲义",
+  "装订成册",
 ];
 
 interface DemoState {
@@ -117,6 +120,21 @@ export function DeskDemo() {
           boxShadow: "var(--scene-card-shadow)",
         }}
       >
+        {/* —— 屏内底纹：智性蓝图（细网格 + 中右柔光 + 淡连线），叠在 --scene-screen 之上、
+            内容之下，低透明度当氛围底，让它更像一台真在跑 AI 的造课台。亮/暗两版随主题切。 —— */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/marketing/ai-forge-panel-bg.jpg"
+          alt=""
+          className="scene-light-only pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/marketing/ai-forge-panel-bg-dark.jpg"
+          alt=""
+          className="scene-dark-only pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
+        />
+
         {/* 屏内智能流光（AI 材质活感）；reduce-motion 静止 */}
         <div className="demo-ai-flow pointer-events-none absolute inset-0" />
 

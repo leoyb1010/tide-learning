@@ -5,15 +5,11 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   UsersThree,
-  GraduationCap,
-  Translate,
   Sparkle,
-  Heart,
-  Books,
+  BookOpen,
 } from "@phosphor-icons/react/dist/ssr";
-import type { Icon } from "@phosphor-icons/react";
 import { VoteButton } from "@/components/VoteButton";
-import type { TrackCardData } from "./types";
+import type { FeaturedCourse } from "./types";
 import { useStudyRoom } from "./StudyRoomContext";
 
 /* ============================================================
@@ -50,24 +46,15 @@ interface DemandTeaser {
   totalVotes: number;
 }
 
-// iconKey → Phosphor 图标（与 ActThree TrackCard 同族，避免把图标耦合进 lib）。
-const TRACK_ICONS: Record<string, Icon> = {
-  ai: Sparkle,
-  english: Translate,
-  elder: Heart,
-  life: GraduationCap,
-  default: Books,
-};
-
 export function HomeFunnel({
-  tracks,
+  featuredCourses,
   totalCourses,
   demand,
   demandCount,
   canVote,
   yearPriceText,
 }: {
-  tracks: TrackCardData[];
+  featuredCourses: FeaturedCourse[];
   totalCourses: number;
   demand: DemandTeaser | null;
   demandCount: number;
@@ -87,14 +74,10 @@ export function HomeFunnel({
         }
       : {};
 
-  // 精选赛道：只取前 3 条作 curated selection（不平铺全量，全量在 /courses）。
-  // 让本区是「先挑一条」的探索入口，而非又一面赛道墙。
-  const featured = tracks.slice(0, 3);
-
   return (
     <section
       aria-label="开始学习"
-      className="relative w-full overflow-hidden px-6 pb-28 pt-20 lg:px-10 lg:pb-40 lg:pt-28"
+      className="relative w-full overflow-hidden pb-28 pt-20 lg:pb-40 lg:pt-28"
       style={{
         // 与三幕衔接：从三幕收尾落点的最亮调 --scene-bg-1 起，向订阅高潮微暖压柔，
         // 材质连续、不断层。收尾底部再压一层 --scene-bg-2 托住订阅高潮。
@@ -109,90 +92,53 @@ export function HomeFunnel({
         style={{ background: "var(--scene-hairline)" }}
       />
 
-      <div className="mx-auto flex max-w-[1080px] flex-col gap-16 lg:max-w-[1200px] lg:gap-24 xl:max-w-[1320px] 2xl:max-w-[1440px]">
+      {/* Beat 1 课程抽屉刻意脱离 max-w 容器、贴近满宽横铺，消除两侧大空白。
+          其余两拍仍在窄容器内保持阅读节奏。 */}
+      <div className="flex flex-col gap-16 lg:gap-24">
         {/* ============================================================
-            Beat 1 · 精选赛道（探索 · 中量级）
-            一句话主张 + 支撑，标题层级清晰。curated 3 条 + 造课逃逸口。
+            Beat 1 · 精选课程抽屉（探索 · 满宽横向排，悬停聚焦放大）
+            标题区收窄靠左，抽屉真实封面卡横向铺开，把「两侧空白 + low 网格」
+            换成一排会点亮的课程抽屉。
             ============================================================ */}
-        <motion.div {...reveal(0)}>
-          <div className="mb-6 flex items-end justify-between gap-4 lg:mb-10">
+        <motion.div {...reveal(0)} className="mx-auto w-full max-w-[1440px] px-0 lg:px-2">
+          <div className="mb-6 flex items-end justify-between gap-4 px-6 lg:mb-8 lg:px-8">
             <div>
               <p className="mono text-[11px] uppercase tracking-[0.2em] text-[var(--scene-ink-3)] lg:text-[12px]">
-                01 · 先挑一条赛道
+                01 · 现成好课
               </p>
-              <h2 className="mt-2 text-[24px] font-bold leading-[1.2] tracking-[-0.01em] text-[var(--scene-ink)] sm:text-[28px] lg:text-[40px] xl:text-[46px]">
+              <h2 className="mt-2 text-[24px] font-bold leading-[1.2] tracking-[-0.01em] text-[var(--scene-ink)] sm:text-[28px] lg:text-[38px] xl:text-[44px]">
                 想学什么，从这里开始
               </h2>
-              <p className="mt-2 max-w-[520px] text-[13px] leading-[1.7] text-[var(--scene-ink-2)] lg:mt-3 lg:max-w-[640px] lg:text-[16px]">
-                真实在架的赛道，一排排等着你。挑一条进去，或者
-                <span className="font-semibold text-[var(--scene-ink)]"> 一句话让 AI 现场为你造一门</span>。
+              <p className="mt-2 max-w-[560px] text-[13px] leading-[1.7] text-[var(--scene-ink-2)] lg:mt-3 lg:text-[16px]">
+                真实在架的编辑精选课，一排排等着你。挑一门坐下就能学，
+                <span className="font-semibold text-[var(--scene-ink)]">或一句话让 AI 现场造一门</span>。
               </p>
             </div>
-            {/* 桌面：赛道区 CTA 主线之一「浏览全部」，触达≥44px */}
             <Link
               href="/courses"
               className="group hidden shrink-0 items-center gap-1 px-2 py-2 text-[13px] font-semibold text-[var(--scene-ink-2)] transition-colors hover:text-[var(--red)] sm:inline-flex lg:text-[15px]"
             >
               浏览全部课程
-              <ArrowRight
-                size={14}
-                weight="bold"
-                aria-hidden
-                className="transition-transform group-hover:translate-x-0.5"
-              />
+              <ArrowRight size={14} weight="bold" aria-hidden className="transition-transform group-hover:translate-x-0.5" />
             </Link>
           </div>
 
-          {/* curated 赛道卡：3 条精选 + 1 张造课卡，四格一行铺开（宽屏 4 列） */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 lg:gap-5">
-            {featured.map((t) => (
-              <FunnelTrackCard key={t.key} track={t} />
-            ))}
-            {/* 造课卡：把「想学的没有 → AI 造」做进赛道行内，CTA 主线贯穿本拍 */}
-            <Link
-              href="/create"
-              className="studio-lift group relative flex min-h-[168px] flex-col justify-between overflow-hidden rounded-[18px] border border-dashed p-5 lg:min-h-[212px] lg:rounded-[22px] lg:p-6"
-              style={{
-                borderColor: "color-mix(in srgb, var(--red) 34%, var(--scene-hairline))",
-                background: "var(--scene-card-2)",
-              }}
-            >
-              <div
-                className="flex h-[42px] w-[42px] items-center justify-center rounded-[12px] lg:h-[50px] lg:w-[50px] lg:rounded-[14px]"
-                style={{ background: "var(--red-soft)", color: "var(--red)" }}
-              >
-                <Sparkle size={22} weight="fill" className="lg:hidden" />
-                <Sparkle size={26} weight="fill" className="hidden lg:block" />
-              </div>
-              <div>
-                <h3 className="text-[17px] font-bold text-[var(--scene-ink)] lg:text-[20px]">
-                  没有想学的？
-                </h3>
-                <p className="mt-1 text-[13px] leading-[1.6] text-[var(--scene-ink-2)] lg:text-[15px]">
-                  说出来，AI 当场造一门。
-                </p>
-                <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-bold text-[var(--red-ink)] lg:text-[14px]">
-                  去造一门课
-                  <ArrowRight
-                    size={13}
-                    weight="bold"
-                    aria-hidden
-                    className="transition-transform group-hover:translate-x-0.5"
-                  />
-                </span>
-              </div>
-            </Link>
-          </div>
+          {/* 课程抽屉：横向滚动 + snap，悬停某卡放大聚焦、同排其余让位（peer/group-hover）。
+              首尾内边距让第一/最后一张不贴边；滚动条隐藏，靠 snap + 拖动浏览。 */}
+          <CourseDrawer courses={featuredCourses} motionOk={motionOk} />
 
-          {/* 移动端：赛道区 CTA 主线（桌面在标题右侧，移动折到卡下），触达≥44px */}
+          {/* 移动端 CTA 主线（桌面在标题右侧） */}
           <Link
             href="/courses"
-            className="mt-5 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-[var(--red-ink)] sm:hidden"
+            className="mt-5 inline-flex min-h-[44px] items-center gap-1 px-6 text-[13px] font-semibold text-[var(--red-ink)] sm:hidden"
           >
             浏览全部课程
             <ArrowRight size={14} weight="bold" aria-hidden />
           </Link>
         </motion.div>
+
+        {/* Beat 2 / Beat 3 回到窄容器保持阅读节奏 */}
+        <div className="mx-auto flex w-full max-w-[1080px] flex-col gap-16 px-6 lg:max-w-[1200px] lg:gap-24 lg:px-10 xl:max-w-[1320px]">
 
         {/* ============================================================
             Beat 2 · 社区共创（参与 · 轻量级、偏置）
@@ -325,100 +271,168 @@ export function HomeFunnel({
               style={{ background: "var(--scene-lamp)" }}
             />
             <p className="mono relative text-[11px] uppercase tracking-[0.2em] text-[var(--scene-ink-3)] lg:text-[12px]">
-              03 · 坐下，开始学
+              03 · 一年畅学
             </p>
-            <h2 className="relative mt-3 text-[27px] font-bold leading-[1.25] tracking-[-0.01em] text-[var(--scene-ink)] sm:text-[36px] lg:text-[52px] xl:text-[60px]">
-              这间工作室，
+            {/* 结尾主张：直说价值、不玩虚隐喻，字号收敛避免头重脚轻。 */}
+            <h2 className="relative mt-3 text-[26px] font-bold leading-[1.2] tracking-[-0.015em] text-[var(--scene-ink)] sm:text-[34px] lg:text-[48px] xl:text-[54px]">
+              一年畅学，
               <br className="sm:hidden" />
-              为你留了一盏灯
+              全部赛道随便学
             </h2>
-            <p className="relative mx-auto mt-4 max-w-[460px] text-[14px] leading-[1.8] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[620px] lg:text-[18px]">
-              {yearPriceText ? (
-                <>
-                  年度会员 {yearPriceText}，{totalCourses}{" "}
-                  门课全部赛道畅学。停订后笔记与截帧永久保存，随时可取消。
-                </>
-              ) : (
-                <>订阅制畅学全部赛道。停订后笔记与截帧永久保存，随时可取消。</>
-              )}
+            {/* 价格 + 利益点分行清晰：价格用等宽 num 强调，信任小字压次级。 */}
+            {yearPriceText ? (
+              <p className="relative mx-auto mt-4 max-w-[560px] text-[15px] leading-[1.8] text-[var(--scene-ink-2)] lg:mt-5 lg:text-[17px]">
+                <span className="mono num text-[var(--scene-ink)]">{yearPriceText}</span>
+                ，
+                <span className="font-semibold text-[var(--scene-ink)]">
+                  {totalCourses} 门课全赛道畅学
+                </span>
+                ，还能一句话让 AI 为你造新课。
+              </p>
+            ) : (
+              <p className="relative mx-auto mt-4 max-w-[560px] text-[15px] leading-[1.8] text-[var(--scene-ink-2)] lg:mt-5 lg:text-[17px]">
+                <span className="font-semibold text-[var(--scene-ink)]">全部赛道畅学</span>
+                ，还能一句话让 AI 为你造新课。
+              </p>
+            )}
+            <p className="mono relative mx-auto mt-2 text-[12px] text-[var(--scene-ink-3)] lg:text-[13px]">
+              停订后笔记与截帧永久保存 · 随时可取消
             </p>
-            {/* 主 CTA 高潮：造课（主，最大最亮）+ 查看方案（次）。触达≥44px */}
-            <div className="relative mt-7 flex flex-wrap items-center justify-center gap-3 lg:mt-10 lg:gap-4">
+            {/* 主 CTA 高潮：开通年度会员（主，红，最强）+ 查看方案（次）。触达≥44px */}
+            <div className="relative mt-7 flex flex-wrap items-center justify-center gap-3 lg:mt-9 lg:gap-4">
               <Link
-                href="/create"
+                href="/pricing"
                 className="cta-glow studio-press inline-flex min-h-[48px] items-center gap-2 rounded-[14px] bg-[var(--red)] px-6 py-3 text-[15px] font-bold text-white transition-[filter] hover:brightness-105 lg:rounded-[16px] lg:px-9 lg:py-4 lg:text-[18px]"
               >
-                坐下，造第一门课
+                开通年度会员
                 <ArrowRight size={16} weight="bold" aria-hidden />
               </Link>
               <Link
-                href="/pricing"
+                href="/courses"
                 className="inline-flex min-h-[48px] items-center gap-2 rounded-[14px] border px-6 py-3 text-[15px] font-bold text-[var(--scene-ink)] transition-colors hover:border-[var(--red)] lg:rounded-[16px] lg:px-8 lg:py-4 lg:text-[18px]"
                 style={{ borderColor: "var(--scene-hairline)", background: "var(--scene-card-2)" }}
               >
-                查看方案
+                先逛逛课程
               </Link>
             </div>
           </div>
         </motion.div>
+        </div>
       </div>
     </section>
   );
 }
 
 /* ------------------------------------------------------------
-   FunnelTrackCard —— 精选赛道卡（Beat 1 内用）
-   与 ActThree TrackCard 视觉同族，但更紧凑（漏斗探索入口，不是赛道墙）：
-   顶部赛道渐变条 + 图标 → 标题 + 人群。点击进课程库该赛道。
+   CourseDrawer —— Beat 1 高级课程抽屉（满宽横向排 + 悬停聚焦放大）
+   真实在架课程 + resolveCoverSrc 真实封面；悬停某卡放大上浮、同排其余压暗让位，
+   营造「聚焦一门」的高级抽屉感。末尾一张「AI 造课」特殊卡承接 CTA 主线。
+   transform/opacity-only，横向 snap 滚动；reduce-motion 下 group-hover 的
+   非动效变化（scale/亮度）浏览器仍生效但无过渡，静态可读。
    ------------------------------------------------------------ */
-function FunnelTrackCard({ track }: { track: TrackCardData }) {
-  const TrackIcon = TRACK_ICONS[track.iconKey] ?? Books;
+function CourseDrawer({ courses, motionOk }: { courses: FeaturedCourse[]; motionOk: boolean }) {
+  return (
+    <div
+      className="flex snap-x snap-mandatory gap-4 overflow-x-auto px-6 pb-4 pt-1 lg:gap-5 lg:px-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // group：同排 hover 联动——悬停任一张时，用 has() 让未悬停卡压暗（下方卡样式内联）
+      style={{ WebkitOverflowScrolling: "touch" }}
+    >
+      {courses.map((c) => (
+        <CourseDrawerCard key={c.slug} course={c} motionOk={motionOk} />
+      ))}
+      {/* 抽屉末位：AI 造课特殊卡（红描边），CTA 主线不断 */}
+      <Link
+        href="/create"
+        className="drawer-card group/card relative flex w-[200px] shrink-0 snap-start flex-col justify-between overflow-hidden rounded-[18px] border border-dashed p-5 transition-[transform,box-shadow] duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:scale-[1.03] lg:w-[230px]"
+        style={{
+          borderColor: "color-mix(in srgb, var(--red) 34%, var(--scene-hairline))",
+          background: "var(--scene-card-2)",
+        }}
+      >
+        <span
+          className="flex h-[44px] w-[44px] items-center justify-center rounded-[13px]"
+          style={{ background: "var(--red-soft)", color: "var(--red)" }}
+        >
+          <Sparkle size={24} weight="fill" />
+        </span>
+        <div>
+          <h3 className="text-[17px] font-bold text-[var(--scene-ink)] lg:text-[19px]">没有想学的？</h3>
+          <p className="mt-1 text-[13px] leading-[1.6] text-[var(--scene-ink-2)] lg:text-[14px]">
+            说出来，AI 当场为你造一门。
+          </p>
+          <span className="mt-3 inline-flex items-center gap-1 text-[12px] font-bold text-[var(--red-ink)] lg:text-[14px]">
+            去造一门课
+            <ArrowRight size={13} weight="bold" aria-hidden className="transition-transform group-hover/card:translate-x-0.5" />
+          </span>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/* 单张课程抽屉卡：真实封面图（4:3）+ 标题 + 赛道徽章 + 节数。
+   封面加载前/失败以赛道渐变兜底（不露白）。悬停放大聚焦。 */
+function CourseDrawerCard({ course, motionOk }: { course: FeaturedCourse; motionOk: boolean }) {
   return (
     <Link
-      href={`/courses?category=${encodeURIComponent(track.key)}`}
-      className="studio-lift group relative flex min-h-[168px] flex-col overflow-hidden rounded-[18px] border lg:min-h-[212px] lg:rounded-[22px]"
+      href={`/courses/${course.slug}`}
+      className="drawer-card group/card relative flex w-[230px] shrink-0 snap-start flex-col overflow-hidden rounded-[18px] border transition-[transform,box-shadow] duration-300 ease-out will-change-transform hover:-translate-y-1.5 hover:scale-[1.03] lg:w-[264px]"
       style={{
         borderColor: "var(--scene-hairline)",
         background: "var(--scene-card)",
         boxShadow: "var(--scene-card-shadow-sm)",
       }}
     >
-      {/* 顶部赛道渐变条 + 图标（课程封面视觉语言的浓缩） */}
+      {/* 封面：真实封面图，赛道渐变兜底底色 */}
       <div
-        className="relative flex h-[66px] items-center justify-center lg:h-[84px]"
-        style={{ background: track.gradient }}
+        className="relative aspect-[4/3] w-full overflow-hidden"
+        style={{ background: course.gradient }}
       >
-        <TrackIcon size={28} weight="fill" color="rgba(255,255,255,.92)" className="lg:hidden" />
-        <TrackIcon
-          size={34}
-          weight="fill"
-          color="rgba(255,255,255,.92)"
-          className="hidden lg:block"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={course.cover}
+          alt=""
+          aria-hidden
+          loading="lazy"
+          className={`h-full w-full object-cover transition-transform duration-500 ease-out ${
+            motionOk ? "group-hover/card:scale-[1.06]" : ""
+          }`}
         />
-        {/* 顶条内高光，增材质 */}
+        {/* 底部渐隐，让标题区与封面自然衔接 */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-0"
-          style={{ background: "linear-gradient(160deg, rgba(255,255,255,.18), transparent 44%)" }}
+          style={{ background: "linear-gradient(180deg, rgba(0,0,0,0) 60%, rgba(0,0,0,.10))" }}
         />
       </div>
-      {/* 卡信息 */}
-      <div className="flex flex-1 flex-col p-4 lg:p-5">
-        <h3 className="text-[16px] font-bold text-[var(--scene-ink)] lg:text-[19px]">
-          {track.label}
+      {/* 信息区 */}
+      <div className="flex flex-1 flex-col p-3.5 lg:p-4">
+        <span
+          className="mono mb-1.5 inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-medium"
+          style={{ background: "var(--scene-card-2)", color: "var(--scene-ink-3)" }}
+        >
+          {course.categoryLabel}
+        </span>
+        <h3 className="line-clamp-2 text-[14px] font-bold leading-snug text-[var(--scene-ink)] lg:text-[15px]">
+          {course.title}
         </h3>
-        <p className="mt-1 flex-1 text-[12px] leading-[1.6] text-[var(--scene-ink-2)] lg:mt-1.5 lg:text-[14px]">
-          {track.blurb}
-        </p>
-        <div className="mono mt-3 flex items-center justify-between text-[11px] text-[var(--scene-ink-3)] lg:mt-3.5">
-          <span className="truncate">{track.people}</span>
-          {track.courseCount > 0 && (
-            <span className="shrink-0 pl-2 font-semibold text-[var(--scene-ink-2)]">
-              {track.courseCount} 门
-            </span>
-          )}
+        {course.subtitle && (
+          <p className="mt-1 line-clamp-1 text-[12px] text-[var(--scene-ink-3)] lg:text-[13px]">
+            {course.subtitle}
+          </p>
+        )}
+        <div className="mono mt-auto flex items-center gap-1 pt-3 text-[11px] text-[var(--scene-ink-3)]">
+          <BookOpen size={12} weight="fill" aria-hidden />
+          {course.lessonsCount} 节
+          <ArrowRight
+            size={12}
+            weight="bold"
+            aria-hidden
+            className="ml-auto text-[var(--scene-ink-2)] transition-transform group-hover/card:translate-x-0.5"
+          />
         </div>
       </div>
     </Link>
   );
 }
+

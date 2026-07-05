@@ -5,7 +5,7 @@ import { StudyRoomProvider, usePointerMotion, type StudyRoomEnv } from "./StudyR
 import { ActOne } from "./ActOne";
 import { ActTwo } from "./ActTwo";
 import { HomeFunnel } from "./HomeFunnel";
-import type { TrackCardData } from "./types";
+import type { TrackCardData, FeaturedCourse } from "./types";
 
 /* ============================================================
    ImmersiveStudyRoom —— 沉浸首页 orchestrator（client 场景根）
@@ -25,6 +25,8 @@ export interface ImmersiveData {
   totalCourses: number;
   /** 第三幕赛道精选卡片墙数据（替代原书架墙 courses） */
   tracks: TrackCardData[];
+  /** 下半漏斗 01 课程抽屉的真实在架课程（含真实封面） */
+  featuredCourses: FeaturedCourse[];
   demand: {
     id: string;
     title: string;
@@ -107,7 +109,7 @@ export function ImmersiveStudyRoom(data: ImmersiveData) {
         {/* 下半 · 转化漏斗：探索（赛道精选）→ 参与（社区共创）→ 决定（订阅），
             视觉重量递增、订阅为唯一高潮；材质延续三幕 --scene-* 冷灰蓝，平滑过渡。 */}
         <HomeFunnel
-          tracks={data.tracks}
+          featuredCourses={data.featuredCourses}
           totalCourses={data.totalCourses}
           demand={data.demand}
           demandCount={data.demandCount}
