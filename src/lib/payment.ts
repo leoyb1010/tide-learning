@@ -195,8 +195,23 @@ export async function processWebhook(channel: string, payload: {
         await tx.order.update({ where: { id: order.id }, data: { status: "refunded" } });
 
         // 精确撤销「这一笔订单」激活的那条订阅，绝不波及该 plan 下的其他有效订阅（A1-6）
-        if (order.subscriptionId) {
-          const sub = await tx.subscription.findUnique({ where: { id: order.subscriptionId } });
+        let refundSubId = order.subscriptionId;
+        // 兜底：老订单 / seed 数据 / 早于 subscriptionId 字段的订单可能没写回 subscriptionId。
+        // 此时不静默跳过（会导致退款后订阅仍生效、权益不撤），而是按 userId + 该 plan 的 scope
+        // 反查该用户当前该赛道有效订阅，取最近到期的一条撤销。仍限定同 scope，不会误伤其它赛道订阅。
+        if (!refundSubId) {
+          const fallback = await tx.subscription.findFirst({
+            where: {
+              userId: order.userId,
+              scope: order.plan.scope,
+              status: { notIn: ["expired", "refunded", "revoked"] },
+            },
+            orderBy: { currentPeriodEnd: "desc" },
+          });
+          if (fallback) refundSubId = fallback.id;
+        }
+        if (refundSubId) {
+          const sub = await tx.subscription.findUnique({ where: { id: refundSubId } });
           if (sub && sub.status !== "expired" && sub.status !== "refunded") {
             await tx.subscription.update({
               where: { id: sub.id },

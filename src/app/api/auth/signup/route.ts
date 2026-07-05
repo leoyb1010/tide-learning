@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { hashPassword, createSession } from "@/lib/session";
+import { hashPassword, createSession, validatePasswordStrength } from "@/lib/session";
 import { ok, fail, handle } from "@/lib/api";
 import { track } from "@/lib/analytics";
 import { ensureAccount } from "@/lib/credits";
@@ -14,7 +14,10 @@ export async function POST(req: NextRequest) {
       nickname?: string;
     };
     if (!identifier || !password) return fail("请填写账号和密码");
-    if (password.length < 6) return fail("密码至少 6 位");
+    // 复用与改密/重置同一套强度校验（≥8 位、含字母与数字、非黑名单），
+    // 避免注册留下弱密码后门与规则分叉。
+    const weak = validatePasswordStrength(password);
+    if (weak) return fail(weak);
 
     const isEmail = identifier.includes("@");
     const where = isEmail ? { email: identifier } : { phone: identifier };

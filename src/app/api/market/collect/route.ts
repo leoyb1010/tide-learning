@@ -129,3 +129,86 @@ export async function POST(req: NextRequest) {
     return ok({ status: "collected", already: false, message: `已把《${course.title}》放进你的书架` });
   });
 }
+
+/**
+ * DELETE /api/market/collect — 从书架「移除 / 隐藏」一门拿走的课（POST collect 的逆操作，S4 §问题⑪补齐）。
+ * 入参：{ courseId }
+ *
+ * 「书架」口径（对齐 lib/shelf.getMyShelf）：一门拿来的课出现在书架，靠的是该课的 LearningProgress
+ * 起始记录（collect/purchase 时 upsert 落地的 fork 起始记录）——learning/collected/completed 三层
+ * 都据 LearningProgress 派生。故「移出书架」= 删掉该课名下我的 LearningProgress 行。
+ *
+ * 分支（按 CoursePurchase.priceCredits 快照——「我当时实付了多少」，比现价更可靠）：
+ *   - 免费课（priceCredits===0）：真·逆操作——删 LearningProgress + 删免费 CoursePurchase。
+ *     免费课随时可零成本再拿走（re-collect 走免费分支重建所有权与书架），删所有权凭证无损失。
+ *   - 付费课（priceCredits>0）：**只从书架隐藏，保留所有权凭证 CoursePurchase**——只删 LearningProgress，
+ *     绝不删 CoursePurchase（付费买断权益永久，删了=白扣钱）。用户仍拥有该课，重新学习任一节即可
+ *     再落 LearningProgress 回到书架，全程不重复扣款（re-collect 撞 CoursePurchase 唯一约束→already_owned）。
+ *
+ * 幂等：deleteMany 天然幂等（无行不抛错）；未拿走过（无 CoursePurchase 且无 LearningProgress）返回 not_on_shelf。
+ * 越权铁律：所有 where 带 userId=当前用户，只能移除自己书架里的课。
+ * 自造/导入课不走此接口：它们在书架靠 authorUserId 归属（造课层），非 collect 而来，删进度也不会移出书架，故拒绝。
+ * 埋点：course_uncollect。
+ */
+export async function DELETE(req: NextRequest) {
+  return handle(async () => {
+    assertSameOrigin(req); // A2：写操作 CSRF 防护
+    const user = await requireUser();
+    // 防刷：与 collect 同额度，每小时最多 60 次移除操作。
+    assertUserRateLimit(user.id, "market_uncollect", 60, 3_600_000);
+
+    const body = (await req.json().catch(() => null)) as { courseId?: string } | null;
+    const courseId = body?.courseId?.trim();
+    if (!courseId) return fail("缺少课程参数");
+
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, title: true, authorUserId: true },
+    });
+    if (!course) throw new AppError("课程不存在", 404);
+    // 自造/导入课（作者=我）在书架属造课层，非 collect 而来，不由本接口移除。
+    if (course.authorUserId === user.id) return fail("这是你自己的课，无法从书架移除", 400);
+
+    // 所有权凭证（免费拿走=priceCredits0 / 付费买断=售价快照）；无则说明从未拿走过。
+    const purchase = await prisma.coursePurchase.findUnique({
+      where: { userId_courseId: { userId: user.id, courseId } },
+      select: { id: true, priceCredits: true },
+    });
+
+    const isPaid = (purchase?.priceCredits ?? 0) > 0;
+
+    // 单事务原子移出：删该课名下我的全部 LearningProgress（=移出书架）；免费课再删所有权凭证。
+    const result = await prisma.$transaction(async (tx) => {
+      const removed = await tx.learningProgress.deleteMany({
+        where: { userId: user.id, courseId },
+      });
+      // 付费课保留 CoursePurchase（买断权益永久）；仅免费课删所有权凭证做真逆操作。
+      let purchaseDeleted = false;
+      if (purchase && !isPaid) {
+        await tx.coursePurchase.delete({ where: { id: purchase.id } });
+        purchaseDeleted = true;
+      }
+      return { removedProgress: removed.count, purchaseDeleted };
+    });
+
+    // 既无所有权凭证、也没删到任何进度 → 本就不在书架，幂等返回。
+    if (!purchase && result.removedProgress === 0) {
+      return ok({ status: "not_on_shelf", message: "这门课不在你的书架" });
+    }
+
+    await track({
+      eventName: "course_uncollect",
+      userId: user.id,
+      properties: { courseId: course.id, paid: isPaid, ownershipKept: isPaid },
+    });
+
+    return ok({
+      status: "removed",
+      // 付费课保留所有权（仅隐藏），免费课连所有权一并移除。
+      ownershipKept: isPaid,
+      message: isPaid
+        ? `已从书架移除《${course.title}》，你仍拥有这门课，随时可重新学习`
+        : `已把《${course.title}》移出书架`,
+    });
+  });
+}

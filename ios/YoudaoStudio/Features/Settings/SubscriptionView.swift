@@ -49,8 +49,9 @@ private struct PricingPlan: Decodable, Identifiable {
 private struct IAPVerifyBody: Encodable {
     let productId: String
     let transactionId: String
-    /// StoreKit 2 JWS 签名凭证（后端用它向 Apple 校验）。
-    let jws: String
+    /// StoreKit 2 JWS 签名凭证。字段名 jwsRepresentation 对齐后端 route 读取的键
+    /// （src/app/api/iap/verify/route.ts 读 body.jwsRepresentation），改前后端读到的恒为 undefined。
+    let jwsRepresentation: String
 }
 
 // MARK: - StoreKit product IDs
@@ -356,7 +357,7 @@ final class SubscriptionViewModel {
 
     private func verifyWithBackend(productId: String, transactionId: String, jws: String) async throws {
         _ = try await API.shared.post("/api/iap/verify",
-                                      body: IAPVerifyBody(productId: productId, transactionId: transactionId, jws: jws),
+                                      body: IAPVerifyBody(productId: productId, transactionId: transactionId, jwsRepresentation: jws),
                                       as: EmptyResponse.self)
     }
 

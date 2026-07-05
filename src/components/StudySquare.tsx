@@ -31,6 +31,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
   const [sort, setSort] = useState<"recent" | "hot">("recent");
   const [tag, setTag] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false); // 加载失败三态：与「空态」区分，展示错误+重试
 
   // 请求序号守卫：切排序/筛选 Tab 时仅接受最新一次请求的结果，
   // 防止较慢的旧响应后返回覆盖较新筛选的列表（竞态）。
@@ -39,6 +40,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
   const load = useCallback(async () => {
     const seq = ++loadSeq.current;
     setLoading(true);
+    setError(false); // 每次重新加载先清错误态
     try {
       const qs = new URLSearchParams();
       if (type) qs.set("type", type);
@@ -49,8 +51,10 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
       const json = (await res.json()) as { ok: true; data: { posts: PostView[] } } | { ok: false };
       if (seq !== loadSeq.current) return; // 期间已有更新请求发出，丢弃过期结果
       if (json.ok) setPosts(json.data.posts);
+      else setError(true); // 服务端返回 ok:false，进入错误态而非当作空列表
     } catch {
-      /* 静默：列表加载失败保持空态 */
+      // 网络/解析失败：进入错误态展示重试，不再静默当成空态误导用户
+      if (seq === loadSeq.current) setError(true);
     } finally {
       if (seq === loadSeq.current) setLoading(false);
     }
@@ -136,6 +140,19 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
               className="h-32 animate-pulse rounded-[16px] border border-[var(--border)] bg-[var(--surface-inset)]"
             />
           ))}
+        </div>
+      ) : error ? (
+        // 加载失败态：与「空态」区分——空态是「没有帖子」，此处是「没拿到数据」，
+        // 展示错误提示 + 重试按钮，避免把失败误导成广场无内容。
+        <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-[var(--red-soft-border)] bg-[var(--red-soft)] px-6 py-16 text-center">
+          <p className="font-semibold text-[var(--red)]">内容加载失败</p>
+          <p className="mt-1.5 text-[13px] text-[var(--ink3)]">网络似乎不太稳定，请稍后重试</p>
+          <button
+            onClick={() => void load()}
+            className="studio-press mt-4 rounded-[10px] bg-[var(--red)] px-4 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
+          >
+            重新加载
+          </button>
         </div>
       ) : posts.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-[16px] border border-dashed border-[var(--border)] bg-[var(--surface)] px-6 py-16 text-center">

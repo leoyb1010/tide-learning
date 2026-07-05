@@ -5,7 +5,6 @@ import { motion } from "framer-motion";
 import {
   ArrowRight,
   UsersThree,
-  CheckCircle,
   GraduationCap,
   Translate,
   Sparkle,
@@ -249,9 +248,13 @@ export function HomeFunnel({
                     <span className="text-[14px] font-semibold text-[var(--scene-ink)] transition-colors hover:text-[var(--red)] lg:text-[16px]">
                       {demand.title}
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--ok-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--ok)]">
-                      <CheckCircle size={12} weight="fill" />
-                      {demand.categoryLabel} · 已进入排期
+                    {/* teaser 数据仅含 {categoryLabel,totalVotes}，不含真实排期 status
+                        （getHomeDemandTeaser 未透传 status，此处无从判断阶段），
+                        故不再硬编码「已进入排期」误导，改用可从现有字段确证的事实：
+                        这是当前呼声最高的一条需求。 */}
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--red-soft)] px-2.5 py-1 text-[11px] font-medium text-[var(--red)]">
+                      <UsersThree size={12} weight="fill" />
+                      {demand.categoryLabel} · 呼声最高
                     </span>
                   </Link>
                   {demand.description && (

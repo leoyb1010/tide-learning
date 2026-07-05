@@ -1,6 +1,9 @@
 import SwiftUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
+#if canImport(AppKit)
+import AppKit  // macOS 下 NSImage 需要
+#endif
 
 /// 学生证（纸质证件）。深色校徽抬头带（videoGradient）压住卡头，
 /// 下方纸质白底承载头像/学号/等级/二维码，积分余额 mono + pop 动画。
@@ -174,7 +177,9 @@ struct StudentCardView: View {
 
     @ViewBuilder private var qrCode: some View {
         if let img = Self.qrImage(for: "/u/\(userId)") {
-            Image(uiImage: img)
+            // 平台适配 Image 由 platformImage(_:) 构造（iOS→UIImage / macOS→NSImage），
+            // 之后统一挂修饰链。不能在 ViewBuilder 里用 #if 后接尾随链——尾随修饰会落空。
+            Self.platformImage(img)
                 .interpolation(.none)
                 .resizable()
                 .frame(width: 58, height: 58)
@@ -184,6 +189,15 @@ struct StudentCardView: View {
                 .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Studio.border, lineWidth: 1))
                 .accessibilityLabel("个人主页二维码")
         }
+    }
+
+    /// 从平台图构造 SwiftUI Image（iOS 用 uiImage，macOS 用 nsImage）。
+    private static func platformImage(_ img: PlatformImage) -> Image {
+        #if canImport(UIKit)
+        Image(uiImage: img)
+        #else
+        Image(nsImage: img)
+        #endif
     }
 
     // MARK: 卡脚：格言 + 积分余额
@@ -242,7 +256,14 @@ struct StudentCardView: View {
 
     private static let ciContext = CIContext()
 
-    static func qrImage(for path: String) -> UIImage? {
+    /// 平台图类型别名：iOS = UIImage，macOS = NSImage。
+    #if canImport(UIKit)
+    typealias PlatformImage = UIImage
+    #else
+    typealias PlatformImage = NSImage
+    #endif
+
+    static func qrImage(for path: String) -> PlatformImage? {
         let filter = CIFilter.qrCodeGenerator()
         guard let data = path.data(using: .utf8) else { return nil }
         filter.message = data
@@ -250,6 +271,10 @@ struct StudentCardView: View {
         guard let output = filter.outputImage else { return nil }
         let scaled = output.transformed(by: CGAffineTransform(scaleX: 8, y: 8))
         guard let cg = ciContext.createCGImage(scaled, from: scaled.extent) else { return nil }
+        #if canImport(UIKit)
         return UIImage(cgImage: cg)
+        #else
+        return NSImage(cgImage: cg, size: CGSize(width: cg.width, height: cg.height))
+        #endif
     }
 }

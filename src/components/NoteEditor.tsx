@@ -149,6 +149,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
   const [draft, setDraft] = useState("");
   const [attachTs, setAttachTs] = useState<number | null>(null);
   const [saving, setSaving] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [submitting, setSubmitting] = useState(false); // 手动记笔记提交闩：阻止双击重复 POST
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<Record<string, boolean>>({});
   const saveTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -192,10 +193,16 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
 
   async function createNote() {
     if (!draft.trim()) return;
+    if (submitting) return; // guard：提交进行中，阻止双击/回车重复 POST
     setErr(null);
+    setSubmitting(true);
     const ts = attachTs ?? Math.floor(getCurrentTime());
-    const created = await post({ timestampSec: ts, contentMd: draft.trim(), kind: "text" });
-    if (created) { setDraft(""); setAttachTs(null); }
+    try {
+      const created = await post({ timestampSec: ts, contentMd: draft.trim(), kind: "text" });
+      if (created) { setDraft(""); setAttachTs(null); }
+    } finally {
+      setSubmitting(false); // 成功/失败都复位，允许再次提交
+    }
   }
 
   // §5.1：点击工具栏按钮，在草稿 textarea 当前选区应用 Markdown 语法
@@ -351,10 +358,10 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
               </button>
               <button
                 onClick={createNote}
-                disabled={!draft.trim()}
+                disabled={!draft.trim() || submitting}
                 className="rounded-lg bg-accent-600 px-4 py-1.5 text-sm font-medium text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40"
               >
-                记笔记
+                {submitting ? "保存中…" : "记笔记"}
               </button>
             </div>
             {err && <p className="mt-2 text-xs text-error">{err}</p>}

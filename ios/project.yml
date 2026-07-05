@@ -3,25 +3,33 @@ options:
   bundleIdPrefix: com.youdao.studio
   deploymentTarget:
     iOS: "17.0"
+    macOS: "14.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "5.9"
     DEVELOPMENT_TEAM: ""
     CODE_SIGN_STYLE: Automatic
-    TARGETED_DEVICE_FAMILY: "1,2"
 targets:
   YoudaoStudio:
     type: application
     platform: iOS
-    sources:
-      - path: YoudaoStudio
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.youdao.studio.app
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+    sources:
+      - path: YoudaoStudio
+        # iOS 不编译 macOS 专属入口与其配置文件（虽已 #if 保护，显式排除更干净）。
+        excludes:
+          - "App/YoudaoStudioAppMac.swift"
+          - "Info-Mac.plist"
+          - "YoudaoStudioMac.entitlements"
+          # macOS 壳与视图（Mac 专属，整目录已 #if os(macOS) 保护；iOS 无需参与编译）。
+          - "MacFeatures"
     # 用独立 Info.plist（xcodegen 从 info.properties 生成），
     # 因 ATS 是字典结构，GENERATE_INFOPLIST_FILE 的 INFOPLIST_KEY_ 只支持标量无法表达。
     info:
@@ -35,6 +43,47 @@ targets:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "拍照记笔记 / 截取学习画面"
         NSPhotoLibraryUsageDescription: "从相册选择图片附加到笔记"
+        # ATS：允许本地/局域网 http 明文连接（联调用 localhost:3100）。
+        # 生产走 https 正式域名不受影响；NSAllowsLocalNetworking 只放行本地网络。
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+
+  # ── macOS 内测 target ─────────────────────────────────────────────
+  # M0：仅编译跨平台 Core + 共享 App 文件（AppConfig/TabRouter）+ Mac 入口，
+  # 排除 iOS 壳（YoudaoStudioApp/RootView）与整个 Features/（iOS 视图含大量
+  # navigationBarTitleDisplayMode / presentationDetents / fullScreenCover 等
+  # iOS-only API）。Mac 的 Features 壳与视图由 M1 增补。
+  YoudaoStudioMac:
+    type: application
+    platform: macOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.youdao.studio.mac
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_ENTITLEMENTS: YoudaoStudio/YoudaoStudioMac.entitlements
+        # 不设 ASSETCATALOG_COMPILER_APPICON_NAME：现有 AppIcon 仅 iOS 平台条目，
+        # Mac 内测暂不需要图标；catalog 仍随 Resources 编译（共享图片资源可用）。
+    sources:
+      - path: YoudaoStudio
+        excludes:
+          # iOS @main 入口（不参与 Mac 编译）。
+          - "App/YoudaoStudioApp.swift"
+          # iOS 根壳（SplashView/MainTabView/LoginView 依赖，M1 建 Mac 壳替代）。
+          - "App/RootView.swift"
+          # 整个 iOS 功能层（含 iOS-only SwiftUI API），M1 增补 Mac 版。
+          - "Features"
+          # iOS/Mac 专属配置文件（避免被当作打包资源）。
+          - "Info.plist"
+          - "Info-Mac.plist"
+    # 用独立 Info-Mac.plist（xcodegen 从 info.properties 生成）：ATS 是字典结构，
+    # 需用 plist 表达；xcodegen 同时自动注入 CFBundleIdentifier / 版本 / 可执行名等标准键。
+    info:
+      path: YoudaoStudio/Info-Mac.plist
+      properties:
+        CFBundleDisplayName: "有道自习室"
+        LSMinimumSystemVersion: "14.0"
+        NSHumanReadableCopyright: "© 有道自习室"
         # ATS：允许本地/局域网 http 明文连接（联调用 localhost:3100）。
         # 生产走 https 正式域名不受影响；NSAllowsLocalNetworking 只放行本地网络。
         NSAppTransportSecurity:

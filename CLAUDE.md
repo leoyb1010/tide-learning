@@ -14,3 +14,10 @@
 - 主分支：feat/studio-v2-redesign（STUDIO 重构 + AI 自习室）
 - 体验账号：demo@tide.learning/demo123(全站订阅)、admin@tide.learning/admin123(后台)
 - LLM key 在 .env 的 DEEPSEEK_API_KEY（已 gitignore）；DeepSeek 账户余额为 0，AI 实际生成需充值
+
+## 验证铁律
+- **契约冒烟必须全绿**：改动任何 API route / DTO 后，跑 `bash scripts/contract-smoke.sh`，必须输出「契约冒烟 N/N 通过」并 exit 0。
+  它以真实 HTTP 响应校验 iOS 消费的高危 DTO（LessonAggregate / MarketStall / ShelfCourse / DeskData / Note 等）的非 Optional 字段与日期格式；任一字段被删/改名/改类型即红，防止 Swift 解码整屏崩。需生产服务器在 3100 运行；脚本只读、可重复跑、不留脏数据。
+- `npm test` 全绿（含 `tests/contract.test.ts`，服务器未起时该组自动 skip 不误红）。
+- 涉及页面/类型改动跑 `npx tsc --noEmit` 无错。
+- 服务端未捕获的 500 会落盘到 `logs/api-errors-YYYY-MM-DD.jsonl`（已 gitignore），在 `/admin/errors`（仅 admin 角色）查看近 200 条 + 今日计数。

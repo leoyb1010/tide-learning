@@ -7,10 +7,18 @@ enum AppConfig {
     static let apiBaseURL = "http://localhost:3100"
 
     /// 原生 App 标识（写操作时带上，配合后端 assertSameOrigin 的 Bearer 放行）。
+    #if os(macOS)
+    static let appOrigin = "mac-app"
+    #else
     static let appOrigin = "ios-app"
+    #endif
 
-    /// 当前是否 iOS（用于隐藏微信/支付宝支付，只走 IAP）。
+    /// 当前是否 iOS（用于隐藏微信/支付宝支付，只走 IAP）。macOS 内测非 iOS。
+    #if os(macOS)
+    static let isIOS = false
+    #else
     static let isIOS = true
+    #endif
 
     /// 落地页基址（分享用）：apiBaseURL 去掉末尾 /api。
     /// 分享走公开落地页链接（/u/{id} 等）而非需鉴权的图 URL，最可靠。

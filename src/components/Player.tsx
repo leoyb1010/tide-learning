@@ -1035,10 +1035,15 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
   const [booked, setBooked] = useState(false);
   const start = lesson.liveStartAt ? new Date(lesson.liveStartAt) : null;
   // upcoming 依赖 Date.now()，SSR 与首帧 hydration 各算一次会不一致；
-  // 挂载后再计算，SSR 首帧统一按“进入直播间”渲染，避免 hydration mismatch
+  // 挂载后再计算，SSR 首帧统一按「未开始」渲染，避免 hydration mismatch。
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const upcoming = mounted && start ? start.getTime() > Date.now() : false;
+  // 两态语义（无真实直播间 URL 字段，不假装可跳转）：
+  //  - upcoming（未到开播点，或时间待定）→ 可「预约席位」，点击后置「已预约席位」。
+  //  - live（已到点/开播后）→ 直播进行中，作状态展示而非可点跳转，避免死链假装「进入直播间」。
+  // 未挂载时统一按 upcoming 渲染（与 SSR 首帧一致）。
+  const live = mounted && !!start && start.getTime() <= Date.now();
+  const upcoming = !live;
   return (
     <div className="overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] shadow-[var(--card)]">
       {/* 深色直播展示区：渐变材质 + 细点纹理 + 红色 live 信号，非死黑平面 */}
@@ -1062,15 +1067,27 @@ function LiveBanner({ lesson }: { lesson: LessonData }) {
             {start ? `开播时间：${start.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai", month: "long", day: "numeric", hour: "2-digit", minute: "2-digit" })}` : "开播时间待定"}
           </p>
         </div>
-        <button
-          onClick={() => { setBooked(true); track("live_class_book", { lesson_id: lesson.id }); }}
-          disabled={booked}
-          className={`studio-press inline-flex items-center gap-1.5 rounded-[12px] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 ${
-            booked ? "bg-[var(--ok)]" : "cta-glow bg-[var(--red)] hover:bg-[var(--red-hover)]"
-          }`}
-        >
-          {booked ? <><Check size={15} weight="bold" /> 已预约</> : upcoming ? "预约席位" : "进入直播间"}
-        </button>
+        {live ? (
+          // 直播进行中：无真实直播间 URL 字段可跳转，作状态展示而非可点按钮，
+          // 不用「进入直播间」制造死链，也不用「预约」——已开播不能预约。
+          <span
+            className="inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)]/12 px-5 py-2.5 text-sm font-semibold text-[var(--red)] ring-1 ring-[var(--red)]/25"
+            role="status"
+          >
+            <span className="live-dot h-2 w-2 rounded-full text-[var(--red)]"><span className="relative block h-2 w-2 rounded-full bg-[var(--red)]" /></span>
+            直播进行中
+          </span>
+        ) : (
+          <button
+            onClick={() => { setBooked(true); track("live_class_book", { lesson_id: lesson.id }); }}
+            disabled={booked}
+            className={`studio-press inline-flex items-center gap-1.5 rounded-[12px] px-5 py-2.5 text-sm font-semibold text-white transition-all duration-200 ${
+              booked ? "bg-[var(--ok)]" : "cta-glow bg-[var(--red)] hover:bg-[var(--red-hover)]"
+            }`}
+          >
+            {booked ? <><Check size={15} weight="bold" /> 已预约席位</> : "预约席位"}
+          </button>
+        )}
       </div>
     </div>
   );

@@ -17,10 +17,12 @@ struct GeneratedLesson: Decodable, Identifiable {
 }
 
 /// POST /api/ai/generate-lesson 返回（能拿到的统计用于完成页；缺省兜底）。
+/// 后端实际返回 { lessonId, blocks:Int(写入块数), allReady }；quizCount 为可选，
+/// 后端暂未下发时解码为 nil（完成页据 quizCount>0 才展示「N 测验」，缺省即不展示，安全）。
+/// blockCount 曾定义但从未被后端下发、也无消费点（永远 nil），删除以消除死字段告警。
 struct GeneratedLessonResult: Decodable {
     let lessonId: String?
     let quizCount: Int?
-    let blockCount: Int?
 }
 
 // MARK: - 造课阶段机

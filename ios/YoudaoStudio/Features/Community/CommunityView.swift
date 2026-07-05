@@ -3,9 +3,12 @@ import Observation
 
 // MARK: - DTO（课程共创）
 
-/// GET /api/demands 返回体（data 为对象包裹 demands 数组）。
+/// GET /api/demands 返回体（data 为对象包裹 demands 数组 + 当前用户本周剩余票额）。
 struct DemandsResponse: Decodable {
     let demands: [Demand]
+    /// 本周剩余票额（后端契约：WEEKLY_VOTE_BUDGET - 本周已用；游客/未登录为 0）。
+    /// 后端旧版本未下发时按 nil 处理，UI 不据此禁用（保守放行，投票时的错误兜底仍在）。
+    let remainingVotes: Int?
 }
 
 /// GET /api/demands 列表项：投票需求。
@@ -17,7 +20,7 @@ struct Demand: Decodable, Identifiable, Equatable {
     let categoryLabel: String?      // 后端已提供中文分类标签
     var totalVotes: Int
     let status: String
-    var votedByMe: Bool?            // 后端列表未返回该字段，保持 Optional
+    var votedByMe: Bool?            // 后端已按当前用户逐条下发（未登录/游客为 false）；解码为 Optional 兼容旧版本
 
     /// 分类展示文案：优先用后端标签，回退原始值。
     var categoryText: String { categoryLabel ?? category }
@@ -70,6 +73,8 @@ final class CommunityViewModel {
     var demandsLoaded = false
     var demandsError: String?
     var votingId: String?
+    /// 本周剩余票额（GET /api/demands 下发）。nil=后端未下发/未知（不据此禁用）；0=已用完本周票。
+    var remainingVotes: Int?
 
     // 广场
     var posts: [CommunityPost] = []
@@ -100,11 +105,15 @@ final class CommunityViewModel {
         do {
             let resp = try await API.shared.get("/api/demands", as: DemandsResponse.self)
             demands = resp.demands
+            remainingVotes = resp.remainingVotes
             demandsLoaded = true
         } catch {
             demandsError = (error as? APIError)?.errorDescription ?? "加载失败"
         }
     }
+
+    /// 本周票是否已用完（仅当后端明确下发 remainingVotes==0 才判定；nil/未知不禁用）。
+    var outOfVotesThisWeek: Bool { remainingVotes == 0 }
 
     /// 按票数倒序（名次用）。
     var rankedDemands: [Demand] {
@@ -117,16 +126,28 @@ final class CommunityViewModel {
     /// 全场最高票（进度条基准，至少 1 防除零）。
     var maxVotes: Int { max(rankedDemands.first?.totalVotes ?? 0, 1) }
 
-    /// 投票：POST /api/demands/[id]/vote。乐观更新票数。
+    /// 投票 POST 响应（消费后端返回的本周剩余票额，保持前端剩余票权威）。
+    private struct VoteResult: Decodable {
+        let remainingThisWeek: Int?
+    }
+
+    /// 投票：POST /api/demands/[id]/vote。乐观更新票数 + 同步本周剩余票额。
+    /// 本周票已用完（remainingVotes==0）时不发起请求（前端拦一道，后端仍是最终裁决）。
     func vote(_ demand: Demand) async {
-        guard demand.votedByMe != true, votingId == nil else { return }
+        guard demand.votedByMe != true, votingId == nil, !outOfVotesThisWeek else { return }
         votingId = demand.id
         defer { votingId = nil }
         do {
-            _ = try await API.shared.post("/api/demands/\(demand.id)/vote", body: EmptyBody(), as: EmptyResponse.self)
+            let res = try await API.shared.post("/api/demands/\(demand.id)/vote", body: EmptyBody(), as: VoteResult.self)
             if let idx = demands.firstIndex(where: { $0.id == demand.id }) {
                 demands[idx].totalVotes += 1
                 demands[idx].votedByMe = true
+            }
+            // 剩余票额以后端返回为准；旧后端未下发时本地兜底自减 1（不低于 0）。
+            if let r = res.remainingThisWeek {
+                remainingVotes = r
+            } else if let cur = remainingVotes {
+                remainingVotes = max(0, cur - 1)
             }
         } catch {
             demandsError = (error as? APIError)?.errorDescription ?? "投票失败"
@@ -353,10 +374,23 @@ struct CommunityView: View {
             LazyVStack(alignment: .leading, spacing: 14) {
                 if let top = vm.topDemand {
                     weekStarCard(top)
-                    Text("需求榜")
-                        .font(.studio(16, .bold))
-                        .foregroundStyle(Studio.ink)
-                        .padding(.top, 4)
+                    HStack(alignment: .firstTextBaseline) {
+                        Text("需求榜")
+                            .font(.studio(16, .bold))
+                            .foregroundStyle(Studio.ink)
+                        Spacer()
+                        // 本周剩余票额提示（仅后端下发 remainingVotes 时展示；0 票用中性提示）。
+                        if let rv = vm.remainingVotes {
+                            HStack(spacing: 4) {
+                                Image(systemName: rv > 0 ? "ticket.fill" : "hourglass")
+                                    .font(.system(size: 10, weight: .semibold))
+                                Text(rv > 0 ? "本周剩余 \(rv) 票" : "本周票已用完")
+                                    .font(.studio(11, .semibold))
+                            }
+                            .foregroundStyle(rv > 0 ? Studio.ink3 : Studio.ink4)
+                        }
+                    }
+                    .padding(.top, 4)
                 }
                 ForEach(Array(vm.rankedDemands.enumerated()), id: \.element.id) { idx, demand in
                     demandCard(rank: idx + 1, demand: demand)
@@ -477,32 +511,36 @@ struct CommunityView: View {
         .pressable()
     }
 
-    /// 投票按钮（已投则禁用并显示已投）。
+    /// 投票按钮：已投→禁用显示「已投」；未投但本周票已用完→禁用显示「票已用完」；否则可投。
     private func voteButton(_ demand: Demand, onDark: Bool) -> some View {
         let voted = demand.votedByMe == true
         let loading = vm.votingId == demand.id
+        // 未投过本需求但本周票已用完（后端下发 remainingVotes==0）→ 置灰不可投。
+        let exhausted = !voted && vm.outOfVotesThisWeek
+        // 置灰态（已投 或 票用完）共用中性底色；仅可投态用有道红。
+        let dimmed = voted || exhausted
         return Button {
             // 仅在真正会计票时给成功触觉（与 VM guard 一致）。
-            if !voted && vm.votingId == nil { Haptics.success() }
+            if !voted && !exhausted && vm.votingId == nil { Haptics.success() }
             Task { await vm.vote(demand) }
         } label: {
             HStack(spacing: 5) {
                 if loading {
-                    ProgressView().controlSize(.small).tint(voted ? Studio.ink3 : .white)
+                    ProgressView().controlSize(.small).tint(dimmed ? Studio.ink3 : .white)
                 } else {
-                    Image(systemName: voted ? "checkmark" : "hand.thumbsup.fill")
+                    Image(systemName: voted ? "checkmark" : (exhausted ? "hourglass" : "hand.thumbsup.fill"))
                         .font(.system(size: 12, weight: .semibold))
                 }
-                Text(voted ? "已投" : "投票").font(.studio(13, .semibold))
+                Text(voted ? "已投" : (exhausted ? "票已用完" : "投票")).font(.studio(13, .semibold))
             }
-            .foregroundStyle(voted ? Studio.ink3 : .white)
+            .foregroundStyle(dimmed ? Studio.ink3 : .white)
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
-            .background(voted ? (onDark ? Color.white.opacity(0.12) : Studio.surfaceInset) : Studio.red)
+            .background(dimmed ? (onDark ? Color.white.opacity(0.12) : Studio.surfaceInset) : Studio.red)
             .clipShape(RoundedRectangle(cornerRadius: StudioRadius.pill, style: .continuous))
         }
         .buttonStyle(.plain)
-        .disabled(voted || loading)
+        .disabled(voted || exhausted || loading)
         .pressable(scale: 0.94, haptic: false)
         .animation(reduceMotion ? nil : StudioMotion.quick, value: voted)
     }

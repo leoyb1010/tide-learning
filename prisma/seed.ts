@@ -277,7 +277,9 @@ async function main() {
   await prisma.entitlement.create({
     data: { userId: demoUser.id, sourceSubscriptionId: sub.id, status: "active", accessLevel: "premium", validUntil: new Date(Date.now() + 365 * 864e5), snapshotJson: JSON.stringify({ isSubscriber: true, accessibleTracks: "all" }) },
   });
-  await prisma.order.create({ data: { userId: demoUser.id, planId: planYear.id, channel: "youdao_dict", amountCents: 49900, status: "paid", paidAt: new Date(), externalOrderId: "seed_demo_year" } });
+  // 已付订单回填 subscriptionId：关联本单激活的那条年卡订阅，退款时可据此精确撤销「这一笔」
+  // （对齐 payment.ts payment.succeeded 分支写回 order.subscriptionId 的语义，避免 seed 数据缺链）。
+  await prisma.order.create({ data: { userId: demoUser.id, planId: planYear.id, channel: "youdao_dict", amountCents: 49900, status: "paid", paidAt: new Date(), externalOrderId: "seed_demo_year", subscriptionId: sub.id } });
 
   // 单赛道体验用户：只订了口语
   const oralUser = await prisma.user.create({
@@ -287,6 +289,8 @@ async function main() {
     data: { userId: oralUser.id, planId: (await prisma.plan.findFirst({ where: { scope: "english_oral" } }))!.id, channel: "ad_external", scope: "english_oral", status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5), cancelAtPeriodEnd: false },
   });
   await prisma.entitlement.create({ data: { userId: oralUser.id, sourceSubscriptionId: oralSub.id, status: "active", accessLevel: "premium", validUntil: new Date(Date.now() + 30 * 864e5), snapshotJson: JSON.stringify({ accessibleTracks: ["english_oral"] }) } });
+  // oral 用户的已付订单也回填 subscriptionId（关联其口语月卡订阅），保持「付费订单↔订阅」双向可查。
+  await prisma.order.create({ data: { userId: oralUser.id, planId: oralSub.planId, channel: "ad_external", amountCents: 1990, status: "paid", paidAt: new Date(), externalOrderId: "seed_oral_month", subscriptionId: oralSub.id } });
 
   // ---------- 广场/社区 demo 用户（轻量：仅昵称 + 头像，无订阅）----------
   // 让广场「有人在学」，并把新头像 avatar-4~12 用起来（避免全站只有 3 个头像）。
@@ -393,13 +397,20 @@ async function main() {
   //   - origin="ai_generated"：市场卡显示「AI 生成」徽标，符合「同学用 AI 造的课」语境。
   //   - visibility 保持默认 public 不动（shared 才是集市开关；public 让它同时可进公共课程库，
   //     不会重新引入「私有课污染库」的 bug——那 bug 挡的是 visibility=private 的课）。
+  // 定价：三门集市课设为付费（priceCredits>0），让交易闭环（course_purchase / course_sale_income）
+  // 有真实付费课可回归。priceCredits=null/0 为免费拿走；此处按内容体量给 300/500/800 三档。
+  const MARKET_PAID_PRICES: Record<string, number> = {
+    "ai-office-005": 300,
+    "ai-writing-006": 500,
+    "anti-fraud-007": 800,
+  };
   const MARKET_SHARED_SLUGS = ["ai-office-005", "ai-writing-006", "anti-fraud-007"];
   for (const slug of MARKET_SHARED_SLUGS) {
     const id = courseIds[slug];
     if (!id) continue;
     await prisma.course.update({
       where: { id },
-      data: { sharedStatus: "shared", authorUserId: demoUser.id, origin: "ai_generated" },
+      data: { sharedStatus: "shared", authorUserId: demoUser.id, origin: "ai_generated", priceCredits: MARKET_PAID_PRICES[slug] ?? null },
     });
   }
   // 让集市卡的「拿走数」非零：其它用户对这些分享课建起始 LearningProgress（= 拿走）。
@@ -764,18 +775,77 @@ async function main() {
     },
   ];
   void pickAuthor;
+  // 广场帖子的 likeCount/commentCount 必须由真实 PostLike/PostComment 行数派生，不能硬编码假数
+  // （否则计数与实际点赞/评论表脱节，前端点开评论区是空的、取消点赞时 -1 会算错）。
+  // 做法：先建帖（计数留 0），再从「除作者外的其它用户」里取 distinct 用户建真实点赞/评论行，
+  // 目标数取 min(想要的热度, 可用 distinct 用户数)——PostLike 有 @@unique([postId,userId])，
+  // 一个用户对一帖只能点一次赞，所以真实计数天然被用户池上限约束（诚实的小数 > 好看的假数）。
+  // 计数在本段末尾按真实行数回填（见下方 recompute）。
+  const likerPool = [demoUser, oralUser, admin, ...communityUsers];
+  const commenterPool = [oralUser, demoUser, ...communityUsers];
+  const COMMENT_TEXTS = [
+    "同款体验，跟着练确实有效！", "收藏了，感谢分享～", "请问用的是哪一讲的方法？",
+    "打卡同行，一起坚持！", "这个思路很受用，学到了。", "太真实了，我也是这么过来的。",
+    "已 mark，回头照着试试。", "求更多细节，蹲一个后续。", "支持！继续更新呀。",
+    "刚好在纠结这个，看完清晰多了。", "点赞，说到心坎里了。", "跟我的情况一模一样，抄作业了。",
+    "赞同，先完成再完美。", "感谢楼主，干货满满。", "学习使我快乐，冲！",
+  ];
+  const createdPostIds: string[] = [];
   let postCount = 0;
-  for (const p of postSeeds) {
-    await prisma.post.create({
+  let postLikeCount = 0;
+  let postCommentCount = 0;
+  for (let pi = 0; pi < postSeeds.length; pi++) {
+    const p = postSeeds[pi];
+    const postCreatedAt = new Date(Date.now() - p.hoursAgo * HOUR);
+    const post = await prisma.post.create({
       data: {
         userId: p.author.id, type: p.type, content: p.content, status: "approved",
         images: JSON.stringify(p.images ?? []),
         topicTags: JSON.stringify(p.topicTags ?? []),
-        likeCount: p.likeCount, commentCount: p.commentCount,
-        createdAt: new Date(Date.now() - p.hoursAgo * HOUR),
+        likeCount: 0, commentCount: 0, // 占位，末尾按真实行数重算
+        createdAt: postCreatedAt,
       },
     });
+    createdPostIds.push(post.id);
     postCount++;
+
+    // 真实点赞：从 likerPool 去掉作者，按目标热度取前 N 个 distinct 用户（受池大小约束）
+    const likers = likerPool.filter((u) => u.id !== p.author.id);
+    const likeTarget = Math.min(p.likeCount, likers.length);
+    for (let li = 0; li < likeTarget; li++) {
+      // 从不同起点轮转，避免每帖都是同一批人点赞，分布更自然
+      const u = likers[(li + pi) % likers.length];
+      try {
+        await prisma.postLike.create({
+          data: { postId: post.id, userId: u.id, createdAt: new Date(postCreatedAt.getTime() + (li + 1) * 60 * 1000) },
+        });
+        postLikeCount++;
+      } catch { /* @@unique([postId,userId]) 撞车则跳过（轮转已尽量避免） */ }
+    }
+
+    // 真实评论：从 commenterPool 去掉作者，取目标数（受池大小约束；同一用户可多条评论，无唯一约束）
+    const commenters = commenterPool.filter((u) => u.id !== p.author.id);
+    const commentTarget = commenters.length === 0 ? 0 : Math.min(p.commentCount, commenters.length);
+    for (let ci = 0; ci < commentTarget; ci++) {
+      const u = commenters[(ci + pi) % commenters.length];
+      await prisma.postComment.create({
+        data: {
+          postId: post.id, userId: u.id, status: "approved",
+          content: COMMENT_TEXTS[(ci + pi) % COMMENT_TEXTS.length],
+          createdAt: new Date(postCreatedAt.getTime() + (ci + 1) * 90 * 1000),
+        },
+      });
+      postCommentCount++;
+    }
+  }
+
+  // 计数重算：把每帖 likeCount/commentCount 校准为真实 PostLike/PostComment 行数（真值源单一）。
+  for (const postId of createdPostIds) {
+    const [likeN, commentN] = await Promise.all([
+      prisma.postLike.count({ where: { postId } }),
+      prisma.postComment.count({ where: { postId, status: "approved" } }),
+    ]);
+    await prisma.post.update({ where: { id: postId }, data: { likeCount: likeN, commentCount: commentN } });
   }
 
   // ---------- C2：需求制作剧场（DemandStage）+ 评论 + 关注 ----------
@@ -880,7 +950,7 @@ async function main() {
   console.log("✅ 融合种子完成：");
   console.log(`   字幕 ${subtitleCount} 条 · 笔记 ${noteCount} 条（截帧 ${captureSeq} 张真实截图）· 成就 ${achievementSeeds.length} 个（demo 解锁 ${demoUnlocked.length}）`);
   console.log(`   需求阶段 ${stageCount} 条 · 关注 ${followCount} 条 · 潮汐日历 ${streakDayCount} 天 · 优惠券 TIDE20`);
-  console.log(`   广场帖子 ${postCount} 条 · 社区用户 ${communityUsers.length} 位（头像 avatar-4~12）`);
+  console.log(`   广场帖子 ${postCount} 条（真实点赞 ${postLikeCount} · 评论 ${postCommentCount}，计数按真实行数重算）· 社区用户 ${communityUsers.length} 位（头像 avatar-4~12）`);
   console.log(`   真实视频已填入 ${[...new Set(videoFilledCourses)].length} 门课首讲：${[...new Set(videoFilledCourses)].join(", ")}`);
   console.log(`   课程 ${courses.length} 门（有道英语板块 + 潮汐 AI/生活）`);
   console.log(`   套餐：全站(月/季/年) + 单赛道(口语/银发/AI) · 线索 ${leadSeeds.length} 条`);

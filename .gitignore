@@ -3,6 +3,9 @@ node_modules
 out
 build
 *.log
+
+# 500 错误结构化落盘（logs/api-errors-YYYY-MM-DD.jsonl，供 /admin/errors 查看，不入库）
+logs/
 .DS_Store
 .env
 .env*.local

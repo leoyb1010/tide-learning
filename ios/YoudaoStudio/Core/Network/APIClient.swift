@@ -88,12 +88,24 @@ final class API {
         let env: APIEnvelope<T>
         do { env = try JSONDecoder.api.decode(APIEnvelope<T>.self, from: data) }
         catch {
-            if http.statusCode >= 400 { throw APIError.from(status: http.statusCode, message: nil) }
+            if http.statusCode >= 400 {
+                await handleAuthExpiredIfNeeded(status: http.statusCode)
+                throw APIError.from(status: http.statusCode, message: nil)
+            }
             throw APIError.network("数据解析失败")
         }
         guard http.statusCode < 400, env.ok, let value = env.data else {
+            await handleAuthExpiredIfNeeded(status: http.statusCode)
             throw APIError.from(status: http.statusCode, message: env.error)
         }
         return value
+    }
+
+    /// 全局 401 处理：任意请求命中 401（token 失效）即触发本地登出，
+    /// AuthManager 内部幂等（已登出则跳过），RootView 观察登录态自动回登录页。
+    /// iOS / macOS 双端共享此逻辑。
+    private func handleAuthExpiredIfNeeded(status: Int) async {
+        guard status == 401 else { return }
+        await AuthManager.shared.handleAuthExpired()
     }
 }

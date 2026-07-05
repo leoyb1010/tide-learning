@@ -13,11 +13,21 @@ extension Color {
         self.init(red: r, green: g, blue: b)
     }
 
-    /// 亮暗双值：SwiftUI 在渲染时按当前 traitCollection 取值。
+    /// 亮暗双值：SwiftUI 在渲染时按当前外观取值。
+    /// iOS 走 UIColor 动态 provider；macOS 走 NSColor 动态 provider（bestMatch → darkAqua 判暗）。
     init(light: String, dark: String) {
+        #if canImport(UIKit)
         self.init(uiColor: UIColor { tc in
             tc.userInterfaceStyle == .dark ? UIColor(Color(hex: dark)) : UIColor(Color(hex: light))
         })
+        #elseif canImport(AppKit)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            return NSColor(Color(hex: isDark ? dark : light))
+        })
+        #else
+        self.init(hex: light)
+        #endif
     }
 }
 
@@ -102,6 +112,9 @@ enum StudioMotion {
 }
 
 /// 触觉反馈封装（统一调用点，避免各屏散落 UIImpactFeedbackGenerator）。
+/// iOS 走 UIKit 反馈生成器；macOS 走 NSHapticFeedbackManager（触控板震感），
+/// 无触控板硬件时系统自动降级为静默。签名两端一致，调用点无需条件编译。
+#if os(iOS)
 import UIKit
 enum Haptics {
     static func light()  { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
@@ -113,6 +126,34 @@ enum Haptics {
     static func error()  { UINotificationFeedbackGenerator().notificationOccurred(.error) }
     static func selection(){ UISelectionFeedbackGenerator().selectionChanged() }
 }
+#elseif canImport(AppKit)
+import AppKit
+enum Haptics {
+    /// macOS 触控板反馈：.alignment 轻、.levelChange 更明显。无硬件时静默。
+    private static func perform(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
+        NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .default)
+    }
+    static func light()  { perform(.alignment) }
+    static func medium() { perform(.levelChange) }
+    static func rigid()  { perform(.levelChange) }
+    static func soft()   { perform(.alignment) }
+    static func success(){ perform(.levelChange) }
+    static func warning(){ perform(.levelChange) }
+    static func error()  { perform(.generic) }
+    static func selection(){ perform(.alignment) }
+}
+#else
+enum Haptics {
+    static func light()  {}
+    static func medium() {}
+    static func rigid()  {}
+    static func soft()   {}
+    static func success(){}
+    static func warning(){}
+    static func error()  {}
+    static func selection(){}
+}
+#endif
 
 /// 字体（MVP 用系统字体；后续打进 Plus Jakarta / Noto SC / IBM Plex Mono）。
 extension Font {

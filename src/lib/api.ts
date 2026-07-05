@@ -6,6 +6,32 @@ import { AppError } from "./errors";
 // AppError 抽到零依赖的 errors.ts（供 client 侧安全 import）；此处 re-export 保持既有引用兼容。
 export { AppError };
 
+/**
+ * 500 错误结构化落盘（流3-U6 · 契约防断裂制度）。
+ * 追加写 logs/api-errors-YYYY-MM-DD.jsonl，一行一条 {ts,path?,message,stack}，
+ * 供 /admin/errors 页查看。仅服务端调用（node fs），且完全「尽力而为」：
+ * 目录不存在则建，任何写失败都吞掉，绝不影响正常错误响应。
+ */
+async function persistInternalError(e: unknown): Promise<void> {
+  try {
+    // 动态 import，避免把 node:fs 拖进任何可能被 client 侧 import 的路径。
+    const { appendFile, mkdir } = await import("node:fs/promises");
+    const { join } = await import("node:path");
+    const now = new Date();
+    const day = now.toISOString().slice(0, 10); // YYYY-MM-DD（UTC）
+    const dir = join(process.cwd(), "logs");
+    await mkdir(dir, { recursive: true });
+    const entry = {
+      ts: now.toISOString(),
+      message: e instanceof Error ? e.message : String(e),
+      stack: e instanceof Error ? e.stack ?? null : null,
+    };
+    await appendFile(join(dir, `api-errors-${day}.jsonl`), JSON.stringify(entry) + "\n", "utf8");
+  } catch {
+    // 落盘失败（只读文件系统 / 权限 / 磁盘满等）绝不能影响响应——静默吞掉。
+  }
+}
+
 export function ok(data: unknown, init?: number) {
   return NextResponse.json({ ok: true, data }, { status: init ?? 200 });
 }
@@ -30,6 +56,8 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
     if (e instanceof SyntaxError) return fail("请求体格式错误", 400);
     // 其余：记录服务端日志，返回通用文案，避免泄露数据结构 / 配置
     console.error("[api:internal]", e instanceof Error ? e.stack ?? e.message : e);
+    // 结构化落盘（尽力而为，不 await —— 绝不阻塞/影响响应）。
+    void persistInternalError(e);
     return fail("服务异常，请稍后再试", 500);
   }
 }

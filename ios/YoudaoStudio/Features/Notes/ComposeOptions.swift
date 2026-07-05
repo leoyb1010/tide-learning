@@ -50,6 +50,10 @@ final class ComposeOptionsLoader {
     var options: ComposeOptions = .empty
     var loaded = false
     var loading = false
+    /// 最近一次 load 是否失败（网络/解码错误 → 静默降级为空选项）。
+    /// 用于区分「加载成功但确实没有笔记本」与「加载失败拿不到列表」：
+    /// 前者不该预选（防选到不属于本人的本），后者应保留调用方预选值（无从校验，信任调用方）。
+    var loadFailed = false
 
     /// 现场创建标签中（禁重复点）。
     var creatingTag = false
@@ -61,8 +65,23 @@ final class ComposeOptionsLoader {
         // 拉失败不阻塞记笔记：静默降级为空选项，用户仍可只写正文保存。
         if let opts = try? await API.shared.get("/api/notes/compose-options", as: ComposeOptions.self) {
             options = opts
+            loadFailed = false
+        } else {
+            // 失败：保留空选项但打标 loadFailed，供预选逻辑保留调用方传入的预选值（见 shouldPreselect）。
+            loadFailed = true
         }
         loaded = true
+    }
+
+    /// 是否应落实调用方传入的预选笔记本 id。
+    /// 契约（流2-U1b · 修「compose-options 拉取失败时预选被丢弃」）：
+    ///   - 加载成功：仅当该本存在于选项里才预选（防选到不属于本人的本）。
+    ///   - 加载失败：无从校验，保留调用方预选值（失败也不丢预选）。
+    /// nil 预选恒返回 false（无预选可落）。
+    func shouldPreselect(_ notebookId: String?) -> Bool {
+        guard let notebookId else { return false }
+        if loadFailed { return true }
+        return options.notebooks.contains(where: { $0.id == notebookId })
     }
 
     /// 现场创建标签，成功则并入 options.tags 并返回新标签（供调用方自动勾选）。

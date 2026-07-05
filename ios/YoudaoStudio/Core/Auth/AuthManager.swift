@@ -68,6 +68,16 @@ final class AuthManager {
         user = nil
         KeychainStore.clear()
     }
+
+    /// 全局 401 钩子：任意请求收到 401（token 失效）时由 `API.send` 调用，
+    /// 清本地登录态 → RootView 观察到 isLoggedIn 变化自动回登录页。iOS/Mac 共享。
+    ///
+    /// 幂等：已登出（token == nil）则跳过，避免 bootstrap 的 401 与并发请求的 401
+    /// 重复触发 logoutLocal / 多次 UI 抖动。bootstrap 自身已处理首个 401，此处兜住其余。
+    func handleAuthExpired() async {
+        guard token != nil else { return }
+        await logoutLocal()
+    }
 }
 
 struct EmptyBody: Encodable {}

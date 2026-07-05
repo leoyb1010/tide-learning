@@ -1,3 +1,5 @@
+// macOS 内测不接 APNs 推送：整文件仅 iOS 参与编译（依赖 UIKit / UIApplication）。
+#if os(iOS)
 import SwiftUI
 import Observation
 import UserNotifications
@@ -183,3 +185,4 @@ extension PushManager: UNUserNotificationCenterDelegate {
         [.banner, .sound, .badge]
     }
 }
+#endif

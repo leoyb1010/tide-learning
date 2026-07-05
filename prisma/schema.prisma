@@ -148,6 +148,7 @@ model Course {
   purchases  CoursePurchase[]
 
   @@index([sharedStatus, lastUpdatedAt]) // 课程集市列表：按分享状态过滤 + 时间排序
+  @@index([authorUserId]) // 「我造/我导入的课」列表 + 用户删除时按作者反查（authorUserId 为软 FK，无级联，查询侧用索引兜住）
 }
 
 model Lesson {
@@ -335,7 +336,7 @@ model NoteTagOnNote {
 model Demand {
   id               String   @id @default(cuid())
   userId           String
-  user             User     @relation(fields: [userId], references: [id])
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade) // 收敛：与所有其他 user 关系一致走 Cascade（此前缺省 NoAction，删用户会因 demand 外键失败，形成「半 Cascade 半 Restrict」不一致）
   title            String
   description      String?
   category         String   @default("ai_skill")
