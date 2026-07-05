@@ -13,8 +13,13 @@ struct YoudaoStudioAppMac: App {
     // 复用跨屏意图（书桌「今天想学」→ 造课台）。
     @State private var router = TabRouter(selection: 0)
 
+    // 菜单栏依赖的 openWindow(\.openWindow) 只能在 View 环境里取用；App struct 内不可直接调。
+    // 命令按钮「记一条 ⌘N」放进持有 @Environment(\.openWindow) 的小 wrapper（NewNoteCommandButton），
+    // 保证 App 里能编过（见 .commands）。
+
     var body: some Scene {
-        WindowGroup {
+        // 主窗设 id:"main"，供菜单栏「打开主窗」用 openWindow(id:"main") 前置。
+        WindowGroup(id: "main") {
             MacRootView()
                 .environment(auth)
                 .environment(router)
@@ -23,6 +28,27 @@ struct YoudaoStudioAppMac: App {
                 .task { await auth.bootstrap() }
         }
         .windowStyle(.titleBar)
+
+        // 「记一条」快速笔记浮窗（openWindow(id:"compose") / ⌘N 打开）。
+        // 注入与主窗一致的 auth/router 环境；MacComposeWindow 内走 API.shared，环境一致避免子视图取用崩。
+        WindowGroup(id: "compose") {
+            MacComposeWindow()
+                .environment(auth)
+                .environment(router)
+                .tint(Studio.red)
+                .frame(minWidth: 420, minHeight: 520)
+        }
+        .windowStyle(.titleBar)
+        .defaultSize(width: 480, height: 640)
+
+        // 菜单栏常驻项：今日学习速览 + 快速入口（记一条 / 打开主窗）。
+        // .menu 样式渲染为下拉菜单；注入 auth 供内容判登录态、拉 /api/desk。
+        MenuBarExtra("有道自习室", systemImage: "book.closed") {
+            MacMenuBarContent()
+                .environment(auth)
+                .environment(router)
+        }
+        .menuBarExtraStyle(.menu)
 
         // 独立播放器窗（course 详情里可访问的节 openWindow(id:"player", value: lessonId) 打开）。
         // for: String.self → 载入 lessonId；注入与主窗一致的 auth/router 环境（VM 走 API.shared，
@@ -43,6 +69,11 @@ struct YoudaoStudioAppMac: App {
             CommandGroup(replacing: .appInfo) {
                 Button("关于 有道自习室") { }
             }
+            // 文件菜单「记一条 ⌘N」：openWindow 需 View 环境，故用持有 @Environment(\.openWindow)
+            // 的 wrapper 承载（App struct 内不能直接取 openWindow）。
+            CommandGroup(after: .newItem) {
+                NewNoteCommandButton()
+            }
             CommandMenu("账号") {
                 Button("退出登录") {
                     Task { await AuthManager.shared.logout() }
@@ -61,6 +92,18 @@ struct YoudaoStudioAppMac: App {
 }
 
 // MacRootView 真身已移至 MacFeatures/MacRootView.swift（M1）。
+
+/// 「记一条 ⌘N」命令按钮 wrapper：持有 @Environment(\.openWindow)，供 App 的 .commands 使用。
+/// App struct 内无法直接取 openWindow，故封装为一个 View，放进 CommandGroup。
+struct NewNoteCommandButton: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("记一条") {
+            openWindow(id: "compose")
+        }
+        .keyboardShortcut("n", modifiers: .command)
+    }
+}
 
 /// 偏好设置面板（⌘,）：账号信息 + 退出登录。
 struct MacSettingsPlaceholder: View {

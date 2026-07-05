@@ -80,7 +80,7 @@ struct MacMainView: View {
             comingSoon("造课", icon: "sparkles", subtitle: "AI 造课台桌面版即将上线")
                 .navigationTitle("造课")
         case .notes:
-            comingSoon("笔记", icon: "square.and.pencil", subtitle: "笔记桌面版即将上线")
+            MacNotesView()
                 .navigationTitle("笔记")
         case .profile:
             comingSoon("我的", icon: "person.fill", subtitle: "个人主页桌面版即将上线")

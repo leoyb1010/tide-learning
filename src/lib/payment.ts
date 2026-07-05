@@ -121,8 +121,18 @@ export async function processWebhook(channel: string, payload: {
       if (payload.eventType === "payment.succeeded") {
         if (order.status === "paid") return { ok: true, duplicate: true };
 
-        // 优惠券：在事务内条件自增，updateMany + count 检查保证并发下不超发（A1-14）
+        // 优惠券核销闭环（流3-U4b）：先建核销记录占位，(couponId,orderId) 唯一约束保证
+        // 同一订单在 webhook 重放/并发下只有一次核销通过；再在事务内条件自增 redeemedCount，
+        // updateMany + count<maxRedeem 二次核验保证并发下不超发（A1-14）。
         if (order.couponId && order.coupon) {
+          try {
+            await tx.couponRedemption.create({
+              data: { couponId: order.couponId, userId: order.userId, orderId: order.id },
+            });
+          } catch {
+            // 唯一冲突 = 本单已核销过（webhook 重放），跳过重复自增，不再重复扣名额
+            throw new AppError("该订单优惠券已核销");
+          }
           if (order.coupon.maxRedeem > 0) {
             const claimed = await tx.coupon.updateMany({
               where: { id: order.couponId, redeemedCount: { lt: order.coupon.maxRedeem } },
@@ -220,12 +230,18 @@ export async function processWebhook(channel: string, payload: {
           }
         }
 
-        // 退款回退优惠券名额（不低于 0）
+        // 退款回退优惠券名额（不低于 0）+ 删核销记录：仅当本单确有核销记录时才回退，
+        // 避免「未核销订单退款也扣名额」把 redeemedCount 扣穿。deleteMany 命中数即本单是否核销过。
         if (order.couponId) {
-          await tx.coupon.updateMany({
-            where: { id: order.couponId, redeemedCount: { gt: 0 } },
-            data: { redeemedCount: { decrement: 1 } },
+          const removed = await tx.couponRedemption.deleteMany({
+            where: { couponId: order.couponId, orderId: order.id },
           });
+          if (removed.count > 0) {
+            await tx.coupon.updateMany({
+              where: { id: order.couponId, redeemedCount: { gt: 0 } },
+              data: { redeemedCount: { decrement: 1 } },
+            });
+          }
         }
         return { ok: true, refunded: true, userId: order.userId };
       }

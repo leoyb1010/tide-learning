@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CaretRight, Cards, Play, Flame, Medal, Check, ClockCounterClockwise } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Cards, Play, Flame, Medal, Check, ClockCounterClockwise, Storefront } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { getGamificationSummary, getYearHeatmap } from "@/lib/gamification";
@@ -381,6 +381,23 @@ export default async function MePage() {
           </div>
         )}
       </section>
+
+      {/* ============ 创作者中心入口（U4-a：作为作者的收益与销售看板）============ */}
+      <Link
+        href="/me/creator"
+        className="studio-lift flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card)]"
+      >
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--red-soft)] text-[var(--red)]">
+            <Storefront size={18} weight="fill" />
+          </div>
+          <div>
+            <p className="text-[14px] font-bold text-[var(--ink)]">创作者中心</p>
+            <p className="text-[12px] text-[var(--ink3)]">你摆摊卖课的收益、销售与近期成交</p>
+          </div>
+        </div>
+        <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
+      </Link>
 
       {/* ============ 设置入口（§7：杂项已拆到设置中心，这里只留一个入口）============ */}
       <Link

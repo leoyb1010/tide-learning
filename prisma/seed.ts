@@ -917,6 +917,13 @@ async function main() {
       isActive: true, expiresAt: new Date(Date.now() + 60 * 864e5),
     },
   });
+  // 限量券示例（流3-U4b 核销/超发验证用）：仅 2 名额、满 100 分抵扣。
+  await prisma.coupon.create({
+    data: {
+      code: "WELCOME10", kind: "fixed", value: 1000, maxRedeem: 2, planScope: "any",
+      isActive: true, expiresAt: new Date(Date.now() + 60 * 864e5),
+    },
+  });
 
   // ---------- C3：demo 用户潮汐日历（Streak + StreakDay）+ 已解锁成就 ----------
   // 最近 14 天，minutes 递增形成上升水位；shanghaiDayKey 与 gamification 保持一致。

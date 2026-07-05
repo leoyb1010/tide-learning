@@ -58,6 +58,9 @@ model User {
   devices        Device[]
   courseReviews  CourseReview[]
   coursePurchases CoursePurchase[]
+  inviteCode     InviteCode?       @relation("InviteCodeOwner")
+  referralsMade  Referral[]        @relation("ReferralInviter")
+  referralReceived Referral?       @relation("ReferralInvitee")
 
   @@index([role])
 }
@@ -461,7 +464,49 @@ model Coupon {
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
 
-  orders Order[]
+  orders      Order[]
+  redemptions CouponRedemption[]
+}
+
+// 核销记录（流3-U4b）：每次订单成功抵扣一张券记一条。
+// (couponId,orderId) 唯一 —— 同一订单绝不重复核销（webhook 重放/并发下的第二次自增被此约束挡下）。
+model CouponRedemption {
+  id        String   @id @default(cuid())
+  couponId  String
+  coupon    Coupon   @relation(fields: [couponId], references: [id])
+  userId    String
+  orderId   String
+  createdAt DateTime @default(now())
+
+  @@unique([couponId, orderId])
+  @@index([userId])
+}
+
+// ---------- 邀请返利（流3-U4b）----------
+// 一人一码：InviteCode 记「谁的邀请码」；Referral 记「谁通过谁的码注册、双方是否已返利」。
+model InviteCode {
+  id        String   @id @default(cuid())
+  inviterId String   @unique // 一人一码：一个用户至多一条邀请码
+  code      String   @unique
+  createdAt DateTime @default(now())
+
+  inviter   User      @relation("InviteCodeOwner", fields: [inviterId], references: [id], onDelete: Cascade)
+  referrals Referral[]
+}
+
+model Referral {
+  id           String    @id @default(cuid())
+  inviteCodeId String
+  inviteCode   InviteCode @relation(fields: [inviteCodeId], references: [id], onDelete: Cascade)
+  inviterId    String
+  inviteeId    String     @unique // 一个新用户只能被返利一次（防重复 bind）
+  rewardedAt   DateTime?
+  createdAt    DateTime   @default(now())
+
+  inviter User @relation("ReferralInviter", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee User @relation("ReferralInvitee", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@index([inviterId])
 }
 
 model Order {

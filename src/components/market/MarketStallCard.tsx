@@ -71,6 +71,10 @@ export function MarketStallCard({
   const price = formatPrice(stall.priceCredits);
   const detailHref = `/market/${stall.slug}`;
 
+  // 价签智能化（U4-a）：付费课 + 未拥有 + 订阅覆盖本赛道 → 价签/CTA 显示「订阅已含」而非价格，
+  // 让已订阅用户明确「不必再花积分」。免费课、已拥有、本人摊位、未订阅均不触发（照常）。
+  const subCovered = Boolean(stall.subscriptionCovered) && stall.isPaid && !collected && !stall.mine;
+
   const badge = useMemo(() => sellerBadge(stall.collectCount), [stall.collectCount]);
   const badgeTone = BADGE_TONE[badge.tier];
   // 评分读数据层已算好的字段（S5）：有真实评价读真实、零评价占位派生，卡片不再自行派生。
@@ -165,13 +169,20 @@ export function MarketStallCard({
           {isAi ? "AI 造课" : "整理导入"}
         </div>
 
-        {/* 价签：免费 / N 积分（交易市场核心信号，颜色区分：免费绿 / 付费红） */}
+        {/* 价签：订阅已含 / 免费 / N 积分（交易市场核心信号）。
+            价签智能化（U4-a）：已订阅覆盖本赛道的付费课显示「订阅已含」（info 蓝，弱化价格焦虑），
+            否则免费绿 / 付费红。已拥有的课不出订阅标（下方 CTA 直接「去学习」）。 */}
         <div
           className={`absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/92 px-2.5 py-1 text-[0.68rem] font-extrabold shadow-[0_1px_3px_rgba(35,41,53,.2)] backdrop-blur-sm ${
-            price.free ? "text-[var(--ok)]" : "text-[var(--red)]"
+            subCovered ? "text-[var(--info)]" : price.free ? "text-[var(--ok)]" : "text-[var(--red)]"
           }`}
         >
-          {price.free ? (
+          {subCovered ? (
+            <>
+              <SealCheck size={12} weight="fill" />
+              订阅已含
+            </>
+          ) : price.free ? (
             <>
               <Gift size={12} weight="fill" />
               免费
@@ -295,6 +306,13 @@ export function MarketStallCard({
               已在书架 · 去学习
               <ArrowRight size={14} weight="bold" />
             </button>
+          ) : subCovered ? (
+            // 价签智能化（U4-a）：已订阅覆盖本赛道的付费课 → 「订阅已含·去学习」，进详情页开始学（不扣积分）
+            <span className="studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--info-soft-border,var(--border2))] bg-[var(--info-soft)] px-4 py-2.5 text-[13px] font-bold text-[var(--info)] transition-all group-hover:brightness-[1.02]">
+              <SealCheck size={15} weight="fill" />
+              订阅已含 · 去学习
+              <ArrowRight size={14} weight="bold" />
+            </span>
           ) : price.free ? (
             // 免费课：卡上直接快捷拿走（零摩擦）
             <button

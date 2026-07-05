@@ -27,6 +27,13 @@ export interface MarketStall {
   salesCount: number;
   /** 当前登录用户是否已把此课拿到书架（决定 CTA 初始态）。 */
   collectedByMe: boolean;
+  /**
+   * 当前登录用户的订阅是否覆盖本课赛道（U4-a 价签智能化）。
+   * true = 已订阅且订阅涵盖本课 category（付费课对该用户免额外付费 → 价签显示「订阅已含」）。
+   * 游客 / 未订阅 / 订阅未覆盖本赛道 → false。免费课不受此影响（照常显示「免费」）。
+   * 可选字段：iOS 旧客户端可忽略（缺省按 false 处理，退回价格显示），不破契约。
+   */
+  subscriptionCovered?: boolean;
   /** 是否本人摊位（自己造的课不出「拿走」，显示「你的摊位」）。 */
   mine: boolean;
   /** 上新时间戳（毫秒），用于"今日上新"氛围计算与"最新"排序。 */

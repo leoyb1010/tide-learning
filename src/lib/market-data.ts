@@ -12,6 +12,7 @@
 
 import { prisma } from "@/lib/db";
 import { marketStallCoverSrc } from "@/lib/tracks";
+import { resolveEntitlement, canAccessTrack } from "@/lib/entitlement";
 import { sellerBadge, type MarketStall } from "@/lib/market-view";
 import { deriveCourseRating } from "@/lib/course-rating";
 import {
@@ -80,6 +81,10 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
     for (const r of mine) myCollectedSet.add(r.courseId);
   }
 
+  // 当前用户订阅权益快照（U4-a 价签智能化）——用于判断「订阅是否覆盖本课赛道」。
+  // resolveEntitlement 用 React cache() 去重，同请求内 layout/page 多次调用只查一次库；游客跳过。
+  const snapshot = viewerId ? await resolveEntitlement(viewerId) : null;
+
   // 作者昵称 + 头像（一次查完）。
   const authorIds = Array.from(
     new Set(courses.map((c) => c.authorUserId).filter((x): x is string => Boolean(x))),
@@ -131,6 +136,8 @@ export async function buildMarketStalls(viewerId: string | null): Promise<Market
       isPaid: (c.priceCredits ?? 0) > 0,
       salesCount: c.salesCount,
       collectedByMe: myCollectedSet.has(c.id),
+      // 订阅是否覆盖本课赛道（价签智能化）：有订阅快照且订阅涵盖 c.category 才为 true；游客/未订阅=false。
+      subscriptionCovered: snapshot ? canAccessTrack(c.category, snapshot) : false,
       mine: Boolean(viewerId && c.authorUserId === viewerId),
       createdAtMs: c.createdAt.getTime(),
       ratingScore: real ? real.score : ph!.score,
@@ -239,6 +246,10 @@ export async function buildStallDetail(
     collectedByMe = Boolean(mine);
   }
 
+  // 当前用户订阅是否覆盖本课赛道（U4-a 价签智能化，与列表口径一致）；游客=false。
+  const snapshot = viewerId ? await resolveEntitlement(viewerId) : null;
+  const subscriptionCovered = snapshot ? canAccessTrack(course.category, snapshot) : false;
+
   // 摊主信息 + 店铺聚合（该作者全部在架课的成交/拿走）。
   const author = course.authorUserId
     ? await prisma.user.findUnique({
@@ -294,6 +305,7 @@ export async function buildStallDetail(
     isPaid: (course.priceCredits ?? 0) > 0,
     salesCount: course.salesCount,
     collectedByMe,
+    subscriptionCovered,
     mine: Boolean(viewerId && course.authorUserId === viewerId),
     createdAtMs: course.createdAt.getTime(),
     ratingScore: rating.score,

@@ -4,6 +4,9 @@ import { rankDemands } from "./demand-score";
 import { TRACK_MAP, trackLabel } from "./tracks";
 import { deriveCourseRating } from "./course-rating";
 import { batchCourseRealRatings } from "./course-review";
+// 创作者中心（U4-a）复用集市交易层已算好的按课收益聚合（越权铁律 where userId=作者）。
+import { getAuthorEarnings } from "./credit-trade";
+import { LEDGER_TYPE } from "./credit-trade";
 // relativeTime / formatDuration 是零依赖纯日期函数，已迁至 @/lib/format（无 "use client"、
 // 不 import prisma）。此处 re-export 以兼容既有 server 侧引用（desk/me/demands 等）。
 import { relativeTime, formatDuration } from "./format";
@@ -383,3 +386,119 @@ export async function getHomeDemandTeaser(
 }
 
 export type { EntitlementSnapshot };
+
+/* ============================================================
+   创作者中心（流2·U4-a）—— 作者收益 + 销售看板数据（server-only）
+   ============================================================ */
+
+/** 创作者中心单课行：收益 + 成交 + 定价 + 真实评分（无真实评价则 rating=null）。 */
+export interface CreatorCourseRow {
+  id: string;
+  slug: string;
+  title: string;
+  salesCount: number;
+  priceCredits: number | null;
+  incomeCredits: number;
+  /** 真实均分（有真实评价才有值；无评价 null，前端标「暂无评分」，收益看板求实不派生占位）。 */
+  rating: number | null;
+  reviewCount: number;
+}
+
+/** 创作者中心近期成交流水行：付费售出 + 免费拿走激励皆在此（refId=courseId）。 */
+export interface CreatorSaleRow {
+  id: string;
+  courseId: string | null;
+  courseTitle: string | null;
+  courseSlug: string | null;
+  incomeCredits: number;
+  reason: string | null;
+  createdAt: Date;
+}
+
+/** 创作者中心看板：累计收益 + 累计成交 + 每课明细 + 近期成交流水。 */
+export interface CreatorDashboard {
+  totalIncome: number;
+  totalSales: number;
+  courses: CreatorCourseRow[];
+  recentSales: CreatorSaleRow[];
+}
+
+/** 近期成交流水默认取条数（创作者中心只看最近动态；API/页面共用同一口径）。 */
+const CREATOR_RECENT_SALES_TAKE = 20;
+
+/**
+ * 创作者收益看板（U4-a）—— Web 页（/me/creator）与 API（GET /api/me/creator）共用**唯一一份**
+ * 组装逻辑，保证字段与语义完全一致。
+ *
+ * 复用铁律：累计/按课收益求和复用 credit-trade.ts::getAuthorEarnings（不重写任何交易逻辑，只读复用），
+ *   本函数只额外补：真实评分（batchCourseRealRatings，无真实评价则 rating=null）+ 近期成交流水。
+ *
+ * 越权铁律：getAuthorEarnings 内部 where userId=authorId；近期流水查询亦恒 where userId=authorId，
+ *   只返回**该作者本人**数据，调用方传入的必须是当前登录用户 id（在 route/page 侧用 requireUser/session 得出）。
+ *
+ * @param authorId 作者（= 当前登录用户）userId。
+ */
+export async function getCreatorDashboard(authorId: string): Promise<CreatorDashboard> {
+  // 作者收益概览（复用交易层求和，不另算）。
+  const earnings = await getAuthorEarnings(authorId);
+  const courseIds = earnings.courses.map((c) => c.courseId);
+
+  // 真实评分批量聚合（无真实评价的课不在 map 中，前端据缺省标「暂无评分」，诚实不冒充）。
+  const realRatingMap =
+    courseIds.length > 0 ? await batchCourseRealRatings(courseIds) : new Map<string, { score: number; count: number }>();
+
+  // 近期成交流水（越权铁律：where userId=authorId）——付费售出 + 免费拿走激励皆在此。
+  const recentRows = await prisma.creditLedger.findMany({
+    where: { userId: authorId, type: LEDGER_TYPE.COURSE_SALE_INCOME },
+    orderBy: { createdAt: "desc" },
+    take: CREATOR_RECENT_SALES_TAKE,
+    select: { id: true, delta: true, refId: true, reason: true, createdAt: true },
+  });
+
+  // 补课程标题/slug（只查涉及到的课，避免 N+1）。refId=courseId。
+  const refCourseIds = Array.from(
+    new Set(recentRows.map((r) => r.refId).filter((x): x is string => Boolean(x))),
+  );
+  const refCourses =
+    refCourseIds.length > 0
+      ? await prisma.course.findMany({
+          where: { id: { in: refCourseIds } },
+          select: { id: true, title: true, slug: true },
+        })
+      : [];
+  const refCourseMap = new Map(refCourses.map((c) => [c.id, c]));
+
+  const courses: CreatorCourseRow[] = earnings.courses.map((c) => {
+    const rating = realRatingMap.get(c.courseId);
+    return {
+      id: c.courseId,
+      slug: c.slug,
+      title: c.title,
+      salesCount: c.salesCount,
+      priceCredits: c.priceCredits,
+      incomeCredits: c.income,
+      rating: rating ? rating.score : null,
+      reviewCount: rating ? rating.count : 0,
+    };
+  });
+
+  const recentSales: CreatorSaleRow[] = recentRows.map((r) => {
+    const c = r.refId ? refCourseMap.get(r.refId) : undefined;
+    return {
+      id: r.id,
+      courseId: r.refId,
+      courseTitle: c?.title ?? null,
+      courseSlug: c?.slug ?? null,
+      incomeCredits: r.delta,
+      reason: r.reason,
+      createdAt: r.createdAt,
+    };
+  });
+
+  return {
+    totalIncome: earnings.totalIncome,
+    totalSales: earnings.totalSales,
+    courses,
+    recentSales,
+  };
+}
