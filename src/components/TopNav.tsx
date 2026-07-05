@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   House, GraduationCap, Sparkle, NotePencil, CardsThree,
-  MagnifyingGlass, Moon, Sun, Play, List, X,
+  MagnifyingGlass, Moon, Sun, Monitor, Play, List, X,
   Storefront, PaperPlaneTilt, Medal, Crown, Gear, SignOut, SquaresFour, Coins,
   ClockCounterClockwise, CaretRight, CaretDown,
 } from "@phosphor-icons/react/dist/ssr";
@@ -44,7 +44,7 @@ function primaryLinks(loggedIn: boolean): NavLink[] {
 
 export function TopNav({ user }: { user: NavUser | null }) {
   const pathname = usePathname();
-  const { resolvedDark, toggleColorScheme } = useMode();
+  const { colorScheme, cycleColorScheme } = useMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false); // 头像下拉
   const [resumeOpen, setResumeOpen] = useState(false); // v3.0 续学胶囊下拉
@@ -119,10 +119,16 @@ export function TopNav({ user }: { user: NavUser | null }) {
   }, [drawerOpen]);
 
   const openCommandK = () => window.dispatchEvent(new KeyboardEvent("keydown", { key: "k", metaKey: true }));
+  // 三态循环：跟随系统 → 浅 → 深 → 跟随系统。埋点记录切换目标。
+  const nextScheme = colorScheme === "system" ? "light" : colorScheme === "light" ? "dark" : "system";
   const onToggleTheme = () => {
-    toggleColorScheme();
-    track("theme_toggle", { to: resolvedDark ? "light" : "dark", source: "topnav" });
+    cycleColorScheme();
+    track("theme_toggle", { to: nextScheme, source: "topnav" });
   };
+  const schemeLabel =
+    colorScheme === "system" ? "主题：跟随系统（点击切浅色）"
+    : colorScheme === "light" ? "主题：浅色（点击切深色）"
+    : "主题：深色（点击切跟随系统）";
 
   return (
     <>
@@ -249,13 +255,20 @@ export function TopNav({ user }: { user: NavUser | null }) {
 
             {user && <NotifBell />}
 
-            {/* 主题 */}
+            {/* 主题：三态循环（跟随系统 / 浅 / 深），图标随当前态 */}
             <button
               onClick={onToggleTheme}
               className="grid h-[36px] w-[36px] place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
-              aria-label={resolvedDark ? "切换到浅色" : "切换到暗色"}
+              aria-label={schemeLabel}
+              title={schemeLabel}
             >
-              {resolvedDark ? <Sun size={17} weight="fill" /> : <Moon size={17} />}
+              {colorScheme === "system" ? (
+                <Monitor size={17} />
+              ) : colorScheme === "light" ? (
+                <Sun size={17} weight="fill" />
+              ) : (
+                <Moon size={17} />
+              )}
             </button>
 
             {/* 头像下拉 / 登录 */}

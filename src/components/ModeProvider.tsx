@@ -27,6 +27,8 @@ interface ModeState {
   setColorScheme: (c: ColorScheme) => void;
   /** 在 亮→暗→亮 之间切换（system 视为跟随，点击后落到显式 light/dark） */
   toggleColorScheme: () => void;
+  /** 三态循环：跟随系统 → 浅 → 深 → 跟随系统…（保证「跟随系统」始终可达） */
+  cycleColorScheme: () => void;
 }
 
 const ModeCtx = createContext<ModeState | null>(null);
@@ -80,9 +82,12 @@ export function ModeProvider({ children }: { children: ReactNode }) {
 
   const resolvedDark = colorScheme === "dark" || (colorScheme === "system" && systemDark);
   const toggleColorScheme = () => setColorScheme(resolvedDark ? "light" : "dark");
+  // 三态循环：跟随系统 → 浅 → 深 → 跟随系统。让「跟随系统」始终可回到。
+  const cycleColorScheme = () =>
+    setColorScheme(colorScheme === "system" ? "light" : colorScheme === "light" ? "dark" : "system");
 
   return (
-    <ModeCtx.Provider value={{ mode, fontScale, theme, colorScheme, resolvedDark, setMode, setFontScale, setTheme, toggleTheme, setColorScheme, toggleColorScheme }}>
+    <ModeCtx.Provider value={{ mode, fontScale, theme, colorScheme, resolvedDark, setMode, setFontScale, setTheme, toggleTheme, setColorScheme, toggleColorScheme, cycleColorScheme }}>
       {children}
     </ModeCtx.Provider>
   );
