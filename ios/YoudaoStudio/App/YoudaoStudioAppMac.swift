@@ -23,6 +23,21 @@ struct YoudaoStudioAppMac: App {
                 .task { await auth.bootstrap() }
         }
         .windowStyle(.titleBar)
+
+        // 独立播放器窗（course 详情里可访问的节 openWindow(id:"player", value: lessonId) 打开）。
+        // for: String.self → 载入 lessonId；注入与主窗一致的 auth/router 环境（VM 走 API.shared，
+        // 无强依赖，但保持环境一致避免子视图取用时崩）。macOS 14 支持 WindowGroup(id:for:)。
+        WindowGroup(id: "player", for: String.self) { $lessonId in
+            if let lessonId {
+                MacPlayerWindow(lessonId: lessonId)
+                    .environment(auth)
+                    .environment(router)
+                    .tint(Studio.red)
+                    .frame(minWidth: 640, minHeight: 480)
+            }
+        }
+        .windowStyle(.titleBar)
+
         .commands {
             // 命令菜单雏形：账号相关（退出登录）。M1 可扩展更多命令。
             CommandGroup(replacing: .appInfo) {

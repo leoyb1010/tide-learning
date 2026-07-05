@@ -54,6 +54,8 @@ export interface WeeklyReport {
   notes: WeeklyDelta;
   /** 本周完课数（completedAt 落在本周，vs 上周）。 */
   completed: WeeklyDelta;
+  /** 本周新增错题数（ExamMistake.createdAt 落在本周，vs 上周）。 */
+  mistakes: WeeklyDelta;
   /** 本周最高连击（连续活跃天数的最长段，vs 上周）。 */
   bestStreak: WeeklyDelta;
   /** 本周单日最高分钟（峰值日，柱图基准与「巅峰日」文案用）。 */
@@ -156,12 +158,19 @@ export async function getWeeklyReport(userId: string): Promise<WeeklyReport> {
   const thisEnd = shanghaiMidnightUtc(shiftDayKey(weekStart, 7));
   const prevStart = shanghaiMidnightUtc(prevWeekStart);
   const prevEnd = thisStart; // 上周结束即本周开始
-  const [completedThis, completedPrev] = await Promise.all([
+  // 错题数：ExamMistake.createdAt 落在各自周区间内（与完课数同区间口径）。
+  const [completedThis, completedPrev, mistakesThis, mistakesPrev] = await Promise.all([
     prisma.learningProgress.count({
       where: { userId, completedAt: { gte: thisStart, lt: thisEnd } },
     }),
     prisma.learningProgress.count({
       where: { userId, completedAt: { gte: prevStart, lt: prevEnd } },
+    }),
+    prisma.examMistake.count({
+      where: { userId, createdAt: { gte: thisStart, lt: thisEnd } },
+    }),
+    prisma.examMistake.count({
+      where: { userId, createdAt: { gte: prevStart, lt: prevEnd } },
     }),
   ]);
 
@@ -186,6 +195,7 @@ export async function getWeeklyReport(userId: string): Promise<WeeklyReport> {
     activeDays: toDelta(thisWeek.activeDays, prevWeek.activeDays),
     notes: toDelta(thisWeek.notes, prevWeek.notes),
     completed: toDelta(completedThis, completedPrev),
+    mistakes: toDelta(mistakesThis, mistakesPrev),
     bestStreak: toDelta(thisWeek.bestStreak, prevWeek.bestStreak),
     peakMinutes: thisWeek.peakMinutes,
     hasActivity: thisWeek.minutes > 0 || thisWeek.notes > 0,

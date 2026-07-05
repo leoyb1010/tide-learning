@@ -82,10 +82,12 @@ export async function GET(req: NextRequest) {
       }),
     ]);
 
-    // 多取的那条不进当前页，其 id 作为下一页 cursor
+    // 多取的那条只用于判断是否有下一页，不进当前页。
+    // nextCursor 必须取「当前页末行」id：下一页查询用 cursor+skip:1 会排除游标自身，
+    // 若误取多取的那条(rows[limit])，它会在下一页被 skip 掉、造成边界行永久丢失。
     const hasMore = rows.length > limit;
     const pageRows = hasMore ? rows.slice(0, limit) : rows;
-    const nextCursor = hasMore ? rows[limit].id : null;
+    const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
     // 拍平标签结构，客户端更好用
     const flat = pageRows.map((n) => ({

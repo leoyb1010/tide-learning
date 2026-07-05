@@ -53,6 +53,7 @@ model User {
   postComments   PostComment[]
   exams          Exam[]
   examAttempts   ExamAttempt[]
+  examMistakes   ExamMistake[]
   notifications  Notification[]
   devices        Device[]
   courseReviews  CourseReview[]
@@ -1002,6 +1003,28 @@ model ExamAttempt {
   finishedAt  DateTime @default(now())
 
   @@index([userId, finishedAt])
+}
+
+// 错题本（流3-U3）：每次判卷把判错的题落一条，供「错题回顾 / 复习闭环」查询。
+// 幂等：以 attemptId+questionId 唯一——同一 attempt 重复提交先删旧错题再插，绝不堆积。
+// 溯源字段（stem/correctAnswer/userAnswer/sourceRef）在落库时快照，即使原 Exam 被删也可回顾。
+model ExamMistake {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examId        String   // 来源试卷（软引用：Exam 删除不级联，靠快照字段保留题面）
+  attemptId     String   // 来源作答（幂等键的一半）
+  questionId    String   // 来源题目（幂等键的一半）
+  stem          String   // 题干快照
+  correctAnswer String   // 正确答案快照（single=选项索引 / judge=true|false / short=参考答案）
+  userAnswer    String   // 我的作答快照
+  sourceRef     String?  // "第 N 讲" / 笔记标题，溯源
+  courseId      String?  // 归属课程（若试卷 scopeType=course，则为 scopeId，供按课过滤）
+  createdAt     DateTime @default(now())
+
+  @@unique([attemptId, questionId]) // 幂等：同 attempt 同题只留一条
+  @@index([userId, createdAt]) // 错题本列表：按人过滤 + 时间排序
+  @@index([userId, courseId]) // 按课程分组/过滤
 }
 
 // ==================== v2.3 §9 站内通知 ====================

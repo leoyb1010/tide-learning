@@ -7,6 +7,7 @@ import { chatJson } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
+import { scheduleNext } from "@/lib/srs";
 
 export const dynamic = "force-dynamic";
 
@@ -279,17 +280,8 @@ export async function PATCH(req: NextRequest) {
     if (!card) return fail("复习卡不存在", 404);
 
     const remembered = body.remembered;
-    let ease = card.ease ?? 2.5;
-    let intervalDays: number;
-    if (remembered) {
-      ease = Math.min(2.8, ease + 0.1);
-      // 首次（间隔 0）记得 → 1 天；之后翻倍并乘以 ease 系数（简化 SM-2）
-      intervalDays = card.intervalDays > 0 ? Math.max(1, Math.round(card.intervalDays * ease)) : 1;
-    } else {
-      ease = Math.max(1.3, ease - 0.2);
-      intervalDays = 1; // 忘了 → 重置为 1 天
-    }
-    const dueAt = new Date(Date.now() + intervalDays * DAY_MS);
+    // 调度逻辑抽到 @/lib/srs 的纯函数（行为与此前内联实现逐字节等价，便于测试/升 FSRS）。
+    const { ease, intervalDays, dueAt } = scheduleNext(card, remembered);
 
     await prisma.reviewCard.updateMany({
       where: { id: cardId, userId: user.id },

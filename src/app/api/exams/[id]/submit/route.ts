@@ -57,6 +57,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         id: true,
         userId: true,
         title: true,
+        scopeType: true, // 错题落库归属课程用（course 卷时 scopeId 即 courseId）
+        scopeId: true,
         questions: {
           orderBy: { sortOrder: "asc" },
           select: {
@@ -191,18 +193,51 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       }
     }
 
-    // —— 落库 ExamAttempt ——
+    // —— 落库 ExamAttempt（+ 错题本 ExamMistake，同事务保证一致）——
     const detailJson = JSON.stringify({ items });
-    const attempt = await prisma.examAttempt.create({
-      data: {
-        examId: exam.id,
-        userId: user.id,
-        answersJson: JSON.stringify(answers),
-        score,
-        total,
-        detailJson,
-      },
-      select: { id: true, finishedAt: true },
+    // 归属课程：course 卷时 scopeId 即 courseId；notebook/all 卷无课程归属（null）。
+    const mistakeCourseId = exam.scopeType === "course" ? exam.scopeId ?? null : null;
+    // 判错题快照（!correct）——除 detailJson 外，额外落 ExamMistake 供错题本查询。
+    // 逐题从原始 question 取题干/正解/溯源快照（即使 Exam 后续被删也可回顾）。
+    const wrongQuestions = exam.questions.filter((q) => {
+      const it = items.find((x) => x.questionId === q.id);
+      return it ? !it.correct : false;
+    });
+
+    const attempt = await prisma.$transaction(async (tx) => {
+      const created = await tx.examAttempt.create({
+        data: {
+          examId: exam.id,
+          userId: user.id,
+          answersJson: JSON.stringify(answers),
+          score,
+          total,
+          detailJson,
+        },
+        select: { id: true, finishedAt: true },
+      });
+      // 幂等：先清掉本 attempt 可能已存在的错题（新 attempt 一般为空，防御性），再批量插入。
+      // @@unique([attemptId, questionId]) 兜住任何重复，绝不堆积。
+      await tx.examMistake.deleteMany({ where: { attemptId: created.id } });
+      if (wrongQuestions.length > 0) {
+        await tx.examMistake.createMany({
+          data: wrongQuestions.map((q) => {
+            const it = items.find((x) => x.questionId === q.id)!;
+            return {
+              userId: user.id,
+              examId: exam.id,
+              attemptId: created.id,
+              questionId: q.id,
+              stem: q.stem,
+              correctAnswer: q.answer,
+              userAnswer: it.userAnswer,
+              sourceRef: q.sourceRef,
+              courseId: mistakeCourseId,
+            };
+          }),
+        });
+      }
+      return created;
     });
 
     await track({

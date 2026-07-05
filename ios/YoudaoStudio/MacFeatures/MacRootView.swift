@@ -74,7 +74,7 @@ struct MacMainView: View {
             MacDeskView()
                 .navigationTitle("书桌")
         case .courses:
-            comingSoon("课程", icon: "safari.fill", subtitle: "浏览赛道课程即将上线")
+            MacCoursesSection()
                 .navigationTitle("课程")
         case .create:
             comingSoon("造课", icon: "sparkles", subtitle: "AI 造课台桌面版即将上线")
@@ -98,6 +98,24 @@ struct MacMainView: View {
                 icon: icon
             )
             .frame(maxWidth: 420)
+        }
+    }
+}
+
+/// 课程分区：课程库（MacCoursesView）+ 选中后 push 课程详情（MacCourseDetailView）。
+///
+/// MacCoursesView 只把选中课程写回外部 `selection`（不自带导航），故此处用 NavigationStack
+/// 承载路由：选中课程即 push 到详情列；详情列里可访问的节 openWindow(id:"player") 开播放器窗。
+/// selection 由本视图 @State 持有，跨列表重建保留选中态。
+private struct MacCoursesSection: View {
+    @State private var selection: MacCourse?
+
+    var body: some View {
+        NavigationStack {
+            MacCoursesView(selection: $selection)
+                .navigationDestination(item: $selection) { course in
+                    MacCourseDetailView(course: course)
+                }
         }
     }
 }
