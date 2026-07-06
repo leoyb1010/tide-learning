@@ -43,6 +43,12 @@ targets:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "拍照记笔记 / 截取学习画面"
         NSPhotoLibraryUsageDescription: "从相册选择图片附加到笔记"
+        # 深链：注册自定义 scheme youdaostudio://（供 onOpenURL 解析跳转），与 Mac 端对齐。
+        # youdaostudio://note/<id> | course/<slug> | review | exam | desk 等。
+        CFBundleURLTypes:
+          - CFBundleURLName: com.youdao.studio.app
+            CFBundleURLSchemes:
+              - youdaostudio
         # ATS：允许本地/局域网 http 明文连接（联调用 localhost:3100）。
         # 生产走 https 正式域名不受影响；NSAllowsLocalNetworking 只放行本地网络。
         NSAppTransportSecurity:

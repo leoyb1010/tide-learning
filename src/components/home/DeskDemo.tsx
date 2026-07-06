@@ -12,6 +12,7 @@ import {
   PlayCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { useStudyRoom } from "./StudyRoomContext";
+import { GEN_DEMO_STEPS } from "@/lib/gen-stages";
 
 /* ============================================================
    DeskDemo —— 第一幕「书桌上的屏幕」真实 UI 产品演示
@@ -30,15 +31,10 @@ import { useStudyRoom } from "./StudyRoomContext";
 type Phase = "typing" | "generating" | "revealed";
 
 // 演示脚本：一句话 → AI 生成 → 成品课。选 AI 赛道（紫），点题「一句话造课」。
-// STEPS 与最新造课引擎 GenStage 四站对齐（understand→outline→lessons→done），
-// 过程导向、不写死具体节数（避免与成品卡节数打架），改常量即可，逻辑随 length 自适应。
+// STEPS 从共享单一事实源取（src/lib/gen-stages 的 GEN_DEMO_STEPS），与真实引擎四站
+// （understand→outline→lessons→done）绑定同一序列，改流程只动 gen-stages，杜绝再漂移。
 const PROMPT = "帮我做一门给完全零基础的人用 AI 做短视频的课";
-const STEPS = [
-  "理解你的需求",
-  "设计课程大纲",
-  "逐节写作讲义",
-  "装订成册",
-];
+const STEPS = GEN_DEMO_STEPS;
 
 interface DemoState {
   phase: Phase;
@@ -126,12 +122,16 @@ export function DeskDemo() {
         <img
           src="/marketing/ai-forge-panel-bg.jpg"
           alt=""
+          fetchPriority="low"
+          decoding="async"
           className="scene-light-only pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/marketing/ai-forge-panel-bg-dark.jpg"
           alt=""
+          loading="lazy"
+          decoding="async"
           className="scene-dark-only pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
         />
 

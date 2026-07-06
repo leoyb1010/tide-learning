@@ -15,6 +15,27 @@ struct YoudaoStudioApp: App {
                 .environment(router)
                 .tint(Studio.red)
                 .task { await auth.bootstrap() }
+                // 深链：youdaostudio://note|course|desk|create|profile|review|exam|market
+                // → 切到对应底部 Tab（详情类简化为跳 Tab，最小可用，与 Mac 端对齐）。
+                .onOpenURL { url in handleDeepLink(url) }
         }
+    }
+
+    /// 解析深链并切到对应 Tab。仅认自定义 scheme youdaostudio://。
+    /// Tab 索引对齐 TabRouter：0书桌 / 1课程 / 2造课 / 3笔记 / 4我的。
+    @MainActor
+    private func handleDeepLink(_ url: URL) {
+        guard url.scheme == "youdaostudio" else { return }
+        let host = url.host?.lowercased()
+        let tab: Int?
+        switch host {
+        case "desk", "home":              tab = 0
+        case "course", "courses", "market": tab = 1
+        case "create", "compose":         tab = 2
+        case "note", "notes", "review", "exam": tab = 3
+        case "profile", "me":             tab = 4
+        default:                          tab = nil
+        }
+        if let tab { router.selection = tab }
     }
 }

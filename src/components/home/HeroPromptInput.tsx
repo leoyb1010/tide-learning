@@ -49,6 +49,16 @@ export function HeroPromptInput() {
           maxLength={200}
           className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--scene-ink)] outline-none placeholder:text-[var(--scene-ink-3)] lg:text-[17px]"
         />
+        {/* 接近上限（>160/200）才显字数，平时不占视觉；到顶时红色提示已达上限。 */}
+        {value.length > 160 && (
+          <span
+            className="mono shrink-0 text-[11px] tabular-nums"
+            style={{ color: value.length >= 200 ? "var(--red)" : "var(--scene-ink-3)" }}
+            aria-live="polite"
+          >
+            {value.length}/200
+          </span>
+        )}
         <button
           type="submit"
           className="cta-glow studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-[filter] hover:brightness-105 lg:rounded-[14px] lg:px-5 lg:py-3 lg:text-[15px]"

@@ -74,10 +74,14 @@ export function ActOne({
           className="pointer-events-none absolute inset-0 overflow-hidden"
           style={{ x: glowX, y: glowY }}
         >
+          {/* 装饰性背景图：低优先级（fetchPriority=low）不与首屏 LCP 内容争带宽；
+              暗版只在暗色态才需要，走 lazy。 */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/marketing/classroom-hero-triptych.jpg"
             alt=""
+            fetchPriority="low"
+            decoding="async"
             className="scene-light-only absolute inset-0 h-full w-full object-cover opacity-[0.34]"
             style={{
               maskImage: "radial-gradient(125% 90% at 50% 42%, #000 0%, rgba(0,0,0,.68) 60%, transparent 92%)",
@@ -88,6 +92,8 @@ export function ActOne({
           <img
             src="/marketing/classroom-hero-triptych-dark.jpg"
             alt=""
+            loading="lazy"
+            decoding="async"
             className="scene-dark-only absolute inset-0 h-full w-full object-cover opacity-[0.24]"
             style={{
               maskImage: "radial-gradient(120% 85% at 50% 42%, #000 0%, rgba(0,0,0,.55) 55%, transparent 88%)",
@@ -142,7 +148,7 @@ export function ActOne({
           className={`pointer-events-none absolute left-1/2 top-[22%] h-2 w-2 -translate-x-1/2 rounded-full ${
             motionOk ? "focus-dot" : ""
           }`}
-          style={{ background: "var(--red)", boxShadow: "0 0 12px 2px rgba(252,1,26,0.6)" }}
+          style={{ background: "var(--red)", boxShadow: "0 0 12px 2px color-mix(in srgb, var(--red) 60%, transparent)" }}
         />
 
         {/* —— 场景内容层：随鼠标整体倾斜（视差容器）。宽屏 max-w 阶梯放宽。 —— */}

@@ -251,6 +251,18 @@
 :root[data-theme="deep"] .scene-dark-only { display: block; }
 
 /* ============================================================
+   首页课程抽屉卡（.drawer-card）触屏体验：
+   - snap 停位刚性化，防快滑停在两卡之间。
+   - 触屏设备（hover:none）关掉 hover 放大浮升与 will-change：
+     移动端长按抬手后 :hover 态会残留、且 will-change 在低端机建合成层反而掉帧。
+   ============================================================ */
+.drawer-card { scroll-snap-align: start; scroll-snap-stop: always; }
+@media (hover: none) {
+  .drawer-card:hover { transform: none !important; }
+  .drawer-card, .mini-shelf-img { will-change: auto !important; }
+}
+
+/* ============================================================
    暗色模式：跟随系统 prefers-color-scheme:dark（默认），
    或 data-theme=dark 手动强制；data-theme=light 手动强制亮色。
    ============================================================ */

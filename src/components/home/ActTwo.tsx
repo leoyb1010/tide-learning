@@ -226,7 +226,7 @@ function DeskCard({
 
         <Link
           href={desk.href}
-          className="relative mt-4 inline-flex min-h-[40px] items-center gap-1 text-[12.5px] font-bold text-[var(--scene-ink)] transition-colors hover:text-[var(--red)] lg:mt-5 lg:text-[14px]"
+          className="relative mt-4 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-bold text-[var(--scene-ink)] transition-colors hover:text-[var(--red)] lg:mt-5 lg:text-[14px]"
         >
           {desk.cta}
           <ArrowRight size={13} weight="bold" aria-hidden className="transition-transform group-hover:translate-x-0.5" />
@@ -327,7 +327,8 @@ function MiniShelf({ tracks, totalCourses }: { tracks: TrackCardData[]; totalCou
             alt=""
             aria-hidden
             loading="lazy"
-            className="h-full w-full origin-bottom object-cover object-bottom transition-transform duration-500 ease-out will-change-transform group-hover/shelf:scale-[1.04]"
+            decoding="async"
+            className="mini-shelf-img h-full w-full origin-bottom object-cover object-bottom transition-transform duration-500 ease-out will-change-transform group-hover/shelf:scale-[1.04]"
           />
           {/* 底部极淡渐隐，让书脊底与卡片背景软衔接（不压住书本） */}
           <div
