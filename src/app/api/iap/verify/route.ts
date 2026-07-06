@@ -5,6 +5,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { ensureAccount } from "@/lib/credits";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
+import { assertUserRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,15 @@ export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
     const user = await requireUser();
+
+    // P0-1 生产闸门：verifyWithApple 目前是 no-op，生产环境未接入真实 Apple 校验前禁止发放，
+    // 否则可无限白刷积分 / 年卡。需真实校验就绪后置 APPLE_IAP_ENABLED=1 放行。
+    // 非生产（本机 / 测试）保持 mock 直发行为不变。
+    if (process.env.NODE_ENV === "production" && process.env.APPLE_IAP_ENABLED !== "1") {
+      return fail("内购校验未启用", 403);
+    }
+    // P0-1 按用户限流：发放为高价值敏感操作，按账号限每分钟 10 次，防暴力重放 / 刷量。
+    assertUserRateLimit(user.id, "iap-verify", 10, 60_000);
 
     const body = (await req.json().catch(() => null)) as
       | { productId?: string; transactionId?: string; receiptData?: string; jwsRepresentation?: string }

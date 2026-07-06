@@ -264,8 +264,23 @@ async function main() {
   await prisma.plan.create({ data: { name: "AI 技能·月卡", billingPeriod: "month", priceCents: 2990, scope: "ai_skill" } });
 
   // ---------- 用户 ----------
+  // P0-4：管理员密码优先取 SEED_ADMIN_PASSWORD，避免弱密码 admin123 进生产。
+  //   - 有 env：一律用它。
+  //   - 无 env + 非生产：回退 admin123（本机 / 测试不受影响，与体验账号文档一致）。
+  //   - 无 env + 生产：生成强随机密码并 console.log 打印一次（仅此一次可见），杜绝默认弱口令上线。
+  // 注：dingyue / oral 等为体验（demo）账号，弱口令是刻意的演示凭据，保持现状不动。
+  const isProd = process.env.NODE_ENV === "production";
+  const adminPassword =
+    process.env.SEED_ADMIN_PASSWORD ??
+    (isProd
+      ? (() => {
+          const generated = randomBytes(18).toString("base64url");
+          console.log(`⚠️  未设置 SEED_ADMIN_PASSWORD，已为 admin 生成强随机密码（仅此一次打印）：${generated}`);
+          return generated;
+        })()
+      : "admin123");
   const admin = await prisma.user.create({
-    data: { nickname: "平台管理员", username: "admin", email: "admin@tide.learning", phone: "13800000000", role: "admin", avatarUrl: "/avatars/avatar-2.png", passwordHash: hashPassword("admin123"), profile: { create: { ageBand: "22-40" } } },
+    data: { nickname: "平台管理员", username: "admin", email: "admin@tide.learning", phone: "13800000000", role: "admin", avatarUrl: "/avatars/avatar-2.png", passwordHash: hashPassword(adminPassword), profile: { create: { ageBand: "22-40" } } },
   });
   const demoUser = await prisma.user.create({
     data: { nickname: "体验用户", username: "dingyue", email: "demo@tide.learning", phone: "13900000000", role: "user", avatarUrl: "/avatars/avatar-1.png", passwordHash: hashPassword("demo123"), profile: { create: { ageBand: "22-40", learningGoal: "口语 + AI" } } },

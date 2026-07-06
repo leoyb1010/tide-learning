@@ -26,10 +26,12 @@ export async function POST(req: NextRequest) {
       return fail("重置链接无效或已过期，请重新申请");
     }
 
-    // 事务：更新密码 + 标记 token 已用（防并发复用）
+    // 事务：更新密码 + 标记 token 已用（防并发复用）+ 吊销该用户所有旧会话
+    // P1-8：重置成功即失效历史登录态，避免攻击者用已窃取的旧会话在改密后继续访问。
     await prisma.$transaction([
       prisma.user.update({ where: { id: record.userId }, data: { passwordHash: hashPassword(password) } }),
       prisma.passwordReset.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
+      prisma.session.deleteMany({ where: { userId: record.userId } }),
     ]);
 
     return ok({ message: "密码已重置，请用新密码登录。" });
