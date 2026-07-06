@@ -11,6 +11,8 @@ logs/
 .env*.local
 prisma/dev.db
 prisma/dev.db-journal
+prisma/dev.db-wal
+prisma/dev.db-shm
 next-env.d.ts.timestamp
 tsconfig.tsbuildinfo
 .claude

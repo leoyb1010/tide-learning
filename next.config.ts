@@ -22,6 +22,37 @@ const nextConfig: NextConfig = {
     // 优先输出 WebP（体积更小），浏览器不支持时 next/image 自动回退原格式。
     formats: ["image/webp"],
   },
+
+  // 安全响应头 + 静态资源缓存。self-host next start 生效。
+  // TODO：HSTS（Strict-Transport-Security）与 CSP（Content-Security-Policy）
+  //       不在本轮范围——上线走 HTTPS 后再补 HSTS，CSP 需先梳理内联脚本/样式白名单。
+  async headers() {
+    return [
+      {
+        // 全站安全头：禁点击劫持、禁 MIME 嗅探、收敛 Referer 泄露。
+        source: "/:path*",
+        headers: [
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        ],
+      },
+      {
+        // 视频为内容寻址的不可变资源（改内容即换文件名），可长缓存 7 天。
+        source: "/videos/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=604800, immutable" },
+        ],
+      },
+      {
+        // 课件图同理长缓存 7 天，命中即免回源。
+        source: "/courseware/:path*",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=604800, immutable" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
