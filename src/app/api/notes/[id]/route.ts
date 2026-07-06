@@ -6,6 +6,9 @@ import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
+// 正文长度上限（与 POST /api/notes 同口径）：防异常长 payload 撑爆库 / 后续 AI 整理拼接
+const NOTE_CONTENT_MAX = 100_000;
+
 // GET /api/notes/:id — 停订后仍可查看自己的笔记（§6.5 验收）
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -50,6 +53,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       !Number.isInteger(body.timestampSec)
     ) {
       return fail("时间戳非法", 400);
+    }
+    if (typeof body.contentMd === "string" && body.contentMd.length > NOTE_CONTENT_MAX) {
+      return fail(`笔记内容过长，请精简到 ${NOTE_CONTENT_MAX} 字以内`, 400);
     }
 
     const note = await prisma.note.findFirst({ where: { id, userId: user.id, deletedAt: null } });

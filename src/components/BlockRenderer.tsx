@@ -23,6 +23,7 @@ import {
 } from "@phosphor-icons/react";
 import type { Block } from "@/lib/blocks";
 import { renderMarkdown } from "@/lib/markdown";
+import { useToast } from "./Toast";
 
 /* ============================================================
    共享：视口触发 in-view 钩子。
@@ -386,6 +387,7 @@ function QuizBlock({
 
 /** 要点卡片：红调软背景 + 每条红点，含「存为复习卡」（POST /api/ai/review-card）。 */
 function KeypointBlock({ points, courseId }: { points: string[]; courseId?: string }) {
+  const { toast } = useToast();
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -394,15 +396,18 @@ function KeypointBlock({ points, courseId }: { points: string[]; courseId?: stri
     setSaving(true);
     try {
       for (const p of points) {
-        await fetch("/api/ai/review-card", {
+        const res = await fetch("/api/ai/review-card", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ front: p, back: p, courseId }),
         });
+        const json = await res.json().catch(() => null);
+        if (!res.ok || json?.ok !== true) throw new Error(json?.error || "存为复习卡失败，请重试");
       }
       setSaved(true);
-    } catch {
-      // 静默失败，不打断学习
+    } catch (e) {
+      // 失败提示且不置 saved，保持可重试
+      toast((e as Error).message || "存为复习卡失败，请重试", { tone: "warn" });
     } finally {
       setSaving(false);
     }
@@ -771,6 +776,7 @@ function ExampleBlock({ markdown }: { markdown: string }) {
 
 /** flashcard —— 内联 3D 翻面卡（复用复习室 flip3d 手感）+ 角落「存为复习卡」。 */
 function FlashcardBlock({ front, back, courseId }: { front: string; back: string; courseId?: string }) {
+  const { toast } = useToast();
   const [flipped, setFlipped] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -779,14 +785,17 @@ function FlashcardBlock({ front, back, courseId }: { front: string; back: string
     if (saving || saved) return;
     setSaving(true);
     try {
-      await fetch("/api/ai/review-card", {
+      const res = await fetch("/api/ai/review-card", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ front, back, courseId }),
       });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || json?.ok !== true) throw new Error(json?.error || "存为复习卡失败，请重试");
       setSaved(true);
-    } catch {
-      // 静默失败
+    } catch (e) {
+      // 失败提示且不置 saved，保持可重试
+      toast((e as Error).message || "存为复习卡失败，请重试", { tone: "warn" });
     } finally {
       setSaving(false);
     }

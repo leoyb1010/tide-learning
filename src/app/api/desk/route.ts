@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { resolveEntitlement } from "@/lib/entitlement";
+import { ensureMonthlyGrant } from "@/lib/credits";
 import { ok, handle } from "@/lib/api";
 import { listUpdates, formatDuration, relativeTime } from "@/lib/queries";
 import { shanghaiDayKey } from "@/lib/week";
@@ -19,6 +21,11 @@ export async function GET(_req: NextRequest) {
 
     const today = shanghaiDayKey();
     const now = new Date();
+
+    // 订阅用户月度积分惰性赠送：纯 iOS/API 用户不经过 web layout，在此高频端点补一次触发
+    // （与 layout.tsx 的调用方式一致；ensureMonthlyGrant 内部有 monthlyGrantKey 水位线防重，多触发无害）。
+    const snapshot = await resolveEntitlement(userId);
+    await ensureMonthlyGrant(userId, today.slice(0, 7), snapshot.isSubscriber, snapshot.monthlyGrant).catch(() => {});
 
     const [streak, streakDayToday, resumeRows, myCourseCount, recentNoteRows, dueReviewCount, updates] =
       await Promise.all([

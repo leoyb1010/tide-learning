@@ -230,11 +230,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
     clearTimeout(saveTimers.current[id]);
     saveTimers.current[id] = setTimeout(async () => {
       try {
-        await fetch(`/api/notes/${id}`, {
+        const res = await fetch(`/api/notes/${id}`, {
           method: "PATCH",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ contentMd: content }),
         });
+        const json = await res.json().catch(() => null);
+        // 失败置 error 态（UI 显示「保存失败」）；不更新本地，下次输入会重触发保存
+        if (!res.ok || json?.ok !== true) { setSaving("error"); return; }
         setNotes((n) => n.map((x) => (x.id === id ? { ...x, contentMd: content } : x)));
         setSaving("saved");
         setTimeout(() => setSaving("idle"), 1200);
@@ -244,20 +247,35 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
 
   async function toggleStar(id: string, next: boolean) {
     setNotes((n) => n.map((x) => (x.id === id ? { ...x, starred: next } : x)));
-    await fetch(`/api/notes/${id}`, {
-      method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ starred: next }),
-    }).catch(() => {});
+    try {
+      const res = await fetch(`/api/notes/${id}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ starred: next }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      // 失败回滚乐观更新
+      setNotes((n) => n.map((x) => (x.id === id ? { ...x, starred: !next } : x)));
+      toast("收藏失败，请重试", { tone: "warn" });
+    }
   }
 
   async function updateTimestamp(id: string) {
     const ts = Math.floor(getCurrentTime());
+    const prev = notes.find((x) => x.id === id)?.timestampSec ?? null;
     setNotes((n) => n.map((x) => (x.id === id ? { ...x, timestampSec: ts } : x)));
-    await fetch(`/api/notes/${id}`, {
-      method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ timestampSec: ts }),
-    }).catch(() => {});
-    toast(`时间戳已更新为 ${mmss(ts)}`, { tone: "success" });
+    try {
+      const res = await fetch(`/api/notes/${id}`, {
+        method: "PATCH", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ timestampSec: ts }),
+      });
+      if (!res.ok) throw new Error();
+      toast(`时间戳已更新为 ${mmss(ts)}`, { tone: "success" });
+    } catch {
+      // 失败回滚乐观更新
+      setNotes((n) => n.map((x) => (x.id === id ? { ...x, timestampSec: prev } : x)));
+      toast("时间戳更新失败，请重试", { tone: "warn" });
+    }
   }
 
   async function del(id: string) {

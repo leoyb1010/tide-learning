@@ -34,8 +34,9 @@ export default function NewDemandPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ title, description, category, desiredDepth }),
       });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error);
+      // 网关 502 等非 JSON 响应时不把解析原文当错误文案：解析失败兜底为 null，统一可读文案
+      const json = await res.json().catch(() => null);
+      if (!res.ok || json?.ok !== true) throw new Error(json?.error || "服务异常，请稍后再试");
       setDone(true);
     } catch (e) {
       setErr((e as Error).message);

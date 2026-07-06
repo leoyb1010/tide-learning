@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, unlink } from "node:fs/promises";
 import path from "node:path";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
@@ -28,12 +28,35 @@ const ALLOWED: Record<string, string> = {
   "text/markdown": "md",
 };
 
-const UPLOAD_DIR = path.join(process.cwd(), "public", "uploads");
+// 磁盘写入根目录：env UPLOAD_DIR 可配（部署时指向持久卷，静态回源由 nginx 负责）；
+// 默认沿用 <cwd>/public/uploads。返回给客户端的 URL 路径固定为 /uploads/...，与磁盘位置解耦。
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
 
 function safeExt(mime: string, fileName: string): string {
   if (ALLOWED[mime]) return ALLOWED[mime];
   const ext = path.extname(fileName).replace(".", "").toLowerCase();
   return /^[a-z0-9]{1,8}$/.test(ext) ? ext : "bin";
+}
+
+/**
+ * 头部魔数校验：不只信客户端 MIME（参考 import-pdf 的 %PDF- 检查）。
+ * 图片与 PDF 有稳定魔数逐一比对；docx/doc/txt/md 无稳定魔数，维持原有大小/类型限制。
+ */
+function matchesMagic(mime: string, bytes: Buffer): boolean {
+  switch (mime) {
+    case "image/png":
+      return bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+    case "image/jpeg":
+      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
+    case "image/webp":
+      return bytes.length >= 12 && bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WEBP";
+    case "image/gif":
+      return bytes.length >= 4 && bytes.subarray(0, 4).toString("latin1") === "GIF8";
+    case "application/pdf":
+      return bytes.subarray(0, 5).toString("latin1") === "%PDF-";
+    default:
+      return true;
+  }
 }
 
 /**
@@ -89,6 +112,7 @@ export async function POST(req: NextRequest) {
     if (bytes.length === 0) return fail("文件内容为空");
     if (bytes.length > MAX_SIZE) return fail("文件不能超过 10MB");
     if (!ALLOWED[mimeType]) return fail("不支持的文件类型");
+    if (!matchesMagic(mimeType, bytes)) return fail("文件内容与声明类型不符");
 
     const isImage = mimeType.startsWith("image/");
 
@@ -112,54 +136,62 @@ export async function POST(req: NextRequest) {
     // 落盘：mock 存储到 public/uploads/
     const ext = safeExt(mimeType, fileName);
     const storedName = `${randomUUID()}.${ext}`;
+    const diskPath = path.join(UPLOAD_DIR, storedName);
     await mkdir(UPLOAD_DIR, { recursive: true });
-    await writeFile(path.join(UPLOAD_DIR, storedName), bytes);
+    await writeFile(diskPath, bytes);
     const publicPath = `/uploads/${storedName}`;
 
     // 事务：（可选）新建挂载笔记 → 建附件。新建笔记时做免费额度校验。
-    const result = await prisma.$transaction(async (tx) => {
-      if (!noteId) {
-        const snapshot = await resolveEntitlement(user.id);
-        if (!snapshot.canCreateNoteUnlimited) {
-          const count = await tx.note.count({ where: { userId: user.id, deletedAt: null } });
-          if (count >= snapshot.noteFreeLimit) {
-            throw new AppError(`免费用户最多创建 ${snapshot.noteFreeLimit} 篇笔记，订阅后可无限记录`, 402);
+    // 事务失败（如 402 配额超限）时清理已落盘文件，不留孤儿。
+    let result: { attachment: { id: string; fileName: string; mimeType: string; size: number; path: string; summary: string | null } };
+    try {
+      result = await prisma.$transaction(async (tx) => {
+        if (!noteId) {
+          const snapshot = await resolveEntitlement(user.id);
+          if (!snapshot.canCreateNoteUnlimited) {
+            const count = await tx.note.count({ where: { userId: user.id, deletedAt: null } });
+            if (count >= snapshot.noteFreeLimit) {
+              throw new AppError(`免费用户最多创建 ${snapshot.noteFreeLimit} 篇笔记，订阅后可无限记录`, 402);
+            }
           }
+          const title = fileName.slice(0, 200);
+          // 图片 → kind=capture 并把图挂到 captureUrl 便于详情页预览；其他文件 → text
+          const contentMd = summary
+            ? `> 附件：${fileName}\n\n${summary}`
+            : `> 附件：${fileName}`;
+          const note = await tx.note.create({
+            data: {
+              userId: user.id,
+              title,
+              contentMd,
+              excerpt: buildExcerpt(contentMd),
+              source: "attachment",
+              kind: isImage ? "capture" : "text",
+              captureUrl: isImage ? publicPath : null,
+            },
+            select: { id: true },
+          });
+          noteId = note.id;
+          createdNoteId = note.id;
         }
-        const title = fileName.slice(0, 200);
-        // 图片 → kind=capture 并把图挂到 captureUrl 便于详情页预览；其他文件 → text
-        const contentMd = summary
-          ? `> 附件：${fileName}\n\n${summary}`
-          : `> 附件：${fileName}`;
-        const note = await tx.note.create({
-          data: {
-            userId: user.id,
-            title,
-            contentMd,
-            excerpt: buildExcerpt(contentMd),
-            source: "attachment",
-            kind: isImage ? "capture" : "text",
-            captureUrl: isImage ? publicPath : null,
-          },
-          select: { id: true },
-        });
-        noteId = note.id;
-        createdNoteId = note.id;
-      }
 
-      const attachment = await tx.noteAttachment.create({
-        data: {
-          noteId: noteId!,
-          fileName: fileName.slice(0, 255),
-          mimeType,
-          size: bytes.length,
-          path: publicPath,
-          summary,
-        },
-        select: { id: true, fileName: true, mimeType: true, size: true, path: true, summary: true },
+        const attachment = await tx.noteAttachment.create({
+          data: {
+            noteId: noteId!,
+            fileName: fileName.slice(0, 255),
+            mimeType,
+            size: bytes.length,
+            path: publicPath,
+            summary,
+          },
+          select: { id: true, fileName: true, mimeType: true, size: true, path: true, summary: true },
+        });
+        return { attachment };
       });
-      return { attachment };
-    });
+    } catch (e) {
+      await unlink(diskPath).catch(() => {});
+      throw e;
+    }
 
     await track({
       eventName: "note_attachment",

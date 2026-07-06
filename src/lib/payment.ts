@@ -19,7 +19,7 @@ import { unlockAchievement } from "./gamification";
  * 记下目标 day，setMonth 后若 getDate() 变了（说明目标月天数不足溢出到下月），
  * 用 setDate(0) 退回目标月最后一天。setFullYear 走同一路径（覆盖 2/29 + 1 年 → 2/28）。
  */
-function addMonthsClamped(d: Date, months: number): void {
+export function addMonthsClamped(d: Date, months: number): void {
   const targetDay = d.getDate();
   d.setMonth(d.getMonth() + months);
   if (d.getDate() !== targetDay) d.setDate(0);
@@ -133,6 +133,24 @@ export async function processWebhook(channel: string, payload: {
 
       if (payload.eventType === "payment.succeeded") {
         if (order.status === "paid") return { ok: true, duplicate: true };
+        // 乱序防护：已退款订单再收到 succeeded（渠道重投/事件乱序）按重复忽略——
+        // 绝不把 refunded 覆写回 paid，也不激活订阅/核销优惠券；写审计留痕便于对账排查。
+        if (order.status === "refunded") {
+          try {
+            await tx.auditLog.create({
+              data: {
+                operatorId: order.userId,
+                action: "webhook_out_of_order",
+                targetType: "order",
+                targetId: order.id,
+                detail: JSON.stringify({ eventType: payload.eventType, externalId: payload.externalId, orderStatus: order.status }),
+              },
+            });
+          } catch {
+            /* 审计写失败不阻断（与 coupon_oversell 审计同策略） */
+          }
+          return { ok: true, duplicate: true };
+        }
 
         // 优惠券核销闭环（流3-U4b）：先建核销记录占位，(couponId,orderId) 唯一约束保证
         // 同一订单在 webhook 重放/并发下只有一次核销通过；再在事务内条件自增 redeemedCount，

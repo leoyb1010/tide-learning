@@ -43,7 +43,9 @@ export async function POST(req: NextRequest) {
     const already = await prisma.referral.findUnique({ where: { inviteeId: invitee.id } });
     if (already) return fail("你已绑定过邀请码");
 
-    // 事务内建 Referral（inviteeId 唯一占位）+ 打 rewardedAt；上限校验也在事务内，防并发绕过
+    // 事务内建 Referral（inviteeId 唯一占位，rewardedAt 先留空）；上限校验也在事务内，防并发绕过。
+    // rewardedAt 延后到两笔 grantCredits 都成功后再打——中途崩溃时状态如实反映「已绑定未发币」，
+    // 不再出现「已标记已返利但未发币」的假账。
     const referral = await prisma.$transaction(async (tx) => {
       const count = await tx.referral.count({ where: { inviterId: invite.inviterId } });
       if (count >= MAX_REFERRALS_PER_INVITER) throw new AppError("该邀请码返利名额已满");
@@ -53,7 +55,6 @@ export async function POST(req: NextRequest) {
             inviteCodeId: invite.id,
             inviterId: invite.inviterId,
             inviteeId: invitee.id,
-            rewardedAt: new Date(),
           },
         });
       } catch {
@@ -64,14 +65,20 @@ export async function POST(req: NextRequest) {
 
     // 记录已建立（inviteeId 唯一 → 不会重复到这里）→ 双方各发返利积分。
     // grantCredits 自带事务与流水；refId 关联 referral，便于对账。
-    await grantCredits(invite.inviterId, REFERRAL_REWARD, "share_reward", {
-      refId: referral.id,
-      reason: "邀请好友注册",
-    });
-    await grantCredits(invitee.id, REFERRAL_REWARD, "share_reward", {
-      refId: referral.id,
-      reason: "受邀注册奖励",
-    });
+    // 全部成功后才打 rewardedAt；失败仅记日志（rewardedAt 保持 null，如实反映未发币，可事后补发）。
+    try {
+      await grantCredits(invite.inviterId, REFERRAL_REWARD, "share_reward", {
+        refId: referral.id,
+        reason: "邀请好友注册",
+      });
+      await grantCredits(invitee.id, REFERRAL_REWARD, "share_reward", {
+        refId: referral.id,
+        reason: "受邀注册奖励",
+      });
+      await prisma.referral.update({ where: { id: referral.id }, data: { rewardedAt: new Date() } });
+    } catch (e) {
+      console.error("[referral] 返利发放失败（referral 已建立，rewardedAt 为 null 待补发）:", referral.id, e);
+    }
 
     return ok({ bound: true, reward: REFERRAL_REWARD });
   });

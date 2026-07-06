@@ -14,6 +14,8 @@ export const dynamic = "force-dynamic";
 const DAY_MS = 86_400_000;
 const MAX_FRONT = 500;
 const MAX_BACK = 2000;
+// 拼接笔记文本的总量上限（与 generate-exam 的素材 12_000 口径一致），防超长 prompt 撑爆成本
+const NOTE_TEXT_MAX = 12_000;
 
 interface FlashcardsResult {
   flashcards?: { q: string; a: string }[];
@@ -62,9 +64,11 @@ export async function POST(req: NextRequest) {
       });
       if (notes.length === 0) return fail("没有可用于生成复习卡的笔记");
 
-      const noteText = notes
+      let noteText = notes
         .map((n, i) => `${i + 1}. ${n.title ? n.title + "：" : ""}${n.contentMd}${n.sourceText ? `（原文：${n.sourceText}）` : ""}`)
         .join("\n");
+      // 总量截断（对齐 generate-exam 的 12_000 口径），防单篇超长笔记撑爆 prompt 成本
+      if (noteText.length > NOTE_TEXT_MAX) noteText = noteText.slice(0, NOTE_TEXT_MAX) + "\n（内容过长已截断）";
 
       const system =
         "你是学习助教，基于用户自己记录的课程笔记生成问答复习卡片。要求：中文、准确、不虚构笔记之外的内容。" +

@@ -90,5 +90,10 @@ const PROVIDERS: Record<string, PaymentProvider> = {
 
 /** 未知渠道返回 null —— webhook route 应据此返回 400，绝不回退到 mock provider。 */
 export function getProvider(channel: string): PaymentProvider | null {
+  // P0：mock 渠道生产门禁——生产默认不可用，仅当显式置 MOCK_PAY_ENABLED=1 时放行
+  // （与 mock-pay / recharge 路由同一闸门），防止生产环境经 mock 渠道伪造支付。
+  if (channel === "mock" && process.env.NODE_ENV === "production" && process.env.MOCK_PAY_ENABLED !== "1") {
+    return null;
+  }
   return PROVIDERS[channel] ?? null;
 }

@@ -30,7 +30,8 @@ export default async function MockCheckoutPage({
   });
   if (!order) redirect("/pricing");
 
-  const nextUrl = next && next.startsWith("/") ? next : "/me/subscription";
+  // 只接受站内相对路径（"//host" 是协议相对外跳，一并挡掉）
+  const nextUrl = next && next.startsWith("/") && !next.startsWith("//") ? next : "/me/subscription";
 
   return (
     <div className="mx-auto max-w-md py-8">

@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { getCurrentUser } from "@/lib/session";
+import { getLogDir } from "@/lib/api";
 import { Badge, EmptyState } from "@/components/ui";
 
 export const metadata = { title: "500 错误日志" };
@@ -16,7 +17,8 @@ type ErrLog = { ts: string; message: string; stack: string | null };
  * 纯服务端（server component）直接读文件。文件不存在 / 解析失败均安全降级为空。
  */
 async function readTodayErrors(): Promise<{ day: string; rows: ErrLog[]; totalToday: number; available: string[] }> {
-  const dir = join(process.cwd(), "logs");
+  // 与 persistInternalError 同源：env LOG_DIR 可配的统一日志目录（见 lib/api.ts getLogDir）
+  const dir = getLogDir();
   const day = new Date().toISOString().slice(0, 10);
   const file = join(dir, `api-errors-${day}.jsonl`);
 

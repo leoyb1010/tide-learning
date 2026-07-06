@@ -9,6 +9,7 @@ import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { importOutlinePrompt } from "@/lib/ai/prompts";
+import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
 
@@ -44,150 +45,159 @@ export async function POST(req: NextRequest) {
       spendScene: "import_source",
     });
 
-    assertUserRateLimit(user.id, "ai_import", 5, 86_400_000);
-
-    const body = (await req.json().catch(() => null)) as {
-      title?: string;
-      rawText?: string;
-    } | null;
-
-    const rawText = body?.rawText?.trim();
-    if (!rawText) return fail("请粘贴要导入的文本内容");
-    if (rawText.length < 100) return fail("文本过短，无法结构化成课程（至少 100 字）");
-    if (rawText.length > MAX_RAW_TEXT) return fail(`文本过长，请精简到 ${MAX_RAW_TEXT} 字以内`);
-
-    const title = (body?.title?.trim() || rawText.slice(0, 20)).slice(0, 120);
-
-    // —— 先落库 ImportedSource（parsed，MVP 粘贴文本即已解析）——
-    const source = await prisma.importedSource.create({
-      data: {
-        userId: user.id,
-        kind: "paste_text",
-        title,
-        rawText,
-        charCount: rawText.length,
-        parseStatus: "parsed",
-      },
-    });
-
-    // —— 内置 prompt 库：忠于原文切章 + 合规底线（见 src/lib/ai/prompts.ts）——
-    // 输出契约不变：{outline:[{title, objective}]}。
-    const { system, user: userMsg } = importOutlinePrompt({ title, rawText });
-
-    let outline: OutlineItem[] = [];
+    // 端点级幂等（P2）：同一用户已有未完成的导入请求（进程内 in-flight 锁）直接拒绝，
+    // 防双击/重放并发建两门课、双份切章扣费。finally 释放。
+    if (!acquireInflight("import_source", user.id)) {
+      return fail("已有生成任务进行中，请稍后再试", 409);
+    }
     try {
-      const result = await chatJson<OutlineResult>({
-        system,
-        user: userMsg,
-        temperature: 0.3,
-        maxTokens: 6000,
-        onUsage: creditingOnUsage(user.id, "import_source"),
-      });
-      const raw = Array.isArray(result?.outline) ? result.outline : [];
-      outline = raw
-        .filter((o) => o && typeof o.title === "string" && o.title.trim())
-        .map((o) => ({
-          title: o.title.trim().slice(0, 120),
-          objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
-        }))
-        .slice(0, 8);
-    } catch {
-      outline = [];
-    }
+      assertUserRateLimit(user.id, "ai_import", 5, 86_400_000);
 
-    // —— 降级：切章失败则退回单章，保证导入不空 ——
-    if (outline.length === 0) {
-      outline = [{ title, objective: "根据导入材料整理的学习内容" }];
-    }
+      const body = (await req.json().catch(() => null)) as {
+        title?: string;
+        rawText?: string;
+      } | null;
 
-    const slug = slugify(title) + "-" + Math.random().toString(36).slice(2, 6);
+      const rawText = body?.rawText?.trim();
+      if (!rawText) return fail("请粘贴要导入的文本内容");
+      if (rawText.length < 100) return fail("文本过短，无法结构化成课程（至少 100 字）");
+      if (rawText.length > MAX_RAW_TEXT) return fail(`文本过长，请精简到 ${MAX_RAW_TEXT} 字以内`);
 
-    // —— 事务落库：Course + N 个空 Lesson + 回填 generatedCourseId + GenerationJob ——
-    const created = await prisma.$transaction(async (tx) => {
-      const course = await tx.course.create({
-        data: {
-          slug,
-          title,
-          description: null,
-          category: "user_imported",
-          level: "L1",
-          status: "published",
-          coverColor: "tide",
-          origin: "user_imported",
-          authorUserId: user.id,
-          ownerId: user.id,
-          visibility: "private",
-          genStatus: "generating",
-          disclaimer: "本课程由用户导入材料经 AI 结构化，内容仅供学习参考",
-        },
-      });
+      const title = (body?.title?.trim() || rawText.slice(0, 20)).slice(0, 120);
 
-      await Promise.all(
-        outline.map((o, i) =>
-          tx.lesson.create({
-            data: {
-              courseId: course.id,
-              title: o.title,
-              summary: o.objective || null,
-              sortOrder: i,
-              contentType: "ai_block",
-              blocksJson: null,
-              isFree: i === 0,
-              status: "published",
-            },
-          }),
-        ),
-      );
-
-      const lessons = await tx.lesson.findMany({
-        where: { courseId: course.id },
-        orderBy: { sortOrder: "asc" },
-        select: { id: true, title: true },
-      });
-
-      // 回填来源 → 课程关联
-      await tx.importedSource.update({
-        where: { id: source.id },
-        data: { generatedCourseId: course.id },
-      });
-
-      await tx.generationJob.create({
+      // —— 先落库 ImportedSource（parsed，MVP 粘贴文本即已解析）——
+      const source = await prisma.importedSource.create({
         data: {
           userId: user.id,
-          type: "import_structure",
-          status: "done",
-          inputJson: JSON.stringify({ sourceId: source.id, charCount: rawText.length }),
-          resultRef: course.id,
-          finishedAt: new Date(),
+          kind: "paste_text",
+          title,
+          rawText,
+          charCount: rawText.length,
+          parseStatus: "parsed",
         },
       });
 
-      return { course, lessons };
-    });
+      // —— 内置 prompt 库：忠于原文切章 + 合规底线（见 src/lib/ai/prompts.ts）——
+      // 输出契约不变：{outline:[{title, objective}]}。
+      const { system, user: userMsg } = importOutlinePrompt({ title, rawText });
 
-    await track({
-      eventName: "ai_import_source",
-      userId: user.id,
-      properties: { sourceId: source.id, courseId: created.course.id, lessons: created.lessons.length, chars: rawText.length },
-    });
+      let outline: OutlineItem[] = [];
+      try {
+        const result = await chatJson<OutlineResult>({
+          system,
+          user: userMsg,
+          temperature: 0.3,
+          maxTokens: 6000,
+          onUsage: creditingOnUsage(user.id, "import_source"),
+        });
+        const raw = Array.isArray(result?.outline) ? result.outline : [];
+        outline = raw
+          .filter((o) => o && typeof o.title === "string" && o.title.trim())
+          .map((o) => ({
+            title: o.title.trim().slice(0, 120),
+            objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
+          }))
+          .slice(0, 8);
+      } catch {
+        outline = [];
+      }
 
-    // —— 服务端后台续跑：与 generate-course 对齐，兑现「关闭页面也会继续生成」的承诺 ——
-    // 大纲已落库，逐节生成交给 after() 在响应返回后接管（断点续造，关页/刷新不影响）。
-    // 前端 writeLessons 仍会并发触发逐节生成，但 generateLessonCore 已用 genClaimedAt 原子 claim
-    // 兜住并发，两条流水对同一节只会有一条真正生成并扣费。
-    const courseId = created.course.id;
-    const total = created.lessons.length;
-    await initGenJob(courseId, user.id, total, { category: "user_imported" });
-    after(async () => {
-      // after() 内部绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。
-      await runCourseGenBackground(courseId, user.id);
-    });
+      // —— 降级：切章失败则退回单章，保证导入不空 ——
+      if (outline.length === 0) {
+        outline = [{ title, objective: "根据导入材料整理的学习内容" }];
+      }
 
-    return ok({
-      courseId: created.course.id,
-      slug: created.course.slug,
-      title: created.course.title, // 供前端「可退出」横幅显示真实课名（附加字段，不改既有契约）
-      lessons: created.lessons,
-    });
+      const slug = slugify(title) + "-" + Math.random().toString(36).slice(2, 6);
+
+      // —— 事务落库：Course + N 个空 Lesson + 回填 generatedCourseId + GenerationJob ——
+      const created = await prisma.$transaction(async (tx) => {
+        const course = await tx.course.create({
+          data: {
+            slug,
+            title,
+            description: null,
+            category: "user_imported",
+            level: "L1",
+            status: "published",
+            coverColor: "tide",
+            origin: "user_imported",
+            authorUserId: user.id,
+            ownerId: user.id,
+            visibility: "private",
+            genStatus: "generating",
+            disclaimer: "本课程由用户导入材料经 AI 结构化，内容仅供学习参考",
+          },
+        });
+
+        await Promise.all(
+          outline.map((o, i) =>
+            tx.lesson.create({
+              data: {
+                courseId: course.id,
+                title: o.title,
+                summary: o.objective || null,
+                sortOrder: i,
+                contentType: "ai_block",
+                blocksJson: null,
+                isFree: i === 0,
+                status: "published",
+              },
+            }),
+          ),
+        );
+
+        const lessons = await tx.lesson.findMany({
+          where: { courseId: course.id },
+          orderBy: { sortOrder: "asc" },
+          select: { id: true, title: true },
+        });
+
+        // 回填来源 → 课程关联
+        await tx.importedSource.update({
+          where: { id: source.id },
+          data: { generatedCourseId: course.id },
+        });
+
+        await tx.generationJob.create({
+          data: {
+            userId: user.id,
+            type: "import_structure",
+            status: "done",
+            inputJson: JSON.stringify({ sourceId: source.id, charCount: rawText.length }),
+            resultRef: course.id,
+            finishedAt: new Date(),
+          },
+        });
+
+        return { course, lessons };
+      });
+
+      await track({
+        eventName: "ai_import_source",
+        userId: user.id,
+        properties: { sourceId: source.id, courseId: created.course.id, lessons: created.lessons.length, chars: rawText.length },
+      });
+
+      // —— 服务端后台续跑：与 generate-course 对齐，兑现「关闭页面也会继续生成」的承诺 ——
+      // 大纲已落库，逐节生成交给 after() 在响应返回后接管（断点续造，关页/刷新不影响）。
+      // 前端 writeLessons 仍会并发触发逐节生成，但 generateLessonCore 已用 genClaimedAt 原子 claim
+      // 兜住并发，两条流水对同一节只会有一条真正生成并扣费。
+      const courseId = created.course.id;
+      const total = created.lessons.length;
+      await initGenJob(courseId, user.id, total, { category: "user_imported" });
+      after(async () => {
+        // after() 内部绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。
+        await runCourseGenBackground(courseId, user.id);
+      });
+
+      return ok({
+        courseId: created.course.id,
+        slug: created.course.slug,
+        title: created.course.title, // 供前端「可退出」横幅显示真实课名（附加字段，不改既有契约）
+        lessons: created.lessons,
+      });
+    } finally {
+      releaseInflight("import_source", user.id);
+    }
   });
 }

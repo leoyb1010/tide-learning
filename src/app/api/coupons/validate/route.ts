@@ -29,8 +29,8 @@ export async function POST(req: NextRequest) {
     if (coupon.maxRedeem > 0 && coupon.redeemedCount >= coupon.maxRedeem) throw new AppError("优惠券已被领完");
     if (coupon.planScope !== "any" && coupon.planScope !== planId) throw new AppError("优惠券不适用于该套餐");
 
-    // 与结算一致：首单用首月价
-    const isFirstEver = (await prisma.order.count({ where: { userId: user.id, status: "paid" } })) === 0;
+    // 与结算一致：首单用首月价（口径对齐 payment.ts：paid/refunded 都算已下过单）
+    const isFirstEver = (await prisma.order.count({ where: { userId: user.id, status: { in: ["paid", "refunded"] } } })) === 0;
     const basePriceCents = isFirstEver && plan.firstPriceCents != null ? plan.firstPriceCents : plan.priceCents;
     const discountCents = coupon.kind === "percent"
       ? Math.round((basePriceCents * Math.min(100, coupon.value)) / 100)

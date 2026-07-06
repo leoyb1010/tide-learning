@@ -104,15 +104,23 @@ export async function ensureAccount(userId: string) {
   const existing = await prisma.creditAccount.findUnique({ where: { userId } });
   if (existing) return existing;
   // 首建：送注册积分（记流水）
-  return prisma.$transaction(async (tx) => {
-    const created = await tx.creditAccount.create({
-      data: { userId, balance: SIGNUP_BONUS, totalEarned: SIGNUP_BONUS },
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const created = await tx.creditAccount.create({
+        data: { userId, balance: SIGNUP_BONUS, totalEarned: SIGNUP_BONUS },
+      });
+      await tx.creditLedger.create({
+        data: { userId, delta: SIGNUP_BONUS, type: "signup_bonus", balanceAfter: SIGNUP_BONUS, reason: "注册赠送" },
+      });
+      return created;
     });
-    await tx.creditLedger.create({
-      data: { userId, delta: SIGNUP_BONUS, type: "signup_bonus", balanceAfter: SIGNUP_BONUS, reason: "注册赠送" },
-    });
-    return created;
-  });
+  } catch (e) {
+    // 并发首访：两请求同时建账，后到者撞 userId 唯一约束(P2002)——账户已被先到者建好，重读返回即可。
+    if ((e as { code?: string })?.code === "P2002") {
+      return prisma.creditAccount.findUniqueOrThrow({ where: { userId } });
+    }
+    throw e;
+  }
 }
 
 /** 入账（赠送/充值/分享奖励/管理调账）。原子：写流水 + 更新余额。返回新余额。 */

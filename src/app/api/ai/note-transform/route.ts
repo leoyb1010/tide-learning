@@ -13,6 +13,9 @@ export const dynamic = "force-dynamic";
 type Action = "outline" | "actions" | "translate" | "weekly";
 const ACTIONS: Action[] = ["outline", "actions", "translate", "weekly"];
 
+// 拼接笔记文本的总量上限（与 generate-exam 的素材 12_000 口径一致），防超长 prompt 撑爆成本
+const NOTE_TEXT_MAX = 12_000;
+
 interface TransformResult {
   // outline：Markdown 大纲字符串；actions：行动项数组；translate：英译 Markdown；weekly：周报 Markdown
   markdown?: string;
@@ -107,7 +110,7 @@ export async function POST(req: NextRequest) {
     });
     if (notes.length === 0) return fail("没有可整理的笔记");
 
-    const noteText = notes
+    let noteText = notes
       .map((n, i) => {
         const ts =
           n.timestampSec != null
@@ -118,6 +121,8 @@ export async function POST(req: NextRequest) {
         }`;
       })
       .join("\n");
+    // 总量截断（对齐 generate-exam 的 12_000 口径），防单篇超长笔记撑爆 prompt 成本
+    if (noteText.length > NOTE_TEXT_MAX) noteText = noteText.slice(0, NOTE_TEXT_MAX) + "\n（内容过长已截断）";
 
     const { system, user: userMsg } = buildPrompt(action, noteText);
 

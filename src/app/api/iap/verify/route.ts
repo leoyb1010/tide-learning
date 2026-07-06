@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { ensureAccount } from "@/lib/credits";
+import { addMonthsClamped } from "@/lib/payment";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
 import { assertUserRateLimit } from "@/lib/rate-limit";
@@ -38,11 +39,12 @@ const SUBSCRIPTION_PRODUCTS: Record<string, { billingPeriod: "month" | "quarter"
 
 const APPLE_IAP_CHANNEL = "apple_iap";
 
+// 复用 payment.ts 的月末钳制加法：1/31 + 1 月落到 2 月末、2/29 + 1 年落到 2/28，不溢出到下月。
 function periodEnd(billingPeriod: "month" | "quarter" | "year", from = new Date()): Date {
   const d = new Date(from);
-  if (billingPeriod === "year") d.setFullYear(d.getFullYear() + 1);
-  else if (billingPeriod === "quarter") d.setMonth(d.getMonth() + 3);
-  else d.setMonth(d.getMonth() + 1);
+  if (billingPeriod === "year") addMonthsClamped(d, 12);
+  else if (billingPeriod === "quarter") addMonthsClamped(d, 3);
+  else addMonthsClamped(d, 1);
   return d;
 }
 
@@ -114,12 +116,13 @@ export async function POST(req: NextRequest) {
           const acc = await tx.creditAccount.findUnique({ where: { userId: user.id }, select: { balance: true } });
           return { balance: acc?.balance ?? 0, duplicate: true };
         }
-        const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: user.id } });
-        const balanceAfter = acc.balance + amount;
-        await tx.creditAccount.update({
+        // 原子入账：balance/totalEarned 由 DB 侧 increment（对齐 credits.ts grantCredits），
+        // 避免「读余额-算-整值覆盖」在并发下互相覆盖；update 返回更新后行，balanceAfter 直接取用。
+        const updated = await tx.creditAccount.update({
           where: { userId: user.id },
-          data: { balance: balanceAfter, totalEarned: acc.totalEarned + amount },
+          data: { balance: { increment: amount }, totalEarned: { increment: amount } },
         });
+        const balanceAfter = updated.balance;
         await tx.creditLedger.create({
           data: { userId: user.id, delta: amount, type: "recharge", refId: transactionId, reason: "IAP充值", balanceAfter },
         });

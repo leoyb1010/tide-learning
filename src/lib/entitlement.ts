@@ -68,6 +68,15 @@ export const FREE_SNAPSHOT: EntitlementSnapshot = {
 const SWEEP_THROTTLE_MS = 5 * 60 * 1000;
 const lastSweepAt = new Map<string, number>();
 
+/**
+ * 模块级节流表的内存上限：条目按 userId 无上限增长会缓慢泄漏。超限时整表清空——
+ * 代价仅是下一次请求多一次幂等写库（节流表只是省写优化，正确性不依赖它），实现最简单。
+ */
+const THROTTLE_MAP_MAX = 10_000;
+function capMap(map: Map<string, unknown>): void {
+  if (map.size >= THROTTLE_MAP_MAX) map.clear();
+}
+
 /** 已过期但 DB 仍标为「有效态」的付费状态 —— 内存判断过期时视为 expired。 */
 const SWEEPABLE_STATUSES = ["active", "grace_period", "billing_retry", "canceled_but_active", "trial"];
 
@@ -79,6 +88,7 @@ function throttledSweepExpired(userId: string, now: Date): void {
   const nowMs = now.getTime();
   const last = lastSweepAt.get(userId) ?? 0;
   if (nowMs - last < SWEEP_THROTTLE_MS) return;
+  capMap(lastSweepAt);
   lastSweepAt.set(userId, nowMs);
   prisma.subscription
     .updateMany({
@@ -216,11 +226,13 @@ async function persistSnapshot(userId: string, subscriptionId: string | null, st
       else await prisma.entitlement.create({ data: { userId, sourceSubscriptionId: null, ...data } });
     }
     // 写成功：记录本次内容 hash + 时间，供节流跳过后续相同快照的冗余写。
+    capMap(lastSnapshotAt);
     lastSnapshotAt.set(throttleKey, { hash: snapshotJson, at: nowMs });
   } catch (e) {
-    // 写失败：清掉节流水位，让下次请求重试落库（不静默吞成功）。
+    // 写失败：清掉节流水位，让下次请求重试落库。快照落库是最终一致的缓存写，
+    // 失败不应拖垮页面渲染（权益解析仍返回内存实时归约结果）——只记日志，不上抛。
     lastSnapshotAt.delete(throttleKey);
-    throw e;
+    console.error("[entitlement] persistSnapshot failed:", e);
   }
 }
 

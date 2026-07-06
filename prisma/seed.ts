@@ -5,6 +5,14 @@ import { validateBlocks } from "../src/lib/blocks";
 
 const prisma = new PrismaClient();
 
+// 生产判定：seed 闸门 / 演示账号口令策略共用（原在用户段内定义，上移到模块级供 main() 开头使用）。
+const isProd = process.env.NODE_ENV === "production";
+
+// 演示账号口令：非生产用文档约定的弱口令（demo123 等，方便本机/测试机体验）；
+// 生产改为强随机且不打印——账号数据保留（广场/社区展示依赖），但无法用弱口令登录。
+const demoPassword = (devPassword: string): string =>
+  isProd ? randomBytes(18).toString("base64url") : devPassword;
+
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
   const derived = scryptSync(password, salt, 64).toString("hex");
@@ -210,6 +218,11 @@ function currentWeekKey(): string {
 }
 
 async function main() {
+  // 生产闸门：seed 会 deleteMany 清空全库再重建，误在生产执行即数据灾难。
+  // 生产环境必须显式设置 SEED_FORCE=1 才放行（确认知晓会清库）。
+  if (isProd && process.env.SEED_FORCE !== "1") {
+    throw new Error("生产环境禁止直接执行 seed（会清空全库重建）；确需执行请显式设置 SEED_FORCE=1");
+  }
   console.log("🌊 清空并重建融合种子数据...");
   await prisma.analyticsEvent.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -268,8 +281,7 @@ async function main() {
   //   - 有 env：一律用它。
   //   - 无 env + 非生产：回退 admin123（本机 / 测试不受影响，与体验账号文档一致）。
   //   - 无 env + 生产：生成强随机密码并 console.log 打印一次（仅此一次可见），杜绝默认弱口令上线。
-  // 注：dingyue / oral 等为体验（demo）账号，弱口令是刻意的演示凭据，保持现状不动。
-  const isProd = process.env.NODE_ENV === "production";
+  // 注：dingyue / oral 等体验（demo）账号的弱口令仅限非生产；生产由 demoPassword() 换成随机值（见模块顶部）。
   const adminPassword =
     process.env.SEED_ADMIN_PASSWORD ??
     (isProd
@@ -283,7 +295,7 @@ async function main() {
     data: { nickname: "平台管理员", username: "admin", email: "admin@tide.learning", phone: "13800000000", role: "admin", avatarUrl: "/avatars/avatar-2.png", passwordHash: hashPassword(adminPassword), profile: { create: { ageBand: "22-40" } } },
   });
   const demoUser = await prisma.user.create({
-    data: { nickname: "体验用户", username: "dingyue", email: "demo@tide.learning", phone: "13900000000", role: "user", avatarUrl: "/avatars/avatar-1.png", passwordHash: hashPassword("demo123"), profile: { create: { ageBand: "22-40", learningGoal: "口语 + AI" } } },
+    data: { nickname: "体验用户", username: "dingyue", email: "demo@tide.learning", phone: "13900000000", role: "user", avatarUrl: "/avatars/avatar-1.png", passwordHash: hashPassword(demoPassword("demo123")), profile: { create: { ageBand: "22-40", learningGoal: "口语 + AI" } } },
   });
   // demo：全站年卡
   const sub = await prisma.subscription.create({
@@ -298,7 +310,7 @@ async function main() {
 
   // 单赛道体验用户：只订了口语
   const oralUser = await prisma.user.create({
-    data: { nickname: "口语学员", email: "oral@tide.learning", phone: "13700000000", role: "user", avatarUrl: "/avatars/avatar-3.png", passwordHash: hashPassword("oral123"), profile: { create: { ageBand: "22-40" } } },
+    data: { nickname: "口语学员", email: "oral@tide.learning", phone: "13700000000", role: "user", avatarUrl: "/avatars/avatar-3.png", passwordHash: hashPassword(demoPassword("oral123")), profile: { create: { ageBand: "22-40" } } },
   });
   const oralSub = await prisma.subscription.create({
     data: { userId: oralUser.id, planId: (await prisma.plan.findFirst({ where: { scope: "english_oral" } }))!.id, channel: "ad_external", scope: "english_oral", status: "active", currentPeriodEnd: new Date(Date.now() + 30 * 864e5), cancelAtPeriodEnd: false },
@@ -326,7 +338,7 @@ async function main() {
     const u = await prisma.user.create({
       data: {
         nickname: s.nickname, avatarUrl: s.avatar, role: "user",
-        email: `community${i + 1}@tide.learning`, passwordHash: hashPassword("demo123"),
+        email: `community${i + 1}@tide.learning`, passwordHash: hashPassword(demoPassword("demo123")),
         profile: { create: { ageBand: s.ageBand } },
       },
     });
@@ -976,7 +988,10 @@ async function main() {
   console.log(`   真实视频已填入 ${[...new Set(videoFilledCourses)].length} 门课首讲：${[...new Set(videoFilledCourses)].join(", ")}`);
   console.log(`   课程 ${courses.length} 门（有道英语板块 + 潮汐 AI/生活）`);
   console.log(`   套餐：全站(月/季/年) + 单赛道(口语/银发/AI) · 线索 ${leadSeeds.length} 条`);
-  console.log("   dingyue/demo123(全站, 或 demo@tide.learning) · admin/admin123(后台) · oral@tide.learning/oral123(仅口语)");
+  // 生产下体验账号口令已随机化，不打印弱口令凭据（admin 密码策略见上方 SEED_ADMIN_PASSWORD 段）。
+  if (!isProd) {
+    console.log("   dingyue/demo123(全站, 或 demo@tide.learning) · admin/admin123(后台) · oral@tide.learning/oral123(仅口语)");
+  }
 }
 
 main().catch((e) => { console.error(e); process.exit(1); }).finally(() => prisma.$disconnect());

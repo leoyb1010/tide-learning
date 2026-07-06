@@ -20,6 +20,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
     const { channel } = await params;
     assertRateLimit(req, `webhook:${channel}`, 120, 60_000);
 
+    // P0：生产默认禁用 mock 渠道回调；仅当显式置 MOCK_PAY_ENABLED=1 时放行（供测试机演示支付）。
+    // 与 checkout/mock-pay、credits/recharge 路由同一闸门；getProvider 层亦有兜底拒绝。
+    if (channel === "mock" && process.env.NODE_ENV === "production" && process.env.MOCK_PAY_ENABLED !== "1") {
+      return fail("mock 支付渠道仅限非生产环境", 403);
+    }
+
     // 未知渠道：绝不回退到 mock provider，直接拒绝
     const provider = getProvider(channel);
     if (!provider) return fail("未知支付渠道", 400);

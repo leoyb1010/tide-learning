@@ -86,7 +86,11 @@ export function anonId(seed?: string): string {
 // ---------- Session ----------
 export async function createSession(userId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 864e5);
-  const session = await prisma.session.create({ data: { userId, expiresAt } });
+  // 会话令牌显式用 256 位 CSPRNG（cuid 可预测性偏高，不适合做 bearer token）。
+  // String 主键可存任意串，旧 cuid 会话不受影响，到期自然淘汰。
+  const session = await prisma.session.create({
+    data: { id: randomBytes(32).toString("hex"), userId, expiresAt },
+  });
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, session.id, {
     httpOnly: true,

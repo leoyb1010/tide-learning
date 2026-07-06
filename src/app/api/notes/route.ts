@@ -19,6 +19,9 @@ type NoteKind = (typeof NOTE_KINDS)[number];
 const NOTE_PAGE_DEFAULT = 30;
 const NOTE_PAGE_MAX = 50;
 
+// 正文长度上限：防异常长 payload 撑爆库 / 后续 AI 整理拼接（与 PATCH /api/notes/:id 同口径）
+const NOTE_CONTENT_MAX = 100_000;
+
 /**
  * GET /api/notes — 笔记馆列表
  * 支持过滤：kind（text|capture|clip）、tag（标签 id）、q（标题/正文/剪藏原文）、starred（仅收藏）、courseId
@@ -143,6 +146,8 @@ export async function POST(req: NextRequest) {
       if (body[k] != null && typeof body[k] !== "string") return fail(`字段 ${k} 类型错误`);
     }
     if (body.timestampSec != null && typeof body.timestampSec !== "number") return fail("字段 timestampSec 类型错误");
+    if (body.contentMd != null && body.contentMd.length > NOTE_CONTENT_MAX)
+      return fail(`笔记内容过长，请精简到 ${NOTE_CONTENT_MAX} 字以内`);
     if (body.tagIds != null && (!Array.isArray(body.tagIds) || body.tagIds.some((t) => typeof t !== "string")))
       return fail("字段 tagIds 类型错误");
 

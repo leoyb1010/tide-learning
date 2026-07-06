@@ -7,6 +7,15 @@ import { AppError } from "./errors";
 export { AppError };
 
 /**
+ * 日志目录：env LOG_DIR 可配（部署时指向持久卷），默认 <cwd>/logs。
+ * persistInternalError 与 /admin/errors 页必须读同一目录，统一从这里取。
+ * 不引 node:path（简单拼接足够），保持本模块被 client 侧 import 时不拖 node 内置模块。
+ */
+export function getLogDir(): string {
+  return process.env.LOG_DIR || `${process.cwd()}/logs`;
+}
+
+/**
  * 500 错误结构化落盘（流3-U6 · 契约防断裂制度）。
  * 追加写 logs/api-errors-YYYY-MM-DD.jsonl，一行一条 {ts,path?,message,stack}，
  * 供 /admin/errors 页查看。仅服务端调用（node fs），且完全「尽力而为」：
@@ -19,7 +28,7 @@ async function persistInternalError(e: unknown): Promise<void> {
     const { join } = await import("node:path");
     const now = new Date();
     const day = now.toISOString().slice(0, 10); // YYYY-MM-DD（UTC）
-    const dir = join(process.cwd(), "logs");
+    const dir = getLogDir();
     await mkdir(dir, { recursive: true });
     const entry = {
       ts: now.toISOString(),

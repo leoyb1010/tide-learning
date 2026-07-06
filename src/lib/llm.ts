@@ -76,6 +76,8 @@ export async function chat(opts: ChatOptions): Promise<string> {
     });
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
+    // timer 由 finally 统一清理：超时须覆盖到 body 完整读取（res.text()/res.json() 同受
+    // controller.signal 约束），拿到响应头就 clear 会让慢 body 读取脱离 45s 超时。
     try {
       const res = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
         method: "POST",
@@ -86,7 +88,6 @@ export async function chat(opts: ChatOptions): Promise<string> {
         body,
         signal: controller.signal,
       });
-      clearTimeout(timer);
 
       if (!res.ok) {
         // 4xx 是客户端/配置问题，不重试；5xx 可重试
@@ -135,7 +136,6 @@ export async function chat(opts: ChatOptions): Promise<string> {
       }
       return content.trim();
     } catch (e) {
-      clearTimeout(timer);
       // AppError 直接上抛（业务级，已折叠）
       if (e instanceof AppError) {
         // 4xx AppError 不重试
@@ -152,6 +152,9 @@ export async function chat(opts: ChatOptions): Promise<string> {
         continue;
       }
       throw lastErr;
+    } finally {
+      // 成功 / 失败 / continue 重试各路径统一清理，避免定时器泄漏或误伤下一次尝试
+      clearTimeout(timer);
     }
   }
   throw lastErr ?? new AppError("AI 服务暂时不可用", 502);

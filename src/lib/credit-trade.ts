@@ -40,50 +40,6 @@ export function authorShareOf(priceCredits: number): number {
   return Math.max(0, Math.floor(priceCredits * AUTHOR_REVENUE_SHARE));
 }
 
-/**
- * 作者售出入账（**独立**给作者加分 + 写 course_sale_income 流水）。原子：更新余额 + 写流水。
- *
- * 用途：
- *   1) 免费课被拿走时的创作激励（小额 bonus，买家侧无扣款，故独立调用）。
- *   2) （若未来有买家外的入账入口）作者收益补录。
- * 注意：**付费购买的作者入账不走此函数**——它必须与买家扣款在同一事务，见 purchaseCourse 内联实现，
- *   避免「买家事务提交、作者入账另起事务失败」的半成交。此函数用于买家侧无对应扣款的单边入账。
- *
- * @param authorId 收益归属作者 userId。
- * @param courseId 关联课程（流水 refId，可对账「这门课给作者赚了多少」）。
- * @param amount 入账积分（必须为正）。
- * @param reason 展示文案。
- * @returns 作者新余额。
- */
-export async function earnFromSale(
-  authorId: string,
-  courseId: string,
-  amount: number,
-  reason: string,
-): Promise<number> {
-  if (amount <= 0) throw new AppError("收益金额必须为正", 400);
-  await ensureAccount(authorId);
-  return prisma.$transaction(async (tx) => {
-    const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: authorId } });
-    const balanceAfter = acc.balance + amount;
-    await tx.creditAccount.update({
-      where: { userId: authorId },
-      data: { balance: balanceAfter, totalEarned: acc.totalEarned + amount },
-    });
-    await tx.creditLedger.create({
-      data: {
-        userId: authorId,
-        delta: amount,
-        type: LEDGER_TYPE.COURSE_SALE_INCOME,
-        refId: courseId,
-        reason,
-        balanceAfter,
-      },
-    });
-    return balanceAfter;
-  });
-}
-
 /** collectFreeCourse 结果：status 区分首次拿走 / 幂等命中（已在书架）。 */
 export interface CollectResult {
   status: "collected" | "already_owned";

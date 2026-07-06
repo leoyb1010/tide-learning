@@ -18,6 +18,8 @@ const notoSC = Noto_Sans_SC({ subsets: ["latin"], weight: ["400", "500", "700", 
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 export const metadata: Metadata = {
+  // OG/twitter 相对图片路径的解析基址；兜底域名与 robots.ts / sitemap.ts 保持一致
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://tide.learning"),
   title: {
     default: "有道自习室 · STUDIO",
     template: "%s · 有道自习室",

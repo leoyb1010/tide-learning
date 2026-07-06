@@ -8,7 +8,9 @@ import { Button } from "@/components/ui";
 function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
-  const next = params.get("next") || "/me";
+  // 只接受站内相对路径（挡 open redirect：外域 URL 与协议相对的 "//host"），否则回落 /me
+  const nextParam = params.get("next") || "";
+  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/me";
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
@@ -26,8 +28,9 @@ function LoginInner() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ identifier, password, nickname }),
       });
-      const json = await res.json();
-      if (!json.ok) throw new Error(json.error);
+      // 网关 502 等非 JSON 响应时不把解析原文当错误文案：解析失败兜底为 null，统一可读文案
+      const json = await res.json().catch(() => null);
+      if (!res.ok || json?.ok !== true) throw new Error(json?.error || "服务异常，请稍后再试");
       router.push(next);
       router.refresh();
     } catch (e) {

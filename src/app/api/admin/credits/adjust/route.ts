@@ -36,19 +36,19 @@ export async function POST(req: NextRequest) {
       // 入账：复用积分核心（写 CreditLedger + CreditAccount，type=admin_adjust）
       balanceAfter = await grantCredits(userId, amount, "admin_adjust", { reason });
     } else {
-      // 扣减：事务内校验足额（不允许负余额），写流水快照
+      // 扣减：原子条件更新（balance >= deduct 才扣，DB 侧 decrement），count===0 即余额不足；
+      // 避免「读-算-写整值覆盖 + check-then-act」的并发窗口。流水快照在同事务内读回。
       const deduct = -amount; // 正数
       balanceAfter = await prisma.$transaction(async (tx) => {
-        const acc = await tx.creditAccount.findUnique({ where: { userId } });
-        const balance = acc?.balance ?? 0;
-        if (balance < deduct) {
+        const res = await tx.creditAccount.updateMany({
+          where: { userId, balance: { gte: deduct } },
+          data: { balance: { decrement: deduct }, totalSpent: { increment: deduct } },
+        });
+        if (res.count === 0) {
           throw new AppError("余额不足，无法扣减到负值", 400);
         }
-        const after = balance - deduct;
-        await tx.creditAccount.update({
-          where: { userId },
-          data: { balance: after, totalSpent: (acc?.totalSpent ?? 0) + deduct },
-        });
+        const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId }, select: { balance: true } });
+        const after = acc.balance;
         await tx.creditLedger.create({
           data: { userId, delta: amount, type: "admin_adjust", balanceAfter: after, reason },
         });

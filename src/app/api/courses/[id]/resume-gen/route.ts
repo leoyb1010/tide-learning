@@ -8,6 +8,9 @@ import { getGenJob, initGenJob, runCourseGenBackground } from "@/lib/course-gen"
 
 export const dynamic = "force-dynamic";
 
+/** running job 心跳超时阈值：超过 15 分钟无心跳视为 stale（进程重启杀死 after() 遗留），允许续造。 */
+const GEN_JOB_STALE_MS = 15 * 60_000;
+
 /**
  * POST /api/courses/:id/resume-gen —— 断点续造入口。
  *
@@ -49,9 +52,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // —— 幂等：已在跑（course_gen job=running）则拒绝，防并发重复生成 ——
+    // 但 running 可能是「僵尸」：进程重启杀死 after() 后台后，job 永远停在 running，
+    // 课程将永久卡 generating。心跳存 inputJson.heartbeatAt（GenerationJob 无 updatedAt 列），
+    // 缺失回退 job.createdAt；超过 15 分钟无心跳视为 stale，放行续造（下方 initGenJob 会复用重置该 job）。
     const job = await getGenJob(course.id);
     if (job?.status === "running") {
-      return fail("该课程正在生成中，请稍后查看进度", 409);
+      let heartbeat = job.createdAt.getTime();
+      try {
+        const p = JSON.parse(job.inputJson || "{}");
+        if (typeof p.heartbeatAt === "string") {
+          const t = Date.parse(p.heartbeatAt);
+          if (Number.isFinite(t)) heartbeat = t;
+        }
+      } catch {
+        /* 解析失败按 createdAt 兜底 */
+      }
+      if (Date.now() - heartbeat < GEN_JOB_STALE_MS) {
+        return fail("该课程正在生成中，请稍后查看进度", 409);
+      }
+      // stale：视为遗留僵尸 job，继续走下方 claim 复位 + initGenJob 重置流程
     }
 
     // 释放遗留 claim：上一轮若在 claim 后、写库前被硬杀（如 serverless 超时），
