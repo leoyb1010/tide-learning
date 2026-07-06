@@ -175,27 +175,53 @@ export const resolveEntitlement = cache(async (userId: string | null | undefined
   return FREE_SNAPSHOT;
 });
 
+/**
+ * 快照持久化的「节流」表：`${userId}:${subscriptionId}` → { hash, at }。
+ * 仿 throttledSweepExpired：快照内容未变（hash 相同）且距上次写 < 窗口时跳过写库——
+ * 消除「每请求都 await 写同一份快照」的冗余写。内容一变立刻写（不受窗口约束），
+ * 内容不变也在窗口到期后再写一次（应对 DB 侧外部漂移的最终一致）。
+ * 快照正确性不依赖此写：resolveEntitlement 返回的 snapshot 始终是内存实时归约结果。
+ */
+const SNAPSHOT_THROTTLE_MS = 5 * 60 * 1000;
+const lastSnapshotAt = new Map<string, { hash: string; at: number }>();
+
 async function persistSnapshot(userId: string, subscriptionId: string | null, status: string, snapshot: EntitlementSnapshot) {
+  const snapshotJson = JSON.stringify(snapshot);
+  // 节流：内容未变且在窗口内 → 跳过写库（内容变或窗口过期则照写）。
+  const throttleKey = `${userId}:${subscriptionId ?? "null"}`;
+  const prev = lastSnapshotAt.get(throttleKey);
+  const nowMs = Date.now();
+  if (prev && prev.hash === snapshotJson && nowMs - prev.at < SNAPSHOT_THROTTLE_MS) {
+    return;
+  }
   const data = {
     status,
     accessLevel: snapshot.accessLevel,
     validUntil: snapshot.validUntil ? new Date(snapshot.validUntil) : null,
-    snapshotJson: JSON.stringify(snapshot),
+    snapshotJson,
   };
-  // 非 null：靠 @@unique([userId, sourceSubscriptionId]) 复合唯一键原子 upsert，杜绝并发 check-then-act 写重复快照行。
-  if (subscriptionId) {
-    await prisma.entitlement.upsert({
-      where: { userId_sourceSubscriptionId: { userId, sourceSubscriptionId: subscriptionId } },
-      update: data,
-      create: { userId, sourceSubscriptionId: subscriptionId, ...data },
-    });
-    return;
+  try {
+    // 非 null：靠 @@unique([userId, sourceSubscriptionId]) 复合唯一键原子 upsert，杜绝并发 check-then-act 写重复快照行。
+    if (subscriptionId) {
+      await prisma.entitlement.upsert({
+        where: { userId_sourceSubscriptionId: { userId, sourceSubscriptionId: subscriptionId } },
+        update: data,
+        create: { userId, sourceSubscriptionId: subscriptionId, ...data },
+      });
+    } else {
+      // null 分支：SQLite 唯一键不能用 NULL 定位（多 NULL 并存），退回 check-then-act。
+      // 现有调用方 subscriptionId 恒非 null，此分支仅为防御性兜底。
+      const existing = await prisma.entitlement.findFirst({ where: { userId, sourceSubscriptionId: null } });
+      if (existing) await prisma.entitlement.update({ where: { id: existing.id }, data });
+      else await prisma.entitlement.create({ data: { userId, sourceSubscriptionId: null, ...data } });
+    }
+    // 写成功：记录本次内容 hash + 时间，供节流跳过后续相同快照的冗余写。
+    lastSnapshotAt.set(throttleKey, { hash: snapshotJson, at: nowMs });
+  } catch (e) {
+    // 写失败：清掉节流水位，让下次请求重试落库（不静默吞成功）。
+    lastSnapshotAt.delete(throttleKey);
+    throw e;
   }
-  // null 分支：SQLite 唯一键不能用 NULL 定位（多 NULL 并存），退回 check-then-act。
-  // 现有调用方 subscriptionId 恒非 null，此分支仅为防御性兜底。
-  const existing = await prisma.entitlement.findFirst({ where: { userId, sourceSubscriptionId: null } });
-  if (existing) await prisma.entitlement.update({ where: { id: existing.id }, data });
-  else await prisma.entitlement.create({ data: { userId, sourceSubscriptionId: null, ...data } });
 }
 
 /** 是否可访问某赛道（全站 or 该赛道单订阅）。 */

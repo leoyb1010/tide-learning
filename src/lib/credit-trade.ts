@@ -137,12 +137,12 @@ export async function collectFreeCourse(args: {
 
       // —— 作者创作激励（同事务原子，绑定 CoursePurchase 首次创建成功；漏发修复）——
       if (willReward && authorId) {
-        const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: authorId } });
-        const balanceAfter = acc.balance + authorBonus;
-        await tx.creditAccount.update({
+        // 原子入账：balance/totalEarned 由 DB 侧 increment，避免「读-算-写」并发覆盖；update 返回更新后行。
+        const acc = await tx.creditAccount.update({
           where: { userId: authorId },
-          data: { balance: balanceAfter, totalEarned: acc.totalEarned + authorBonus },
+          data: { balance: { increment: authorBonus }, totalEarned: { increment: authorBonus } },
         });
+        const balanceAfter = acc.balance;
         await tx.creditLedger.create({
           data: {
             userId: authorId,
@@ -235,11 +235,13 @@ export async function purchaseCourse(args: {
       if (buyerAcc.balance < priceCredits) {
         throw new AppError("积分不足，充值后可购买本课", 402);
       }
-      const buyerBalanceAfter = buyerAcc.balance - priceCredits;
-      await tx.creditAccount.update({
+      // 原子扣款：balance/totalSpent 由 DB 侧 decrement/increment，避免「读-算-写」并发越扣；
+      // TOCTOU 二次核验保留在前（余额不足即回滚）。update 返回更新后行，取 balanceAfter。
+      const buyerUpdated = await tx.creditAccount.update({
         where: { userId: buyerId },
-        data: { balance: buyerBalanceAfter, totalSpent: buyerAcc.totalSpent + priceCredits },
+        data: { balance: { decrement: priceCredits }, totalSpent: { increment: priceCredits } },
       });
+      const buyerBalanceAfter = buyerUpdated.balance;
       await tx.creditLedger.create({
         data: {
           userId: buyerId,
@@ -253,12 +255,12 @@ export async function purchaseCourse(args: {
 
       // —— 作者入账（同事务，与扣款成对；分成的 30% 平台抽成不入任何账户）——
       if (authorShare > 0) {
-        const authorAcc = await tx.creditAccount.findUniqueOrThrow({ where: { userId: authorId } });
-        const authorBalanceAfter = authorAcc.balance + authorShare;
-        await tx.creditAccount.update({
+        // 原子入账：balance/totalEarned 由 DB 侧 increment，避免「读-算-写」并发覆盖；update 返回更新后行。
+        const authorAcc = await tx.creditAccount.update({
           where: { userId: authorId },
-          data: { balance: authorBalanceAfter, totalEarned: authorAcc.totalEarned + authorShare },
+          data: { balance: { increment: authorShare }, totalEarned: { increment: authorShare } },
         });
+        const authorBalanceAfter = authorAcc.balance;
         await tx.creditLedger.create({
           data: {
             userId: authorId,

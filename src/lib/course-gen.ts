@@ -229,8 +229,16 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
   // updateMany 的 where 是数据库层条件判定：仅 blocksJson 仍为空且未被认领的行会被改动，
   // 两条流水几乎同刻进来，只有一条 count===1（认领成功），另一条 count===0（已被抢走）。
   // 认领失败者立即返回、绝不进入下方的 LLM 调用与扣费。
+  // TTL 防死锁：认领超过 10 分钟仍未落库（进程重启/崩溃遗留）视为死锁，允许重取。
+  // where 仍要求 blocksJson=null（未生成），genClaimedAt 为 null 或已超 10 分钟两者其一即可认领。
+  const CLAIM_TTL_MS = 10 * 60_000;
+  const staleBefore = new Date(Date.now() - CLAIM_TTL_MS);
   const claim = await prisma.lesson.updateMany({
-    where: { id: lessonId, blocksJson: null, genClaimedAt: null },
+    where: {
+      id: lessonId,
+      blocksJson: null,
+      OR: [{ genClaimedAt: null }, { genClaimedAt: { lt: staleBefore } }],
+    },
     data: { genClaimedAt: new Date() },
   });
   if (claim.count === 0) {

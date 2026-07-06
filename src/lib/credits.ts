@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { after } from "next/server";
 import { prisma } from "./db";
 import { AppError } from "./errors";
 import type { LlmUsageInfo } from "./llm";
@@ -124,12 +125,12 @@ export async function grantCredits(
   if (amount <= 0) throw new AppError("入账金额必须为正", 400);
   await ensureAccount(userId);
   return prisma.$transaction(async (tx) => {
-    const acc = await tx.creditAccount.findUniqueOrThrow({ where: { userId } });
-    const balanceAfter = acc.balance + amount;
-    await tx.creditAccount.update({
+    // 原子入账：balance/totalEarned 由 DB 侧 increment，避免「读-算-写」并发覆盖；update 返回更新后行。
+    const updated = await tx.creditAccount.update({
       where: { userId },
-      data: { balance: balanceAfter, totalEarned: acc.totalEarned + amount },
+      data: { balance: { increment: amount }, totalEarned: { increment: amount } },
     });
+    const balanceAfter = updated.balance;
     await tx.creditLedger.create({
       data: { userId, delta: amount, type, refId: opts.refId, reason: opts.reason, balanceAfter },
     });
@@ -160,15 +161,20 @@ export async function recordLlmSpend(userId: string, usage: LlmUsageInfo, scene:
   const cost = tokensToCredits(usage, scene);
   try {
     return await prisma.$transaction(async (tx) => {
-      const acc = await tx.creditAccount.findUnique({ where: { userId } });
-      const balance = acc?.balance ?? 0;
       // 全额扣（允许负余额=欠账）：AI 已产生成本，不能免单；欠账下次被 assertCanSpend 拦。
-      const balanceAfter = balance - cost;
+      // 原子扣减：balance/totalSpent 由 DB 侧 decrement/increment，避免「读-算-写」并发越扣；
+      // update 返回更新后行，balanceAfter 直接取自返回值（省一次读）。
+      const acc = await tx.creditAccount.findUnique({ where: { userId }, select: { userId: true } });
+      let balanceAfter: number;
       if (acc) {
-        await tx.creditAccount.update({
+        const updated = await tx.creditAccount.update({
           where: { userId },
-          data: { balance: balanceAfter, totalSpent: acc.totalSpent + cost },
+          data: { balance: { decrement: cost }, totalSpent: { increment: cost } },
         });
+        balanceAfter = updated.balance;
+      } else {
+        // 无账户（理论上调用前已 ensureAccount，此处防御）：视余额为 0，仅记欠账流水不建账。
+        balanceAfter = 0 - cost;
       }
       await tx.llmUsage.create({
         data: {
@@ -231,11 +237,12 @@ export async function ensureMonthlyGrant(
     // 事务内二次确认，防并发重复发放
     const fresh = await tx.creditAccount.findUniqueOrThrow({ where: { userId } });
     if (fresh.monthlyGrantKey === monthKey) return;
-    const balanceAfter = fresh.balance + amount;
-    await tx.creditAccount.update({
+    // 原子发放：balance/totalEarned 由 DB 侧 increment，同时推进 monthlyGrantKey 水位线；update 返回更新后行。
+    const updated = await tx.creditAccount.update({
       where: { userId },
-      data: { balance: balanceAfter, totalEarned: fresh.totalEarned + amount, monthlyGrantKey: monthKey },
+      data: { balance: { increment: amount }, totalEarned: { increment: amount }, monthlyGrantKey: monthKey },
     });
+    const balanceAfter = updated.balance;
     await tx.creditLedger.create({
       // type 保留 "monthly_grant" 不变（对账/历史流水兼容）；档位差异记在 reason 里。
       data: { userId, delta: amount, type: "monthly_grant", refId: monthKey, balanceAfter, reason: `${monthKey} 会员月度积分 (+${amount})` },
@@ -243,9 +250,22 @@ export async function ensureMonthlyGrant(
   });
 }
 
-/** 便捷 helper：把 llm.ts 的 onUsage 回调直接对接到记账。 */
+/**
+ * 便捷 helper：把 llm.ts 的 onUsage 回调直接对接到记账。
+ * P2-2：改用 Next 的 after()——onUsage 常在流式生成过程中触发，此时用 fire-and-forget 的 void
+ * 记账可能随响应返回被打断而丢账。after() 保证「响应体返回后」仍在同一请求生命周期内落账。
+ * 兜底：after() 仅在请求作用域内可用；若在无请求上下文（脚本/嵌套 after 的后台续跑等）被调用会抛，
+ * 此时退回原 void 直发，保证任何调用点都不因 after 不可用而崩。
+ */
 export function creditingOnUsage(userId: string, scene: Scene) {
   return (usage: LlmUsageInfo) => {
-    void recordLlmSpend(userId, usage, scene);
+    try {
+      after(() => {
+        void recordLlmSpend(userId, usage, scene);
+      });
+    } catch {
+      // 非请求作用域：after() 不可用，退回直发（recordLlmSpend 内部已自带失败落 AuditLog 兜底）。
+      void recordLlmSpend(userId, usage, scene);
+    }
   };
 }
