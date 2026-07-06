@@ -14,6 +14,7 @@ import {
   Check,
   XCircle,
 } from "@phosphor-icons/react";
+import { GEN_STATIONS } from "@/lib/gen-stages";
 
 /* ============================================================
    GenStage —— AI 生产线舞台（造课 / 导入「生成中」的酷炫可视化）
@@ -37,8 +38,9 @@ export interface GenStageLesson {
   state: GenStageLessonState;
 }
 
-const STATIONS_GENERATE = ["理解需求", "设计大纲", "逐节写作", "装订成册"];
-const STATIONS_IMPORT = ["通读资料", "拆分章节", "逐章升维", "装订成册"];
+// 站名从共享单一事实源取（src/lib/gen-stages），避免与首页演示卡文案漂移。
+const STATIONS_GENERATE = GEN_STATIONS.generate;
+const STATIONS_IMPORT = GEN_STATIONS.import;
 const STATION_ICONS = [Brain, TreeStructure, PencilLine, BookBookmark] as const;
 
 /** 深色舞台上的行底/描边（统一常量，避免四处硬编码） */

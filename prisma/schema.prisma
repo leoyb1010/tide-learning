@@ -311,6 +311,7 @@ model Note {
   @@index([userId, lessonId])
   @@index([userId, pinned, updatedAt]) // v2.2：笔记馆「全部」列表默认排序（置顶优先 + 最近更新）
   @@index([notebookId])
+  @@index([courseId])
 }
 
 // ---------- 笔记标签（C1：标签系统）----------
@@ -362,6 +363,7 @@ model Demand {
 
   @@index([category, status])
   @@index([createdAt])
+  @@index([userId])
 }
 
 model DemandVote {
@@ -395,6 +397,7 @@ model Comment {
   deletedAt  DateTime?
 
   @@index([demandId, createdAt])
+  @@index([userId])
 }
 
 // ---------- 需求关注（C2.4：进度订阅）----------
@@ -921,6 +924,7 @@ model CreditLedger {
   createdAt    DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([type]) // admin/credits 按流水类型统计（monthly_grant / llm_spend …），避免全表扫
 }
 
 /** LLM Token 用量原始记录（积分折算依据）。 */

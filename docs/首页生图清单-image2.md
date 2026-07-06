@@ -60,7 +60,7 @@ The SAME three-zone self-study room as a premium night scene: deep cool blue-bla
 **负向**：（全局负向）+ `no horror, no cold sterile feeling, no multiple colored lights, no bright overexposed screen`
 **验收**：暗但温暖不恐怖；三区仍可辨；仅一点暖红；与 A1 构图呼应。
 
-> 备注：现有 `public/marketing/studyroom-act1-hero.jpg` 是很好的夜景，但只有「一张桌」，没体现三种内容——A2 是它的「三区」升级版。
+> 备注：旧的 `studyroom-act*.jpg` 单桌夜景已作死资产清理（首页改用 CSS 场景 + 新教室三区图，旧图零引用）。A1/A2 的三区教室图已生成并接入，取代了旧的单桌夜景。
 
 ---
 
@@ -145,7 +145,7 @@ An abstract minimal "AI blueprint" background texture for a light UI panel, 16:1
 - **书架木纹层板**（问题②）→ 用了现成 `public/textures/shelf-wood-texture.jpg`（真实深胡桃木纹），书脊用 CSS + 赛道渐变绘制。
 - **首屏 / 三桌 / 邻座卡 / 结尾**（问题①④）→ 纯代码 + `--scene-*` token，亮暗自适应，无需图。
 
-> 现有 `public/marketing/studyroom-act*.jpg`（3 张高质量夜景）当前**未被首页引用**（首页改用 CSS 场景）。它们质量很高但都是「深夜单桌」，不含三种内容并置——所以列了 A1/A2 作「三区」升级版；若你更想直接复用旧夜景，也可，我把 A2 换成引用 `studyroom-act1-hero.jpg` 即可（省一张图）。
+> 旧的 `studyroom-act*.jpg` / `landing-hero-scene.jpg` / `desk-screen-demo.jpg` / `illustrations/hero.jpg`（共 6 张单桌夜景/旧原型图）已作死资产清理——首页早已改用 CSS 场景 + 新教室三区图（A1/A2），旧图零引用。需要时可从 git 历史恢复。
 
 ---
 
