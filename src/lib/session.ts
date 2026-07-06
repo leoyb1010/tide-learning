@@ -8,17 +8,52 @@ const SESSION_COOKIE = "tide_session";
 const SESSION_DAYS = 30;
 
 // ---------- 密码哈希（scrypt，无外部依赖）----------
+// 两种存储格式并存，向后兼容：
+//   旧：`<salt>:<key>`            —— 用 Node 默认 N=16384,r=8,p=1 生成（现网 dev.db 里的哈希）
+//   新：`scrypt$<N>$<r>$<p>$<salt>$<key>` —— 参数编码进串，成本可随时调高不影响旧哈希
+// 关键：verifyPassword 按串前缀识别格式并各用其参数，旧哈希永远能通过；
+//       hashPassword 一律写新格式（成本更高的 N），新注册/改密即升级。
+const KEYLEN = 64;
+// 新哈希成本参数：N=2**15（比旧默认翻倍），r=8、p=1 沿用 Node 默认。
+const SCRYPT_N = 32768;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+// N 增大后单次派生的内存超过 scrypt 默认 maxmem 上限，须显式放宽（≈128*N*r*p 再留余量）。
+const scryptMaxmem = (N: number, r: number, p: number) => 256 * N * r * p + 1024 * 1024;
+
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
-  const derived = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${derived}`;
+  const derived = scryptSync(password, salt, KEYLEN, {
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+    maxmem: scryptMaxmem(SCRYPT_N, SCRYPT_R, SCRYPT_P),
+  }).toString("hex");
+  return `scrypt$${SCRYPT_N}$${SCRYPT_R}$${SCRYPT_P}$${salt}$${derived}`;
 }
 
 export function verifyPassword(password: string, stored: string | null): boolean {
   if (!stored) return false;
+
+  // 新格式：scrypt$N$r$p$salt$key —— 用串内编码的成本参数派生。
+  if (stored.startsWith("scrypt$")) {
+    const parts = stored.split("$");
+    if (parts.length !== 6) return false;
+    const [, nStr, rStr, pStr, salt, key] = parts;
+    const N = Number(nStr), r = Number(rStr), p = Number(pStr);
+    if (!Number.isInteger(N) || !Number.isInteger(r) || !Number.isInteger(p)) return false;
+    if (!salt || !key) return false;
+    const derived = scryptSync(password, salt, KEYLEN, {
+      N, r, p, maxmem: scryptMaxmem(N, r, p),
+    });
+    const keyBuf = Buffer.from(key, "hex");
+    return keyBuf.length === derived.length && timingSafeEqual(keyBuf, derived);
+  }
+
+  // 旧格式：salt:key —— 用 Node 默认参数（N=16384）派生，保证现网旧哈希仍能登录。
   const [salt, key] = stored.split(":");
   if (!salt || !key) return false;
-  const derived = scryptSync(password, salt, 64);
+  const derived = scryptSync(password, salt, KEYLEN);
   const keyBuf = Buffer.from(key, "hex");
   return keyBuf.length === derived.length && timingSafeEqual(keyBuf, derived);
 }
