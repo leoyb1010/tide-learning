@@ -112,7 +112,7 @@ export function Lightbox({
         <button
           onClick={onClose}
           data-autofocus
-          aria-label="关闭"
+          title="关闭" aria-label="关闭"
           className="lb-btn absolute right-2 top-2 sm:right-4 sm:top-4"
         >
           <X size={22} weight="bold" />
@@ -122,7 +122,7 @@ export function Lightbox({
         {hasPrev && (
           <button
             onClick={goPrev}
-            aria-label="上一张"
+            title="上一张" aria-label="上一张"
             className="lb-btn absolute left-2 top-1/2 -translate-y-1/2 sm:left-4"
           >
             <CaretLeft size={24} weight="bold" />
@@ -142,7 +142,7 @@ export function Lightbox({
         {hasNext && (
           <button
             onClick={goNext}
-            aria-label="下一张"
+            title="下一张" aria-label="下一张"
             className="lb-btn absolute right-2 top-1/2 -translate-y-1/2 sm:right-4"
           >
             <CaretRight size={24} weight="bold" />

@@ -52,7 +52,7 @@ export function TideCalendar({ calendar, todayKey }: { calendar: TideDay[]; toda
           <span className="num ml-2 text-sm font-normal text-ink-400">{year} 年 {month + 1} 月</span>
         </h3>
         <div className="flex items-center gap-1">
-          <button onClick={() => setOffset((o) => o - 1)} aria-label="上一月" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-50 hover:text-ink-700">
+          <button onClick={() => setOffset((o) => o - 1)} title="上一月" aria-label="上一月" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-50 hover:text-ink-700">
             <CaretLeft size={16} />
           </button>
           <button
@@ -63,7 +63,7 @@ export function TideCalendar({ calendar, todayKey }: { calendar: TideDay[]; toda
             本月
           </button>
           {/* 不允许翻到未来之后（未来无数据但允许看空月，仅到下月为止） */}
-          <button onClick={() => setOffset((o) => Math.min(o + 1, 0))} disabled={offset >= 0} aria-label="下一月" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-50 hover:text-ink-700 disabled:opacity-40">
+          <button onClick={() => setOffset((o) => Math.min(o + 1, 0))} disabled={offset >= 0} title="下一月" aria-label="下一月" className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-400 transition-colors hover:bg-ink-50 hover:text-ink-700 disabled:opacity-40">
             <CaretRight size={16} />
           </button>
         </div>

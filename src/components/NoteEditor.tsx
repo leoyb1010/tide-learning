@@ -413,14 +413,14 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
                   <KindBadge kind={n.kind} />
                 </div>
                 <div className="flex items-center gap-2 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button onClick={() => toggleStar(n.id, !n.starred)} className={n.starred ? "text-accent-600" : "text-ink-300 hover:text-accent-600"} aria-label="收藏">
+                  <button onClick={() => toggleStar(n.id, !n.starred)} className={n.starred ? "text-accent-600" : "text-ink-300 hover:text-accent-600"} title={n.starred ? "取消收藏" : "收藏"} aria-label={n.starred ? "取消收藏" : "收藏"}>
                     <Star size={13} weight={n.starred ? "fill" : "regular"} />
                   </button>
-                  <button onClick={() => updateTimestamp(n.id)} className="text-ink-300 hover:text-accent-700" aria-label="更新时间戳"><PencilSimple size={13} /></button>
-                  <button onClick={() => del(n.id)} className="text-ink-300 hover:text-error" aria-label="删除"><Trash size={13} /></button>
+                  <button onClick={() => updateTimestamp(n.id)} className="text-ink-300 hover:text-accent-700" title="更新时间戳" aria-label="更新时间戳"><PencilSimple size={13} /></button>
+                  <button onClick={() => del(n.id)} className="text-ink-300 hover:text-error" title="删除" aria-label="删除"><Trash size={13} /></button>
                 </div>
                 {n.starred && (
-                  <button onClick={() => toggleStar(n.id, false)} className="text-accent-600 group-hover:hidden" aria-label="已收藏"><Star size={13} weight="fill" /></button>
+                  <button onClick={() => toggleStar(n.id, false)} className="text-accent-600 group-hover:hidden" title="取消收藏" aria-label="取消收藏"><Star size={13} weight="fill" /></button>
                 )}
               </div>
 

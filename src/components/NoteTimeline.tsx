@@ -145,7 +145,7 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
                             <button
                               type="button"
                               onClick={() => onToggleStar(n)}
-                              aria-label={n.starred ? "取消收藏" : "收藏"}
+                              title={n.starred ? "取消收藏" : "收藏"} aria-label={n.starred ? "取消收藏" : "收藏"}
                               className="rounded-[9px] p-1.5 text-[var(--ink4)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--red)]"
                             >
                               <Star size={16} weight={n.starred ? "fill" : "regular"} className={n.starred ? "text-[var(--red)]" : ""} />
@@ -153,7 +153,7 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
                             <button
                               type="button"
                               onClick={() => onDelete(n)}
-                              aria-label="删除"
+                              title="删除" aria-label="删除"
                               className="rounded-[9px] p-1.5 text-[var(--ink4)] transition-colors hover:bg-[var(--red-soft)] hover:text-[var(--red)]"
                             >
                               <Trash size={16} />

@@ -76,7 +76,7 @@ export function Dialog({
         className={`dialog-panel-in relative w-full max-w-lg rounded-3xl border border-ink-100 bg-paper-raised p-6 shadow-[0_32px_80px_-32px_rgba(125,8,18,0.35)] ${className ?? ""}`}
       >
         {title && <h2 className="mb-4 text-lg font-semibold text-ink-950">{title}</h2>}
-        <button onClick={onClose} className="absolute right-4 top-4 text-ink-400 transition-colors hover:text-ink-700" aria-label="关闭">
+        <button onClick={onClose} className="absolute right-4 top-4 text-ink-400 transition-colors hover:text-ink-700" title="关闭" aria-label="关闭">
           <X size={18} />
         </button>
         {children}

@@ -83,7 +83,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                     {t.action.label}
                   </button>
                 )}
-                <button onClick={() => dismiss(t.id)} className="ml-1 text-ink-400 transition-colors hover:text-ink-600" aria-label="关闭">
+                <button onClick={() => dismiss(t.id)} className="ml-1 text-ink-400 transition-colors hover:text-ink-600" title="关闭" aria-label="关闭">
                   <X size={14} />
                 </button>
               </motion.div>

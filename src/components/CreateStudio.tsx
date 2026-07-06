@@ -1186,7 +1186,7 @@ function GeneratingBanner({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="收起提示"
+          title="收起提示" aria-label="收起提示"
           className="studio-press grid h-8 w-8 place-items-center rounded-[10px] text-[var(--ink4)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink2)]"
         >
           <XCircle size={17} weight="regular" />

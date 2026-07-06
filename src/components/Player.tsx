@@ -490,7 +490,7 @@ export function Player({
             {/* 顶部柔光晕，营造展示区聚光感 */}
             <div className="absolute inset-x-0 top-0 h-1/2 opacity-60" style={{ background: "radial-gradient(60% 90% at 50% 0%, rgba(255,255,255,.08), transparent 70%)" }} aria-hidden />
             {access && (
-              <button onClick={togglePlay} className="studio-press group relative flex h-[68px] w-[68px] items-center justify-center rounded-full bg-white/95 text-[var(--red)] shadow-[0_8px_28px_-6px_rgba(0,0,0,.5)] ring-1 ring-white/40 transition-transform duration-200 hover:scale-[1.08]" aria-label={playing ? "暂停" : "播放"}>
+              <button onClick={togglePlay} className="studio-press group relative flex h-[68px] w-[68px] items-center justify-center rounded-full bg-white/95 text-[var(--red)] shadow-[0_8px_28px_-6px_rgba(0,0,0,.5)] ring-1 ring-white/40 transition-transform duration-200 hover:scale-[1.08]" title={playing ? "暂停" : "播放"} aria-label={playing ? "暂停" : "播放"}>
                 {/* 播放待机时的呼吸光环，暗示可点击 */}
                 {!playing && <span className="pointer-events-none absolute inset-0 rounded-full ring-2 ring-white/50 motion-safe:animate-ping" aria-hidden />}
                 {playing ? <Pause size={26} weight="fill" /> : <Play size={26} weight="fill" className="ml-0.5" />}
@@ -548,7 +548,7 @@ export function Player({
             )}
           </div>
           <div className="flex items-center gap-3">
-            <button onClick={togglePlay} className={`studio-press grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white ${hit44}`} aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
+            <button onClick={togglePlay} className={`studio-press grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white ${hit44}`} title={playing ? "暂停" : "播放"} aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
             <span className="mono text-xs tabular-nums text-white/70"><span className="text-white/90">{mmss(Math.floor(time))}</span> / {mmss(playbackDurationSec)}</span>
             <div className="flex-1" />
             {CaptureBar}
@@ -757,7 +757,7 @@ export function Player({
               <button
                 onClick={dismissNextCard}
                 className="studio-press -mr-1 -mt-1 grid h-6 w-6 place-items-center rounded-full text-[var(--ink4)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink2)]"
-                aria-label="关闭"
+                title="关闭" aria-label="关闭"
               >
                 <X size={14} weight="bold" />
               </button>

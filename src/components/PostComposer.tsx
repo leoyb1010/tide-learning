@@ -170,7 +170,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
             setResult(null);
           }}
           className="studio-press inline-flex h-7 w-7 items-center justify-center rounded-full text-[var(--ink3)] transition-colors hover:bg-[var(--surface-inset)] hover:text-[var(--ink)]"
-          aria-label="关闭"
+          title="关闭" aria-label="关闭"
         >
           <X size={15} />
         </button>
@@ -223,7 +223,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
               <img src={src} alt="" className="h-full w-full object-cover" />
               <button
                 onClick={() => removeImage(i)}
-                aria-label="移除图片"
+                title="移除图片" aria-label="移除图片"
                 className="studio-press absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-[var(--ink)]/70 text-white transition-opacity hover:bg-[var(--ink)]"
               >
                 <X size={11} weight="bold" />
@@ -242,7 +242,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
               className="mono inline-flex items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--red)]"
             >
               #{t}
-              <button onClick={() => removeTag(t)} aria-label={`移除话题 ${t}`} className="studio-press">
+              <button onClick={() => removeTag(t)} title={`移除话题 ${t}`} aria-label={`移除话题 ${t}`} className="studio-press">
                 <X size={10} weight="bold" />
               </button>
             </span>

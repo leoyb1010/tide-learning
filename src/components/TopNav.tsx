@@ -249,7 +249,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
               <span>搜索</span>
               <kbd className="mono rounded bg-[var(--surface-inset)] px-1.5 py-0.5 text-[10px] text-[var(--ink4)]">⌘K</kbd>
             </button>
-            <button onClick={openCommandK} className="grid h-[36px] w-[36px] place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] transition-colors hover:text-[var(--ink)] lg:hidden" aria-label="搜索">
+            <button onClick={openCommandK} className="grid h-[36px] w-[36px] place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] transition-colors hover:text-[var(--ink)] lg:hidden" title="搜索" aria-label="搜索">
               <MagnifyingGlass size={17} />
             </button>
 
@@ -278,7 +278,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                   onClick={() => setMenuOpen((o) => !o)}
                   className="grid h-[36px] w-[36px] place-items-center rounded-full text-[13px] font-semibold text-white"
                   style={{ background: "linear-gradient(135deg, var(--red), #ff5462)" }}
-                  aria-label={user.nickname}
+                  title={`账户菜单（${user.nickname}）`} aria-label={`账户菜单（${user.nickname}）`}
                 >
                   {user.nickname.slice(0, 1)}
                 </button>
@@ -321,7 +321,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
             <button
               ref={hamburgerRef}
               onClick={() => setDrawerOpen(true)}
-              aria-label="菜单"
+              title="菜单" aria-label="菜单"
               aria-haspopup="dialog"
               aria-expanded={drawerOpen}
               className="relative grid h-[36px] w-[36px] place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] md:hidden"
@@ -347,7 +347,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
               <span className="text-[14px] font-bold text-[var(--ink)]">导航</span>
               <button
                 onClick={() => setDrawerOpen(false)}
-                aria-label="关闭"
+                title="关闭" aria-label="关闭"
                 className="relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
               >
                 <X size={18} />

@@ -164,7 +164,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
                 <button
                   type="button"
                   onClick={() => setMoreOpen(false)}
-                  aria-label="关闭"
+                  title="关闭" aria-label="关闭"
                   className="relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
                 >
                   <X size={17} weight="bold" />

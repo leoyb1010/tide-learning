@@ -160,7 +160,7 @@ export default function NotebookGrid() {
                     type="button"
                     onClick={() => setIcon(em)}
                     aria-pressed={active}
-                    aria-label={`选择图标 ${em}`}
+                    title={`选择图标 ${em}`} aria-label={`选择图标 ${em}`}
                     className={`studio-press flex aspect-square items-center justify-center rounded-[10px] border text-[18px] transition-colors ${
                       active
                         ? "border-[var(--red)] bg-[var(--red-soft)]"

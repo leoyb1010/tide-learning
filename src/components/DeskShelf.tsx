@@ -228,7 +228,7 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
           </div>
           <button
             onClick={onClose}
-            aria-label="关闭书架"
+            title="关闭书架" aria-label="关闭书架"
             className="studio-press flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
           >
             <X size={18} weight="bold" />
@@ -506,7 +506,7 @@ function ShelfCard({
               <Link
                 href="/me/courses"
                 onClick={onNavigate}
-                aria-label={`到管理页删除《${course.title}》`}
+                title={`到管理页删除《${course.title}》`} aria-label={`到管理页删除《${course.title}》`}
                 className="studio-press inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors hover:border-[color-mix(in_srgb,var(--red)_35%,transparent)] hover:text-[var(--red)]"
               >
                 <Trash size={14} weight="bold" />

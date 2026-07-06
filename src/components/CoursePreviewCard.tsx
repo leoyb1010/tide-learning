@@ -132,7 +132,7 @@ function PreviewOverlay({
             <button
               type="button"
               onClick={onClose}
-              aria-label="关闭预览"
+              title="关闭预览" aria-label="关闭预览"
               className="studio-press absolute right-3 top-3 flex h-11 w-11 items-center justify-center rounded-full bg-black/35 text-white backdrop-blur-sm ring-1 ring-white/15 transition-colors hover:bg-black/55"
             >
               <X size={18} weight="bold" />

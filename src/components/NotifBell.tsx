@@ -158,6 +158,7 @@ export function NotifBell() {
       <button
         onClick={toggle}
         className="relative grid h-[38px] w-[38px] place-items-center rounded-[11px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] transition-colors hover:text-[var(--ink)] focus:border-[var(--ink3)] focus:outline-none"
+        title={unread > 0 ? `通知（${unread} 条未读）` : "通知"}
         aria-label={unread > 0 ? `通知（${unread} 条未读）` : "通知"}
         aria-haspopup="true"
         aria-expanded={open}

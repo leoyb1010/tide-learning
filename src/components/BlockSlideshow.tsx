@@ -266,6 +266,7 @@ export function BlockSlideshow({
           type="button"
           onClick={() => setHelpOpen((v) => !v)}
           className="studio-press relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+          title="键盘快捷键"
           aria-label="键盘快捷键"
           aria-expanded={helpOpen}
         >
@@ -281,6 +282,7 @@ export function BlockSlideshow({
                 ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
                 : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
             }`}
+            title={noteOpen ? "关闭笔记" : "记笔记"}
             aria-label={noteOpen ? "关闭笔记" : "记笔记"}
             aria-expanded={noteOpen}
           >
@@ -291,6 +293,7 @@ export function BlockSlideshow({
           type="button"
           onClick={toggleFullscreen}
           className="studio-press relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+          title={fullscreen ? "退出全屏" : "全屏播放"}
           aria-label={fullscreen ? "退出全屏" : "全屏播放"}
         >
           {fullscreen ? <CornersIn size={16} /> : <CornersOut size={16} />}
@@ -380,6 +383,7 @@ export function BlockSlideshow({
           onClick={goPrev}
           disabled={isFirst}
           className="studio-press group inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-40"
+          title="上一页"
           aria-label="上一页"
         >
           <CaretLeft size={16} className="transition-transform group-enabled:group-hover:-translate-x-0.5" />
@@ -397,6 +401,7 @@ export function BlockSlideshow({
                 onClick={() => goTo(i)}
                 role="tab"
                 aria-selected={active}
+                title={`第 ${i + 1} 页`}
                 aria-label={`第 ${i + 1} 页`}
                 className="grid h-11 w-4 shrink-0 place-items-center"
               >
@@ -419,6 +424,7 @@ export function BlockSlideshow({
             type="button"
             onClick={goNext}
             className="studio-press cta-glow group inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 text-[13px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+            title="下一页"
             aria-label="下一页"
           >
             <span className="hidden sm:inline">下一页</span>
@@ -443,6 +449,7 @@ export function BlockSlideshow({
           onClick={() => setNoteOpen(true)}
           className="studio-press cta-glow fixed bottom-6 right-6 grid h-14 w-14 place-items-center rounded-full bg-[var(--red)] text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,.5)] transition-transform hover:scale-105"
           style={{ zIndex: "calc(var(--z-focus) + 1)" }}
+          title="记笔记 (N)"
           aria-label="记笔记 (N)"
         >
           <NotePencil size={22} weight="fill" />
@@ -484,6 +491,7 @@ export function BlockSlideshow({
                     type="button"
                     onClick={() => setNoteOpen(false)}
                     className="studio-press relative grid h-9 w-9 place-items-center rounded-[10px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
+                    title="关闭笔记"
                     aria-label="关闭笔记"
                   >
                     <X size={16} weight="bold" />
@@ -531,6 +539,7 @@ export function BlockSlideshow({
                   type="button"
                   onClick={() => setHelpOpen(false)}
                   className="studio-press relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+                  title="关闭"
                   aria-label="关闭"
                 >
                   <X size={15} weight="bold" />

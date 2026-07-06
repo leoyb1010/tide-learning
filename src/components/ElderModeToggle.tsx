@@ -18,6 +18,7 @@ export function ElderModeToggle() {
           onClick={() => setMode(isElder ? "standard" : "elder")}
           className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${isElder ? "bg-[var(--red)]" : "bg-[var(--surface-inset)]"}`}
           aria-pressed={isElder}
+          title="切换长辈模式"
           aria-label="切换长辈模式"
         >
           <span

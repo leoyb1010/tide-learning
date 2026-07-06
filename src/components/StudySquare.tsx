@@ -123,7 +123,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
         <div className="flex items-center gap-2">
           <span className="mono inline-flex items-center gap-1.5 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1 text-[12.5px] font-medium text-[var(--red)]">
             #{tag}
-            <button onClick={() => setTag(null)} aria-label="清除话题筛选" className="studio-press">
+            <button onClick={() => setTag(null)} title="清除话题筛选" aria-label="清除话题筛选" className="studio-press">
               <X size={12} weight="bold" />
             </button>
           </span>

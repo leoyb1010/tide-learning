@@ -109,7 +109,7 @@ export function SharePanel({
           type="button"
           onClick={openPanel}
           aria-haspopup="dialog"
-          aria-label={triggerLabel}
+          title={triggerLabel} aria-label={triggerLabel}
           className="contents"
         >
           {trigger}
@@ -120,7 +120,7 @@ export function SharePanel({
           type="button"
           onClick={openPanel}
           aria-haspopup="dialog"
-          aria-label={triggerLabel}
+          title={triggerLabel} aria-label={triggerLabel}
           className={
             triggerClassName ??
             "group studio-press inline-flex h-11 w-11 items-center justify-center rounded-[12px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
@@ -347,7 +347,7 @@ function SharePanelModal({
               <button
                 type="button"
                 onClick={onClose}
-                aria-label="关闭"
+                title="关闭" aria-label="关闭"
                 className="studio-press inline-flex h-9 w-9 items-center justify-center rounded-full text-[var(--ink3)] transition-colors hover:bg-[var(--surface-inset)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
               >
                 <X size={16} weight="bold" />
