@@ -109,11 +109,15 @@ export function MarketBuyPanel({
     if (inFlight.current) return;
     inFlight.current = true;
     setBuying(true);
+    // 20s 超时兜底：网络卡死时用 AbortController 中断请求，避免按钮永久卡 loading（finally 统一解锁）。
+    const ctrl = new AbortController();
+    const timeout = window.setTimeout(() => ctrl.abort(), 20000);
     try {
       const res = await fetch("/api/market/collect", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ courseId }),
+        signal: ctrl.signal,
       });
       const json = (await res.json()) as
         | { ok: true; data: { status: string; already: boolean; message: string; balance?: number; spent?: number } }
@@ -148,6 +152,7 @@ export function MarketBuyPanel({
     } catch {
       toast("网络异常，请重试", { tone: "warn" });
     } finally {
+      window.clearTimeout(timeout);
       inFlight.current = false;
       setBuying(false);
     }

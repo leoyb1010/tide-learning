@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Ripple } from "./motion";
 import { useToast } from "./Toast";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import { track } from "@/lib/analytics-client";
 
 /**
@@ -15,7 +16,8 @@ export function MockPayActions({ externalOrderId, nextUrl }: { externalOrderId: 
   const { toast } = useToast();
   const [busy, setBusy] = useState<null | "success" | "fail">(null);
 
-  async function pay(outcome: "success" | "fail") {
+  // useSubmitGuard(20s)：拦截双击双发（避免同一订单重复回调 webhook），网络卡死时 20s 兜底解锁按钮。
+  const { guard: pay } = useSubmitGuard(async (outcome: "success" | "fail") => {
     setBusy(outcome);
     try {
       const r = await fetch("/api/checkout/mock-pay", {
@@ -38,7 +40,7 @@ export function MockPayActions({ externalOrderId, nextUrl }: { externalOrderId: 
       toast((e as Error).message || "操作失败，请重试", { tone: "warn" });
       setBusy(null);
     }
-  }
+  }, 20000);
 
   return (
     <div className="mt-6 space-y-3">

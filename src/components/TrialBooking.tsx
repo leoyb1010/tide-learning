@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SealCheck, CalendarCheck } from "@phosphor-icons/react/dist/ssr";
+import { useToast } from "./Toast";
 
 /**
  * 预约试听（0转正入口）— 融合有道端内/端外留资 + 电联建联漏斗。
@@ -13,16 +14,29 @@ export function TrialBooking({ courseId, track, source }: { courseId: string; tr
   const [name, setName] = useState("");
   const [done, setDone] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { toast } = useToast();
 
   async function submit() {
     setLoading(true);
-    await fetch("/api/leads", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ courseId, track, phone, name, source: source ?? "youdao_dict" }),
-    });
-    setLoading(false);
-    setDone(true);
+    // 网络失败/服务端 4xx 都必须复位 loading 且不误置 done——否则留资静默丢失、按钮永久卡「提交中」。
+    try {
+      const res = await fetch("/api/leads", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ courseId, track, phone, name, source: source ?? "youdao_dict" }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        toast(json?.error || "预约提交失败，请稍后重试", { tone: "warn" });
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+      setDone(true);
+    } catch {
+      toast("网络异常，预约未提交，请重试", { tone: "warn" });
+      setLoading(false);
+    }
   }
 
   if (done) {

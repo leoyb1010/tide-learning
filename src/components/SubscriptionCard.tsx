@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, Star, TrendUp, Coins } from "@phosphor-icons/react";
 import { Ripple } from "./motion";
 import { useToast } from "./Toast";
+import { useSubmitGuard } from "@/hooks/useSubmitGuard";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
 import { trackLabel } from "@/lib/tracks";
 import { track } from "@/lib/analytics-client";
@@ -72,13 +73,13 @@ export function SubscriptionCard({
   const shownPrice = plan.firstPriceCents ?? plan.priceCents;
   const periodLabel = PLAN_PERIOD_LABELS[plan.billingPeriod] ?? plan.billingPeriod;
   const perUnit = plan.billingPeriod === "year" ? "年" : plan.billingPeriod === "quarter" ? "季" : "月";
-  const loading = step !== "idle";
   // hero 由父层显式指定；auto 时回落 plan.highlight（单赛道独立使用场景）
   const hot = variant === "hero" || (variant === "auto" && plan.highlight);
   // 角标只在「独立自决」的 auto 场景由卡内自绘；hero/plain 由父层统一绘制并让位，避免裁切。
   const drawOwnBadge = variant === "auto" && plan.highlight;
 
-  async function subscribe() {
+  // useSubmitGuard(20s)：拦截快速双击的双发下单；网络卡死时 20s 兜底解锁，避免按钮永久 loading。
+  const { submitting, guard: subscribe } = useSubmitGuard(async () => {
     if (!isLoggedIn) {
       router.push(`/login?next=${encodeURIComponent(redirectTo ?? "/pricing")}`);
       return;
@@ -102,7 +103,9 @@ export function SubscriptionCard({
       setStep("idle");
       toast((e as Error).message || "发起支付失败，请重试", { tone: "warn" });
     }
-  }
+  }, 20000);
+
+  const loading = submitting || step !== "idle";
 
   const ctaText = !isLoggedIn
     ? "登录后订阅"

@@ -2,13 +2,24 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { useToast } from "./Toast";
 
 export function LogoutButton() {
   const router = useRouter();
+  const { toast } = useToast();
   async function logout() {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/");
-    router.refresh();
+    // 退出失败（网络/服务端）不能跳走假装已退出——静默假成功会让用户以为已登出实则仍在登录态。
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) {
+        toast("退出失败，请稍后重试", { tone: "warn" });
+        return;
+      }
+      router.push("/");
+      router.refresh();
+    } catch {
+      toast("网络异常，退出失败，请重试", { tone: "warn" });
+    }
   }
   return (
     <button onClick={logout} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left text-sm text-ink-800 hover:border-error hover:text-error">
@@ -20,20 +31,33 @@ export function LogoutButton() {
 /** 取消订阅（§6.7：入口可见，一屏挽留但不隐藏取消按钮）。 */
 export function CancelSubscription() {
   const router = useRouter();
+  const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [loading, setLoading] = useState(false);
   const [reason, setReason] = useState("");
 
   async function cancel() {
     setLoading(true);
-    await fetch("/api/subscription/cancel", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ reason }),
-    });
-    setLoading(false);
-    setConfirming(false);
-    router.refresh();
+    // 涉钱：取消失败若静默假成功，用户会以为已退订却仍在续费扣款。失败必须提示、不关确认框、不 refresh。
+    try {
+      const res = await fetch("/api/subscription/cancel", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || (json && json.ok === false)) {
+        toast(json?.error || "取消失败，请稍后重试", { tone: "warn" });
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+      setConfirming(false);
+      router.refresh();
+    } catch {
+      toast("网络异常，取消未生效，请重试", { tone: "warn" });
+      setLoading(false);
+    }
   }
 
   if (!confirming) {
@@ -63,10 +87,29 @@ export function CancelSubscription() {
 
 export function RestoreButton() {
   const router = useRouter();
+  const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  // 涉钱：恢复购买失败若静默，用户以为已恢复权益实则未生效。失败提示、不 refresh；成功才刷新。
+  async function restore() {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/subscription/restore", { method: "POST" });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || (json && json.ok === false)) {
+        toast(json?.error || "恢复失败，请稍后重试", { tone: "warn" });
+        setLoading(false);
+        return;
+      }
+      setLoading(false);
+      router.refresh();
+    } catch {
+      toast("网络异常，恢复未生效，请重试", { tone: "warn" });
+      setLoading(false);
+    }
+  }
   return (
     <button
-      onClick={async () => { setLoading(true); await fetch("/api/subscription/restore", { method: "POST" }); setLoading(false); router.refresh(); }}
+      onClick={restore}
       className="text-sm text-accent-700 hover:underline"
     >
       {loading ? "恢复中…" : "恢复购买"}
