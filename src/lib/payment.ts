@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 import { resolveEntitlement } from "./entitlement";
 import { track } from "./analytics";
@@ -13,11 +14,22 @@ import { unlockAchievement } from "./gamification";
  * - 状态机：trial → active → grace_period → billing_retry → expired（A1-2）。
  */
 
+/**
+ * 按月加法并钳制月末溢出：1/31 + 1 月不该溢出到 3/3，应落到 2 月最后一天。
+ * 记下目标 day，setMonth 后若 getDate() 变了（说明目标月天数不足溢出到下月），
+ * 用 setDate(0) 退回目标月最后一天。setFullYear 走同一路径（覆盖 2/29 + 1 年 → 2/28）。
+ */
+function addMonthsClamped(d: Date, months: number): void {
+  const targetDay = d.getDate();
+  d.setMonth(d.getMonth() + months);
+  if (d.getDate() !== targetDay) d.setDate(0);
+}
+
 function periodEnd(billingPeriod: string, from = new Date()): Date {
   const d = new Date(from);
-  if (billingPeriod === "year") d.setFullYear(d.getFullYear() + 1);
-  else if (billingPeriod === "quarter") d.setMonth(d.getMonth() + 3);
-  else d.setMonth(d.getMonth() + 1); // month / month_recurring
+  if (billingPeriod === "year") addMonthsClamped(d, 12);
+  else if (billingPeriod === "quarter") addMonthsClamped(d, 3);
+  else addMonthsClamped(d, 1); // month / month_recurring
   return d;
 }
 
@@ -110,6 +122,7 @@ export async function processWebhook(channel: string, payload: {
     where: { channel_externalId: { channel, externalId: payload.externalId } },
   });
 
+  let committed = false;
   try {
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findFirst({
@@ -125,22 +138,48 @@ export async function processWebhook(channel: string, payload: {
         // 同一订单在 webhook 重放/并发下只有一次核销通过；再在事务内条件自增 redeemedCount，
         // updateMany + count<maxRedeem 二次核验保证并发下不超发（A1-14）。
         if (order.couponId && order.coupon) {
+          // 钱已收 → 订单必须激活：优惠券核销只做「记录」，任何营销名额/幂等冲突都不得回滚已付款事务。
+          let alreadyRedeemed = false;
           try {
             await tx.couponRedemption.create({
               data: { couponId: order.couponId, userId: order.userId, orderId: order.id },
             });
-          } catch {
-            // 唯一冲突 = 本单已核销过（webhook 重放），跳过重复自增，不再重复扣名额
-            throw new AppError("该订单优惠券已核销");
+          } catch (e) {
+            // 仅唯一冲突(P2002) = 本单已核销过（webhook 重放）：跳过自增（本就幂等），不 throw、不回滚。
+            // 其它异常（连接抖动/FK 等）是真错误：rethrow 让本事务回滚，由渠道重投重新原子处理，
+            // 不静默把未知失败当成「已核销」而污染 redeemedCount 对账。
+            if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+              alreadyRedeemed = true;
+            } else {
+              throw e;
+            }
           }
-          if (order.coupon.maxRedeem > 0) {
-            const claimed = await tx.coupon.updateMany({
-              where: { id: order.couponId, redeemedCount: { lt: order.coupon.maxRedeem } },
-              data: { redeemedCount: { increment: 1 } },
-            });
-            if (claimed.count === 0) throw new AppError("优惠券已被领完");
-          } else {
-            await tx.coupon.update({ where: { id: order.couponId }, data: { redeemedCount: { increment: 1 } } });
+          if (!alreadyRedeemed) {
+            if (order.coupon.maxRedeem > 0) {
+              const claimed = await tx.coupon.updateMany({
+                where: { id: order.couponId, redeemedCount: { lt: order.coupon.maxRedeem } },
+                data: { redeemedCount: { increment: 1 } },
+              });
+              // 名额抢不到（已超发）：不 throw 回滚，记一条审计后继续激活订阅（钱已收不能拒绝履约）。
+              if (claimed.count === 0) {
+                console.warn(`[payment] 优惠券超发放行：couponId=${order.couponId} orderId=${order.id}（名额已满仍激活订阅）`);
+                try {
+                  await tx.auditLog.create({
+                    data: {
+                      operatorId: order.userId,
+                      action: "coupon_oversell",
+                      targetType: "coupon",
+                      targetId: order.couponId,
+                      detail: JSON.stringify({ orderId: order.id, maxRedeem: order.coupon.maxRedeem }),
+                    },
+                  });
+                } catch {
+                  /* 审计写失败不阻断履约 */
+                }
+              }
+            } else {
+              await tx.coupon.update({ where: { id: order.couponId }, data: { redeemedCount: { increment: 1 } } });
+            }
           }
         }
 
@@ -249,24 +288,38 @@ export async function processWebhook(channel: string, payload: {
       throw new AppError("未知事件类型");
     });
 
-    // 事务外：刷新权益快照 + 埋点 + 成就（非关键路径，失败不回滚订单）
-    if ("userId" in result && result.userId) {
-      await resolveEntitlement(result.userId);
-      if ("subscriptionId" in result) {
-        await track({ eventName: "subscription_success", userId: result.userId, properties: { channel } });
-        await unlockAchievement(result.userId, "first_subscribe").catch(() => {});
+    // 事务已提交：订单/订阅落库成功，后续都是「不可回滚订单」的收尾。
+    // committed 置真后，即便下面的收尾抛错也绝不能触发 catch 里的「删占位日志」补偿——
+    // 那会把一笔已成功的支付误报失败、诱导渠道重投并毁掉幂等/审计日志。
+    committed = true;
+
+    // 事务外：刷新权益快照 + 埋点 + 成就 + 标记占位处理完成（非关键路径，失败不回滚订单、也不冒泡）。
+    try {
+      if ("userId" in result && result.userId) {
+        await resolveEntitlement(result.userId);
+        if ("subscriptionId" in result) {
+          await track({ eventName: "subscription_success", userId: result.userId, properties: { channel } });
+          await unlockAchievement(result.userId, "first_subscribe").catch(() => {});
+        }
       }
-    }
-    if (logRef) {
-      await prisma.paymentWebhookLog.update({ where: { id: logRef.id }, data: { status: "processed", processedAt: new Date() } });
+      if (logRef) {
+        await prisma.paymentWebhookLog.update({ where: { id: logRef.id }, data: { status: "processed", processedAt: new Date() } });
+      }
+    } catch (tailErr) {
+      // 事务已提交，收尾失败只记日志，不影响已履约的订单，也不进入删除补偿分支。
+      console.warn("[payment] webhook 事务后收尾失败（订单已激活，可忽略）：", tailErr);
     }
     return result;
   } catch (e) {
-    if (logRef) {
-      await prisma.paymentWebhookLog.update({
-        where: { id: logRef.id },
-        data: { status: "error", errorMessage: (e as Error).message },
-      });
+    // 仅当事务未提交（订单未激活）时才删除占位日志行，使同一 externalId 的渠道重试能重新进入处理
+    // （不再被唯一约束误判重复）。保留占位并标 error 会毒化重试——create 撞唯一约束被当成「重复回调」
+    // 直接放过，付款永久丢失。committed 后的异常绝不删日志：那笔支付已成功，重投由事务内幂等闸门挡下。
+    if (logRef && !committed) {
+      try {
+        await prisma.paymentWebhookLog.delete({ where: { id: logRef.id } });
+      } catch {
+        // 删除自身失败（并发已删/连接异常）不掩盖原始异常，仅退化为「下次重试可能仍被判重复」
+      }
     }
     throw e;
   }

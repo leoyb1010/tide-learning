@@ -19,7 +19,10 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    if (process.env.NODE_ENV === "production") return fail("mock 收银台仅限非生产环境", 403);
+    // P0-3：生产默认禁用 mock 收银台；仅当显式置 MOCK_PAY_ENABLED=1 时放行（供测试机演示支付）。
+    if (process.env.NODE_ENV === "production" && process.env.MOCK_PAY_ENABLED !== "1") {
+      return fail("mock 收银台仅限非生产环境", 403);
+    }
     assertSameOrigin(req);
     assertRateLimit(req, "mock-pay", 30, 60_000);
     const user = await requireUser();
