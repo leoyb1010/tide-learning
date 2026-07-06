@@ -12,7 +12,7 @@
 - 设计系统：STUDIO v2（冷灰蓝 + 有道红 #FC011A 作专注信号 ~7% + 亮暗跟随系统）。见 docs/设计系统-STUDIO-v2.md
 - AI 自习室架构（三引擎+中枢）见 docs/AI自习室架构.md
 - 主分支：feat/studio-v2-redesign（STUDIO 重构 + AI 自习室）
-- 体验账号：demo@tide.learning/demo123(全站订阅)、admin@tide.learning/admin123(后台)
+- 体验账号（支持 用户名/手机号/邮箱 登录）：dingyue/demo123(全站订阅, 或 demo@tide.learning)、admin/admin123(后台, 或 admin@tide.learning)。username 为体验账号预置，普通注册不设。
 - LLM key 在 .env 的 DEEPSEEK_API_KEY（已 gitignore）；DeepSeek 账户余额为 0，AI 实际生成需充值
 
 ## 验证铁律

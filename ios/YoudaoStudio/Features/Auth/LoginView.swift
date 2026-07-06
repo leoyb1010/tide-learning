@@ -22,7 +22,7 @@ struct LoginView: View {
                         .font(.studio(14)).foregroundStyle(Studio.ink3)
                 }
                 VStack(spacing: 12) {
-                    field("手机号 / 邮箱", text: $identifier, secure: false)
+                    field("用户名 / 手机号 / 邮箱", text: $identifier, secure: false)
                     field("密码", text: $password, secure: true)
                     if let error {
                         Text(error).font(.studio(12)).foregroundStyle(Studio.red)

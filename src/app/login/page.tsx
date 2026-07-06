@@ -66,7 +66,7 @@ function LoginInner() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="至少 6 位"
+              placeholder={mode === "signup" ? "至少 8 位，含字母和数字" : "输入密码"}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]"
               required
             />

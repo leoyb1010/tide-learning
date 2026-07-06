@@ -43,7 +43,7 @@ struct MacLoginView: View {
 
                 // 表单卡片
                 VStack(spacing: 12) {
-                    TextField("手机号 / 邮箱", text: $identifier)
+                    TextField("用户名 / 手机号 / 邮箱", text: $identifier)
                         .macField()
                         .noAutocapitalization()
                         .noAutocorrection()

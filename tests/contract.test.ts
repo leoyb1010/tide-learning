@@ -203,3 +203,46 @@ describe("契约 · 高危 DTO 形状", () => {
     expect(del.status).toBe(200);
   });
 });
+
+/**
+ * 登录多 identifier 契约：用户名 / 手机号 / 邮箱 三路都应能登录并返回 sessionToken。
+ * 防止未来重构登录 where 分支时悄悄破坏某一路（如误删 username 或 phone 分支）。
+ */
+describe("契约 · 登录三路 identifier", () => {
+  async function loginWith(identifier: string, password: string) {
+    const res = await fetch(`${BASE}/api/auth/login`, {
+      method: "POST",
+      headers: CT,
+      body: JSON.stringify({ identifier, password }),
+    });
+    return res.json();
+  }
+
+  it("用户名登录：dingyue / demo123 → sessionToken", async ({ skip }) => {
+    if (!SERVER_UP) return skip();
+    const j = await loginWith("dingyue", "demo123");
+    expect(j.ok, "用户名登录应成功").toBe(true);
+    expectField(j.data, "sessionToken", "string");
+    expect(j.data.role).toBe("user");
+  });
+
+  it("手机号登录：13900000000 / demo123 → sessionToken", async ({ skip }) => {
+    if (!SERVER_UP) return skip();
+    const j = await loginWith("13900000000", "demo123");
+    expect(j.ok, "手机号登录应成功").toBe(true);
+    expectField(j.data, "sessionToken", "string");
+  });
+
+  it("邮箱登录：demo@tide.learning / demo123 → sessionToken", async ({ skip }) => {
+    if (!SERVER_UP) return skip();
+    const j = await loginWith("demo@tide.learning", "demo123");
+    expect(j.ok, "邮箱登录应成功").toBe(true);
+    expectField(j.data, "sessionToken", "string");
+  });
+
+  it("错误密码 → 不返回 sessionToken", async ({ skip }) => {
+    if (!SERVER_UP) return skip();
+    const j = await loginWith("dingyue", "wrong-password");
+    expect(j.ok).toBeFalsy();
+  });
+});

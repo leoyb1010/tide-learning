@@ -19,6 +19,7 @@ export async function POST(req: NextRequest) {
     const weak = validatePasswordStrength(password);
     if (weak) return fail(weak);
 
+    // signup 仅支持 email/phone identifier；username 为体验账号专用预置字段，注册不设。
     const isEmail = identifier.includes("@");
     const where = isEmail ? { email: identifier } : { phone: identifier };
     const existing = await prisma.user.findFirst({ where });
