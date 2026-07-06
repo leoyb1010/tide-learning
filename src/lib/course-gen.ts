@@ -270,7 +270,8 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     "你的目标不是罗列知识点，而是带学习者走一段“为什么学 → 学什么 → 怎么用 → 记住了没 → 下一步”的完整旅程。\n" +
     voice + "\n" +
     "\n" +
-    "【节结构模板】每节输出 6-10 块，严格遵循以下三段式：\n" +
+    // 块数 6-10 → 8-12：提升每节内容丰富度（用户反馈偏“素”），每节 token 成本约 +30%，属有意权衡。
+    "【节结构模板】每节输出 8-12 块，严格遵循以下三段式：\n" +
     "1. 开头（钩子+目标）：先一个 scene 块讲“为什么学这节、它能解决什么真实困扰”，" +
     "紧接一个 objectives 块列 3-5 条本节具体可衡量的学习目标（能说出/能写出/能区分/能完成……，避免“了解/熟悉”这类无法检验的词）。\n" +
     "2. 主体（讲解，据学科选择块型交替）：\n" +
@@ -335,11 +336,13 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
       : "") +
     sourceCtx +
     `请依据课程主题判断学科类型（语言/口语类、技能/操作类、还是理论/概念类），据此选择主体块型。\n` +
-    `按节结构模板为本节输出 JSON：{blocks:[...]}，6-10 块：\n` +
+    `按节结构模板为本节输出 JSON：{blocks:[...]}，8-12 块：\n` +
     `- 以 scene 钩子（具体到能想象的真实困扰场景，带人物/情境/痛点）+ objectives（3-5 条具体可衡量目标）开头；\n` +
     `- 主体交替使用与学科匹配的讲解块（语言课必含 dialog），穿插至少 1 个 keypoint；\n` +
     `- 至少用 2 种视觉表现力强的块型（compare / steps / dialog / flashcard / callout 中挑），别让整节沦为 concept 文字墙；\n` +
     `- 讲解块与交互/视觉块交替，单个 concept 控制在 3-5 句；\n` +
+    `- 主体至少包含 1 个 example 块（贴近目标人群日常的具体实例）；\n` +
+    `- concept/scene 的 markdown 写满 3-5 句，给足细节与画面感，禁止一两句敷衍；\n` +
     `- 至少 1 个交互块（quiz 或 flashcard）；\n` +
     `- 以 summary（含 next 下节预告）结尾。`;
 
@@ -355,7 +358,8 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
           system,
           user: userMsg,
           temperature: 0.3,
-          maxTokens: 6000,
+          // 6000 → 8000：配合块数上调（8-12 块），避免长节被截断；每节 token 成本约 +30%，属有意权衡。
+          maxTokens: 8000,
           onUsage: creditingOnUsage(userId, "generate_lesson"),
         });
         const validated = validateBlocks(result?.blocks ?? result);

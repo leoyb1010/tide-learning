@@ -27,7 +27,8 @@ import { Button } from "@/components/ui";
 import { ArchiveStamp } from "@/components/motion";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
-import { ProgressRing, Spinner, useGenPolling, type GenProgress } from "@/components/GenProgress";
+import Link from "next/link";
+import { ProgressRing, Spinner, useAutoGoCountdown, useGenPolling, type GenProgress } from "@/components/GenProgress";
 import { GenStage, TypewriterText, type GenStageLesson, type GenStageLessonState } from "@/components/GenStage";
 
 /**
@@ -1236,6 +1237,12 @@ function RecoveryTheater({
   const startHref = course.firstLessonId
     ? `/courses/${course.slug}/learn/${course.firstLessonId}`
     : `/courses/${course.slug}`;
+  // ready 终态自动落地：课程详情页。仅 /create 剧场启用（enabled: true），
+  // 3 秒可视倒计时后自动跳转；用户 hover/触摸进度详情即取消，不打断围观。
+  const courseHref = `/courses/${course.slug}`;
+  const { secondsLeft, cancel: cancelAutoGo } = useAutoGoCountdown(isReady ? courseHref : null, {
+    enabled: true,
+  });
 
   // 生产舞台数据：ready→done；当前生成节→writing（无 current 时取第一个未 ready）；其余 pending。
   // isFailed（后台判定不再继续）时未完节标 failed 提示可续跑。
@@ -1274,7 +1281,12 @@ function RecoveryTheater({
         <div className="w-[92px] shrink-0" aria-hidden="true" />
       </div>
 
-      <div className="studio-rise w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-5">
+      <div
+        className="studio-rise w-full rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-5"
+        /* 倒计时进行中，用户在进度详情上有任何 hover/触摸 → 取消自动跳转，不打断围观 */
+        onPointerMove={() => { if (secondsLeft !== null && secondsLeft > 0) cancelAutoGo(); }}
+        onTouchStart={() => { if (secondsLeft !== null && secondsLeft > 0) cancelAutoGo(); }}
+      >
         {/* 头部：进度环 + 标题 + 状态句 */}
         <div className="flex items-center gap-4 px-1 pb-4 pt-1">
           <ProgressRing done={done} total={total} size={56} stroke={5} showLabel={false} />
@@ -1330,17 +1342,49 @@ function RecoveryTheater({
               }
             />
 
-            {/* 就绪：开始学习 CTA */}
+            {/* 就绪：去看课 CTA（主）+ 开始学习（次）+ 3 秒自动跳转倒计时（hover/触摸取消） */}
             {isReady && (
-              <button
-                type="button"
-                onClick={() => router.push(startHref)}
-                className="cta-glow studio-press group mt-4 inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
+              <div className="mt-4 flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelAutoGo();
+                    router.push(courseHref);
+                  }}
+                  className="cta-glow studio-press group inline-flex w-full min-h-[44px] items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
+                >
+                  <BookOpen size={17} weight="fill" />
+                  去看课
+                  <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    cancelAutoGo();
+                    router.push(startHref);
+                  }}
+                  className="studio-press inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                >
+                  <Play size={15} weight="fill" />
+                  直接开始第一节
+                </button>
+                {secondsLeft !== null && secondsLeft > 0 && (
+                  <p className="text-center text-[12px] text-[var(--ink3)]" aria-live="polite">
+                    <span className="mono font-bold text-[var(--ink2)]">{secondsLeft}</span> 秒后自动打开课程页，移动鼠标或触摸可取消
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* 失败终态：引导去「我的课程」重试续跑 */}
+            {isFailed && (
+              <Link
+                href="/me/courses"
+                className="studio-press group mt-4 inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
               >
-                <BookOpen size={17} weight="fill" />
-                开始学习
-                <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
-              </button>
+                前往我的课程重试
+                <ArrowRight size={15} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
+              </Link>
             )}
           </>
         )}

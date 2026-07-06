@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { SPRING_GENTLE } from "@/components/motion";
 
@@ -241,6 +242,54 @@ export function useGenPolling(
   }, [fetchOnce]);
 
   return { progress, loading, error, refresh };
+}
+
+/* ============================================================
+   useAutoGoCountdown —— ready 终态「N 秒后自动去看课」倒计时
+   ------------------------------------------------------------
+   默认关闭（enabled=false），仅 /create 剧场打开，不影响其他复用处
+   （me/courses、TopNav 指示器等只用 hook/环，不会触发跳转）。
+   · enabled 且 href 非空时启动倒计时（默认 3 秒），到 0 自动 router.push(href)
+   · 调 cancel()（如用户 hover/触摸进度详情）即取消自动跳转，倒计时提示消失
+   · secondsLeft 供 UI 显示可视倒计时；null 表示未在倒计时（未启动或已取消）
+   ============================================================ */
+export function useAutoGoCountdown(
+  href: string | null,
+  opts?: { enabled?: boolean; seconds?: number },
+): { secondsLeft: number | null; cancel: () => void } {
+  const enabled = opts?.enabled ?? false;
+  const seconds = opts?.seconds ?? 3;
+  const router = useRouter();
+  const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+  const cancelledRef = useRef(false);
+
+  useEffect(() => {
+    if (!enabled || !href || cancelledRef.current) return;
+    let s = seconds;
+    setSecondsLeft(s);
+    const id = setInterval(() => {
+      if (cancelledRef.current) {
+        clearInterval(id);
+        return;
+      }
+      s -= 1;
+      if (s <= 0) {
+        clearInterval(id);
+        setSecondsLeft(0);
+        router.push(href);
+      } else {
+        setSecondsLeft(s);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, [enabled, href, seconds, router]);
+
+  const cancel = useCallback(() => {
+    cancelledRef.current = true;
+    setSecondsLeft(null);
+  }, []);
+
+  return { secondsLeft, cancel };
 }
 
 /* ============================================================

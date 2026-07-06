@@ -1,5 +1,7 @@
 import { Suspense } from "react";
-import { MagnifyingGlass, Compass } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
+import { MagnifyingGlass, Compass, BookOpen } from "@phosphor-icons/react/dist/ssr";
+import { getCurrentUser } from "@/lib/session";
 import { listCourses } from "@/lib/queries";
 import { expandSearchKeywords } from "@/lib/llm";
 import { CoursePreviewCard } from "@/components/CoursePreviewCard";
@@ -20,7 +22,11 @@ export default async function CoursesPage({
   const q = sp.q ?? "";
   // 语义搜索（场景4）：有关键词时用 LLM 扩展同义词再检索；失败/未配置自动降级为原词（不阻塞）
   const searchTerms = q ? await expandSearchKeywords(q) : undefined;
-  const courses = await listCourses({ category, sort, q: searchTerms });
+  const [courses, user] = await Promise.all([
+    listCourses({ category, sort, q: searchTerms }),
+    // 登录用户在页顶展示「发现｜我的课程」切换（我的课程直达 /me/courses）
+    getCurrentUser(),
+  ]);
 
   return (
     <div className="studio-rise flex flex-col gap-6">
@@ -35,6 +41,24 @@ export default async function CoursesPage({
           订阅解锁全站，每门课都在持续更新
         </p>
       </header>
+
+      {/* 登录用户：「发现｜我的课程」切换。样式对齐 /create 的胶囊 Tab；
+          「我的课程」直达 /me/courses（列表不在此重复实现），未登录不显示。 */}
+      {user && (
+        <div className="inline-flex self-start gap-1 rounded-full border border-[var(--border)] bg-[var(--surface2)] p-1">
+          <span className="flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)]">
+            <Compass size={15} weight="fill" />
+            发现
+          </span>
+          <Link
+            href="/me/courses"
+            className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold text-[var(--ink3)] transition-all duration-150 hover:text-[var(--ink)]"
+          >
+            <BookOpen size={15} />
+            我的课程
+          </Link>
+        </div>
+      )}
 
       <Suspense fallback={<div className="h-24" />}>
         <CourseFilterBar category={category} sort={sort} q={q} />

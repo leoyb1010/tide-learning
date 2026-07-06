@@ -1,13 +1,23 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium, Play } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium, Play, Coins } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
+import { getAuthorEarnings } from "@/lib/credit-trade";
 import { CoverBg } from "@/components/ui";
 import { trackLabel, resolveCoverSrc } from "@/lib/tracks";
 import { ShareToMarketButton, type ShareState } from "@/components/ShareToMarketButton";
+import { CourseManageButton } from "@/components/CourseManageButton";
 import { AccessRequestActions } from "@/components/AccessRequestActions";
 import { CourseGenControls } from "@/components/CourseGenControls";
+
+/** sharedStatus → 徽标文案与配色（STUDIO 语义色 pill，写法对齐卡片内既有 pill）。 */
+const SHARE_BADGE: Record<ShareState, { label: string; cls: string }> = {
+  private: { label: "未上架", cls: "bg-[var(--surface-inset)] text-[var(--ink3)] border-[var(--border)]" },
+  pending: { label: "审核中", cls: "bg-[var(--warn-soft)] text-[var(--warn)] border-transparent" },
+  shared: { label: "已上架", cls: "bg-[var(--ok-soft)] text-[var(--ok)] border-transparent" },
+  rejected: { label: "未通过", cls: "bg-[var(--red-soft)] text-[var(--red)] border-transparent" },
+};
 
 export const metadata = { title: "我的课" };
 
@@ -38,6 +48,8 @@ export default async function MyCoursesPage() {
       origin: true,
       genStatus: true,
       sharedStatus: true, // 分享态：private / pending / shared / rejected
+      priceCredits: true, // 集市售价（积分）：null/0=免费，>0=付费
+      salesCount: true, // 累计成交数
       createdAt: true,
       // 全部章节数 + 首节（作为进入学习入口）
       lessons: {
@@ -58,6 +70,10 @@ export default async function MyCoursesPage() {
         })
       : [];
   const completedMap = new Map(completed.map((r) => [r.courseId, r._count._all]));
+
+  // 按课累计收益（经营弹窗展示）：复用收益口径，按 courseId 建索引。
+  const earnings = await getAuthorEarnings(user.id);
+  const incomeMap = new Map(earnings.courses.map((c) => [c.courseId, c.income]));
 
   // —— 我的分享：他人对我课程的待批准申请（越权铁律：where ownerId=user.id）——
   const pendingRequests = await prisma.courseAccessRequest.findMany({
@@ -123,6 +139,13 @@ export default async function MyCoursesPage() {
           <p className="mt-1 text-[14px] text-[var(--ink2)]">你用 AI 生成或导入资料整理出的专属课程。</p>
         </div>
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
+          <Link
+            href="/me/earnings"
+            className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+          >
+            <Coins size={15} weight="fill" />
+            我的收益
+          </Link>
           <Link
             href="/market"
             className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
@@ -197,7 +220,24 @@ export default async function MyCoursesPage() {
                   </CoverBg>
 
                   <div className="flex flex-col px-4 pt-4">
-                    <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">{trackLabel(c.category)}</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">{trackLabel(c.category)}</div>
+                      {/* 上架状态徽标：private 中性灰 / pending 暖黄 / shared 正向绿(+售价) / rejected 警示红 */}
+                      {(() => {
+                        const badge = SHARE_BADGE[c.sharedStatus as ShareState] ?? SHARE_BADGE.private;
+                        return (
+                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${badge.cls}`}>
+                            {badge.label}
+                            {c.sharedStatus === "shared" && (c.priceCredits ?? 0) > 0 && (
+                              <span className="mono inline-flex items-center gap-0.5">
+                                <Coins size={10} weight="fill" />
+                                {c.priceCredits} 积分
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
+                    </div>
                     <h3 className="mt-1.5 line-clamp-2 text-[15px] font-bold leading-snug tracking-tight text-[var(--ink)] transition-colors group-hover:text-[var(--red)]">
                       {c.title}
                     </h3>
@@ -234,10 +274,26 @@ export default async function MyCoursesPage() {
                 </Link>
 
                 {/* 底部操作区（脱离 Link，避免嵌套交互）：
-                    就绪 → 分享到社区；生成中/失败 → 进度环 + 查看进度/继续生成。 */}
+                    已上架/审核中 → 经营（改价/编辑文案/下架，pending 只可撤回）；
+                    就绪未上架 → 分享到社区（上架弹窗含定价）；生成中/失败 → 进度环 + 查看进度/继续生成。 */}
                 <div className="mt-auto flex items-center justify-end border-t border-[var(--border)] px-4 py-3">
-                  {canShare ? (
-                    <ShareToMarketButton courseId={c.id} initialStatus={c.sharedStatus as ShareState} />
+                  {canShare && (c.sharedStatus === "shared" || c.sharedStatus === "pending") ? (
+                    <CourseManageButton
+                      courseId={c.id}
+                      status={c.sharedStatus as "shared" | "pending"}
+                      priceCredits={c.priceCredits}
+                      salesCount={c.salesCount}
+                      income={incomeMap.get(c.id) ?? 0}
+                      courseTitle={c.title}
+                      courseSubtitle={c.subtitle}
+                    />
+                  ) : canShare ? (
+                    <ShareToMarketButton
+                      courseId={c.id}
+                      initialStatus={c.sharedStatus as ShareState}
+                      courseTitle={c.title}
+                      courseSubtitle={c.subtitle}
+                    />
                   ) : (
                     <CourseGenControls
                       courseId={c.id}
