@@ -107,6 +107,44 @@ export function heroMotif(art: ArtDirection, seed: number): string {
         `<text x="430" y="430" font-family="ui-monospace, monospace" font-size="300" font-weight="800" fill="${a}" fill-opacity=".07" text-anchor="middle">${v === 0 ? "%" : "＃"}</text>` +
         `</g>`;
       break;
+    case "cinematic_neon":
+      // 电光辉光 + 对角光束 + 发光节点（发布会戏剧感）。
+      inner =
+        `<defs><radialGradient id="cn" cx="62%" cy="16%" r="76%">` +
+        `<stop offset="0" stop-color="${a}" stop-opacity=".30"/><stop offset="1" stop-color="${a}" stop-opacity="0"/>` +
+        `</radialGradient></defs>` +
+        `<rect width="600" height="520" fill="url(#cn)"/>` +
+        `<g stroke="${a}" stroke-opacity=".28" stroke-width="1.5">` +
+        (v === 0 ? `<path d="M-20 170 L620 50"/><path d="M-20 250 L620 130"/>` : `<path d="M90 -20 L300 540"/><path d="M250 -20 L470 540"/>`) +
+        `</g>` +
+        `<g fill="${a}">` +
+        [
+          [120, 130],
+          [470, 90],
+          [300, 300],
+          [520, 360],
+        ]
+          .map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${v === 0 ? 4 : 3}" fill-opacity="${i % 2 ? 0.9 : 0.5}"/>`)
+          .join("") +
+        `</g>`;
+      break;
+    case "dev_terminal":
+      // 终端窗口镜框 + 交通灯圆点 + 代码符号幽灵字。
+      inner =
+        `<g fill="none" stroke="${b}" stroke-width="1.5"><rect x="58" y="86" width="484" height="348" rx="8"/><line x1="58" y1="124" x2="542" y2="124"/></g>` +
+        `<g fill="${a}"><circle cx="80" cy="105" r="5" fill-opacity=".7"/><circle cx="98" cy="105" r="5" fill-opacity=".45"/><circle cx="116" cy="105" r="5" fill-opacity=".25"/></g>` +
+        `<g font-family="${art.fontMono}" fill="${a}" fill-opacity=".13" font-weight="700" font-size="46">` +
+        (v === 0 ? `<text x="88" y="210">&lt;/&gt;</text><text x="88" y="290">$ _</text>` : `<text x="88" y="250">{ }</text><text x="300" y="330">=&gt;</text>`) +
+        `</g>`;
+      break;
+    case "academic_lecture":
+      // 页边栏竖线 + 刊头双细线 + 章节号 §（学院讲义）。
+      inner =
+        `<g stroke="${a}" stroke-opacity=".38"><line x1="92" y1="78" x2="92" y2="452"/><line x1="92" y1="120" x2="512" y2="120" stroke-width="2"/><line x1="92" y1="127" x2="512" y2="127"/></g>` +
+        (v === 0
+          ? `<text x="430" y="400" font-family="${art.fontDisplay}" font-size="120" fill="${a}" fill-opacity=".10">§</text>`
+          : `<g stroke="${b}"><line x1="120" y1="210" x2="480" y2="210"/><line x1="120" y1="252" x2="440" y2="252"/><line x1="120" y1="294" x2="474" y2="294"/></g>`);
+      break;
     case "storybook":
     default:
       // 有机 blob + 波浪丝带（绘本代入感）。
@@ -158,6 +196,15 @@ export function cornerMotif(art: ArtDirection): string {
       break;
     case "storybook":
       inner = `<circle cx="12" cy="12" r="6" fill="${a}" fill-opacity=".4"/>`;
+      break;
+    case "cinematic_neon":
+      inner = `<g fill="${a}"><circle cx="12" cy="12" r="3.5" fill-opacity=".9"/><circle cx="12" cy="12" r="8" fill="none" stroke="${a}" stroke-opacity=".35"/></g>`;
+      break;
+    case "dev_terminal":
+      inner = `<g font-family="${art.fontMono}" fill="${a}" fill-opacity=".6" font-size="16" font-weight="700"><text x="4" y="17">&gt;_</text></g>`;
+      break;
+    case "academic_lecture":
+      inner = `<g stroke="${a}" stroke-opacity=".5"><line x1="3" y1="7" x2="21" y2="7" stroke-width="1.5"/><line x1="3" y1="11" x2="21" y2="11"/></g>`;
       break;
     default: // soft_structure
       inner = `<circle cx="12" cy="12" r="8" fill="none" stroke="${a}" stroke-opacity=".4"/>`;

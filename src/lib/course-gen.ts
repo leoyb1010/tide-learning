@@ -730,7 +730,7 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
   try {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, category: true, template: true, designJson: true },
+      select: { id: true, title: true, category: true, template: true, designJson: true },
     });
     if (!course) return;
     const design = resolveCourseDesign(course);

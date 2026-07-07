@@ -13,6 +13,7 @@ import { creditingOnUsage } from "../credits";
 import { track } from "../analytics";
 import { resolveCourseDesign, serializeCourseDesign, type CourseDesign } from "./courseware-design";
 import { resolveLessonVariance } from "./courseware-variance";
+import { llmStyleBrief } from "./courseware-catalog";
 import {
   renderCoursewareHtml,
   buildContract,
@@ -87,7 +88,9 @@ async function synthesizeViaLLM(
     `- 标题字族：${a.fontDisplay}；正文：${a.fontBody}；圆角基准 ${a.radius}px；缓动 ${a.ease}。\n` +
     `- 动效强度 ${design.motion}/10，视觉密度 ${design.density}/10（密度低=更大留白）。\n` +
     "- 要有编辑级排版层级、macro 留白、入场动效、交互（quiz 判分/记忆卡翻转），高级不廉价。\n" +
-    "只输出 HTML，不要任何解释文字或代码围栏。";
+    // 吸收 20 源模板侦察：按内容类型 mode 注入呈现风格指令，让 bespoke HTML 贴合内容而非千篇一律。
+    llmStyleBrief(design, title) +
+    "\n只输出 HTML，不要任何解释文字或代码围栏。";
   const user =
     `课件标题：《${title}》\n本节内容块（JSON，作为你的内容素材，忠于其信息，可重排版式但不虚构）：\n` +
     JSON.stringify(blocks).slice(0, 12000) +

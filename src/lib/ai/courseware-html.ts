@@ -226,6 +226,44 @@ a{color:var(--ct-accent-ink)}
 .ex .tag{font-family:${a.fontMono};font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ct-ink3);margin-bottom:8px;display:block}
 .img-ph{background:var(--ct-surface2);border:1px dashed var(--ct-border);border-radius:var(--ct-radius);
   padding:30px;text-align:center;color:var(--ct-ink3);font-size:14px}
+/* —— 补齐版式：variance 已抽签的 example/steps/compare/quiz/summary 新版式（破同型块单调）—— */
+.ex--quote{background:var(--ct-surface);border:1px solid var(--ct-border);border-radius:var(--ct-radius);box-shadow:var(--ct-shadow);padding:clamp(24px,4vw,36px) clamp(22px,4vw,32px);position:relative}
+.ex--quote::before{content:"\\201C";position:absolute;top:2px;left:14px;font-family:${a.fontDisplay};font-size:72px;line-height:1;color:var(--ct-accent);opacity:.22}
+.ex--quote .body{font-family:${a.fontDisplay};font-weight:${a.displayWeight};letter-spacing:${a.displayTracking};font-size:clamp(18px,3vw,23px);line-height:1.5;color:var(--ct-ink);padding-left:26px}
+.ex--ticket{background:var(--ct-surface2);border:1px dashed var(--ct-border);border-radius:var(--ct-radius);position:relative;overflow:hidden}
+.ex--ticket .tk-h{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;border-bottom:1px dashed var(--ct-border);font-family:${a.fontMono};font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--ct-ink3)}
+.ex--ticket .tk-b{padding:16px 18px}
+.steps--rail{display:flex;flex-wrap:wrap;gap:0;list-style:none;padding:0}
+.steps--rail li{flex:1 1 120px;min-width:112px;display:flex;flex-direction:column;align-items:flex-start;gap:8px;padding:0 16px 12px 0;position:relative;grid-template-columns:none}
+.steps--rail li::after{content:"";position:absolute;left:15px;right:0;top:14px;height:2px;background:var(--ct-border);z-index:0}
+.steps--rail li:last-child::after{display:none}
+.steps--rail li::before{display:none}
+.steps--rail .n{position:relative;z-index:1}
+.steps--rail .st{font-size:14px}
+.steps--rail .sd{font-size:12.5px;margin-top:2px}
+.cmp--ledger{display:block;border:1px solid var(--ct-border);border-radius:var(--ct-radius);overflow:hidden}
+.cmp--ledger .lg-row{display:grid;grid-template-columns:1fr 1fr}
+.cmp--ledger .lg-row+.lg-row{border-top:1px solid var(--ct-border)}
+.cmp--ledger .lg-cell{padding:12px 16px;font-size:14.5px;color:var(--ct-ink2)}
+.cmp--ledger .lg-cell+.lg-cell{border-left:1px solid var(--ct-border)}
+.cmp--ledger .lg-cell.r{background:var(--ct-accent-soft);color:var(--ct-ink)}
+.cmp--ledger .lg-head .lg-cell{font-family:${a.fontMono};font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--ct-ink3);background:var(--ct-surface2)}
+.cmp--ledger .lg-head .lg-cell.r{color:var(--ct-accent-ink)}
+.quiz--split .q-grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media(min-width:560px){.quiz--split .q-grid{grid-template-columns:5fr 6fr;align-items:start}}
+.quiz--split .q{margin-bottom:0}
+.summary--band{background:var(--ct-accent-soft);border:1px solid var(--ct-accent);box-shadow:none}
+.summary--band .next{background:transparent;border-top-color:var(--ct-accent);color:var(--ct-accent-ink)}
+/* —— code：终端/编辑器镜框 + 行号栏（吸收 reveal/slidev 代码课件；developer-training 门面）—— */
+.code-term{background:var(--ct-surface2);border:1px solid var(--ct-border);border-radius:var(--ct-radius);overflow:hidden}
+.code-term .ct-bar{display:flex;align-items:center;gap:7px;padding:9px 14px;border-bottom:1px solid var(--ct-border);background:var(--ct-surface)}
+.code-term .ct-dot{width:10px;height:10px;border-radius:50%;flex:none}
+.code-term .ct-dot.r{background:#ff5f57}.code-term .ct-dot.y{background:#febc2e}.code-term .ct-dot.g{background:#28c840}
+.code-term .ct-fname{margin-left:8px;font-family:${a.fontMono};font-size:12px;color:var(--ct-ink3);letter-spacing:.04em}
+.code-term .ct-code{counter-reset:ln;margin:0;padding:12px 0;overflow:auto;font-family:${a.fontMono};font-size:13.5px;line-height:1.65;color:var(--ct-ink)}
+.code-term .cl{display:block;padding:0 16px 0 52px;position:relative;white-space:pre}
+.code-term .cl::before{counter-increment:ln;content:counter(ln);position:absolute;left:0;width:38px;text-align:right;color:var(--ct-ink3);opacity:.55}
+.code-term .ct-note{padding:12px 16px;border-top:1px solid var(--ct-border);font-size:14.5px;color:var(--ct-ink2)}
 /* —— 入场动效（GPU 安全：只动 transform/opacity）—— */
 [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ct-ease),transform .7s var(--ct-ease)}
 [data-reveal].m-fade{transform:none}
@@ -470,12 +508,18 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       const inner = `<span class="tag">例</span><div class="body" style="color:var(--ct-ink)">${md(b.markdown)}</div>`;
       if (variant === "inline-mark")
         return `<section ${rv}><div class="accentbar" style="border-left-width:3px">${inner}</div></section>`;
+      if (variant === "quote-card")
+        return `<section ${rv}><div class="ex--quote"><div class="body">${md(b.markdown)}</div></div></section>`;
+      if (variant === "ticket")
+        return `<section ${rv}><div class="ex--ticket"><div class="tk-h"><span>例 · 示范</span><span>Example</span></div>
+          <div class="tk-b"><div class="body" style="color:var(--ct-ink)">${md(b.markdown)}</div></div></div></section>`;
       return `<section ${rv}><div class="ex">${inner}</div></section>`;
     }
     case "steps": {
       const cards = variant === "numbered-cards";
+      const rail = variant === "rail";
       return `<section ${rv}><span class="eyebrow">操作步骤</span>
-        <ol class="steps ${cards ? "steps--cards" : ""}" data-stagger>${b.steps
+        <ol class="steps ${rail ? "steps--rail" : cards ? "steps--cards" : ""}" data-stagger>${b.steps
           .map(
             (s, k) =>
               `<li style="--i:${k}"><span class="n">${k + 1}</span><div><div class="st">${esc(s.title)}</div>${
@@ -486,11 +530,22 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     }
     case "compare": {
       const stacked = variant === "stacked";
+      const eyebrow = b.title ? `<span class="eyebrow">${esc(b.title)}</span>` : `<span class="eyebrow">对比辨析</span>`;
+      // ledger：左右对齐成台账行（表格式），与双面板 duel/stacked 构图不同。
+      if (variant === "ledger") {
+        const rows = Math.max(b.left.items.length, b.right.items.length);
+        const body = Array.from({ length: rows }, (_, k) =>
+          `<div class="lg-row"><div class="lg-cell">${esc(b.left.items[k] || "")}</div><div class="lg-cell r">${esc(b.right.items[k] || "")}</div></div>`,
+        ).join("");
+        return `<section ${rv}>${eyebrow}<div class="cmp--ledger">
+          <div class="lg-row lg-head"><div class="lg-cell">${esc(b.left.heading || "常见误区")}</div><div class="lg-cell r">${esc(b.right.heading || "正确做法")}</div></div>
+          ${body}</div></section>`;
+      }
       const col = (heading: string, items: string[], right: boolean) =>
         `<div class="col ${right ? "right" : "wrong"}"><h4>${esc(heading)}</h4><ul>${items
           .map((it) => `<li>${esc(it)}</li>`)
           .join("")}</ul></div>`;
-      return `<section ${rv}>${b.title ? `<span class="eyebrow">${esc(b.title)}</span>` : `<span class="eyebrow">对比辨析</span>`}
+      return `<section ${rv}>${eyebrow}
         <div class="cmp ${stacked ? "cmp--stacked" : ""}">${col(b.left.heading || "常见误区", b.left.items, false)}${col(
           b.right.heading || "正确做法",
           b.right.items,
@@ -518,27 +573,42 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       return `<section ${rv}><div class="callout ${b.tone === "warn" ? "warn" : "info"}"><span class="ic">${
         b.tone === "warn" ? "!" : "i"
       }</span><div class="body" style="color:var(--ct-ink)">${md(b.markdown)}</div></div></section>`;
-    case "code":
-      return `<section ${rv}><div class="card"><span class="pill">${esc(b.lang || "code")}</span>
-        <pre class="tide-md-pre" style="margin-top:12px">${esc(b.code)}</pre>${
-          b.explanation ? `<div class="body" style="margin-top:10px">${esc(b.explanation)}</div>` : ""
+    case "code": {
+      // 终端/编辑器镜框 + 行号（交通灯点 + 文件名 tab + 逐行行号栏），远比裸 <pre> 专业。
+      const lines = String(b.code || "").split("\n");
+      const codeBody = lines.map((l) => `<span class="cl">${esc(l) || "&nbsp;"}</span>`).join("");
+      return `<section ${rv}><div class="code-term">
+        <div class="ct-bar"><span class="ct-dot r"></span><span class="ct-dot y"></span><span class="ct-dot g"></span><span class="ct-fname">${esc(b.lang || "code")}</span></div>
+        <pre class="ct-code"><code>${codeBody}</code></pre>${
+          b.explanation ? `<div class="ct-note">${esc(b.explanation)}</div>` : ""
         }</div></section>`;
-    case "quiz":
+    }
+    case "quiz": {
+      const opts = `<div class="opts">${b.options
+        .map((o) => `<button class="opt"><span>${esc(o)}</span><span class="mk">●</span></button>`)
+        .join("")}</div>`;
+      // split：题干与选项左右分栏（宽屏），与单列 stage 构图不同；交互 JS 靠 .quiz/.opt 不变。
+      if (variant === "split") {
+        return `<section ${rv}><div class="card quiz quiz--split" data-answer="${b.answerIndex}"><span class="pill">随堂测</span>
+          <div class="q-grid" style="margin-top:12px"><div class="q">${esc(b.question)}</div>${opts}</div>
+          <div class="exp">${esc(b.explain)}</div></div></section>`;
+      }
       return `<section ${rv}><div class="card quiz" data-answer="${b.answerIndex}"><span class="pill">随堂测</span>
         <div class="q" style="margin-top:12px">${esc(b.question)}</div>
-        <div class="opts">${b.options
-          .map((o) => `<button class="opt"><span>${esc(o)}</span><span class="mk">●</span></button>`)
-          .join("")}</div>
+        ${opts}
         <div class="exp">${esc(b.explain)}</div></div></section>`;
+    }
     case "flashcard":
       return `<section ${rv}><div class="fc"><div class="inner">
         <div class="face front"><span class="lab">记忆卡 · 点击翻面</span><div class="t">${esc(b.front)}</div></div>
         <div class="face back"><span class="lab">答案</span><div class="t">${esc(b.back)}</div></div>
       </div></div></section>`;
-    case "summary":
-      return `<section ${rv}><div class="summary"><div class="top"><span class="pill">本节小结</span>
+    case "summary": {
+      const band = variant === "band";
+      return `<section ${rv}><div class="summary ${band ? "summary--band" : ""}"><div class="top"><span class="pill">本节小结</span>
         <div class="body" style="margin-top:12px;color:var(--ct-ink)">${md(b.markdown)}</div></div>
         ${b.next ? `<div class="next"><b>下一节</b>${esc(b.next)}</div>` : ""}</div></section>`;
+    }
     case "image":
       // 沙箱 CSP 禁外链，站内图无法直接加载；渲染优雅占位（有 caption 显 caption），不留破图、不外泄。
       return `<section ${rv}><div class="img-ph">${esc(b.caption || b.alt || "图解")}</div></section>`;

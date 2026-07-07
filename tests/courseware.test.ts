@@ -14,6 +14,7 @@ import {
   CSP_META,
 } from "@/lib/ai/courseware-html";
 import { heroMotif, cornerMotif } from "@/lib/ai/courseware-motifs";
+import { resolveCoursewareMode, getModeProfile, llmStyleBrief, MODE_PROFILES } from "@/lib/ai/courseware-catalog";
 import type { Block } from "@/lib/blocks";
 
 /**
@@ -65,6 +66,69 @@ describe("resolveCourseDesign —— 课级设计系统（确定性）", () => {
       ),
     );
     expect(keys.size).toBeGreaterThan(1); // 不是所有课都同一个方向
+  });
+});
+
+describe("新艺术方向 + 内容信号路由（吸收 20 源模板：扩展视觉世界 + 内容→风格）", () => {
+  it("新增 3 个方向(cinematic_neon/dev_terminal/academic_lecture)存在且各自母题不同", () => {
+    for (const k of ["cinematic_neon", "dev_terminal", "academic_lecture"]) {
+      expect(ART_DIRECTIONS.some((a) => a.key === k)).toBe(true);
+    }
+    // 共 9 个方向
+    expect(ART_DIRECTIONS.length).toBeGreaterThanOrEqual(9);
+  });
+
+  it("内容信号路由：编程课→dev_terminal，讲义/精读→academic_lecture", () => {
+    const dev = resolveCourseDesign({ id: "c1", category: "ai_skill", template: "workshop", designJson: null, title: "Python 编程入门：从函数到部署" });
+    expect(dev.art.key).toBe("dev_terminal"); // 内容信号优先于 template hint(workshop→blueprint)
+    const aca = resolveCourseDesign({ id: "c2", category: "english_foundation", template: null, designJson: null, title: "考研英语精读讲义" });
+    expect(aca.art.key).toBe("academic_lecture");
+    // 无强信号 → 回落赛道候选（不强制）
+    const plain = resolveCourseDesign({ id: "c3", category: "life", template: null, designJson: null, title: "阳台种菜指南" });
+    expect(ART_DIRECTIONS.some((a) => a.key === plain.art.key)).toBe(true);
+  });
+
+  it("已落库 designJson 仍优先于内容信号（稳定不漂移）", () => {
+    const design = resolveCourseDesign({ id: "c4", category: "ai_skill", template: null, designJson: null, title: "深度学习" });
+    const json = serializeCourseDesign({ ...design, art: getArtDirection("storybook") });
+    const back = resolveCourseDesign({ id: "c4", category: "ai_skill", template: null, designJson: json, title: "Python 编程" });
+    expect(back.art.key).toBe("storybook"); // designJson 赢过内容信号
+  });
+
+  it("新方向渲染产物恒过安全/反slop 校验", () => {
+    for (const k of ["cinematic_neon", "dev_terminal", "academic_lecture"]) {
+      const d = { ...resolveCourseDesign({ id: "x", category: "ai_skill", template: null, designJson: null }), art: getArtDirection(k) };
+      const v = resolveLessonVariance("x", { id: "l", title: "t", sortOrder: 0 }, d);
+      const html = renderCoursewareHtml({ title: "算清 ROI", blocks: sampleBlocks(), design: d, variance: v });
+      expect(validateCoursewareHtml(html).ok).toBe(true);
+    }
+  });
+});
+
+describe("课件风格智能层 catalog（内容类型→mode→风格）", () => {
+  it("每个 mode 档案的艺术方向候选都是合法 key", () => {
+    for (const p of Object.values(MODE_PROFILES)) {
+      expect(p.artCandidates.length).toBeGreaterThan(0);
+      for (const k of p.artCandidates) expect(ART_DIRECTIONS.some((a) => a.key === k)).toBe(true);
+    }
+  });
+
+  it("内容类型→mode 路由：编程→developer-training，讲义→editorial-academic，测验→interactive-quiz", () => {
+    expect(resolveCoursewareMode({ title: "Python 数据库开发实战" })).toBe("developer-training");
+    expect(resolveCoursewareMode({ title: "考研英语精读讲义" })).toBe("editorial-academic");
+    expect(resolveCoursewareMode({ title: "高考语文刷题冲刺" })).toBe("interactive-quiz");
+    // 无标题信号→按艺术方向蕴含
+    expect(resolveCoursewareMode({ artKey: "cinematic_neon" })).toBe("cinematic-tech");
+    // 兜底
+    expect(resolveCoursewareMode({})).toBe("scroll-lesson");
+  });
+
+  it("llmStyleBrief 产出含 mode 指令 + 页型节奏（供 enhance 注入）", () => {
+    const d = resolveCourseDesign({ id: "x", category: "ai_skill", template: null, designJson: null, title: "Python 编程" });
+    const brief = llmStyleBrief(d, "Python 编程");
+    expect(brief).toContain("developer-training");
+    expect(brief).toContain("页型节奏");
+    expect(getModeProfile("developer-training").blockEmphasis).toContain("code");
   });
 });
 
@@ -173,6 +237,17 @@ describe("页型档案 + 签名母题（§2 P0：破单调）", () => {
 
   it("含页型舞台的产物仍恒过安全/反slop 校验", () => {
     expect(validateCoursewareHtml(html).ok).toBe(true);
+  });
+
+  it("code 块渲染为终端镜框 + 逐行行号，且过安全校验", () => {
+    const codeBlocks: (Block & { id: string })[] = [
+      { id: "c", type: "code", lang: "python", code: "def f(x):\n    return x*2", explanation: "翻倍" },
+    ];
+    const out = renderCoursewareHtml({ title: "t", blocks: codeBlocks, design, variance });
+    expect(out).toContain("code-term");
+    expect(out).toContain("ct-bar"); // 终端标题栏
+    expect((out.match(/class="cl"/g) || []).length).toBe(2); // 两行 → 两个行元素
+    expect(validateCoursewareHtml(out).ok).toBe(true);
   });
 });
 

@@ -165,7 +165,7 @@ export function StudyDesk({
         {/* Hero 输入框：主材质卡 + 内顶高光，聚焦时红光环提示这是主入口 */}
         <form
           onSubmit={onSubmit}
-          className="studio-sweep group relative mt-7 w-full max-w-[640px] overflow-hidden rounded-[18px] border border-[var(--border2)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none transition-shadow focus-within:border-[var(--red-soft-border)] focus-within:shadow-[var(--red-glow),var(--inner-hi)]"
+          className="studio-sweep group relative mt-7 w-full max-w-[640px] overflow-hidden rounded-[18px] border border-[var(--border2)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none"
         >
           <div className="flex items-center gap-2.5">
             <Sparkle size={20} weight="fill" className="ml-2.5 shrink-0 text-[var(--red)]" />

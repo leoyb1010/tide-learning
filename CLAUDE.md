@@ -7,6 +7,14 @@
 - 启动示例：`DATABASE_URL="file:./dev.db" PORT=3100 npm run dev`
 - 浏览器验证也访问对应端口，如 `http://localhost:3100`。
 
+### 「测试版本很慢」的根因与修复（重要）
+`next dev` 会对**每个路由首次访问按需编译**（冷 1~1.5s+，热才 ~20ms）——这就是「每个页面都很慢」的来源，不是代码问题。**给别人体验/演示的测试版应跑生产构建**（零按需编译，实测冷 200 响应 5~50ms，快 30~150 倍）：
+- 一键：`preview_start("tide-prod")`（launch.json 已配，会 `npm run build` 后 `next start`）。
+- 或手动：`npm run build` 后
+  `env DATABASE_URL="file:/Users/leoyuan/tide-work/prisma/dev.db" PAY_MOCK_SECRET="<非示例随机值>" ./node_modules/.bin/next start -p 3100`
+- ⚠️ 生产守卫（`src/instrumentation.ts`）会 fail-fast 拒绝启动，必须满足：**DATABASE_URL 用绝对路径**（本地库真身在 `prisma/dev.db`，Prisma 把相对 `file:` 解析到 schema 目录），**PAY_MOCK_SECRET 不能是示例值 `dev-mock-secret`**。漏配会整站 500。
+- dev（`npm run dev`）不触发生产守卫，用于日常改代码 + HMR。
+
 ## 容器宽度规范（STUDIO v2，防对齐漂移）
 页面主容器 `max-w-` 只用这几档，别自创中间值：
 - `max-w-[1120px]` → 内容网格页默认（成长档案 /me、课程库 /courses、我的课 /me/courses、创作者 /me/creator、收益 /me/earnings、设置 /me/settings、笔记馆、复习室、社区、用户主页等）

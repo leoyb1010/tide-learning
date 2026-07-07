@@ -194,6 +194,82 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     texture: "none",
     ease: "cubic-bezier(0.16, 1, 0.3, 1)",
   },
+  // —— v3.5：参照开源课件模板库（20 源侦察）衍生的新方向，扩展视觉世界 ——
+  {
+    // 参照 vibe-slides 的 cinematic/neon/玻璃拟态；比 dark_tech 更戏剧化（电光紫、发光）。
+    key: "cinematic_neon",
+    label: "霓虹剧场",
+    mood: "深空黑幕 + 电光紫 + 发光玻璃卡，产品发布会级的科技戏剧感",
+    substrate: "dark",
+    bg: "#07070d",
+    surface: "#12121f",
+    surfaceAlt: "#191a2c",
+    ink: "#f0eefb",
+    ink2: "#b2adcf",
+    ink3: "#7d7899",
+    border: "#2a2a44",
+    accent: "#a06bff",
+    accentInk: "#c4a3ff",
+    accentSoft: "#1e1638",
+    fontDisplay: "system-ui, -apple-system, 'Segoe UI', 'PingFang SC', sans-serif",
+    fontBody: "system-ui, -apple-system, 'PingFang SC', 'Segoe UI', sans-serif",
+    fontMono: "ui-monospace, 'SF Mono', Menlo, monospace",
+    displayWeight: 800,
+    displayTracking: "-0.03em",
+    radius: 18,
+    texture: "radial-gradient(circle at 1px 1px, rgba(160,120,255,.08) 1px, transparent 0)",
+    ease: "cubic-bezier(0.32, 0.72, 0, 1)",
+  },
+  {
+    // 参照 slidev/reveal 的代码课件；GitHub 深色 + 等宽标题 + 终端绿，写给编程/技术课。
+    key: "dev_terminal",
+    label: "终端代码",
+    mood: "GitHub 深色 + 等宽标题 + 终端绿，写给编程课/技术课的 IDE 质感",
+    substrate: "dark",
+    bg: "#0d1117",
+    surface: "#161b22",
+    surfaceAlt: "#1c2129",
+    ink: "#e6edf3",
+    ink2: "#adbac7",
+    ink3: "#768390",
+    border: "#30363d",
+    accent: "#3fb950",
+    accentInk: "#57c96a",
+    accentSoft: "#12261a",
+    fontDisplay: "ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace",
+    fontBody: "system-ui, -apple-system, 'PingFang SC', 'Segoe UI', sans-serif",
+    fontMono: "ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, monospace",
+    displayWeight: 700,
+    displayTracking: "-0.01em",
+    radius: 8,
+    texture: "none",
+    ease: "cubic-bezier(0.16, 1, 0.3, 1)",
+  },
+  {
+    // 参照 remark 的极简讲义 + 学术课程站；象牙纸 + 深墨衬线 + 学院蓝，排版讲究的大学讲义。
+    key: "academic_lecture",
+    label: "学术讲义",
+    mood: "象牙纸 + 深墨衬线 + 学院蓝，像一份排版讲究的大学讲义",
+    substrate: "light",
+    bg: "#f6f4ee",
+    surface: "#fffdf8",
+    surfaceAlt: "#eeebe1",
+    ink: "#1e242e",
+    ink2: "#4a5260",
+    ink3: "#7a8290",
+    border: "#ddd8c9",
+    accent: "#2f5c8f",
+    accentInk: "#244a75",
+    accentSoft: "#e3ecf5",
+    fontDisplay: "Georgia, 'Songti SC', 'Noto Serif SC', 'Times New Roman', serif",
+    fontBody: "Georgia, 'Songti SC', 'Noto Serif SC', serif",
+    fontMono: "ui-monospace, 'SF Mono', Menlo, monospace",
+    displayWeight: 700,
+    displayTracking: "-0.01em",
+    radius: 8,
+    texture: "radial-gradient(circle at 1px 1px, rgba(60,70,90,.045) 1px, transparent 0)",
+    ease: "cubic-bezier(0.16, 1, 0.3, 1)",
+  },
 ];
 
 const ART_BY_KEY = new Map(ART_DIRECTIONS.map((a) => [a.key, a]));
@@ -203,11 +279,11 @@ const ART_BY_KEY = new Map(ART_DIRECTIONS.map((a) => [a.key, a]));
  * category 见 tracks.ts；template 见 templates.ts。未命中用全体做候选。
  */
 const CATEGORY_CANDIDATES: Record<string, string[]> = {
-  ai_skill: ["dark_tech", "soft_structure", "blueprint"],
+  ai_skill: ["dark_tech", "cinematic_neon", "soft_structure", "blueprint", "dev_terminal"],
   english_oral: ["storybook", "editorial_paper", "soft_structure"],
-  english_foundation: ["editorial_paper", "soft_structure", "scoreboard"],
+  english_foundation: ["academic_lecture", "editorial_paper", "soft_structure", "scoreboard"],
   silver_english: ["storybook", "soft_structure"],
-  life: ["editorial_paper", "soft_structure", "storybook"],
+  life: ["editorial_paper", "soft_structure", "storybook", "academic_lecture"],
 };
 
 const TEMPLATE_HINT: Record<string, string> = {
@@ -218,6 +294,22 @@ const TEMPLATE_HINT: Record<string, string> = {
   workshop: "blueprint",
   exam_sprint: "scoreboard",
 };
+
+/**
+ * 内容信号路由（吸收 20 源侦察的「内容类型→课件风格」思想）：标题命中强信号时，
+ * 直接路由到最契合的艺术方向（编程课→终端代码、讲义/精读→学术讲义）。优先级仅次于已落库 designJson。
+ * 只在关键词明确时触发，避免误伤；未命中则回落模板提示/赛道候选。
+ */
+const CONTENT_HINTS: Array<{ art: string; re: RegExp }> = [
+  { art: "dev_terminal", re: /编程|代码|程序|python|java(?:script)?|前端|后端|算法|开发者?|命令行|terminal|函数|接口|\bapi\b|\bsql\b|\bgit\b|debug|脚本|部署|数据库/i },
+  { art: "academic_lecture", re: /讲义|精读|阅读理解|论文|学术|考研|雅思|托福|语法|文献|讲座|通识|读写|文言|古文/i },
+];
+
+function artKeyByContent(title?: string | null): string | undefined {
+  if (!title) return undefined;
+  for (const h of CONTENT_HINTS) if (h.re.test(title)) return h.art;
+  return undefined;
+}
 
 /** 稳定字符串哈希（FNV-1a 32 位）—— 可复现种子源，避免 Math.random（保证同课稳定、跨课分化）。 */
 export function hashSeed(s: string): number {
@@ -263,6 +355,8 @@ export function resolveCourseDesign(course: {
   category?: string | null;
   template?: string | null;
   designJson?: string | null;
+  /** 课程标题：用于内容信号路由（编程课→终端、讲义→学术）。缺省则不参与路由。 */
+  title?: string | null;
 }): CourseDesign {
   // 已落库的设计系统直接用（造课时可由更强逻辑/LLM 生成后持久化）。
   if (course.designJson) {
@@ -283,9 +377,11 @@ export function resolveCourseDesign(course: {
     }
   }
 
-  // 模板提示优先（模板已强表达课型气质）。
+  // 内容信号路由优先（标题命中强信号→最契合方向），仅次于已落库 designJson。
+  const contentArt = artKeyByContent(course.title);
+  // 否则模板提示（模板已强表达课型气质）。
   const hinted = course.template ? TEMPLATE_HINT[course.template] : undefined;
-  let art = hinted ? ART_BY_KEY.get(hinted) : undefined;
+  let art = (contentArt && ART_BY_KEY.get(contentArt)) || (hinted ? ART_BY_KEY.get(hinted) : undefined);
 
   // 否则按赛道候选 + courseId 种子挑一个（软映射保契合，种子保多样）。
   if (!art) {
