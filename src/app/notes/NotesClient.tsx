@@ -65,6 +65,8 @@ export interface NotesInitialData {
   total: number;
   tags: TagFacet[];
   loggedIn: boolean;
+  /** 首屏落地视图（如从笔记本详情页返回时经 ?view=notebook 直达笔记本视图）。缺省「全部」。 */
+  initialView?: View;
 }
 
 type View = "all" | "timeline" | "gallery" | "course" | "notebook";
@@ -97,7 +99,7 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
   const [error, setError] = useState(false);
   const [needLogin] = useState(!initialData.loggedIn);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [view, setView] = useState<View>("all"); // v2.2：默认落「全部」普通列表
+  const [view, setView] = useState<View>(initialData.initialView ?? "all"); // v2.2：默认落「全部」；?view= 可直达指定视图
 
   // 「记一条」独立笔记编辑弹窗
   const [composeOpen, setComposeOpen] = useState(false);

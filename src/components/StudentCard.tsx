@@ -78,7 +78,7 @@ export function StudentCardMini({ data }: { data: StudentCardData }) {
 }
 
 /** /me 头部大卡（async server：含二维码生成）。 */
-export async function StudentCard({ data }: { data: StudentCardData }) {
+export async function StudentCard({ data, headerAction }: { data: StudentCardData; headerAction?: React.ReactNode }) {
   const level = deriveLevel(data.totalSeconds);
   const initial = data.nickname.slice(0, 1);
   const joined = `${data.joinedYear}.${String(data.joinedMonth).padStart(2, "0")}`;
@@ -104,16 +104,19 @@ export async function StudentCard({ data }: { data: StudentCardData }) {
               <p className="mono text-[9px] uppercase tracking-[0.24em] text-[var(--ink-on-dark-3)]">STUDENT ID</p>
             </div>
           </div>
-          {/* 订阅胶囊 */}
-          {data.isSubscriber ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline-on-dark)] bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--ink-on-dark)]">
-              <SealCheck size={12} weight="fill" className="text-[var(--red)]" /> 会员
-            </span>
-          ) : (
-            <span className="inline-flex items-center rounded-full border border-[var(--hairline-on-dark)] px-2.5 py-1 text-[10.5px] font-medium text-[var(--ink-on-dark-2)]">
-              免费学员
-            </span>
-          )}
+          {/* 右侧：订阅胶囊 + 可选操作（如分享按钮，走 flex 流内，避免与胶囊绝对定位重叠）*/}
+          <div className="flex items-center gap-2">
+            {data.isSubscriber ? (
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline-on-dark)] bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--ink-on-dark)]">
+                <SealCheck size={12} weight="fill" className="text-[var(--red)]" /> 会员
+              </span>
+            ) : (
+              <span className="inline-flex items-center rounded-full border border-[var(--hairline-on-dark)] px-2.5 py-1 text-[10.5px] font-medium text-[var(--ink-on-dark-2)]">
+                免费学员
+              </span>
+            )}
+            {headerAction}
+          </div>
         </div>
       </div>
 
@@ -183,13 +186,22 @@ export async function StudentCard({ data }: { data: StudentCardData }) {
               <p className="text-[13px] leading-[1.6] text-[var(--ink4)]">写一句座右铭，给这张证一点温度。</p>
             )}
           </div>
-          {/* 二维码 → 个人主页 */}
+          {/* 二维码 → 个人主页（扫码或点击均可访问，带说明避免「这方框是啥」的困惑）*/}
           {qrSvg && (
-            <div
-              className="h-[72px] w-[72px] shrink-0 rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-1.5 opacity-90 [&>svg]:h-full [&>svg]:w-full"
-              dangerouslySetInnerHTML={{ __html: qrSvg }}
-              aria-label="个人主页二维码"
-            />
+            <a
+              href={`/u/${data.userId}`}
+              title="扫码或点击访问我的主页"
+              aria-label="我的主页二维码，点击可访问"
+              className="group flex shrink-0 flex-col items-center gap-1"
+            >
+              <span
+                className="h-[72px] w-[72px] rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-1.5 opacity-90 transition-opacity group-hover:opacity-100 [&>svg]:h-full [&>svg]:w-full"
+                dangerouslySetInnerHTML={{ __html: qrSvg }}
+              />
+              <span className="text-[9.5px] leading-none text-[var(--ink4)] transition-colors group-hover:text-[var(--ink3)]">
+                扫码看主页
+              </span>
+            </a>
           )}
         </div>
       </div>

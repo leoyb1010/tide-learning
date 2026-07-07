@@ -9,6 +9,8 @@ import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
+import { isValidTemplate } from "@/lib/ai/templates";
+import { availableModelsFor, DEFAULT_MODEL_KEY } from "@/lib/ai/models";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +39,7 @@ export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
     // 权益闸门：AI 能力需订阅（余额预检留到限流之后，保持原有先限流再预检的顺序）
-    const { user } = await requireLLMAccess({ precheckSpend: false });
+    const { user, snapshot } = await requireLLMAccess({ precheckSpend: false });
 
     // 端点级幂等（P2）：同一用户已有未完成的造课请求（进程内 in-flight 锁）直接拒绝，
     // 防双击/重放并发建两门课、双份大纲扣费。finally 释放。
@@ -55,6 +57,8 @@ export async function POST(req: NextRequest) {
       const body = (await req.json().catch(() => null)) as {
         prompt?: string;
         category?: string;
+        template?: string;
+        model?: string;
       } | null;
       const prompt = body?.prompt?.trim();
       if (!prompt) return fail("请描述你想学的内容");
@@ -63,15 +67,27 @@ export async function POST(req: NextRequest) {
 
       const category = body?.category?.trim() || "ai_skill";
 
-      // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 合规底线（见 src/lib/ai/prompts.ts）。
+      // v3.2 课件模板：模板全员免费，非法 key 直接拒绝（不静默回落，避免脏数据落库）。
+      const template = body?.template?.trim() || undefined;
+      if (!isValidTemplate(template)) return fail("未知的课件模板");
+
+      // v3.2 选模型：会员可选高级模型。请求了不在可用集内的模型 → 402（会员专享/未配置）。
+      const requestedModel = body?.model?.trim();
+      if (requestedModel && !availableModelsFor(snapshot.isSubscriber).some((m) => m.key === requestedModel)) {
+        return fail("该模型为会员专享或暂不可用，请升级订阅或换用默认模型", 402);
+      }
+      const modelKey = requestedModel || DEFAULT_MODEL_KEY;
+
+      // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 模板结构 + 合规底线。
       // 输出契约不变：{title, subtitle, intro, outline:[{title, objective, difficulty}]}。
-      const { system, user: userMsg } = courseOutlinePrompt({ prompt, category });
+      const { system, user: userMsg } = courseOutlinePrompt({ prompt, category, template });
 
       const result = await chatJson<OutlineResult>({
         system,
         user: userMsg,
         temperature: 0.5,
         maxTokens: 6000,
+        model: modelKey,
         onUsage: creditingOnUsage(user.id, "generate_course"),
       });
 
@@ -109,6 +125,8 @@ export async function POST(req: NextRequest) {
             ownerId: user.id,
             visibility: "private",
             genStatus: "generating",
+            template: template ?? null,
+            modelUsed: modelKey,
             disclaimer: "本课程由 AI 生成，内容仅供学习参考",
           },
         });
@@ -143,7 +161,7 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             type: "course_outline",
             status: "done",
-            inputJson: JSON.stringify({ prompt, category }),
+            inputJson: JSON.stringify({ prompt, category, template: template ?? null, model: modelKey }),
             resultRef: course.id,
             finishedAt: new Date(),
           },

@@ -1,0 +1,163 @@
+/**
+ * 课件模板注册表 —— 造课 / 导入共用。
+ *
+ * 每个模板 = 大纲节奏规则(outlineRules) + 每节块配方(lessonRecipe) + 质量分阈值。
+ * 它编排的是已存在的 13 种块（见 src/lib/blocks.ts），不新增块类型，也不改输出契约，
+ * 所以是纯 prompt 层扩展：大纲仍产 {title,subtitle,intro,outline:[...]}，逐节仍产 {blocks:[...]}。
+ *
+ * 模板管「结构」，赛道(TRACK_VOICE)管「口吻」，二者正交，同时注入。
+ * 新增模板：往 COURSE_TEMPLATES 加一项即可，UI 卡片 / API 校验 / prompt 注入 / 落库全自动生效。
+ */
+
+export interface CourseTemplate {
+  key: string; // 落库到 Course.template
+  label: string; // UI 卡片标题
+  tagline: string; // UI 卡片一句话
+  icon: string; // phosphor 图标名（前端 ICON_MAP 映射）
+  recommendedFor: string; // 适合什么内容（UI hover）
+  outlineRules: string; // 注入大纲 system 的结构规则段
+  lessonRecipe: string; // 注入逐节 system 的块配方段（最关键）
+  minInteractive: number; // 质量分：本模板每节最少交互块（quiz+flashcard）
+  minVisual: number; // 质量分：本模板每节最少视觉块（compare/steps/dialog/flashcard/callout）
+}
+
+export const DEFAULT_TEMPLATE = "classic";
+
+export const COURSE_TEMPLATES: CourseTemplate[] = [
+  {
+    key: "classic",
+    label: "经典教学",
+    tagline: "循序渐进，稳扎稳打",
+    icon: "GraduationCap",
+    recommendedFor: "通用内容、系统性知识、不确定选哪个时的稳妥默认",
+    minInteractive: 1,
+    minVisual: 1,
+    outlineRules:
+      "【结构模板：经典教学】章节按“入门体验→核心概念→动手应用→进阶避坑→综合收束”推进，首节必须轻（15 分钟内可完成的体验式内容），倒数第二节安排综合练习，末节收束+下一步指引。",
+    lessonRecipe: `【本节块配方：经典教学】严格按以下顺序与数量产出 8-12 个块：
+1. objectives（1 个）：3-4 条本节目标，动词开头（能说出/能操作/能判断）。
+2. scene（1 个）：80-150 字真实场景钩子，回答“不学这节会在哪吃亏”。
+3. concept（2-3 个）：每个只讲一个概念，markdown 用小标题+短段落+列表，单块 300-600 字。
+4. example（1-2 个）：紧跟对应 concept，给带具体数字/对话/文件名的实例，不许抽象举例。
+5. compare 或 steps（1 个）：概念易混淆用 compare（左“常见误区”右“正确做法”，各 3-5 条）；偏操作用 steps（4-7 步，每步 title 动词开头 + detail 一句话）。
+6. quiz（1-2 个）：考察本节最核心判断，四选一，explain 必须解释“为什么其他选项不对”。
+7. flashcard（1 个）：front 是本节最值得反复回忆的一问，back ≤120 字。
+8. summary（1 个）：3 行以内小结 + next 一句话预告下一节。
+禁止：连续 2 个以上 concept 不插 example；全节无 compare/steps/dialog。`,
+  },
+  {
+    key: "case_driven",
+    label: "案例拆解",
+    tagline: "每章一个真实案例，边破案边学",
+    icon: "MagnifyingGlass",
+    recommendedFor: "职场技能、商业分析、决策判断、复盘型内容",
+    minInteractive: 2,
+    minVisual: 2,
+    outlineRules:
+      "【结构模板：案例拆解】每一章围绕一个“真实案例”组织，章节标题写成“案例：{具体情境}”或“{情境}翻车/成功复盘”。全课案例难度递进：小案例→复合案例→末章学员自己的案例套用。objective 里写清本章案例覆盖哪 1-2 个原理点。",
+    lessonRecipe: `【本节块配方：案例拆解】8-12 个块，叙事顺序=侦探破案：
+1. scene（1 个）：120-200 字抛出完整案例现场（谁/在什么场景/遇到什么具体麻烦，带数字与细节），结尾抛悬念问句。
+2. callout(info)（1 个）：“先想 30 秒：如果是你会怎么做？”给 2-3 个思考方向。
+3. concept（1-2 个）：只讲解开本案例所需的最小原理，不铺开讲全集。
+4. steps（1 个）：把案例的正确解法拆成 4-6 步复盘。
+5. compare（1 个）：左列“案例里的错误做法及其代价”，右列“正确做法及其收益”，各 3-5 条，条目必须来自本案例，不许写通用套话。
+6. example（1 个）：给一个“换壳案例”——同原理换一个场景，验证迁移。
+7. quiz（2 个）：第 1 题考案例判断（给新情境选做法），第 2 题考原理本身。
+8. flashcard（1 个）：front=“遇到{此类情境}第一反应是什么？”
+9. summary（1 个）：一句话提炼“本案例教会我们的一条原则”。`,
+  },
+  {
+    key: "story",
+    label: "故事沉浸",
+    tagline: "跟着主角连载，剧情里学会",
+    icon: "BookOpen",
+    recommendedFor: "口语/沟通、软技能、青少年或银发学员、需要代入感的内容",
+    minInteractive: 1,
+    minVisual: 2,
+    outlineRules:
+      "【结构模板：故事沉浸】全课是一部连载：设定一位与目标学员画像一致的主角（给名字与处境），每章是主角故事的一集，章节标题写成剧集感（如“第3集 · 小林第一次给老板汇报就砸了”）。章节间剧情连续（上一章的坑是下一章的起点），intro 里用 2 句话介绍主角设定。",
+    lessonRecipe: `【本节块配方：故事沉浸】8-12 个块，是“剧集+知识点解说”双线：
+1. scene（1 个）：150-250 字本集剧情开场，承接上集结尾，把主角推入本节要解决的困境。
+2. dialog（1-2 个）：主角与配角（同事/家人/客户）的 4-8 轮对话推进剧情，在犯错或转机处用 turn.note 标注画外音（“注意：这句话就是踩坑点”）。
+3. concept（1-2 个）：以“解说员暂停剧情”的口吻讲原理，开头一句固定为“按下暂停——刚才发生了什么？”，单块 ≤500 字。
+4. compare 或 steps（1 个）：主角的旧做法 vs 新做法对比，或主角接下来照做的步骤清单。
+5. quiz（1-2 个）：题干延续剧情（“如果小林此时说___，结果会怎样？”）。
+6. flashcard（1 个）：front 用剧情提问，back 用原理回答。
+7. summary（1 个）：本集剧情收尾 + next 写成“下集预告”（吊胃口一句话）。
+全节人名、场景必须与 outline 设定一致，禁止每节换主角。`,
+  },
+  {
+    key: "socratic",
+    label: "问答思辨",
+    tagline: "不灌结论，带你想通",
+    icon: "Question",
+    recommendedFor: "思维方法、易有误区的概念、需要“先破再立”的内容",
+    minInteractive: 3,
+    minVisual: 1,
+    outlineRules:
+      "【结构模板：问答思辨】每章标题直接是一个好问题（如“为什么你记住的单词总是用不出来？”），章节顺序=问题链，前一章答案自然引出后一章新问题。intro 声明本课风格：“不灌结论，带你想通”。",
+    lessonRecipe: `【本节块配方：问答思辨】9-12 个块，问-猜-证-用 四拍循环：
+1. scene（1 个）：把本章问题落到一个具体情境（≤120 字），结尾重复该问题。
+2. quiz（1 个，前置！）：先考后教——在讲解前就出一道直觉题，explain 里说“无论对错，往下看你会重新理解这道题”。
+3. concept（1 个）：不直接给答案，先呈现 2-3 个常见回答并逐个检验（“你可能会想 A……但注意”）。
+4. callout(info)（1-2 个）：追问块，每个只有一句更深的追问 + 两行提示。
+5. concept（1 个）：给出经得起检验的答案与推理链。
+6. compare（1 个）：左“直觉答案（为什么诱人）” 右“正确答案（为什么反直觉）”。
+7. quiz（2 个）：变式检验，选项设计成四个“都像对的”，explain 必须逐项拆。
+8. flashcard（1-2 个）：front=本章问题原文。
+9. summary（1 个）：用一句话回答本章标题问题 + next 抛出下一章问题。
+本模板 quiz 总数必须 ≥3，这是硬性要求。`,
+  },
+  {
+    key: "workshop",
+    label: "实战工坊",
+    tagline: "边做边学，学完手上有作品",
+    icon: "Wrench",
+    recommendedFor: "工具操作、写作/设计、编程、任何“动手才会”的技能",
+    minInteractive: 1,
+    minVisual: 2,
+    outlineRules:
+      "【结构模板：实战工坊】全课=完成一个真实作品/任务（在 intro 明确最终交付物，如“学完你手上会有一份可直接发出的英文自我介绍视频脚本”）。每章是工序的一站，章节标题写成“动手：{本站产出物}”，objective 写清本章结束时学员手上多了什么。",
+    lessonRecipe: `【本节块配方：实战工坊】8-12 个块，动手为骨、讲解为辅：
+1. objectives（1 个）：第一条永远是“做出：{本节产出物}”。
+2. scene（1 个）：≤100 字说明本节产出物在最终作品里的位置。
+3. steps（1-2 个）：核心块！4-7 步操作卡，每步 title=动词短语，detail 给到“照着敲/照着说”的粒度（具体到按钮名、句式、文件名）。
+4. concept（1 个）：只讲“为什么这么做”，≤400 字，放在 steps 之后（先做后懂）。
+5. callout(warn)（1 个）：翻车预警——本步骤 2-3 个最常见失败现象与自救办法。
+6. compare（1 个）：左“新手成品的样子” 右“合格成品的样子”，让学员能自检。
+7. quiz（1 个）：考操作判断（“下一步该点哪个/该说哪句”）。
+8. flashcard（1 个）：front=“做{本节任务}的口诀”。
+9. summary（1 个）：核对清单式小结（“此刻你应该已有：…”）+ next。`,
+  },
+  {
+    key: "exam_sprint",
+    label: "考点冲刺",
+    tagline: "高频考点+连打测验，直击拿分",
+    icon: "Target",
+    recommendedFor: "备考、证书、面试题、任何有明确测评目标的内容",
+    minInteractive: 3,
+    minVisual: 2,
+    outlineRules:
+      "【结构模板：考点冲刺】按考试/测评的知识板块组织章节，标题写成“考点{n}：{板块}·{高频陷阱}”。intro 写清适用考试与目标分数段。章节顺序按“分值权重×易错度”降序。",
+    lessonRecipe: `【本节块配方：考点冲刺】10-14 个块，高密度记忆-检测循环：
+1. objectives（1 个）：写成“本考点拿分要求”。
+2. keypoint（1-2 个）：考点墙，6-10 条，每条=一个可直接得分的记忆点（公式/句型/规则），禁止写解释性长句。
+3. concept（1 个）：只讲最容易失分的 1 个难点，≤400 字。
+4. example（1 个）：一道完整真题式例题+逐步解析。
+5. compare（1 个）：左“出题人陷阱选项长这样” 右“正确特征”。
+6. quiz（3-4 个）：连打！难度递增，最后一题是综合题；每题 explain 给“秒杀判据”。
+7. flashcard（2 个）：正反各一张（一张记规则，一张记例外）。
+8. callout(warn)（1 个）：本考点“考前 10 秒最后看一眼”的一句话。
+9. summary（1 个）：本考点拿分口诀。`,
+  },
+];
+
+/** 取模板（非法 key → classic）。 */
+export function getTemplate(key?: string | null): CourseTemplate {
+  return COURSE_TEMPLATES.find((t) => t.key === key) ?? COURSE_TEMPLATES[0];
+}
+
+/** 校验 key 是否合法（服务端用，非法直接拒绝而非静默回落，避免脏数据落库）。 */
+export function isValidTemplate(key?: string | null): boolean {
+  return !key || COURSE_TEMPLATES.some((t) => t.key === key);
+}

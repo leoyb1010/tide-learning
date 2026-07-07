@@ -38,7 +38,7 @@ export default async function CreatorCenterPage() {
   const hasCourses = courses.length > 0;
 
   return (
-    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-6 py-4">
+    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-6 py-4">
       {/* 顶部返回 + 标题 */}
       <div>
         <Link

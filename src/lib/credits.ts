@@ -3,6 +3,7 @@ import { after } from "next/server";
 import { prisma } from "./db";
 import { AppError } from "./errors";
 import type { LlmUsageInfo } from "./llm";
+import { costWeightOf } from "./ai/models";
 
 /**
  * 积分经济系统（v2.3 §6）—— 记账核心。
@@ -81,16 +82,21 @@ export function monthlyGrantForPlan(
   return MONTHLY_GRANT_BY_PERIOD[period] ?? DEFAULT_MONTHLY_GRANT;
 }
 
-/** Token 用量 → 积分（向上取整，至少 1 分，避免零成本刷调用）。 */
-export function tokensToCredits(usage: LlmUsageInfo, scene: Scene): number {
+/**
+ * Token 用量 → 积分（向上取整，至少 1 分，避免零成本刷调用）。
+ * v3.2：叠乘模型计费权重（usage.model → costWeight，flash 基准=1，深思档更贵）。
+ * 缺 model（如 estimate 预估）按权重 1 计。
+ */
+export function tokensToCredits(usage: { totalTokens: number; model?: string }, scene: Scene): number {
   const weight = sceneWeight(scene);
-  const raw = (usage.totalTokens / TOKENS_PER_CREDIT) * weight;
+  const modelWeight = costWeightOf(usage.model);
+  const raw = (usage.totalTokens / TOKENS_PER_CREDIT) * weight * modelWeight;
   return Math.max(1, Math.ceil(raw));
 }
 
-/** 预估某场景一次调用的积分（UI 展示"本次约消耗 ~N 积分"，按典型 token 量估算）。 */
-export function estimateCredits(scene: Scene, approxTokens = 3000): number {
-  return tokensToCredits({ promptTokens: 0, completionTokens: 0, totalTokens: approxTokens }, scene);
+/** 预估某场景一次调用的积分（UI 展示"本次约消耗 ~N 积分"，按典型 token 量估算）。可传 model 估高级模型成本。 */
+export function estimateCredits(scene: Scene, approxTokens = 3000, model?: string): number {
+  return tokensToCredits({ totalTokens: approxTokens, model }, scene);
 }
 
 /** 读余额（React cache 去重）。无账户视为 0。 */
@@ -195,7 +201,7 @@ export async function recordLlmSpend(userId: string, usage: LlmUsageInfo, scene:
         },
       });
       await tx.creditLedger.create({
-        data: { userId, delta: -cost, type: "llm_spend", refId: scene, balanceAfter, reason: `AI·${scene}` },
+        data: { userId, delta: -cost, type: "llm_spend", refId: scene, balanceAfter, reason: `AI·${scene}·${usage.model}` },
       });
       return cost;
     });

@@ -163,7 +163,9 @@ function SharePanelModal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const headingId = useId();
-  const imgSrc = `/api/share-card/${kind}${buildQuery(params)}`;
+  // 分享卡深/浅双主题：用户可切，默认深色（更出片）。theme 进入 query，下载/系统分享同源。
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const imgSrc = `/api/share-card/${kind}${buildQuery({ ...params, theme })}`;
   const dlName = `${fileName ?? kind}.png`;
 
   // Portal 挂载点：面板须逃出触发处的局部堆叠上下文（如笔记详情 .studio-rise
@@ -194,6 +196,12 @@ function SharePanelModal({
       setDlState("idle");
     }
   }, [open]);
+
+  // 切换深/浅主题时预览换图：重置加载态，让新图淡入。
+  useEffect(() => {
+    setImgLoaded(false);
+    setImgError(false);
+  }, [theme]);
 
   // Esc 关闭 + Tab 焦点陷阱 + 滚动锁 + 初始焦点。
   useEffect(() => {
@@ -352,6 +360,25 @@ function SharePanelModal({
               >
                 <X size={16} weight="bold" />
               </button>
+            </div>
+
+            {/* 深/浅主题切换：两种分享卡都能出 */}
+            <div className="mb-3 flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] p-1">
+              {(["dark", "light"] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  onClick={() => setTheme(t)}
+                  aria-pressed={theme === t}
+                  className={`flex-1 rounded-[8px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                    theme === t
+                      ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
+                      : "text-[var(--ink3)] hover:text-[var(--ink)]"
+                  }`}
+                >
+                  {t === "dark" ? "深色" : "浅色"}
+                </button>
+              ))}
             </div>
 
             {/* 分享图预览：竖版 3:4，加载骨架 + 出错兜底。shrink-0 防止在限高滚动容器里被压扁 */}

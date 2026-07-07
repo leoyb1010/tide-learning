@@ -20,6 +20,34 @@ import type { NavUser } from "./nav-types";
 
 const ADMIN_ROLES = ["admin", "content_manager", "demand_moderator", "support", "finance", "reviewer"];
 
+// 顶栏会员胶囊：由订阅状态派生「短标签 + 语气」。tooltip 用完整 statusLabel（可能是整句）。
+const SUB_PILL: Record<string, { short: string; tone: "member" | "warn" | "free" }> = {
+  active: { short: "会员", tone: "member" },
+  trial: { short: "试用", tone: "member" },
+  canceled_but_active: { short: "会员", tone: "member" },
+  grace_period: { short: "续费中", tone: "warn" },
+  billing_retry: { short: "待续费", tone: "warn" },
+  free: { short: "开通会员", tone: "free" },
+  expired: { short: "已到期", tone: "free" },
+  refunded: { short: "开通会员", tone: "free" },
+  revoked: { short: "开通会员", tone: "free" },
+};
+
+function subPillView(user: NavUser): { short: string; tooltip: string; cls: string; fill: boolean } {
+  const status = user.subscriptionStatus ?? (user.isSubscriber ? "active" : "free");
+  const meta = SUB_PILL[status] ?? { short: user.isSubscriber ? "会员" : "开通会员", tone: user.isSubscriber ? "member" : "free" as const };
+  const validTxt =
+    user.isSubscriber && user.validUntil ? ` · 到期 ${user.validUntil.slice(0, 10)}` : "";
+  const tooltip = (user.statusLabel ?? meta.short) + validTxt;
+  const cls =
+    meta.tone === "member"
+      ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+      : meta.tone === "warn"
+        ? "border-[var(--warn)] bg-[var(--warn-soft)] text-[var(--warn)]"
+        : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]";
+  return { short: meta.short, tooltip, cls, fill: meta.tone !== "free" };
+}
+
 /**
  * TopNav —— v2.3 §C7 现代顶部导航壳（替代传统左侧栏）。
  * 单一顶栏：logo + 主导航横排 + 右侧工具（续学/搜索/铃铛/主题/积分/头像下拉）。
@@ -239,6 +267,33 @@ export function TopNav({ user }: { user: NavUser | null }) {
               </div>
             )}
 
+            {/* 会员状态 + 积分胶囊（md 起显示；移动端收进头像下拉头部） */}
+            {user && (() => {
+              const pill = subPillView(user);
+              return (
+                <div className="hidden items-center gap-1.5 md:flex">
+                  <Link
+                    href="/pricing"
+                    title={pill.tooltip}
+                    aria-label={`会员状态：${pill.tooltip}`}
+                    className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${pill.cls}`}
+                  >
+                    <Crown size={13} weight={pill.fill ? "fill" : "regular"} />
+                    <span className="hidden lg:inline">{pill.short}</span>
+                  </Link>
+                  <Link
+                    href="/me"
+                    title={`积分余额 ${(user.credits ?? 0).toLocaleString()}`}
+                    aria-label={`积分余额 ${user.credits ?? 0}`}
+                    className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+                  >
+                    <Coins size={13} weight="fill" className="text-[var(--red)]" />
+                    <span className="mono">{(user.credits ?? 0).toLocaleString()}</span>
+                  </Link>
+                </div>
+              );
+            })()}
+
             {/* 搜索 */}
             <button
               onClick={openCommandK}
@@ -284,13 +339,29 @@ export function TopNav({ user }: { user: NavUser | null }) {
                 </button>
                 {menuOpen && (
                   <div className="studio-rise absolute right-0 top-[calc(100%+8px)] w-[232px] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--lift)]">
-                    {/* 头部：昵称 + 积分 */}
+                    {/* 头部：昵称 + 会员状态 + 积分 */}
                     <div className="border-b border-[var(--border)] p-3.5">
                       <p className="text-[14px] font-bold text-[var(--ink)]">{user.nickname}</p>
                       <p className="mono mt-0.5 text-[11px] text-[var(--ink4)]">{user.studentId}</p>
-                      <Link href="/me" className="mt-2.5 flex items-center justify-between rounded-[9px] bg-[var(--surface2)] px-3 py-2 transition-colors hover:bg-[var(--surface-inset)]">
+                      {(() => {
+                        const pill = subPillView(user);
+                        return (
+                          <Link
+                            href="/pricing"
+                            className={`mt-2.5 flex items-center justify-between rounded-[9px] border px-3 py-2 transition-colors ${pill.cls}`}
+                          >
+                            <span className="flex items-center gap-1.5 text-[12px] font-medium">
+                              <Crown size={14} weight={pill.fill ? "fill" : "regular"} /> {pill.short}
+                            </span>
+                            <span className="text-[11px] opacity-80">
+                              {user.isSubscriber && user.validUntil ? `到期 ${user.validUntil.slice(0, 10)}` : "查看方案"}
+                            </span>
+                          </Link>
+                        );
+                      })()}
+                      <Link href="/me" className="mt-2 flex items-center justify-between rounded-[9px] bg-[var(--surface2)] px-3 py-2 transition-colors hover:bg-[var(--surface-inset)]">
                         <span className="flex items-center gap-1.5 text-[12px] text-[var(--ink2)]"><Coins size={14} weight="fill" className="text-[var(--red)]" /> 积分</span>
-                        <span className="mono text-[13px] font-bold text-[var(--ink)]">{user.credits ?? 0}</span>
+                        <span className="mono text-[13px] font-bold text-[var(--ink)]">{(user.credits ?? 0).toLocaleString()}</span>
                       </Link>
                     </div>
                     <div className="p-1.5">

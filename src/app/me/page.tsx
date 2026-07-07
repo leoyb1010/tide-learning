@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CaretRight, Cards, Play, Flame, Medal, Check, ClockCounterClockwise, Storefront } from "@phosphor-icons/react/dist/ssr";
+import { CaretRight, Cards, Play, Flame, Medal, Check, ClockCounterClockwise, Storefront, Clock, NotePencil, Coins, Trophy, BookBookmark, ShoppingBag, TrendUp, ArrowClockwise } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { getGamificationSummary, getYearHeatmap } from "@/lib/gamification";
+import { getBalance } from "@/lib/credits";
+import { getAuthorEarnings } from "@/lib/credit-trade";
 import { prisma } from "@/lib/db";
 import { TideCalendar } from "@/components/TideCalendar";
 import { YearHeatmap } from "@/components/YearHeatmap";
@@ -12,6 +14,7 @@ import { CreditCard } from "@/components/CreditCard";
 import { SharePanel } from "@/components/SharePanel";
 import { formatDurationSec } from "@/lib/format";
 import { relativeTime } from "@/lib/queries";
+import { trackGradientVar } from "@/lib/tracks";
 import { shanghaiDayKey } from "@/lib/week";
 
 export const metadata = { title: "成长档案" };
@@ -23,34 +26,67 @@ function studentNo(id: string, year: number): string {
   return `YD·${year}·${String(h % 10000).padStart(4, "0")}`;
 }
 
+/**
+ * 续学 Hero 的「潮汐召回文案」：把冷冰冰的相对时间变成情绪化召回。
+ * 今天=涨潮中(红)，1-2 天=昨天/前天(弱)，≥3 天=退潮 N 天(warn 召回)。
+ */
+function recallLine(last: Date, now: Date): { text: string; tone: string; dot: string } {
+  const dayMs = 86_400_000;
+  const d0 = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const d1 = new Date(last.getFullYear(), last.getMonth(), last.getDate()).getTime();
+  const days = Math.max(0, Math.round((d0 - d1) / dayMs));
+  if (days === 0) return { text: "今天 · 涨潮中", tone: "text-[var(--red)]", dot: "bg-[var(--red)]" };
+  if (days === 1) return { text: "昨天学过", tone: "text-[var(--ink3)]", dot: "bg-[var(--ink4)]" };
+  if (days === 2) return { text: "前天学过", tone: "text-[var(--ink3)]", dot: "bg-[var(--ink4)]" };
+  return { text: `退潮 ${days} 天了，回来一下？`, tone: "text-[var(--warn)]", dot: "bg-[var(--warn)]" };
+}
+
 export default async function MePage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/me");
 
   const now = new Date();
-  const [snapshot, progressAgg, completedCount, notesCount, learning, dueCount, gamification, profile, yearHeat] =
-    await Promise.all([
-      resolveEntitlement(user.id),
-      prisma.learningProgress.aggregate({ where: { userId: user.id }, _sum: { progressSec: true } }),
-      // 完课数：completedAt 非空即已完成（schema 无 completed 布尔字段）
-      prisma.learningProgress.count({ where: { userId: user.id, completedAt: { not: null } } }),
-      prisma.note.count({ where: { userId: user.id, deletedAt: null } }),
-      // 学习中：全部有进度的课程（越权铁律：where userId）
-      prisma.learningProgress.findMany({
-        where: { userId: user.id },
-        orderBy: { lastPlayedAt: "desc" },
-        take: 10,
-        include: {
-          course: { select: { slug: true, title: true } },
-          lesson: { select: { id: true, title: true, durationSec: true } },
-        },
-      }),
-      // 我的复习：到期待复习卡数
-      prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: now } } }),
-      getGamificationSummary(user.id),
-      prisma.userProfile.findUnique({ where: { userId: user.id }, select: { motto: true } }),
-      getYearHeatmap(user.id),
-    ]);
+  const [
+    snapshot,
+    progressAgg,
+    completedCount,
+    notesCount,
+    learning,
+    dueCount,
+    gamification,
+    profile,
+    yearHeat,
+    balance,
+    notebookCount,
+    purchasedCount,
+    earnings,
+  ] = await Promise.all([
+    resolveEntitlement(user.id),
+    prisma.learningProgress.aggregate({ where: { userId: user.id }, _sum: { progressSec: true } }),
+    // 完课数：completedAt 非空即已完成（schema 无 completed 布尔字段）
+    prisma.learningProgress.count({ where: { userId: user.id, completedAt: { not: null } } }),
+    prisma.note.count({ where: { userId: user.id, deletedAt: null } }),
+    // 学习中：全部有进度的课程（越权铁律：where userId）
+    prisma.learningProgress.findMany({
+      where: { userId: user.id },
+      orderBy: { lastPlayedAt: "desc" },
+      take: 10,
+      include: {
+        course: { select: { slug: true, title: true, category: true } },
+        lesson: { select: { id: true, title: true, durationSec: true } },
+      },
+    }),
+    // 我的复习：到期待复习卡数
+    prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: now } } }),
+    getGamificationSummary(user.id),
+    prisma.userProfile.findUnique({ where: { userId: user.id }, select: { motto: true } }),
+    getYearHeatmap(user.id),
+    // v3.2 成长档案丰富化：积分余额 / 笔记本数 / 已购课程数 / 待清错题数 / 创作者收益
+    getBalance(user.id),
+    prisma.notebook.count({ where: { userId: user.id } }),
+    prisma.coursePurchase.count({ where: { userId: user.id } }),
+    getAuthorEarnings(user.id),
+  ]);
 
   const meta = STATUS_LABELS[snapshot.subscriptionStatus] ?? STATUS_LABELS.free;
   const j = user.createdAt;
@@ -96,70 +132,129 @@ export default async function MePage() {
     <div className="mx-auto flex max-w-[1120px] flex-col gap-6">
       {/* ============ 第一段 · 学生证（v2.3 纸质证件）+ 积分卡 ============ */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[1.6fr_1fr]">
-        <div className="relative flex flex-col">
-          <StudentCard data={cardData} />
-          {/* 分享学生证：贴在证件右上角的 icon 触发器，融入抬头带不抢视觉 */}
-          <div className="absolute right-3 top-3 z-10">
-            <SharePanel
-              kind="student-card"
-              title="分享学生证"
-              shareUrl={`/u/${user.id}`}
-              triggerLabel="分享学生证"
-              triggerClassName="group studio-press inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[var(--hairline-on-dark)] bg-white/10 text-[var(--ink-on-dark-2)] backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-[var(--ink-on-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
-            />
-          </div>
+        <div className="flex flex-col">
+          {/* 分享学生证按钮放进抬头带 flex 流内（headerAction 插槽），与「会员」胶囊并排不重叠 */}
+          <StudentCard
+            data={cardData}
+            headerAction={
+              <SharePanel
+                kind="student-card"
+                title="分享学生证"
+                shareUrl={`/u/${user.id}`}
+                triggerLabel="分享学生证"
+                triggerClassName="group studio-press inline-flex h-7 w-7 items-center justify-center rounded-[9px] border border-[var(--hairline-on-dark)] bg-white/10 text-[var(--ink-on-dark-2)] backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-[var(--ink-on-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+              />
+            }
+          />
         </div>
         <CreditCard />
       </div>
+
+      {/* ============ 数据总览条（一眼看到自己在这里积累了什么）============ */}
+      <section className="studio-rise grid grid-cols-3 gap-2.5 sm:grid-cols-6">
+        <OverviewStat icon={<Clock size={16} weight="fill" />} label="累计学习" value={formatDurationSec(progressAgg._sum.progressSec ?? 0)} />
+        <OverviewStat icon={<Check size={16} weight="bold" />} label="完成课程" value={String(completedCount)} />
+        <OverviewStat icon={<NotePencil size={16} weight="fill" />} label="笔记" value={String(notesCount)} />
+        <OverviewStat icon={<Flame size={16} weight="fill" />} label="连续天数" value={String(gamification.currentStreak)} accent />
+        <OverviewStat icon={<Trophy size={16} weight="fill" />} label="获得成就" value={String(gamification.achievements.length)} />
+        <OverviewStat icon={<Coins size={16} weight="fill" />} label="积分" value={balance.toLocaleString()} />
+      </section>
 
       {/* ============ 第二段 · 学习进度（主体）============ */}
       <section className="studio-rise flex flex-col gap-4">
         <h2 className="text-[18px] font-bold text-[var(--ink)]">学习进度</h2>
 
         {learning.length > 0 ? (
-          <div className="stagger flex flex-col gap-2.5">
-            {learning.map((r, i) => {
+          <div className="stagger flex flex-col gap-3">
+            {/* 层1 · 续学 Hero 卡：赛道渐变色块 + 环形进度 + 潮汐召回文案 */}
+            {(() => {
+              const r = learning[0];
               const dur = r.lesson.durationSec;
               const pct = dur > 0 ? Math.min(Math.round((r.progressSec / dur) * 100), 100) : 0;
               const done = pct >= 100;
+              const recall = recallLine(r.lastPlayedAt, now);
               return (
-                <div
-                  key={r.lessonId}
-                  style={{ "--i": i } as React.CSSProperties}
-                  className="studio-lift rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+                <Link
+                  href={`/courses/${r.course.slug}/learn/${r.lesson.id}`}
+                  style={{ "--i": 0 } as React.CSSProperties}
+                  className="studio-lift group flex overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]"
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-[15px] font-bold text-[var(--ink)]">{r.course.title}</p>
-                      <p className="mt-0.5 truncate text-[12px] text-[var(--ink3)]">{r.lesson.title}</p>
-                    </div>
-                    <Link
-                      href={`/courses/${r.course.slug}/learn/${r.lesson.id}`}
-                      className="studio-press cta-glow hover-sheen inline-flex shrink-0 items-center gap-1 rounded-[10px] bg-[var(--red)] px-3.5 py-1.5 text-[13px] font-semibold text-white"
+                  {/* 左：赛道渐变 + 环形进度 */}
+                  <div
+                    className="relative flex w-[120px] shrink-0 items-center justify-center sm:w-[168px]"
+                    style={{ background: trackGradientVar(r.course.category) }}
+                  >
+                    <span className="pointer-events-none absolute inset-0 opacity-30" style={{ background: "radial-gradient(circle at 70% 20%, rgba(255,255,255,0.35), transparent 60%)" }} aria-hidden />
+                    <div
+                      className="relative grid h-[76px] w-[76px] place-items-center rounded-full"
+                      style={{ background: `conic-gradient(#fff ${pct * 3.6}deg, rgba(255,255,255,0.28) 0deg)` }}
+                      aria-hidden
                     >
-                      <Play size={12} weight="fill" /> {done ? "重温" : "继续"}
-                    </Link>
+                      <span className="grid h-[60px] w-[60px] place-items-center rounded-full bg-black/25 text-white backdrop-blur-sm">
+                        {done ? <ArrowClockwise size={22} weight="bold" /> : <Play size={22} weight="fill" />}
+                      </span>
+                    </div>
                   </div>
-                  {/* 进度条：完课用语义绿(--ok)，进行中用有道红 */}
-                  <div className="mt-3 flex items-center gap-3">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-inset)]">
-                      <div
-                        className={`h-full rounded-full ${done ? "bg-[var(--ok)]" : "bg-[var(--red)]"}`}
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                    <span
-                      className={`mono shrink-0 text-[11px] font-semibold ${done ? "text-[var(--ok)]" : "text-[var(--ink3)]"}`}
-                    >
-                      {pct}%
+                  {/* 右：续学信息 */}
+                  <div className="flex min-w-0 flex-1 flex-col justify-center gap-1.5 p-5">
+                    <span className="mono text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--ink4)]">
+                      CONTINUE · 上次学到
                     </span>
+                    <p className="truncate text-[17px] font-bold text-[var(--ink)]">{r.course.title}</p>
+                    <p className="truncate text-[13px] text-[var(--ink3)]">{r.lesson.title}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1">
+                      <span className={`inline-flex items-center gap-1.5 text-[12px] font-medium ${recall.tone}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${recall.dot}`} aria-hidden />
+                        {recall.text}
+                      </span>
+                      <span className="mono text-[12px] font-semibold text-[var(--ink3)]">{pct}%</span>
+                      <span className="cta-glow ml-auto inline-flex items-center gap-1 rounded-[10px] bg-[var(--red)] px-3.5 py-1.5 text-[13px] font-semibold text-white transition-transform group-hover:translate-x-0.5">
+                        {done ? "重温" : "继续学习"} <Play size={12} weight="fill" />
+                      </span>
+                    </div>
                   </div>
-                  <p className="mono mt-2 text-[11px] text-[var(--ink4)]">
-                    最近学习 · {relativeTime(r.lastPlayedAt)}
-                  </p>
-                </div>
+                </Link>
               );
-            })}
+            })()}
+
+            {/* 层2 · 其余在学课：双列紧凑卡 + 赛道色竖条 + 刻度进度 */}
+            {learning.length > 1 && (
+              <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                {learning.slice(1).map((r, i) => {
+                  const dur = r.lesson.durationSec;
+                  const pct = dur > 0 ? Math.min(Math.round((r.progressSec / dur) * 100), 100) : 0;
+                  const done = pct >= 100;
+                  return (
+                    <Link
+                      key={r.lessonId}
+                      href={`/courses/${r.course.slug}/learn/${r.lesson.id}`}
+                      style={{ "--i": i + 1 } as React.CSSProperties}
+                      className="studio-lift hover-sheen relative flex flex-col gap-2.5 overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 pl-5 shadow-[var(--card),var(--inner-hi)]"
+                    >
+                      {/* 赛道色竖条 */}
+                      <span className="absolute left-0 top-4 bottom-4 w-[3px] rounded-r" style={{ background: trackGradientVar(r.course.category) }} aria-hidden />
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-[14px] font-bold text-[var(--ink)]">{r.course.title}</p>
+                          <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink3)]">{r.lesson.title}</p>
+                        </div>
+                        {done ? (
+                          <span className="mono shrink-0 rounded-full bg-[var(--ok-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--ok)]">已学完</span>
+                        ) : (
+                          <span className="mono shrink-0 text-[11px] font-semibold text-[var(--ink3)]">{pct}%</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[var(--surface-inset)]">
+                          <div className={`h-full rounded-full ${done ? "bg-[var(--ok)]" : "bg-[var(--red)]"}`} style={{ width: `${pct}%` }} />
+                        </div>
+                        <span className="mono text-[10px] text-[var(--ink4)]">{relativeTime(r.lastPlayedAt)}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
           </div>
         ) : (
           <div className="studio-rise relative overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-6 py-10 text-center shadow-[var(--card),var(--inner-hi)]">
@@ -192,45 +287,98 @@ export default async function MePage() {
           </div>
         )}
 
-        {/* 查看全部学习记录（学习进度上方仅取最近 10 条，这里通向全量分组页） */}
-        {learning.length > 0 && (
+        {/* 层3 · 入口行：全部学习记录 + 我的复习（等高两列对齐）*/}
+        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+          {learning.length > 0 && (
+            <Link
+              href="/me/history"
+              className="studio-lift hover-sheen flex min-h-[68px] items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--surface-inset)] text-[var(--ink3)]">
+                  <ClockCounterClockwise size={18} weight="fill" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-bold text-[var(--ink)]">全部学习记录</p>
+                  <p className="truncate text-[12px] text-[var(--ink3)]">按课程分组看进度足迹</p>
+                </div>
+              </div>
+              <CaretRight size={15} weight="bold" className="shrink-0 text-[var(--ink4)]" />
+            </Link>
+          )}
+
+          {/* 我的复习入口（待复习用 --warn 语义，红只留给关键信号） */}
           <Link
-            href="/me/history"
-            className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+            href="/review"
+            className="studio-lift hover-sheen flex min-h-[68px] items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--surface-inset)] text-[var(--ink3)]">
-                <ClockCounterClockwise size={18} weight="fill" />
+              <div
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] ${dueCount > 0 ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--surface-inset)] text-[var(--ink3)]"}`}
+              >
+                <Cards size={18} weight="fill" />
               </div>
-              <div>
-                <p className="text-[14px] font-bold text-[var(--ink)]">全部学习记录</p>
-                <p className="text-[12px] text-[var(--ink3)]">按课程分组查看每门课、每一节的进度足迹</p>
+              <div className="min-w-0">
+                <p className="text-[14px] font-bold text-[var(--ink)]">我的复习</p>
+                <p className="text-[12px] text-[var(--ink3)]">
+                  {dueCount > 0 ? (
+                    <>
+                      <span className="mono font-semibold text-[var(--warn)]">{dueCount}</span> 张待复习
+                    </>
+                  ) : (
+                    "暂无到期复习卡"
+                  )}
+                </p>
               </div>
             </div>
-            <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
+            <CaretRight size={15} weight="bold" className="shrink-0 text-[var(--ink4)]" />
           </Link>
-        )}
+        </div>
+      </section>
 
-        {/* 我的复习入口（待复习用 --warn 语义，红只留给关键信号） */}
+      {/* ============ 学习资产（我在平台沉淀的东西：笔记本 / 已购课程）============ */}
+      <section className="studio-rise grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Link
-          href="/review"
+          href="/notes?view=notebook"
           className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
         >
           <div className="flex items-center gap-3">
-            <div
-              className={`flex h-10 w-10 items-center justify-center rounded-[12px] ${dueCount > 0 ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--surface-inset)] text-[var(--ink3)]"}`}
-            >
-              <Cards size={18} weight="fill" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--info-soft)] text-[var(--info)]">
+              <BookBookmark size={18} weight="fill" />
             </div>
             <div>
-              <p className="text-[14px] font-bold text-[var(--ink)]">我的复习</p>
+              <p className="text-[14px] font-bold text-[var(--ink)]">我的笔记本</p>
               <p className="text-[12px] text-[var(--ink3)]">
-                {dueCount > 0 ? (
+                {notebookCount > 0 ? (
                   <>
-                    <span className="mono font-semibold text-[var(--warn)]">{dueCount}</span> 张待复习
+                    <span className="mono font-semibold text-[var(--ink2)]">{notebookCount}</span> 个主题空间
                   </>
                 ) : (
-                  "暂无到期复习卡"
+                  "把笔记归入主题空间，成体系"
+                )}
+              </p>
+            </div>
+          </div>
+          <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
+        </Link>
+
+        <Link
+          href="/me/courses"
+          className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--surface-inset)] text-[var(--ink3)]">
+              <ShoppingBag size={18} weight="fill" />
+            </div>
+            <div>
+              <p className="text-[14px] font-bold text-[var(--ink)]">我的课程</p>
+              <p className="text-[12px] text-[var(--ink3)]">
+                {purchasedCount > 0 ? (
+                  <>
+                    已入手 <span className="mono font-semibold text-[var(--ink2)]">{purchasedCount}</span> 门 · 含创建与订阅
+                  </>
+                ) : (
+                  "已购、已创建与订阅可学的课都在这"
                 )}
               </p>
             </div>
@@ -393,7 +541,18 @@ export default async function MePage() {
           </div>
           <div>
             <p className="text-[14px] font-bold text-[var(--ink)]">创作者中心</p>
-            <p className="text-[12px] text-[var(--ink3)]">你摆摊卖课的收益、销售与近期成交</p>
+            {earnings.courses.length > 0 ? (
+              <p className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[12px] text-[var(--ink3)]">
+                <span className="inline-flex items-center gap-1">
+                  <TrendUp size={12} weight="fill" className="text-[var(--ok)]" />
+                  收益 <span className="mono font-semibold text-[var(--ok)]">{earnings.totalIncome.toLocaleString()}</span>
+                </span>
+                <span>在架 <span className="mono font-semibold text-[var(--ink2)]">{earnings.courses.length}</span> 门</span>
+                <span>成交 <span className="mono font-semibold text-[var(--ink2)]">{earnings.totalSales}</span> 笔</span>
+              </p>
+            ) : (
+              <p className="text-[12px] text-[var(--ink3)]">你摆摊卖课的收益、销售与近期成交</p>
+            )}
           </div>
         </div>
         <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
@@ -410,6 +569,29 @@ export default async function MePage() {
         </div>
         <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
       </Link>
+    </div>
+  );
+}
+
+/** 数据总览条单元：图标 + 大数值 + 标签，居中材质卡。 */
+function OverviewStat({
+  icon,
+  label,
+  value,
+  accent = false,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  accent?: boolean;
+}) {
+  return (
+    <div className="studio-lift flex flex-col items-center gap-1 rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-center shadow-[var(--card),var(--inner-hi)]">
+      <span className={accent ? "text-[var(--red)]" : "text-[var(--ink3)]"}>{icon}</span>
+      <span className={`mono text-[17px] font-extrabold leading-none ${accent ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
+        {value}
+      </span>
+      <span className="text-[11px] leading-tight text-[var(--ink4)]">{label}</span>
     </div>
   );
 }

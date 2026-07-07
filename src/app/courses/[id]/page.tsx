@@ -8,6 +8,7 @@ import { Button } from "@/components/ui";
 import { AmbientVideo } from "@/components/AmbientVideo";
 import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
+import { SmartBackLink } from "@/components/SmartBackLink";
 import { RatingStars } from "@/components/RatingStars";
 import { CourseReviews } from "@/components/CourseReviews";
 import { SharePanel } from "@/components/SharePanel";
@@ -386,7 +387,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
       )}
 
       <div className="text-center">
-        <Link href="/courses" className="text-[13px] text-[var(--red)] hover:underline">← 返回课程库</Link>
+        <SmartBackLink
+          fallback="/courses"
+          label="← 返回课程库"
+          icon={false}
+          className="text-[13px] text-[var(--red)] hover:underline"
+        />
       </div>
     </div>
   );

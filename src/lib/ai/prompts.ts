@@ -14,7 +14,11 @@
  * - 简版/导入大纲输出：{outline:[{title, objective}]}
  * - 逐节块课件的「块结构契约」不在本文件（仍在 course-gen.ts 的 system 里，受 blocks.ts 白名单约束）；
  *   本文件只提供可拼接的「口吻/合规/素材」片段，不触碰块字段结构。
+ * - v3.2 课件模板：模板管「结构」（大纲节奏 + 每节块配方），赛道管「口吻」，二者正交同时注入。
+ *   模板定义在 src/lib/ai/templates.ts；此处把 outlineRules 注入大纲、lessonRecipe 供逐节引用。
  */
+
+import { getTemplate } from "./templates";
 
 // ————————————————————————————————————————————————————————————
 //  赛道吸引力包（built-in prompt packs）
@@ -122,8 +126,8 @@ export const COMPLIANCE_GUARDRAIL =
 //  大纲 prompt（造课 / 简版 / 导入）
 // ————————————————————————————————————————————————————————————
 
-/** 大纲 system 基座：金牌架构师 + 起承转合 + 钩子改写手法 + 赛道口吻 + 克制文案。 */
-function outlineSystemBase(category: string): string {
+/** 大纲 system 基座：金牌架构师 + 起承转合 + 钩子改写手法 + 赛道口吻 + 模板结构 + 克制文案。 */
+function outlineSystemBase(category: string, template?: string): string {
   return (
     "你是学习平台的金牌课程架构师。你设计的大纲不只有清晰的学习路径，更让人一眼扫过就想立刻点开——" +
     "每节标题都带钩子、有画面感，把抽象的知识点翻译成「学完我能得到什么」的诱惑。\n" +
@@ -144,6 +148,8 @@ function outlineSystemBase(category: string): string {
     "- 中段：核心硬功夫——最有分量的知识与技能，一节一个硬核能力。\n" +
     "- 末节：综合应用 / 成果展示——把前面所学串起来做出点东西，带走一个看得见的成果。\n" +
     "\n" +
+    getTemplate(template).outlineRules +
+    "\n" +
     "要求：中文、面向成人自学者、章节递进不重复、不夸大不承诺速成；objective 必须可衡量（能说出/能写出/能做出，避免「了解/熟悉」）。\n" +
     NO_HYPE_RULE +
     "\n" +
@@ -156,11 +162,11 @@ function outlineSystemBase(category: string): string {
  * 造课大纲（generate-course 线上主路径）。
  * 输出契约：{title, subtitle, intro, outline:[{title, objective, difficulty}]}
  */
-export function courseOutlinePrompt(opts: { prompt: string; category: string }): {
+export function courseOutlinePrompt(opts: { prompt: string; category: string; template?: string }): {
   system: string;
   user: string;
 } {
-  const system = outlineSystemBase(opts.category);
+  const system = outlineSystemBase(opts.category, opts.template);
   const user =
     `学习需求（已转义的字符串字面量）：${JSON.stringify(opts.prompt)}\n` +
     `请按「轻松入门 → 核心硬功夫 → 综合应用/成果展示」的节奏，设计一门有起承转合、每节标题都想让人点开的课程，输出 JSON，字段：\n` +
@@ -176,11 +182,11 @@ export function courseOutlinePrompt(opts: { prompt: string; category: string }):
  * 简版大纲（course-gen.generateCourseOutline，供 admin「需求转课」等复用）。
  * 输出契约：{outline:[{title, objective}]}
  */
-export function simpleOutlinePrompt(opts: { prompt: string; category?: string }): {
+export function simpleOutlinePrompt(opts: { prompt: string; category?: string; template?: string }): {
   system: string;
   user: string;
 } {
-  const system = outlineSystemBase(opts.category || "ai_skill");
+  const system = outlineSystemBase(opts.category || "ai_skill", opts.template);
   const user =
     `学习需求（已转义的字符串字面量）：${JSON.stringify(opts.prompt.slice(0, 800))}\n` +
     `请按「轻松入门 → 核心硬功夫 → 综合应用/成果展示」的节奏，输出一门有起承转合的课程大纲 JSON：\n` +
@@ -192,7 +198,7 @@ export function simpleOutlinePrompt(opts: { prompt: string; category?: string })
  * 导入切章（import-source）。与造课不同：必须忠于原文、不虚构，但标题可在忠实前提下更好读。
  * 输出契约：{outline:[{title, objective}]}
  */
-export function importOutlinePrompt(opts: { title: string; rawText: string }): {
+export function importOutlinePrompt(opts: { title: string; rawText: string; template?: string }): {
   system: string;
   user: string;
 } {
@@ -201,6 +207,8 @@ export function importOutlinePrompt(opts: { title: string; rawText: string }): {
     "【第一原则：忠于原文】只依据原文内容归纳，不虚构原文之外的知识点、数据或案例。\n" +
     "【在忠实前提下让标题更好读】章节标题可以从干巴的主题命名，改写成让人想点开的一句话，" +
     "但改写只能基于原文已有的内容，不得夸大或添加原文没有的承诺。\n" +
+    getTemplate(opts.template).outlineRules +
+    "（注意：以上结构模板在忠于原文的前提下应用，不得为套模板而虚构原文没有的内容。）\n" +
     "要求：中文、按主题分 5-8 章、章节递进不重复。\n" +
     NO_HYPE_RULE +
     "\n" +
@@ -217,6 +225,14 @@ export function importOutlinePrompt(opts: { title: string; rawText: string }): {
 // ————————————————————————————————————————————————————————————
 //  逐节 prompt 的可拼接片段（块结构契约仍在 course-gen.ts，本处只提供口吻/合规/素材）
 // ————————————————————————————————————————————————————————————
+
+/**
+ * 逐节生成时插入 system 的「模板块配方」段（v3.2）。它规定本节该用哪些块、什么顺序与数量，
+ * 是模板差异化的核心。course-gen 的逐节 system 拼上它，块字段结构仍受 blocks.ts 白名单约束。
+ */
+export function lessonRecipeBlock(template: string | null | undefined): string {
+  return `\n${getTemplate(template).lessonRecipe}\n`;
+}
 
 /** 逐节生成时插入 system 的赛道口吻行（一句话，不改块结构契约）。 */
 export function lessonVoiceLine(category: string | null | undefined): string {

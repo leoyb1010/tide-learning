@@ -1,5 +1,6 @@
 import { AppError } from "./api";
 import { SEARCH_KEYWORDS_SYSTEM, searchKeywordsUser } from "./ai/prompts";
+import { resolveModel, modelCredentials } from "./ai/models";
 
 /**
  * DeepSeek LLM 统一服务层（C 模块）。
@@ -10,16 +11,12 @@ import { SEARCH_KEYWORDS_SYSTEM, searchKeywordsUser } from "./ai/prompts";
  * 绝不把 DeepSeek 的原始错误体/key 泄露给客户端。
  */
 
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
-// deepseek-v4-flash：快速、低成本，适合课程草稿/笔记总结/回复起草/搜索扩展等场景。
-// 可用 DEEPSEEK_MODEL 环境变量覆盖（如切 deepseek-v4-pro 做更复杂推理）。
-const DEFAULT_MODEL = process.env.DEEPSEEK_MODEL || "deepseek-v4-flash";
-
-/** LLM Token 用量（v2.3 积分经济计量）。DeepSeek 响应的 usage 字段。 */
+/** LLM Token 用量（v2.3 积分经济计量）。DeepSeek 响应的 usage 字段 + 本次所用模型。 */
 export interface LlmUsageInfo {
   promptTokens: number;
   completionTokens: number;
   totalTokens: number;
+  model: string; // v3.2：本次实际所用模型 key，供积分记账按 costWeight 折算
 }
 
 export interface ChatOptions {
@@ -30,6 +27,7 @@ export interface ChatOptions {
   json?: boolean; // true → response_format json_object
   timeoutMs?: number; // 默认 45s（推理模型延迟更高）
   retries?: number; // 默认 1（仅 5xx/网络/超时重试）
+  model?: string; // v3.2：本次调用用哪个模型（见 ai/models.ts）；缺省用默认模型
   onUsage?: (usage: LlmUsageInfo) => void; // v2.3：成功返回后回调实际 Token 用量（供积分记账）
 }
 
@@ -46,7 +44,10 @@ export function isLLMConfigured(): boolean {
 
 /** 统一 chat 调用。返回模型输出文本（已 trim）。 */
 export async function chat(opts: ChatOptions): Promise<string> {
-  const key = process.env.DEEPSEEK_API_KEY;
+  // v3.2：解析本次所用模型条目（含 apiKey / baseUrl / model key）。缺省回落默认模型，
+  // 故不传 model 的历史调用行为完全不变。
+  const modelEntry = resolveModel(opts.model);
+  const { apiKey: key, baseUrl } = modelCredentials(modelEntry);
   if (!key) throw new AppError("AI 服务未配置", 503);
 
   const {
@@ -65,7 +66,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
   let lastErr: unknown;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const body = JSON.stringify({
-      model: DEFAULT_MODEL,
+      model: modelEntry.key,
       messages: [
         { role: "system", content: system },
         { role: "user", content: user },
@@ -79,7 +80,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     // timer 由 finally 统一清理：超时须覆盖到 body 完整读取（res.text()/res.json() 同受
     // controller.signal 约束），拿到响应头就 clear 会让慢 body 读取脱离 45s 超时。
     try {
-      const res = await fetch(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
@@ -129,6 +130,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
             promptTokens: data.usage.prompt_tokens ?? 0,
             completionTokens: data.usage.completion_tokens ?? 0,
             totalTokens: data.usage.total_tokens ?? 0,
+            model: modelEntry.key,
           });
         } catch {
           /* 记账回调异常不影响 AI 返回 */

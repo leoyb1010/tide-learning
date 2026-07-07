@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, BookBookmark, PushPin, Sparkle, PencilSimpleLine, NotePencil, LinkSimple, Books } from "@phosphor-icons/react/dist/ssr";
+import { BookBookmark, PushPin, Sparkle, PencilSimpleLine, NotePencil, LinkSimple, Books } from "@phosphor-icons/react/dist/ssr";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { TidalReveal } from "@/components/motion";
 import { EmptyTide } from "@/components/TideIllustration";
 import NotebookAiTidy from "@/components/NotebookAiTidy";
 import NotebookComposeButton from "@/components/NotebookComposeButton";
+import { SmartBackLink } from "@/components/SmartBackLink";
 import { ExportMenu } from "@/components/ExportMenu";
 
 export const dynamic = "force-dynamic";
@@ -55,12 +56,11 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
   return (
     <div className="space-y-7">
       <TidalReveal>
-        <Link
-          href="/notes"
+        <SmartBackLink
+          fallback="/notes?view=notebook"
+          label="返回"
           className="mono inline-flex items-center gap-1.5 text-[12px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
-        >
-          <ArrowLeft size={13} weight="bold" /> 返回笔记馆
-        </Link>
+        />
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">

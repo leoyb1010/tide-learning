@@ -3,12 +3,13 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  ArrowLeft, PencilSimple, MapPin, ArrowUpRight, Quotes, CalendarBlank, Clock,
+  PencilSimple, MapPin, ArrowUpRight, Quotes, CalendarBlank, Clock,
   ShareNetwork, NotePencil, Sparkle, PencilSimpleLine, LinkSimple, CaretDown,
 } from "@phosphor-icons/react";
 import { renderMarkdown } from "@/lib/markdown";
 import { mmss } from "@/lib/format";
 import { useToast } from "@/components/Toast";
+import { SmartBackLink } from "@/components/SmartBackLink";
 import { NoteEditorInline } from "@/components/NoteEditorInline";
 import { SharePanel } from "@/components/SharePanel";
 import { ExportMenu } from "@/components/ExportMenu";
@@ -84,13 +85,8 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
 
   return (
     <div className="mx-auto max-w-[760px] space-y-6">
-      {/* 顶部返回 */}
-      <Link
-        href="/notes"
-        className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
-      >
-        <ArrowLeft size={15} weight="bold" /> 笔记馆
-      </Link>
+      {/* 顶部返回：智能回到真实来源（笔记本/课程/笔记馆），直链兜底笔记馆 */}
+      <SmartBackLink fallback="/notes" label="笔记馆" />
 
       {editing ? (
         <NoteEditorInline

@@ -130,7 +130,7 @@ export default async function MyCoursesPage() {
   });
 
   return (
-    <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-8">
+    <div className="mx-auto flex w-full max-w-[1120px] flex-col gap-8">
       {/* 头部 */}
       <header className="flex items-end justify-between gap-4">
         <div>
@@ -192,7 +192,7 @@ export default async function MyCoursesPage() {
             return (
               <div
                 key={c.id}
-                className="studio-lift group flex flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)] hover:border-[var(--border2)]"
+                className="studio-lift group flex flex-col overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)] hover:border-[var(--border2)]"
               >
                 {/* 封面 + 标题为链接主体 */}
                 <Link href={href} className="flex flex-col">
@@ -226,7 +226,7 @@ export default async function MyCoursesPage() {
                       {(() => {
                         const badge = SHARE_BADGE[c.sharedStatus as ShareState] ?? SHARE_BADGE.private;
                         return (
-                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${badge.cls}`}>
+                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-semibold ${badge.cls}`}>
                             {badge.label}
                             {c.sharedStatus === "shared" && (c.priceCredits ?? 0) > 0 && (
                               <span className="mono inline-flex items-center gap-0.5">
@@ -261,7 +261,7 @@ export default async function MyCoursesPage() {
                     )}
 
                     {/* 学习进度 */}
-                    <div className="pt-3.5">
+                    <div className="pt-2.5">
                       <div className="flex items-center justify-between text-[11px] text-[var(--ink3)]">
                         <span className="mono">{c.done}/{c.total} 节已学</span>
                         <span className="mono">{c.pct}%</span>

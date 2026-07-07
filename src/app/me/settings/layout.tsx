@@ -29,7 +29,8 @@ export default async function SettingsLayout({
       >
         <ArrowLeft size={14} weight="bold" /> 成长档案
       </Link>
-      <h1 className="mt-3 text-[24px] font-bold text-[var(--ink)]">设置中心</h1>
+      <div className="mono mt-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--ink4)]">SETTINGS · 设置中心</div>
+      <h1 className="mt-1 text-[24px] font-bold text-[var(--ink)]">设置中心</h1>
       <p className="mt-1 text-[13px] text-[var(--ink3)]">
         管理你的账号、订阅、偏好与数据
       </p>
@@ -37,7 +38,7 @@ export default async function SettingsLayout({
       <div className="mt-6 flex flex-col gap-4 md:flex-row md:items-start md:gap-8">
         {/* 左窄栏导航：桌面 sticky 纵向；移动横向 scroll tab（在 SettingsNav 内切换布局） */}
         <aside className="shrink-0 md:w-48">
-          <div className="md:sticky md:top-6">
+          <div className="md:sticky md:top-[84px]">
             <SettingsNav />
           </div>
         </aside>

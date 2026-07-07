@@ -6,6 +6,7 @@ import { ToastProvider } from "@/components/Toast";
 import { TopNav } from "@/components/TopNav";
 import { MobileTabs } from "@/components/MobileTabs";
 import { ViewTransitions } from "@/components/ViewTransitions";
+import { NavHistoryTracker } from "@/components/NavHistoryTracker";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
@@ -75,6 +76,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     role: string;
     studentId: string; // 学号（userId 短哈希）
     credits: number; // v2.3 积分余额
+    // v3.2 顶栏会员状态胶囊
+    isSubscriber: boolean;
+    subscriptionStatus: string;
+    statusLabel: string;
+    validUntil: string | null;
     // v2.3 §5 全局续学：最近在学的一节，供 TopNav 续学胶囊直达。无进度则为 null。
     resumeInfo: { courseSlug: string; courseTitle: string; lessonId: string; lessonTitle: string; pct: number } | null;
     // v3.0：续学胶囊展开的最近学习课程（最多 5 门）。
@@ -161,6 +167,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       role: user.role,
       studentId: shortStudentId(user.id),
       credits,
+      isSubscriber: snapshot.isSubscriber,
+      subscriptionStatus: snapshot.subscriptionStatus,
+      statusLabel: snapshot.statusLabel,
+      validUntil: snapshot.validUntil,
       resumeInfo,
       recentCourses,
     };
@@ -191,6 +201,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <ToastProvider>
             {/* v3.0 页面转场：软导航 View Transitions 驱动（无 UI，渐进增强） */}
             <ViewTransitions />
+            {/* 会话内导航探针：为 SmartBackLink 记「是否已站内导航过」（无 UI） */}
+            <NavHistoryTracker />
             {/* STUDIO v2.3 外壳：现代顶部导航 + 全宽内容 + 移动底部 Tab */}
             <div className="flex min-h-screen flex-col bg-[var(--bg)] text-[var(--ink)]">
               <TopNav user={navUser} />

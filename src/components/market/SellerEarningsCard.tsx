@@ -34,63 +34,58 @@ export function SellerEarningsCard({ earnings }: { earnings: SellerEarnings }) {
   const stallCount = courses.length;
 
   return (
-    <div className="studio-rise relative overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)]">
-      <span className="absolute left-0 top-5 h-6 w-[3px] rounded-r bg-[var(--red)]" aria-hidden />
+    <div className="studio-rise relative overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 shadow-[var(--card),var(--inner-hi)]">
+      <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-r bg-[var(--red)]" aria-hidden />
 
-      {/* 头部 */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[var(--ink3)]">
-          <TrendUp size={16} weight="fill" className="text-[var(--red)]" />
-          <span className="text-[12.5px] font-semibold tracking-[0.06em]">我的集市收益</span>
-        </div>
-        <Link
-          href="/create"
-          className="group inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--red)]"
-        >
-          再摆一摊
-          <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
-        </Link>
-      </div>
+      {/* 单行条：标题 · 内联三指标 · 明细/再摆一摊 —— 压缩高度，不再抢集市首屏 */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-1">
+        <span className="flex items-center gap-1.5 text-[var(--ink3)]">
+          <TrendUp size={15} weight="fill" className="text-[var(--red)]" />
+          <span className="text-[12.5px] font-semibold tracking-[0.04em]">我的集市收益</span>
+        </span>
 
-      {/* 三数字：累计收益 / 付费成交 / 在架课 */}
-      <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface-inset)]">
-        <div className="flex flex-col items-center gap-1 px-2 py-3.5">
-          <span className="mono text-[24px] font-extrabold leading-none text-[var(--red)]">
-            {abbrevCount(totalIncome)}
+        <span className="flex items-center gap-3.5 text-[12px] text-[var(--ink3)]">
+          <span className="inline-flex items-center gap-1">
+            <Coins size={12} weight="fill" className="text-[var(--red)]" />
+            累计
+            <b className="mono font-bold text-[var(--red)]">{abbrevCount(totalIncome)}</b>
           </span>
-          <span className="flex items-center gap-1 text-[11px] text-[var(--ink4)]">
-            <Coins size={11} weight="fill" />
-            累计收益
+          <span className="inline-flex items-center gap-1">
+            <Package size={12} weight="fill" className="text-[var(--ink4)]" />
+            成交
+            <b className="mono font-bold text-[var(--ink)]">{abbrevCount(totalSales)}</b>
           </span>
-        </div>
-        <div className="flex flex-col items-center gap-1 px-2 py-3.5">
-          <span className="mono text-[24px] font-extrabold leading-none text-[var(--ink)]">
-            {abbrevCount(totalSales)}
+          <span className="inline-flex items-center gap-1">
+            在架
+            <b className="mono font-bold text-[var(--ink)]">{stallCount}</b>
           </span>
-          <span className="flex items-center gap-1 text-[11px] text-[var(--ink4)]">
-            <Package size={11} weight="fill" />
-            付费成交
-          </span>
-        </div>
-        <div className="flex flex-col items-center gap-1 px-2 py-3.5">
-          <span className="mono text-[24px] font-extrabold leading-none text-[var(--ink)]">{stallCount}</span>
-          <span className="text-[11px] text-[var(--ink4)]">在架课</span>
-        </div>
+        </span>
+
+        <span className="ml-auto flex items-center gap-3">
+          {courses.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setOpen((v) => !v)}
+              className="inline-flex items-center gap-1 text-[12px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+              aria-expanded={open}
+            >
+              明细
+              <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+          )}
+          <Link
+            href="/create"
+            className="group inline-flex items-center gap-1 text-[12px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--red)]"
+          >
+            再摆一摊
+            <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </span>
       </div>
 
       {/* 明细展开 */}
       {courses.length > 0 && (
         <>
-          <button
-            type="button"
-            onClick={() => setOpen((v) => !v)}
-            className="mt-3 flex w-full items-center justify-between rounded-[10px] py-1.5 text-left text-[12.5px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
-            aria-expanded={open}
-          >
-            <span>各课收益明细</span>
-            <CaretDown size={13} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
-          </button>
-
           {open && (
             <ul className="stagger mt-1.5 space-y-1.5">
               {courses.map((c, i) => {

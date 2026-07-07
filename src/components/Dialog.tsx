@@ -27,36 +27,48 @@ export function Dialog({
   // 打开前的焦点锚点：关闭时还原，避免焦点落回 body（WCAG 2.4.3 焦点顺序）。
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const [host, setHost] = useState<HTMLElement | null>(null);
+
+  // onClose 存入 ref：下方键盘/焦点 effect 只依赖 [open]，不因父组件每次重渲染传入
+  // 的「新 onClose 身份」而重跑。否则受控表单（如新建笔记本标题框）每敲一个字都会重挂
+  // 监听并重新 requestAnimationFrame 抢焦点 → 输入框瞬间失焦、中文 IME 被打断、回车落到
+  // 关闭按钮上误关弹窗，表现为「输入框乱跳、没法输入」。这是全站 11 处弹窗的共性雷区。
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
   useEffect(() => {
     setHost(document.body);
   }, []);
 
   useEffect(() => {
     if (!open) return;
-    // 仅在 open 转真时记录一次锚点（onClose 变更导致 effect 重跑时不覆盖成浮层内按钮）。
-    if (!restoreFocusRef.current) {
-      restoreFocusRef.current = document.activeElement as HTMLElement | null;
-    }
+    // open 翻转为真：记录来源焦点、锁滚动、装监听、初始聚焦——整段仅在开合翻转时跑一次。
+    restoreFocusRef.current = document.activeElement as HTMLElement | null;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") onCloseRef.current();
       if (e.key === "Tab") trapFocus(e, panelRef.current);
     };
     document.addEventListener("keydown", onKey);
-    // 初始焦点
-    requestAnimationFrame(() => panelRef.current?.querySelector<HTMLElement>("[data-autofocus],button,a,input,textarea")?.focus());
+    // 初始焦点优先落在业务输入上（data-autofocus > 表单控件 > 其它可聚焦），绝不默认落到
+    // 右上角关闭按钮。querySelector 对逗号并列选择器按 DOM 序返回首个命中，而关闭按钮在 DOM
+    // 中先于表单控件，故必须分层查询而非把 [data-autofocus] 与 button 逗号并列。
+    requestAnimationFrame(() => {
+      const panel = panelRef.current;
+      if (!panel) return;
+      const target =
+        panel.querySelector<HTMLElement>("[data-autofocus]") ??
+        panel.querySelector<HTMLElement>("input:not([type='hidden']),textarea,select") ??
+        panel.querySelector<HTMLElement>("button,a[href],[tabindex]:not([tabindex='-1'])");
+      target?.focus();
+    });
     return () => {
       document.body.style.overflow = prev;
       document.removeEventListener("keydown", onKey);
+      // 关闭 / 卸载时还原来源焦点并清空锚点，为下次打开重新记录做准备。
+      restoreFocusRef.current?.focus?.();
+      restoreFocusRef.current = null;
     };
-  }, [open, onClose]);
-
-  // 关闭（open 转假）时还原焦点并清空锚点，为下次打开重新记录做准备。
-  useEffect(() => {
-    if (open) return;
-    restoreFocusRef.current?.focus?.();
-    restoreFocusRef.current = null;
   }, [open]);
 
   // SSR/首帧无 host 时不 Portal（避免 document 未定义）；未打开时不渲染浮层。

@@ -22,8 +22,13 @@ import {
   Books,
   Export,
   HourglassMedium,
+  FileArrowUp,
+  FilePdf,
+  FileDoc,
+  FileText,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
+import { TemplateModelPicker } from "@/components/TemplateModelPicker";
 import { ArchiveStamp } from "@/components/motion";
 import { useToast } from "@/components/Toast";
 import { track } from "@/lib/analytics-client";
@@ -147,10 +152,16 @@ export function CreateStudio({
   const [category, setCategory] = useState<string>("");
   // v3.1：造课时是否同时生成视频课件（选中 → 逐节写完块课件后，对每节发起视频生成）。
   const [genVideo, setGenVideo] = useState(false);
+  // v3.2：课件模板（默认经典）与生成模型（空=用默认模型）。造课/导入共用，透传进生成请求体。
+  const [template, setTemplate] = useState<string>("classic");
+  const [model, setModel] = useState<string>("");
 
   // —— 导入资料状态 ——
   const [importTitle, setImportTitle] = useState("");
   const [importText, setImportText] = useState("");
+  // 文件导入：拖拽高亮态 + 隐藏 file input 引用（点击整卡触发选择）。
+  const [dragActive, setDragActive] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // —— 剧场共享状态（造课 & 导入复用同一套阶段机）——
   const [phase, setPhase] = useState<Phase>("idle");
@@ -336,7 +347,7 @@ export function CreateStudio({
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: q, category: category || undefined }),
+        body: JSON.stringify({ prompt: q, category: category || undefined, template, model: model || undefined }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
@@ -405,21 +416,11 @@ export function CreateStudio({
   // ——————————————————————————————————————————————
   //  §4 资料升维：导入 → 剧场 → 升维报告
   // ——————————————————————————————————————————————
-  async function handleImport() {
-    if (busy) return;
-    const text = importText.trim();
-    if (!text) {
-      toast("先把你的资料粘贴进来吧", { tone: "info" });
-      return;
-    }
-    if (text.length < 100) {
-      toast("资料太短啦，至少 100 字才好拆成课", { tone: "info" });
-      return;
-    }
-    if (!canUseLLM) return gate();
-
-    track("hero_cta_click", { source: "create_import" });
-    const chars = text.length;
+  /**
+   * 导入剧场共用核心：粘贴与文件导入都走「读懂→切章→逐节写作→报告」同一阶段机，
+   * 差异只在 outline() 打哪个接口。outline() 须返回 { courseId, slug, title?, charCount?, lessons }。
+   */
+  async function runImportTheater(opts: { outline: () => Promise<Response>; fallbackTitle: string }) {
     setSource("import");
     setSummary(null);
     setLessons([]);
@@ -432,12 +433,7 @@ export function CreateStudio({
     // 步骤2 拆分章节（后端切章 + 落库空节，返回 lessons）
     setPhase("outline");
     try {
-      const res = await fetch("/api/ai/import-source", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // 注意：import-source route 约定字段为 rawText（非 sourceText）
-        body: JSON.stringify({ title: importTitle.trim() || undefined, rawText: text }),
-      });
+      const res = await opts.outline();
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
         if (res.status === 402) {
@@ -451,7 +447,13 @@ export function CreateStudio({
         }
         throw new Error(json?.error || "整理失败");
       }
-      const data = json.data as { courseId: string; slug: string; title?: string; lessons: OutlineLesson[] };
+      const data = json.data as {
+        courseId: string;
+        slug: string;
+        title?: string;
+        charCount?: number;
+        lessons: OutlineLesson[];
+      };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("未能从资料中拆出章节，请调整后重试");
 
@@ -459,7 +461,7 @@ export function CreateStudio({
       setLiveGen({
         id: data.courseId,
         slug: data.slug,
-        title: data.title || importTitle.trim() || outline[0]?.title || data.slug,
+        title: data.title || opts.fallbackTitle || outline[0]?.title || data.slug,
         isImport: true,
         total: outline.length,
         done: 0,
@@ -482,7 +484,7 @@ export function CreateStudio({
         succeeded,
         quizzes: succeeded,
         cards: succeeded,
-        chars,
+        chars: data.charCount ?? 0,
       });
       setLiveGen(null); // 已到完成页：闭环由完成页「已放入书架」接管，撤下顶部生产中横幅候选
       setPhase("done");
@@ -495,6 +497,65 @@ export function CreateStudio({
       resetTheater();
       toast(e instanceof Error ? e.message : "整理失败，请稍后再试", { tone: "warn" });
     }
+  }
+
+  // 粘贴文本导入
+  async function handleImport() {
+    if (busy) return;
+    const text = importText.trim();
+    if (!text) {
+      toast("先把你的资料粘贴进来吧", { tone: "info" });
+      return;
+    }
+    if (text.length < 100) {
+      toast("资料太短啦，至少 100 字才好拆成课", { tone: "info" });
+      return;
+    }
+    if (!canUseLLM) return gate();
+
+    track("hero_cta_click", { source: "create_import" });
+    await runImportTheater({
+      // 注意：import-source route 约定字段为 rawText（非 sourceText）
+      outline: () =>
+        fetch("/api/ai/import-source", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: importTitle.trim() || undefined, rawText: text, template, model: model || undefined }),
+        }),
+      fallbackTitle: importTitle.trim(),
+    });
+  }
+
+  // 支持的文件格式（前端与后端 EXT_KIND 对齐）
+  const ACCEPT_EXT = ".pdf,.docx,.txt,.md,.markdown";
+
+  // 文件导入（拖拽 / 点击选择均走这里）
+  async function handleFileImport(file: File) {
+    if (busy) return;
+    if (!canUseLLM) return gate();
+    if (!/\.(pdf|docx|txt|md|markdown|text)$/i.test(file.name)) {
+      toast("仅支持 PDF / Word(.docx) / TXT / Markdown 文件", { tone: "warn" });
+      return;
+    }
+    if (file.size > 15_000_000) {
+      toast("文件过大（上限 15MB）", { tone: "warn" });
+      return;
+    }
+    if (file.size === 0) {
+      toast("文件内容为空", { tone: "warn" });
+      return;
+    }
+
+    track("hero_cta_click", { source: "create_import_file" });
+    const fd = new FormData();
+    fd.append("file", file);
+    if (importTitle.trim()) fd.append("title", importTitle.trim());
+    fd.append("template", template);
+    if (model) fd.append("model", model);
+    await runImportTheater({
+      outline: () => fetch("/api/ai/import-file", { method: "POST", body: fd }),
+      fallbackTitle: importTitle.trim() || file.name.replace(/\.[^.]+$/, ""),
+    });
   }
 
   const inTheater = phase !== "idle";
@@ -652,6 +713,9 @@ export function CreateStudio({
                 </div>
               </div>
 
+              {/* v3.2：课件模板 + 生成模型选择 */}
+              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} />
+
               {/* v3.1：生成视频课件开关。选中后逐节写完块课件，再把课件转成带旁白的视频课件。 */}
               <button
                 type="button"
@@ -726,13 +790,86 @@ export function CreateStudio({
                 placeholder="课程标题（可留空，AI 帮你起）"
                 className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
               />
+
+              {/* v3.2：课件模板 + 模型（放上传区之上——拖入文件即刻开始生成，须先选好）*/}
+              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} />
+
+              {/* 文件上传区：点击整卡或拖拽文件入内均可选择；支持 PDF / Word / TXT / MD。 */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={ACCEPT_EXT}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  // 复位 value，保证同一文件二次选择也能触发 onChange。
+                  e.target.value = "";
+                  if (f) void handleFileImport(f);
+                }}
+              />
+              <div
+                role="button"
+                tabIndex={0}
+                aria-label="上传文件导入（PDF / Word / TXT / Markdown）"
+                onClick={() => !busy && fileInputRef.current?.click()}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && !busy) {
+                    e.preventDefault();
+                    fileInputRef.current?.click();
+                  }
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!busy) setDragActive(true);
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragActive(false);
+                  const f = e.dataTransfer.files?.[0];
+                  if (f) void handleFileImport(f);
+                }}
+                className={`studio-press flex cursor-pointer flex-col items-center justify-center gap-2 rounded-[14px] border-2 border-dashed px-4 py-7 text-center transition-colors duration-200 ${
+                  dragActive
+                    ? "border-[var(--red)] bg-[var(--red-soft)]"
+                    : "border-[var(--border2)] bg-[var(--surface-inset)] hover:border-[var(--red)] hover:bg-[var(--surface)]"
+                } ${busy ? "pointer-events-none opacity-50" : ""}`}
+              >
+                <FileArrowUp size={26} weight="duotone" className="text-[var(--red)]" />
+                <span className="text-[14px] font-semibold text-[var(--ink)]">
+                  {dragActive ? "松开鼠标即可导入" : "点击上传或把文件拖到这里"}
+                </span>
+                <span className="flex flex-wrap items-center justify-center gap-2 text-[11.5px] text-[var(--ink3)]">
+                  <span className="inline-flex items-center gap-1">
+                    <FilePdf size={13} weight="fill" className="text-[var(--red)]" /> PDF
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <FileDoc size={13} weight="fill" className="text-[var(--info)]" /> Word
+                  </span>
+                  <span className="inline-flex items-center gap-1">
+                    <FileText size={13} weight="fill" className="text-[var(--ink3)]" /> TXT / Markdown
+                  </span>
+                  <span className="text-[var(--ink4)]">· 单个 ≤ 15MB</span>
+                </span>
+              </div>
+
+              {/* 分隔：文件 或 粘贴文本 */}
+              <div className="flex items-center gap-3 text-[11px] font-medium text-[var(--ink4)]">
+                <span className="h-px flex-1 bg-[var(--border)]" />
+                或直接粘贴文本
+                <span className="h-px flex-1 bg-[var(--border)]" />
+              </div>
+
               <div className="relative">
                 <textarea
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
-                  rows={8}
+                  rows={7}
                   maxLength={50000}
-                  placeholder="把你的学习资料 / PDF 内容 / 文章粘贴进来，AI 帮你整理成可学的课"
+                  placeholder="把学习资料 / 文章 / 讲义正文粘贴进来，AI 帮你整理成可学的课"
                   className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
@@ -745,7 +882,7 @@ export function CreateStudio({
                 className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
               >
                 <FilePlus size={17} weight="fill" />
-                把资料升维成课
+                把粘贴的资料升维成课
                 <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
               <p className="text-center text-[11.5px] text-[var(--ink3)]">AI 会把长文拆成章节，配上要点与测验，帮你把资料变成能学的课。</p>

@@ -3,7 +3,8 @@ import { prisma } from "./db";
 import { creditingOnUsage } from "./credits";
 import { track } from "./analytics";
 import { validateBlocks, type Block } from "./blocks";
-import { simpleOutlinePrompt, lessonVoiceLine, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
+import { simpleOutlinePrompt, lessonVoiceLine, lessonRecipeBlock, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
+import { getTemplate } from "./ai/templates";
 
 /**
  * 造课内核 —— 引擎A 的可复用逻辑层（供 route / after() 后台续跑 / 共创闭环共用）。
@@ -265,13 +266,22 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     if (src?.rawText) sourceCtx = sourceContextBlock(src.rawText);
   }
 
+  // v3.2 课件模板：规定本节块的种类/顺序/数量，是六种课型差异化的核心。放在最前，优先遵循。
+  const tmpl = getTemplate(course.template);
+  const recipe =
+    `\n【本课课件模板：${tmpl.label}（${tmpl.tagline}）】\n` +
+    `以下配方规定了本节应包含的块种类、顺序与大致数量，请优先按它来编排本节的块；` +
+    `下方的通用三段式、吸睛度与字段结构规则作为质量补充同时生效（模板与它们冲突时以模板的块编排为准）。\n` +
+    lessonRecipeBlock(course.template);
+
   const system =
     "你是学习平台的资深课程内容作者，为一节自学课编写有叙事结构、像杂志专栏一样好读、让人舍不得划走的块课件。" +
     "你的目标不是罗列知识点，而是带学习者走一段“为什么学 → 学什么 → 怎么用 → 记住了没 → 下一步”的完整旅程。\n" +
     voice + "\n" +
+    recipe +
     "\n" +
     // 块数 6-10 → 8-12：提升每节内容丰富度（用户反馈偏“素”），每节 token 成本约 +30%，属有意权衡。
-    "【节结构模板】每节输出 8-12 块，严格遵循以下三段式：\n" +
+    "【通用节结构（模板未特别规定时的默认三段式）】每节输出 8-12 块：\n" +
     "1. 开头（钩子+目标）：先一个 scene 块讲“为什么学这节、它能解决什么真实困扰”，" +
     "紧接一个 objectives 块列 3-5 条本节具体可衡量的学习目标（能说出/能写出/能区分/能完成……，避免“了解/熟悉”这类无法检验的词）。\n" +
     "2. 主体（讲解，据学科选择块型交替）：\n" +
@@ -358,8 +368,11 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
           system,
           user: userMsg,
           temperature: 0.3,
-          // 6000 → 8000：配合块数上调（8-12 块），避免长节被截断；每节 token 成本约 +30%，属有意权衡。
-          maxTokens: 8000,
+          // 8000 → 10000：maxTokens 是产出上限而非计费额（按实际 completion 记账），提高上限
+          // 只让高密度模板（如考点冲刺 10-14 块）不被截断，普通节仍按需产出、成本不变。
+          maxTokens: 10000,
+          // v3.2：用课级选定的模型（会员可选高级模型）；null 时 llm 回落默认模型。
+          model: course.modelUsed ?? undefined,
           onUsage: creditingOnUsage(userId, "generate_lesson"),
         });
         const validated = validateBlocks(result?.blocks ?? result);

@@ -190,6 +190,7 @@ export default function NotebookGrid() {
               标题<span className="text-[var(--red)]"> *</span>
             </label>
             <input
+              data-autofocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="例如：产品经理养成"

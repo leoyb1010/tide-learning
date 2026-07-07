@@ -130,6 +130,8 @@ model Course {
   priceCredits     Int?      // 集市售价（积分）；null/0=免费，>0=付费
   salesCount       Int       @default(0) // 累计成交数（付费被购买次数；免费拿走不计入，销量口径 = 真实成交）
   genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
+  template         String?   // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
+  modelUsed        String?   // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
   sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
   instructorName   String?
   reviewerName     String? // 健康/财务/防诈骗类必填

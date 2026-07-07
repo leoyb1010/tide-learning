@@ -7,6 +7,15 @@
 - 启动示例：`DATABASE_URL="file:./dev.db" PORT=3100 npm run dev`
 - 浏览器验证也访问对应端口，如 `http://localhost:3100`。
 
+## 容器宽度规范（STUDIO v2，防对齐漂移）
+页面主容器 `max-w-` 只用这几档，别自创中间值：
+- `max-w-[1120px]` → 内容网格页默认（成长档案 /me、课程库 /courses、我的课 /me/courses、创作者 /me/creator、收益 /me/earnings、设置 /me/settings、笔记馆、复习室、社区、用户主页等）
+- `max-w-[1280px]` → 仅课程集市 /market 与管理后台 /admin（大屏专属）
+- `max-w-[880px]` → 表格/双列数据页（学习记录 /me/history）
+- `max-w-[760px]` → 单列文章/流式（隐私、条款、需求详情、复习流）
+- `max-w-2xl`(640) 及以下 → 登录/支付/订阅管理等单列表单模态
+页头统一写法：`<div className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink4)]">{英文小标} · {中文}</div>` + `<h1>`。
+
 ## 项目速览
 - Next.js 15 App Router + Prisma/SQLite + Tailwind v4 + framer-motion + DeepSeek(deepseek-v4-flash)
 - 设计系统：STUDIO v2（冷灰蓝 + 有道红 #FC011A 作专注信号 ~7% + 亮暗跟随系统）。见 docs/设计系统-STUDIO-v2.md

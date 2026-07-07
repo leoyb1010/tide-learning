@@ -19,8 +19,21 @@ const FIRST_PAGE = 30;
  * 消除旧版「整页 use client 首屏 3 个 fetch 才有数据」的空窗。
  * 所有交互（视图切换/筛选/AI 整理/滚动加载更多）在 NotesClient（"use client"）里进行。
  */
-export default async function NotesPage() {
+const VIEW_KEYS = ["all", "timeline", "gallery", "course", "notebook"] as const;
+type ViewKey = (typeof VIEW_KEYS)[number];
+
+export default async function NotesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string }>;
+}) {
   const user = await getCurrentUser();
+
+  // ?view= 直达指定视图（如从笔记本详情页返回落到「笔记本」视图）；非法值忽略。
+  const { view } = await searchParams;
+  const initialView = (VIEW_KEYS as readonly string[]).includes(view ?? "")
+    ? (view as ViewKey)
+    : undefined;
 
   // 未登录：交互岛用空数据渲染登录引导，不查库。
   if (!user) {
@@ -80,7 +93,7 @@ export default async function NotesPage() {
 
   const tags = tagRows.map((t) => ({ id: t.id, name: t.name, color: t.color, count: t._count.notes }));
 
-  const initialData: NotesInitialData = { notes, nextCursor, total, tags, loggedIn: true };
+  const initialData: NotesInitialData = { notes, nextCursor, total, tags, loggedIn: true, initialView };
 
   return <NotesClient initialData={initialData} />;
 }
