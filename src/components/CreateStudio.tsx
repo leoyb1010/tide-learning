@@ -632,12 +632,12 @@ export function CreateStudio({
                 key={t.key}
                 type="button"
                 onClick={() => setTab(t.key)}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-150 ${
+                className={`flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-150 ${
                   active ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"
                 }`}
               >
-                <t.Icon size={15} weight={active ? "fill" : "regular"} />
-                {t.label}
+                <t.Icon size={15} weight={active ? "fill" : "regular"} className="shrink-0" />
+                <span className="whitespace-nowrap">{t.label}</span>
               </button>
             );
           })}

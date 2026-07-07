@@ -113,7 +113,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
                 <span className="studio-press -mt-6 grid h-[46px] w-[46px] place-items-center rounded-full bg-[var(--red)] text-white shadow-[0_6px_16px_-4px_rgba(252,1,26,0.5)]">
                   <t.Icon size={22} weight="fill" />
                 </span>
-                <span className={active ? "text-[var(--red)]" : ""}>{t.label}</span>
+                <span className={`whitespace-nowrap ${active ? "text-[var(--red)]" : ""}`}>{t.label}</span>
               </Link>
             );
           }
@@ -124,7 +124,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
               className={`flex flex-col items-center gap-1 py-2.5 text-[0.68rem] transition-colors ${active ? "text-[var(--red)]" : "text-[var(--ink4)]"}`}
             >
               <t.Icon size={21} weight={active ? "fill" : "regular"} />
-              {t.label}
+              <span className="whitespace-nowrap">{t.label}</span>
             </Link>
           );
         })}
@@ -139,7 +139,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
           className={`flex flex-col items-center gap-1 py-2.5 text-[0.68rem] transition-colors ${moreActive || moreOpen ? "text-[var(--red)]" : "text-[var(--ink4)]"}`}
         >
           <DotsThreeOutline size={21} weight={moreActive || moreOpen ? "fill" : "regular"} />
-          更多
+          <span className="whitespace-nowrap">更多</span>
         </button>
       </nav>
 

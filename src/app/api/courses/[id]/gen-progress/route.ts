@@ -2,9 +2,12 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { readGenProgress } from "@/lib/course-gen";
+import { readGenProgress, getGenJob, finalizeGenJob } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
+
+/** running job 心跳超过该阈值视为僵尸；轮询接口会自动收敛，避免前端永久转圈。 */
+const GEN_JOB_STALE_MS = 15 * 60_000;
 
 /**
  * GET /api/courses/:id/gen-progress —— 断点续造进度查询（供前端轮询恢复剧场）。
@@ -44,13 +47,48 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // total 以实际 lesson 数为准（job 快照可能落后），保证前端进度条分母稳定。
     const total = lessons.length;
     const doneByLessons = lessons.filter((l) => l.ready).length;
+    let genStatus = course.genStatus;
+    let currentLessonId = progress.currentLessonId;
+
+    // 自愈收尾：后台 after() 在 serverless/重启/超时时可能来不及执行最终 finalize，
+    // 导致所有节都 ready 但 Course 仍是 generating。轮询接口是用户正在看的路径，顺手收敛为 ready。
+    if (genStatus === "generating" && total > 0 && doneByLessons === total) {
+      await prisma.course.update({ where: { id: course.id }, data: { genStatus: "ready" } });
+      await finalizeGenJob(course.id, "done");
+      genStatus = "ready";
+      currentLessonId = null;
+    }
+
+    // 僵尸收敛：有空节但 course_gen running 心跳过期，说明后台流水已死。
+    // 不继续展示“正在生成”转圈，改为 failed，让前端出现“继续生成”入口。
+    if (genStatus === "generating" && doneByLessons < total) {
+      const job = await getGenJob(course.id);
+      if (job?.status === "running") {
+        let heartbeat = job.createdAt.getTime();
+        try {
+          const p = JSON.parse(job.inputJson || "{}");
+          if (typeof p.heartbeatAt === "string") {
+            const t = Date.parse(p.heartbeatAt);
+            if (Number.isFinite(t)) heartbeat = t;
+          }
+        } catch {
+          /* 解析失败按 createdAt 兜底 */
+        }
+        if (Date.now() - heartbeat > GEN_JOB_STALE_MS) {
+          await prisma.course.update({ where: { id: course.id }, data: { genStatus: "failed" } });
+          await finalizeGenJob(course.id, "failed");
+          genStatus = "failed";
+          currentLessonId = null;
+        }
+      }
+    }
 
     return ok({
       total,
       done: Math.max(progress.done, doneByLessons),
       failed: progress.failed,
-      currentLessonId: progress.currentLessonId,
-      genStatus: course.genStatus,
+      currentLessonId,
+      genStatus,
       lessons,
     });
   });

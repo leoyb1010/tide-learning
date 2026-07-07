@@ -255,8 +255,8 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
                 aria-pressed={active}
                 className={
                   active
-                    ? "studio-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3.5 text-[13px] font-semibold text-[var(--red)]"
-                    : "studio-press inline-flex h-11 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 text-[13px] text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                    ? "studio-press inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3.5 text-[13px] font-semibold text-[var(--red)]"
+                    : "studio-press inline-flex h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 text-[13px] text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
                 }
               >
                 {t.label}

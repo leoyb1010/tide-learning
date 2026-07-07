@@ -86,7 +86,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
             <button
               key={s.key}
               onClick={() => setSort(s.key)}
-              className={`rounded-[8px] px-4 py-1.5 transition-colors ${
+              className={`whitespace-nowrap rounded-[8px] px-4 py-1.5 transition-colors ${
                 active
                   ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
                   : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -106,7 +106,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
             <button
               key={f.label}
               onClick={() => setType(f.key)}
-              className={`mono rounded-full px-3.5 py-1.5 text-[12px] transition-colors ${
+              className={`mono whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] transition-colors ${
                 active
                   ? "bg-[var(--ink)] text-[var(--surface)]"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"

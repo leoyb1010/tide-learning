@@ -691,12 +691,11 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       await prisma.course.update({ where: { id: courseId }, data: { genStatus: "ready" } });
       await finalizeGenJob(courseId, "done");
     } else {
-      // 剩余空节若仍被另一条流水活跃认领（claim 未超 TTL），说明对方还在生成：
-      // 不能置 failed（避免双流水互踩把正常生成判死），保持 generating / running，交对方收尾。
-      const activelyClaimed = await prisma.lesson.count({
-        where: { courseId, blocksJson: null, genClaimedAt: { gte: new Date(Date.now() - CLAIM_TTL_MS) } },
-      });
-      if (activelyClaimed > 0) return;
+      // 仍有空节：不再因为“另一流水活跃认领”而保持 running 后直接 return。
+      // 生产上 after() 可能在 serverless 超时/进程重启时被杀，另一流水也可能只生成了部分节；
+      // 若这里继续保持 running，前端会永久转圈且 resume-gen 会被“正在跑”挡住。
+      // 先收敛为 failed，前端可立即显示“继续生成”；若另一流水随后真的补齐最后一节，
+      // generateLessonCore 的 allReady 收尾仍会把课程改回 ready。
       await prisma.course.update({ where: { id: courseId }, data: { genStatus: "failed" } });
       await finalizeGenJob(courseId, "failed");
     }

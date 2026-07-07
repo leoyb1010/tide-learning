@@ -821,12 +821,12 @@ export function Player({
                           key={t.key}
                           type="button"
                           onClick={() => setBlockView(t.key)}
-                          className={`inline-flex min-h-[44px] items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors duration-150 ${
+                          className={`inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-[13px] font-semibold transition-colors duration-150 ${
                             on ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"
                           }`}
                         >
-                          <t.Icon size={15} weight={on ? "fill" : "regular"} className={t.key === "video" ? "text-[var(--red)]" : undefined} />
-                          {t.label}
+                          <t.Icon size={15} weight={on ? "fill" : "regular"} className={`shrink-0 ${t.key === "video" ? "text-[var(--red)]" : ""}`} />
+                          <span className="whitespace-nowrap">{t.label}</span>
                           {t.key === "video" && videoGenerating && (
                             <span className="mono rounded-full bg-[var(--red-soft)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--red)]">生成中</span>
                           )}
@@ -851,7 +851,7 @@ export function Player({
                           type="button"
                           onClick={() => setBlockLayout("slides")}
                           aria-pressed={blockLayout === "slides"}
-                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] px-3.5 transition-colors ${
+                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3.5 transition-colors ${
                             blockLayout === "slides"
                               ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
                               : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -864,7 +864,7 @@ export function Player({
                           type="button"
                           onClick={() => setBlockLayout("scroll")}
                           aria-pressed={blockLayout === "scroll"}
-                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] px-3.5 transition-colors ${
+                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3.5 transition-colors ${
                             blockLayout === "scroll"
                               ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
                               : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -955,16 +955,16 @@ export function Player({
                 <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
                   <button
                     onClick={() => setPanelTab("notes")}
-                    className={`rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "notes" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
+                    className={`whitespace-nowrap rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "notes" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
                   >
-                    笔记
+                    <span className="whitespace-nowrap">笔记</span>
                   </button>
                   <button
                     onClick={() => setPanelTab("companion")}
-                    className={`inline-flex items-center gap-1.5 rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "companion" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
+                    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "companion" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
                   >
-                    <Sparkle size={13} weight={panelTab === "companion" ? "fill" : "regular"} className="text-[var(--red)]" />
-                    AI 伴侣
+                    <Sparkle size={13} weight={panelTab === "companion" ? "fill" : "regular"} className="shrink-0 text-[var(--red)]" />
+                    <span className="whitespace-nowrap">AI 伴侣</span>
                   </button>
                 </div>
                 <div className="h-[540px] overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
