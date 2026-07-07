@@ -16,6 +16,11 @@ import { renderMarkdown } from "../markdown";
 import type { CourseDesign } from "./courseware-design";
 import type { LessonVariance } from "./courseware-variance";
 import { heroMotif, cornerMotif } from "./courseware-motifs";
+import { getModeProfile, type CoursewareMode } from "./courseware-catalog";
+
+// 款式层字体族（modeCss 按 mode 换字族，与 art 的配色正交）。自包含、无外链（CSP 只允 data: 字体）。
+const MONO_STACK = "ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace";
+const SERIF_STACK = "'Songti SC','Source Han Serif SC','Noto Serif SC',Georgia,'Times New Roman',serif";
 
 export const HTML_CONTRACT_VERSION = 2; // v2: 内置翻页/滚动双模式运行时（默认翻页）
 
@@ -720,6 +725,8 @@ export interface RenderInput {
   blocks: IdBlock[];
   design: CourseDesign;
   variance: LessonVariance;
+  /** 款式（内容类型→呈现风格）。缺省 scroll-lesson。决定宏观版式：排版/构图/镜框，与配色正交。 */
+  mode?: CoursewareMode;
 }
 
 // —— 页型档案（Page Archetype）：给每个 block 的整页一个「舞台」，翻页时构图有对比 ——
@@ -739,10 +746,143 @@ function stageFor(type: string, i: number, seed: number, prev: Stage | null, poo
   return s;
 }
 
+const ROTATING_STAGES = new Set<string>(["band", "surface", "figure", "plain", "spotlight"]);
+
+/**
+ * 款式的「页型节奏」：用 mode 档案的 archetypeEmphasis 定制非 hero 页的轮转池，
+ * 让不同 mode 的整页构图节奏不同（PPT 偏 band/plain 大留白，编程偏 surface/figure 镜框，等）。
+ * 不足两种可轮转时回退基础池，避免相邻页老同型。
+ */
+function stagePoolFor(mode: CoursewareMode, dark: boolean): readonly Stage[] {
+  const base = dark ? STAGE_POOL_DARK : STAGE_POOL;
+  const emph = getModeProfile(mode).archetypeEmphasis.filter((s): s is Stage => ROTATING_STAGES.has(s));
+  const uniq = Array.from(new Set(emph));
+  return uniq.length >= 2 ? uniq : base;
+}
+
+/**
+ * 款式层（v3.6，根治「只有配色不同」）：按 mode 给整节课件一套**宏观版式**——排版字族 / 整页构图 /
+ * 镜框 / 装饰 / 块内布局，与 art 的配色正交。作用域全挂在 body.ct-mode-{mode} 下，覆盖 baseCss 的对应
+ * 块类（选择器更具体，天然胜出），**不改 DOM 结构与交互 JS**（.quiz/.fc/.opt/.dlg 等钩子不变），
+ * 只重塑长相 → 不同内容类型出不同款式，而非只换色。运行时翻页/滚动两模式下均适用。
+ */
+function modeCss(mode: CoursewareMode): string {
+  const m = `body.ct-mode-${mode}`;
+  switch (mode) {
+    case "developer-training":
+      return `
+${m}{--ct-radius:8px}
+${m} .lead,${m} .h-title,${m} h1,${m} h2,${m} h3,${m} .tide-md-h{font-family:${MONO_STACK};letter-spacing:-.02em}
+${m} .eyebrow,${m} .pill{border-radius:4px}
+${m} .page--surface,${m} .page--figure{padding-top:44px;border-radius:10px}
+${m} .page--surface::before,${m} .page--figure::before{content:"";position:absolute;top:15px;left:18px;width:10px;height:10px;border-radius:50%;background:var(--ct-accent);box-shadow:17px 0 0 var(--ct-ink3),34px 0 0 var(--ct-border);z-index:2}
+${m} .page--surface::after,${m} .page--figure::after{content:"~/lesson — zsh";position:absolute;top:12px;left:70px;font-family:${MONO_STACK};font-size:11px;color:var(--ct-ink3);z-index:2}
+${m} .body ul{list-style:none;padding-left:2px}
+${m} .body ul li{padding-left:20px;position:relative}
+${m} .body ul li::before{content:"›";position:absolute;left:0;color:var(--ct-accent);font-family:${MONO_STACK};font-weight:700}
+${m} .steps .n{border-radius:5px}
+${m} .kp .item{border-left:3px solid var(--ct-accent);border-radius:0 6px 6px 0}
+${m} .tide-md-pre{border-radius:8px;position:relative;padding-top:32px}
+${m} .tide-md-pre::before{content:"● ● ●";position:absolute;top:8px;left:12px;font-size:9px;letter-spacing:3px;color:var(--ct-ink3)}
+`;
+    case "editorial-academic":
+      return `
+${m} .lead,${m} .h-title,${m} .body,${m} h1,${m} h2,${m} h3,${m} li,${m} p{font-family:${SERIF_STACK}}
+${m} .deck{max-width:720px}
+${m} .body{font-size:17px;line-height:1.85;text-align:justify;text-justify:inter-character}
+${m} .eyebrow{font-family:${MONO_STACK};border-bottom:1px solid var(--ct-border);padding-bottom:6px;letter-spacing:.14em}
+${m} .h-title{border-bottom:2px solid var(--ct-ink);padding-bottom:8px;display:table}
+${m} .page--surface,${m} .page--band,${m} .page--figure{background:transparent;border:0;box-shadow:none;border-left:2px solid var(--ct-border);border-radius:0;padding-left:clamp(18px,4vw,30px)}
+${m} .card,${m} .ex{box-shadow:none;border-radius:2px}
+${m} .cmp .col{border-radius:2px}
+${m} .body p:first-of-type::first-letter{font-size:3.1em;float:left;line-height:.86;padding:2px 10px 0 0;font-weight:700;color:var(--ct-accent)}
+`;
+    case "deck-horizontal":
+      return `
+${m}{padding-top:clamp(16px,4vh,40px)}
+${m} .deck{max-width:860px}
+${m} .lead{font-size:clamp(38px,8vw,72px);line-height:1.02}
+${m} .h-title{font-size:clamp(26px,5vw,40px)}
+${m} .eyebrow{font-size:12px;letter-spacing:.32em}
+${m} .page--hero{text-align:center}
+${m} .page--hero .eyebrow{display:block}
+${m} .page--band,${m} .page--surface,${m} .page--figure{border-radius:calc(var(--ct-radius) + 6px);padding:clamp(28px,5vw,46px)}
+${m} .body{font-size:19px}
+${m} .kp{grid-template-columns:1fr}
+${m} .kp .item{font-size:18px;padding:16px 18px}
+${m} .quiz .q{font-size:22px}
+`;
+    case "cinematic-tech":
+      return `
+${m} .lead{font-size:clamp(34px,6.4vw,58px);text-shadow:0 0 30px color-mix(in srgb,var(--ct-accent) 30%,transparent)}
+${m} .page--surface,${m} .page--figure,${m} .card,${m} .fc .face,${m} .summary{background:color-mix(in srgb,var(--ct-surface) 82%,transparent);backdrop-filter:blur(6px);border:1px solid color-mix(in srgb,var(--ct-accent) 30%,var(--ct-border));box-shadow:0 0 0 1px color-mix(in srgb,var(--ct-accent) 14%,transparent),0 24px 60px -30px color-mix(in srgb,var(--ct-accent) 60%,transparent)}
+${m} .h-title{position:relative;padding-bottom:10px}
+${m} .h-title::after{content:"";position:absolute;left:0;bottom:0;width:56px;height:2px;background:linear-gradient(90deg,var(--ct-accent),transparent);box-shadow:0 0 10px var(--ct-accent)}
+${m} .pill{box-shadow:0 0 16px -4px color-mix(in srgb,var(--ct-accent) 70%,transparent)}
+${m} .quiz .opt{background:color-mix(in srgb,var(--ct-surface2) 70%,transparent)}
+${m} .kp .item .b{box-shadow:0 0 12px -2px color-mix(in srgb,var(--ct-accent) 70%,transparent)}
+`;
+    case "interactive-quiz":
+      return `
+${m}{--ct-radius:18px}
+${m} .quiz,${m} .fc{position:relative}
+${m} .page--surface:has(.quiz),${m} .page:has(.quiz){padding-top:46px}
+${m} .page:has(.quiz)::before{content:"检查点 · CHECKPOINT";position:absolute;top:14px;left:18px;font-family:${MONO_STACK};font-size:10px;letter-spacing:.18em;color:var(--ct-accent-ink);background:var(--ct-accent-soft);padding:4px 10px;border-radius:999px;z-index:2}
+${m} .quiz .q{font-size:20px}
+${m} .quiz .opt{padding:15px 18px;border-width:1.5px;border-radius:14px;font-size:16px}
+${m} .quiz .opt:hover{transform:translateX(3px)}
+${m} .fc .face{border-radius:20px;border-width:1.5px}
+${m} .fc .face::after{content:"翻转 ↻";position:absolute;bottom:12px;right:16px;font-family:${MONO_STACK};font-size:11px;color:var(--ct-ink3)}
+${m} .kp .item{border-radius:14px}
+`;
+    case "course-dashboard":
+      return `
+${m} .eyebrow{font-family:${MONO_STACK}}
+${m} .page--surface,${m} .page--figure,${m} .card{border-radius:calc(var(--ct-radius) - 2px);border:1px solid var(--ct-border);box-shadow:var(--ct-shadow)}
+${m} .page--figure{border-left:4px solid var(--ct-accent)}
+${m} .kp{grid-template-columns:repeat(2,1fr);gap:12px}
+${m} .kp .item{flex-direction:column;align-items:flex-start;gap:8px;background:var(--ct-surface);padding:16px}
+${m} .kp .item .b{width:26px;height:26px}
+${m} .obj li{background:var(--ct-surface2);border:1px solid var(--ct-border);border-radius:10px;padding:12px 14px}
+${m} .steps li{grid-template-columns:auto 1fr}
+${m} .h-title::before{content:"▮ ";color:var(--ct-accent)}
+`;
+    case "spatial-concept-map":
+      return `
+${m} .page{background-image:radial-gradient(color-mix(in srgb,var(--ct-border) 60%,transparent) 1px,transparent 1px);background-size:22px 22px}
+${m} .kp{grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:22px 26px;position:relative}
+${m} .kp .item{border-radius:999px;text-align:center;justify-content:center;background:var(--ct-surface);border:1.5px solid var(--ct-accent);box-shadow:var(--ct-shadow);position:relative}
+${m} .kp .item::before{content:"";position:absolute;left:-26px;top:50%;width:26px;height:1.5px;background:var(--ct-border)}
+${m} .kp .item:first-child::before{display:none}
+${m} .cmp{position:relative}
+${m} .h-title::before{content:"◇ ";color:var(--ct-accent)}
+${m} .concept,${m} .body{position:relative}
+`;
+    case "sidebar-lesson":
+      return `
+${m} .page--surface,${m} .page--band,${m} .page--figure{border-left:4px solid var(--ct-accent);border-radius:0 var(--ct-radius) var(--ct-radius) 0;padding-left:clamp(22px,4vw,34px)}
+${m} .eyebrow{color:var(--ct-accent-ink);background:var(--ct-accent-soft);padding:4px 10px;border-radius:6px}
+${m} .steps{counter-reset:st}
+${m} .steps .st{font-size:17px}
+${m} .obj{border-left:3px solid var(--ct-accent);padding-left:16px}
+${m} .kp .item{border-radius:0 8px 8px 0;border-left:3px solid var(--ct-accent)}
+${m} .h-title{padding-left:14px;border-left:4px solid var(--ct-accent)}
+`;
+    case "scroll-lesson":
+    default:
+      return `
+${m} .h-title::after{content:"";display:block;width:38px;height:3px;background:var(--ct-accent);border-radius:2px;margin-top:10px}
+${m} .body{font-size:17px;line-height:1.8}
+`;
+  }
+}
+
 /** 确定性渲染：给定输入必产同一自包含 HTML（含 CSP、内联样式脚本、reduce-motion、页型舞台+签名母题）。 */
 export function renderCoursewareHtml(input: RenderInput): string {
   const { title, blocks, design, variance } = input;
-  const pool = design.art.substrate === "dark" ? STAGE_POOL_DARK : STAGE_POOL;
+  const mode: CoursewareMode = input.mode ?? "scroll-lesson";
+  // 页型节奏随 mode（款式）定制，破「每课同一套 band/surface/figure 轮转」。
+  const pool = stagePoolFor(mode, design.art.substrate === "dark");
   let prev: Stage | null = null;
   const body = blocks
     .map((b, i) => {
@@ -758,8 +898,8 @@ export function renderCoursewareHtml(input: RenderInput): string {
   return (
     `<!doctype html><html lang="zh-CN"><head>${CSP_META}` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<title>${esc(title)}</title><style>${baseCss(design)}</style></head>` +
-    `<body><main class="deck">${body}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
+    `<title>${esc(title)}</title><style>${baseCss(design)}${modeCss(mode)}</style></head>` +
+    `<body class="ct-mode-${mode}"><main class="deck">${body}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
   );
 }
 

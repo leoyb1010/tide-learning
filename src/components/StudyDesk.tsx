@@ -18,6 +18,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { WeeklyReportBanner } from "./WeeklyReportBanner";
 import { DeskShelf } from "./DeskShelf";
+import { BeamFrame } from "./ui/BeamFrame";
 import type { WeeklyReport } from "@/lib/weekly-report";
 
 /**
@@ -162,10 +163,11 @@ export function StudyDesk({
           说出想学的，AI 帮你造一门课；或直接找到现成的。
         </p>
 
-        {/* Hero 输入框：主材质卡 + 内顶高光，聚焦时红光环提示这是主入口 */}
+        {/* Hero 输入框：主入口 → 动态边框光束(BeamFrame，流转)包一圈；去掉硬描边，只留极淡轮廓 + 光束。 */}
+        <BeamFrame className="mt-7 w-full max-w-[640px] rounded-[18px]" radius={18} variant="line">
         <form
           onSubmit={onSubmit}
-          className="studio-sweep group relative mt-7 w-full max-w-[640px] overflow-hidden rounded-[18px] border border-[var(--border2)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none"
+          className="group relative w-full overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none"
         >
           <div className="flex items-center gap-2.5">
             <Sparkle size={20} weight="fill" className="ml-2.5 shrink-0 text-[var(--red)]" />
@@ -188,6 +190,7 @@ export function StudyDesk({
             </button>
           </div>
         </form>
+        </BeamFrame>
 
         {/* 快捷灵感胶囊 */}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-2">

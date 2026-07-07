@@ -190,6 +190,23 @@ export function getTemplate(key?: string | null): CourseTemplate {
   return COURSE_TEMPLATES.find((t) => t.key === key) ?? COURSE_TEMPLATES[0];
 }
 
+/**
+ * 内容 → 课型模板启发式（造课未显式选模板时自动匹配）。
+ *
+ * 根治「12/14 门课 template 为空 → 全默认 classic → 内容块千篇一律」：造课链路未传模板时据
+ * prompt/category/title 的强信号自动选一个契合课型，让内容块配方也随课分化（视觉款式另由 mode 分化）。
+ * 无强信号回落 classic（稳妥默认；此时视觉款式仍随 art→mode 变化，不会全同）。纯正则、零 LLM。
+ */
+export function pickTemplate(input: { category?: string | null; title?: string | null; prompt?: string | null }): string {
+  const t = `${input.title ?? ""} ${input.prompt ?? ""}`;
+  if (input.category === "exam" || /备考|考试|考点|冲刺|真题|模拟题|证书|面试题|刷题|自测|\bielts\b|雅思|托福/i.test(t)) return "exam_sprint";
+  if (/编程|代码|程序|python|java(?:script)?|前端|后端|算法|开发|命令行|函数|接口|\bapi\b|\bsql\b|\bgit\b|脚本|部署|数据库|工具|操作|上手|实操|写作|设计|excel|\bppt\b|word|剪辑|做一个|做个/i.test(t)) return "workshop";
+  if (/口语|对话|会话|沟通|表达|speaking|情景|谈判|社交|亲子|银发|青少年|故事|职场沟通/i.test(t)) return "story";
+  if (/案例|复盘|职场|商业|管理|营销|运营|决策|财务|投资|谈判/i.test(t)) return "case_driven";
+  if (/思维|逻辑|误区|为什么|辨析|认知|批判|想通|方法论/i.test(t)) return "socratic";
+  return DEFAULT_TEMPLATE;
+}
+
 /** 校验 key 是否合法（服务端用，非法直接拒绝而非静默回落，避免脏数据落库）。 */
 export function isValidTemplate(key?: string | null): boolean {
   return !key || COURSE_TEMPLATES.some((t) => t.key === key);

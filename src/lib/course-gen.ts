@@ -6,6 +6,7 @@ import { validateBlocks, type Block } from "./blocks";
 import { simpleOutlinePrompt, lessonVoiceLine, lessonRecipeBlock, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
 import { getTemplate, templateHardRequirement, checkTemplateAdherence } from "./ai/templates";
 import { resolveCourseDesign, serializeCourseDesign } from "./ai/courseware-design";
+import { resolveCoursewareMode } from "./ai/courseware-catalog";
 import { renderAndStoreLessonHtml } from "./ai/courseware-gen";
 
 /**
@@ -784,6 +785,8 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
         .update({ where: { id: courseId }, data: { designJson: serializeCourseDesign(design) } })
         .catch(() => {});
     }
+    // 款式（内容类型→呈现风格）：整门课解析一次，各节共用，保证同一门课款式一致、课与课之间分化。
+    const mode = resolveCoursewareMode({ title: course.title, template: course.template, artKey: design.art.key });
     const lessons = await prisma.lesson.findMany({
       where: { courseId, blocksJson: { not: null } },
       orderBy: { sortOrder: "asc" },
@@ -791,7 +794,7 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
     });
     for (const l of lessons) {
       try {
-        await renderAndStoreLessonHtml(courseId, l, design);
+        await renderAndStoreLessonHtml(courseId, l, design, mode);
       } catch (e) {
         console.error("[course-gen] html render failed for lesson", l.id, e);
       }

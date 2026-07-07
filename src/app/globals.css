@@ -1409,8 +1409,7 @@ body::before {
   pointer-events: none;
 }
 .hero-prompt:focus-within {
-  border-color: color-mix(in srgb, var(--red) 40%, var(--scene-hairline));
-  /* 柔和光晕外扩：一层贴身的极淡红边 + 一层扩散的红雾，无硬边缘（两态通用） */
+  /* 不再改硬描边（去掉「点击后出现一道边线」）：聚焦只以柔光外扩 + 底部呼吸线（+ 外层 BeamFrame 流转光束）提示。 */
   box-shadow:
     var(--scene-card-shadow-sm),
     0 0 0 4px rgba(252, 1, 26, 0.1),

@@ -9,7 +9,7 @@ import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
-import { isValidTemplate } from "@/lib/ai/templates";
+import { isValidTemplate, pickTemplate } from "@/lib/ai/templates";
 import { selectModelFor } from "@/lib/ai/models";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
@@ -68,8 +68,10 @@ export async function POST(req: NextRequest) {
       const category = body?.category?.trim() || "ai_skill";
 
       // v3.2 课件模板：模板全员免费，非法 key 直接拒绝（不静默回落，避免脏数据落库）。
-      const template = body?.template?.trim() || undefined;
-      if (!isValidTemplate(template)) return fail("未知的课件模板");
+      const provided = body?.template?.trim() || undefined;
+      if (provided && !isValidTemplate(provided)) return fail("未知的课件模板");
+      // #3b：未显式选模板时据内容自动匹配课型，避免全默认 classic → 内容块千篇一律。
+      const template = provided ?? pickTemplate({ category, prompt });
 
       // v3.2 选模型：会员可选高级模型。请求了不在可用集内的模型 → 402（会员专享/未配置）。
       const requestedModel = body?.model?.trim();

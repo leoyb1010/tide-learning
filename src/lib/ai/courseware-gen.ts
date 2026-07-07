@@ -13,7 +13,7 @@ import { creditingOnUsage } from "../credits";
 import { track } from "../analytics";
 import { resolveCourseDesign, serializeCourseDesign, type CourseDesign } from "./courseware-design";
 import { resolveLessonVariance } from "./courseware-variance";
-import { llmStyleBrief, resolveCoursewareMode } from "./courseware-catalog";
+import { llmStyleBrief, resolveCoursewareMode, type CoursewareMode } from "./courseware-catalog";
 import { goldenExemplar, exemplarNoteFor } from "./courseware-exemplars";
 import {
   renderCoursewareHtml,
@@ -42,11 +42,12 @@ export async function renderAndStoreLessonHtml(
   courseId: string,
   lesson: { id: string; title: string; sortOrder?: number | null; blocksJson: string | null },
   design: CourseDesign,
+  mode?: CoursewareMode,
 ): Promise<boolean> {
   const blocks = parseBlocks(lesson.blocksJson);
   if (blocks.length === 0) return false;
   const variance = resolveLessonVariance(courseId, lesson, design);
-  const html = renderCoursewareHtml({ title: lesson.title, blocks, design, variance });
+  const html = renderCoursewareHtml({ title: lesson.title, blocks, design, variance, mode });
   const contract = buildContract(html);
   await prisma.lesson.update({ where: { id: lesson.id }, data: { htmlJson: JSON.stringify(contract) } });
   return true;
@@ -149,9 +150,11 @@ export async function generateLessonHtml(
     await prisma.course.update({ where: { id: course.id }, data: { designJson: serializeCourseDesign(design) } }).catch(() => {});
   }
   const variance = resolveLessonVariance(course.id, lesson, design);
+  // 款式（内容类型→呈现风格）：由标题 / 课型模板 / 已定艺术方向共同决定，让不同课出不同版式。
+  const mode = resolveCoursewareMode({ title: lesson.title, template: course.template, artKey: design.art.key });
 
   // —— 确定性渲染（永远先得到一个可靠可用的 HTML）——
-  const deterministic = renderCoursewareHtml({ title: lesson.title, blocks, design, variance });
+  const deterministic = renderCoursewareHtml({ title: lesson.title, blocks, design, variance, mode });
 
   let html = deterministic;
   let engine: HtmlGenResult["engine"] = "deterministic";
