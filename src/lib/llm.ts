@@ -1,6 +1,6 @@
 import { AppError } from "./api";
 import { SEARCH_KEYWORDS_SYSTEM, searchKeywordsUser } from "./ai/prompts";
-import { resolveModel, modelCredentials } from "./ai/models";
+import { resolveModel, modelCredentials, hasUsableModel } from "./ai/models";
 
 /**
  * DeepSeek LLM 统一服务层（C 模块）。
@@ -39,7 +39,7 @@ interface DeepSeekResponse {
 
 /** 是否已配置 AI —— 供 UI/降级判断，未配置时 AI 功能优雅缺席而非崩溃。 */
 export function isLLMConfigured(): boolean {
-  return Boolean(process.env.DEEPSEEK_API_KEY);
+  return hasUsableModel();
 }
 
 /** 统一 chat 调用。返回模型输出文本（已 trim）。 */
@@ -94,7 +94,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
         // 4xx 是客户端/配置问题，不重试；5xx 可重试
         const upstreamText = await res.text().catch(() => "");
         // 不泄露 upstream 细节给客户端，仅服务端日志
-        console.error(`[llm] DeepSeek ${res.status}: ${upstreamText.slice(0, 300)}`);
+        console.error(`[llm] upstream ${res.status}: ${upstreamText.slice(0, 300)}`);
         if (res.status >= 400 && res.status < 500) {
           if (res.status === 429) throw new AppError("AI 请求过于频繁，请稍后再试", 429);
           throw new AppError("AI 服务暂时不可用", 502);

@@ -5,7 +5,7 @@ import { requireLLMAccess } from "@/lib/ai-guard";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 import { structureImportedTextIntoCourse, MIN_IMPORT_TEXT, MAX_IMPORT_TEXT } from "@/lib/course-import";
 import { isValidTemplate } from "@/lib/ai/templates";
-import { availableModelsFor, DEFAULT_MODEL_KEY } from "@/lib/ai/models";
+import { selectModelFor } from "@/lib/ai/models";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +51,11 @@ export async function POST(req: NextRequest) {
       const template = body?.template?.trim() || undefined;
       if (!isValidTemplate(template)) return fail("未知的课件模板");
       const requestedModel = body?.model?.trim();
-      if (requestedModel && !availableModelsFor(snapshot.isSubscriber).some((m) => m.key === requestedModel)) {
-        return fail("该模型为会员专享或暂不可用，请升级订阅或换用默认模型", 402);
+      const modelEntry = selectModelFor(requestedModel, snapshot.isSubscriber);
+      if (!modelEntry) {
+        return requestedModel
+          ? fail("该模型为会员专享或暂不可用，请升级订阅或换用默认模型", 402)
+          : fail("AI 服务未配置", 503);
       }
 
       const result = await structureImportedTextIntoCourse({
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
         kind: "paste_text",
         title: body?.title,
         template,
-        model: requestedModel || DEFAULT_MODEL_KEY,
+        model: modelEntry.key,
       });
 
       return ok(result);

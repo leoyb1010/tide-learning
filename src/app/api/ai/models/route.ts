@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { ok, handle } from "@/lib/api";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
-import { availableModelsFor, lockedModelsFor, DEFAULT_MODEL_KEY } from "@/lib/ai/models";
+import { availableModelsFor, lockedModelsFor, defaultModelFor } from "@/lib/ai/models";
 import { COURSE_TEMPLATES, DEFAULT_TEMPLATE } from "@/lib/ai/templates";
 
 export const dynamic = "force-dynamic";
@@ -45,7 +45,7 @@ export async function GET(_req: NextRequest) {
     return ok({
       models,
       lockedModels,
-      defaultModel: DEFAULT_MODEL_KEY,
+      defaultModel: defaultModelFor(isSubscriber)?.key ?? null,
       templates,
       defaultTemplate: DEFAULT_TEMPLATE,
       isSubscriber,

@@ -52,6 +52,7 @@ export function TemplateModelPicker({
   const [templates, setTemplates] = useState<TemplateOpt[]>([]);
   const [models, setModels] = useState<ModelOpt[]>([]);
   const [lockedModels, setLockedModels] = useState<LockedModelOpt[]>([]);
+  const [defaultModel, setDefaultModel] = useState<string | null>(null);
   // 模板缩略图（public/templates/template-<key>.jpg）加载失败的卡回落成图标渲染。
   const [thumbFail, setThumbFail] = useState<Record<string, boolean>>({});
 
@@ -64,6 +65,8 @@ export function TemplateModelPicker({
         setTemplates(j.data.templates ?? []);
         setModels(j.data.models ?? []);
         setLockedModels(j.data.lockedModels ?? []);
+        setDefaultModel(j.data.defaultModel ?? null);
+        if (!model && j.data.defaultModel) setModel(j.data.defaultModel);
       })
       .catch(() => {});
     return () => {
@@ -138,7 +141,7 @@ export function TemplateModelPicker({
           </span>
           <div className="flex flex-wrap gap-2">
             {models.map((m) => {
-              const active = (model || models[0]?.key) === m.key;
+              const active = (model || defaultModel || models[0]?.key) === m.key;
               return (
                 <button
                   key={m.key}

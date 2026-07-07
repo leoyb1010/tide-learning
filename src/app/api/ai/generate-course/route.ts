@@ -10,7 +10,7 @@ import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
 import { isValidTemplate } from "@/lib/ai/templates";
-import { availableModelsFor, DEFAULT_MODEL_KEY } from "@/lib/ai/models";
+import { selectModelFor } from "@/lib/ai/models";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
@@ -73,10 +73,13 @@ export async function POST(req: NextRequest) {
 
       // v3.2 选模型：会员可选高级模型。请求了不在可用集内的模型 → 402（会员专享/未配置）。
       const requestedModel = body?.model?.trim();
-      if (requestedModel && !availableModelsFor(snapshot.isSubscriber).some((m) => m.key === requestedModel)) {
-        return fail("该模型为会员专享或暂不可用，请升级订阅或换用默认模型", 402);
+      const modelEntry = selectModelFor(requestedModel, snapshot.isSubscriber);
+      if (!modelEntry) {
+        return requestedModel
+          ? fail("该模型为会员专享或暂不可用，请升级订阅或换用默认模型", 402)
+          : fail("AI 服务未配置", 503);
       }
-      const modelKey = requestedModel || DEFAULT_MODEL_KEY;
+      const modelKey = modelEntry.key;
 
       // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 模板结构 + 合规底线。
       // 输出契约不变：{title, subtitle, intro, outline:[{title, objective, difficulty}]}。
