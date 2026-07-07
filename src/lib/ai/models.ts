@@ -6,7 +6,7 @@
  * 下架某模型：把 enabled 设 false（或不配它的 env key），它就从所有 UI 与校验里消失。
  */
 
-const DEFAULT_BASE_URL = "https://newapi.inner.youdao.com";
+const DEFAULT_BASE_URL = "https://newapi.inner.youdao.com/v1";
 const NEWAPI_KEY_ENV = "NEWAPI_API_KEY";
 const NEWAPI_BASE_URL_ENV = "NEWAPI_BASE_URL";
 
@@ -40,7 +40,9 @@ export const LLM_MODELS: LlmModelEntry[] = [
     costWeight: 2,
     envKeyName: NEWAPI_KEY_ENV,
     baseUrlEnvName: NEWAPI_BASE_URL_ENV,
-    enabled: true,
+    // 2026-07-07 实测 NewAPI /v1/chat/completions 返回上游 401（Missing required field: model），
+    // 暂时下架，避免会员选择后造课/导入生成失败；网关修复后改回 true 即可。
+    enabled: false,
   },
   {
     key: "glm-5.2",
@@ -119,11 +121,16 @@ export function resolveModel(key?: string | null): LlmModelEntry {
   return def ?? LLM_MODELS.find(isModelUsable) ?? LLM_MODELS[0];
 }
 
+function normalizeBaseUrl(raw?: string): string {
+  const base = (raw || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  return base.endsWith("/v1") ? base : `${base}/v1`;
+}
+
 /** 解析条目的 apiKey / baseUrl（供 llm.ts 直连）。 */
 export function modelCredentials(m: LlmModelEntry): { apiKey: string | undefined; baseUrl: string } {
   return {
     apiKey: process.env[m.envKeyName],
-    baseUrl: (m.baseUrlEnvName && process.env[m.baseUrlEnvName]) || DEFAULT_BASE_URL,
+    baseUrl: normalizeBaseUrl(m.baseUrlEnvName ? process.env[m.baseUrlEnvName] : undefined),
   };
 }
 
