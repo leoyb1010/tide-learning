@@ -121,7 +121,14 @@ export function resolveModel(key?: string | null): LlmModelEntry {
   const found = key ? LLM_MODELS.find((m) => m.key === key && isModelUsable(m)) : null;
   if (found) return found;
   const def = LLM_MODELS.find((m) => m.key === DEFAULT_MODEL_KEY && isModelUsable(m));
-  return def ?? LLM_MODELS.find(isModelUsable) ?? LLM_MODELS[0];
+  const fallback = def ?? LLM_MODELS.find(isModelUsable) ?? LLM_MODELS[0];
+  // 可见化静默回退（R3）：用户「换了模型结果一样」的一大成因是请求模型不可用被无声回落到默认，
+  // 用户侧无感。这里在服务端日志明确记一条，便于排查「到底跑的哪个模型」。仅在显式请求了某模型
+  // 却拿不到时才 warn（key 为空是正常取默认，不告警）。
+  if (key && !found) {
+    console.warn(`[llm] 请求模型「${key}」当前不可用（未启用或未配 key），已回退到「${fallback.key}」`);
+  }
+  return fallback;
 }
 
 function normalizeBaseUrl(raw?: string): string {

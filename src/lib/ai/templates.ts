@@ -19,6 +19,21 @@ export interface CourseTemplate {
   lessonRecipe: string; // 注入逐节 system 的块配方段（最关键）
   minInteractive: number; // 质量分：本模板每节最少交互块（quiz+flashcard）
   minVisual: number; // 质量分：本模板每节最少视觉块（compare/steps/dialog/flashcard/callout）
+  /**
+   * 本模板的「签名块」机检最小数量（块 type → 至少几个）。是模板差异化的硬约束：
+   * 1) 逐节 system 据此生成一条明确「必须包含」的硬性要求（templateHardRequirement），
+   *    替代此前被通用规则稀释掉的隐性期待（如 story 每节要有 dialog、socratic 要有 ≥3 quiz）；
+   * 2) 生成后据此机检模板遵循度（checkTemplateAdherence），把「模板没生效」变成可观测事件。
+   * 空对象表示无硬性签名块（如 classic 走通用结构即可）。
+   */
+  mustInclude: Partial<Record<string, number>>;
+  /**
+   * 逐节 system 末尾的「别忘了」提醒（recency 锚点）。放在整段 system 最后，
+   * 专门重申本模板最容易被通用规则冲刷掉的特征（flash 级模型对「最后看到的话」更敏感）。
+   */
+  signature: string;
+  /** 逐节生成温度：叙事型（story/case）高一些更有表现力，应试型（exam）低一些更稳。 */
+  temperature: number;
 }
 
 export const DEFAULT_TEMPLATE = "classic";
@@ -32,6 +47,9 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
     recommendedFor: "通用内容、系统性知识、不确定选哪个时的稳妥默认",
     minInteractive: 1,
     minVisual: 1,
+    mustInclude: { example: 1 },
+    signature: "经典教学：每个 concept 之后紧跟 example 落地，全节至少 1 个 compare（误区 vs 正确）或 steps。",
+    temperature: 0.5,
     outlineRules:
       "【结构模板：经典教学】章节按“入门体验→核心概念→动手应用→进阶避坑→综合收束”推进，首节必须轻（15 分钟内可完成的体验式内容），倒数第二节安排综合练习，末节收束+下一步指引。",
     lessonRecipe: `【本节块配方：经典教学】严格按以下顺序与数量产出 8-12 个块：
@@ -53,6 +71,9 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
     recommendedFor: "职场技能、商业分析、决策判断、复盘型内容",
     minInteractive: 2,
     minVisual: 2,
+    mustInclude: { compare: 1, quiz: 2 },
+    signature: "案例拆解：全节围绕同一个真实案例展开，compare 的条目必须取自本案例（错误做法及代价 vs 正确做法及收益），不许写通用套话；quiz 第 1 题考本案例判断。",
+    temperature: 0.6,
     outlineRules:
       "【结构模板：案例拆解】每一章围绕一个“真实案例”组织，章节标题写成“案例：{具体情境}”或“{情境}翻车/成功复盘”。全课案例难度递进：小案例→复合案例→末章学员自己的案例套用。objective 里写清本章案例覆盖哪 1-2 个原理点。",
     lessonRecipe: `【本节块配方：案例拆解】8-12 个块，叙事顺序=侦探破案：
@@ -74,6 +95,9 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
     recommendedFor: "口语/沟通、软技能、青少年或银发学员、需要代入感的内容",
     minInteractive: 1,
     minVisual: 2,
+    mustInclude: { dialog: 1 },
+    signature: "故事沉浸：本节必须有至少 1 个 dialog 块推进剧情（主角与配角对话，关键处用 note 标注画外音）；人名与场景延续 outline 设定，绝不每节换主角；summary 的 next 写成「下集预告」。",
+    temperature: 0.7,
     outlineRules:
       "【结构模板：故事沉浸】全课是一部连载：设定一位与目标学员画像一致的主角（给名字与处境），每章是主角故事的一集，章节标题写成剧集感（如“第3集 · 小林第一次给老板汇报就砸了”）。章节间剧情连续（上一章的坑是下一章的起点），intro 里用 2 句话介绍主角设定。",
     lessonRecipe: `【本节块配方：故事沉浸】8-12 个块，是“剧集+知识点解说”双线：
@@ -94,6 +118,9 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
     recommendedFor: "思维方法、易有误区的概念、需要“先破再立”的内容",
     minInteractive: 3,
     minVisual: 1,
+    mustInclude: { quiz: 3 },
+    signature: "问答思辨：quiz 总数必须 ≥3，且第一个 quiz 前置在讲解之前（先考后教，explain 写「往下看你会重新理解这道题」）；concept 先呈现常见错误答案再逐个检验，不要一上来给结论。",
+    temperature: 0.5,
     outlineRules:
       "【结构模板：问答思辨】每章标题直接是一个好问题（如“为什么你记住的单词总是用不出来？”），章节顺序=问题链，前一章答案自然引出后一章新问题。intro 声明本课风格：“不灌结论，带你想通”。",
     lessonRecipe: `【本节块配方：问答思辨】9-12 个块，问-猜-证-用 四拍循环：
@@ -116,6 +143,9 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
     recommendedFor: "工具操作、写作/设计、编程、任何“动手才会”的技能",
     minInteractive: 1,
     minVisual: 2,
+    mustInclude: { steps: 1 },
+    signature: "实战工坊：steps 是本节核心块，粒度细到「照着敲/照着说」（具体到按钮名/句式/文件名）；concept 放在 steps 之后（先做后懂）；本节要让学员手上多一个看得见的成品。",
+    temperature: 0.5,
     outlineRules:
       "【结构模板：实战工坊】全课=完成一个真实作品/任务（在 intro 明确最终交付物，如“学完你手上会有一份可直接发出的英文自我介绍视频脚本”）。每章是工序的一站，章节标题写成“动手：{本站产出物}”，objective 写清本章结束时学员手上多了什么。",
     lessonRecipe: `【本节块配方：实战工坊】8-12 个块，动手为骨、讲解为辅：
@@ -137,6 +167,9 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
     recommendedFor: "备考、证书、面试题、任何有明确测评目标的内容",
     minInteractive: 3,
     minVisual: 2,
+    mustInclude: { keypoint: 1, quiz: 3 },
+    signature: "考点冲刺：keypoint 考点墙 6-10 条纯记忆点（禁写解释性长句），quiz 连打 ≥3 且难度递增，每题 explain 给「秒杀判据」。",
+    temperature: 0.4,
     outlineRules:
       "【结构模板：考点冲刺】按考试/测评的知识板块组织章节，标题写成“考点{n}：{板块}·{高频陷阱}”。intro 写清适用考试与目标分数段。章节顺序按“分值权重×易错度”降序。",
     lessonRecipe: `【本节块配方：考点冲刺】10-14 个块，高密度记忆-检测循环：
@@ -160,4 +193,64 @@ export function getTemplate(key?: string | null): CourseTemplate {
 /** 校验 key 是否合法（服务端用，非法直接拒绝而非静默回落，避免脏数据落库）。 */
 export function isValidTemplate(key?: string | null): boolean {
   return !key || COURSE_TEMPLATES.some((t) => t.key === key);
+}
+
+/** 块 type → 中文可读名（供硬性要求 / 遵循度报告拼人话）。 */
+const BLOCK_LABEL: Record<string, string> = {
+  dialog: "对话",
+  quiz: "测验",
+  steps: "步骤",
+  keypoint: "要点墙",
+  compare: "对比",
+  example: "实例",
+  flashcard: "记忆卡",
+};
+
+function blockLabel(type: string): string {
+  return BLOCK_LABEL[type] ?? type;
+}
+
+/**
+ * 渲染本模板的「签名块硬性要求」段，注入逐节 system —— 是模板差异化落地的关键。
+ *
+ * 把 mustInclude（如 story:{dialog:1}、socratic:{quiz:3}）翻成一条明确的「本节必须包含 N 个 X 块」，
+ * 再接 signature（模板最易被稀释掉的特征提醒）。此前这些期待只散落在 lessonRecipe 的叙述里，
+ * 被后面 3 倍长的通用规则冲刷，模型（尤其 flash 级）会收敛回同一套通用结构（实测 story 课 0 dialog）。
+ * 空 mustInclude 且空 signature 的模板返回空串（不额外注入噪声）。
+ */
+export function templateHardRequirement(key?: string | null): string {
+  const t = getTemplate(key);
+  const reqs = Object.entries(t.mustInclude)
+    .filter(([, n]) => (n ?? 0) > 0)
+    .map(([type, n]) => `至少 ${n} 个 ${blockLabel(type)}（${type}）块`);
+  if (reqs.length === 0 && !t.signature) return "";
+  return (
+    `\n【本模板签名块 · 硬性要求（优先级高于下方通用规则，冲突时以此为准）】\n` +
+    (reqs.length ? `本节必须包含：${reqs.join("；")}。\n` : "") +
+    (t.signature ? `${t.signature}\n` : "")
+  );
+}
+
+export interface TemplateAdherence {
+  /** 是否满足本模板全部签名块最小数量。 */
+  ok: boolean;
+  /** 未达标的项（人话，供埋点/排查，如「对话(dialog) 需≥1 实得0」）。空数组即达标。 */
+  missing: string[];
+}
+
+/**
+ * 机检一节 blocks 是否遵循本模板的签名块要求（纯函数，零 LLM）。
+ * 与 scoreLesson（通用六项质量分）正交：那个查「好不好」，这个查「像不像本模板」。
+ * 供 generateLessonCore 生成后埋点，把「选了模板却没生效」变成可查事件（此前完全无法发现）。
+ */
+export function checkTemplateAdherence(blocks: { type: string }[], key?: string | null): TemplateAdherence {
+  const t = getTemplate(key);
+  const counts = new Map<string, number>();
+  for (const b of blocks) counts.set(b.type, (counts.get(b.type) ?? 0) + 1);
+  const missing: string[] = [];
+  for (const [type, need] of Object.entries(t.mustInclude)) {
+    const got = counts.get(type) ?? 0;
+    if (got < (need ?? 0)) missing.push(`${blockLabel(type)}(${type}) 需≥${need} 实得${got}`);
+  }
+  return { ok: missing.length === 0, missing };
 }

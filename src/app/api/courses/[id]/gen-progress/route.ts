@@ -2,12 +2,9 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { readGenProgress, getGenJob, finalizeGenJob } from "@/lib/course-gen";
+import { readGenProgress, getGenJob, finalizeGenJob, isGenJobStale } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
-
-/** running job 心跳超过该阈值视为僵尸；轮询接口会自动收敛，避免前端永久转圈。 */
-const GEN_JOB_STALE_MS = 15 * 60_000;
 
 /**
  * GET /api/courses/:id/gen-progress —— 断点续造进度查询（供前端轮询恢复剧场）。
@@ -63,23 +60,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // 不继续展示“正在生成”转圈，改为 failed，让前端出现“继续生成”入口。
     if (genStatus === "generating" && doneByLessons < total) {
       const job = await getGenJob(course.id);
-      if (job?.status === "running") {
-        let heartbeat = job.createdAt.getTime();
-        try {
-          const p = JSON.parse(job.inputJson || "{}");
-          if (typeof p.heartbeatAt === "string") {
-            const t = Date.parse(p.heartbeatAt);
-            if (Number.isFinite(t)) heartbeat = t;
-          }
-        } catch {
-          /* 解析失败按 createdAt 兜底 */
-        }
-        if (Date.now() - heartbeat > GEN_JOB_STALE_MS) {
-          await prisma.course.update({ where: { id: course.id }, data: { genStatus: "failed" } });
-          await finalizeGenJob(course.id, "failed");
-          genStatus = "failed";
-          currentLessonId = null;
-        }
+      if (job?.status === "running" && isGenJobStale(job)) {
+        await prisma.course.update({ where: { id: course.id }, data: { genStatus: "failed" } });
+        await finalizeGenJob(course.id, "failed");
+        genStatus = "failed";
+        currentLessonId = null;
       }
     }
 

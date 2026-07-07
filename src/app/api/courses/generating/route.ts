@@ -1,12 +1,9 @@
 import { prisma } from "@/lib/db";
 import { ok, handle } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { getGenJob, finalizeGenJob } from "@/lib/course-gen";
+import { getGenJobsFor, finalizeGenJob, isGenJobStale } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
-
-/** 与 gen-progress 对齐：超过 15 分钟无心跳的 running job 不再展示为生产中。 */
-const GEN_JOB_STALE_MS = 15 * 60_000;
 
 /**
  * GET /api/courses/generating —— 我正在生成中的课（轻量列表，供全局生产中指示 / 横幅）。
@@ -36,6 +33,9 @@ export async function GET() {
       },
     });
 
+    // 一次批量取回这批课的最新 course_gen job（避免逐课 getGenJob 的 N+1；前端 8s 轮询会放大）。
+    const jobMap = await getGenJobsFor(rows.map((c) => c.id));
+
     const courses = [];
     for (const c of rows) {
       const total = c.lessons.length;
@@ -50,23 +50,11 @@ export async function GET() {
       }
 
       // 僵尸 running job 不展示为“生产中”，同时置 failed，交由“继续生成”入口恢复。
-      const job = await getGenJob(c.id);
-      if (job?.status === "running") {
-        let heartbeat = job.createdAt.getTime();
-        try {
-          const p = JSON.parse(job.inputJson || "{}");
-          if (typeof p.heartbeatAt === "string") {
-            const t = Date.parse(p.heartbeatAt);
-            if (Number.isFinite(t)) heartbeat = t;
-          }
-        } catch {
-          /* 解析失败按 createdAt 兜底 */
-        }
-        if (Date.now() - heartbeat > GEN_JOB_STALE_MS) {
-          await prisma.course.update({ where: { id: c.id }, data: { genStatus: "failed" } });
-          await finalizeGenJob(c.id, "failed");
-          continue;
-        }
+      const job = jobMap.get(c.id);
+      if (job?.status === "running" && isGenJobStale(job)) {
+        await prisma.course.update({ where: { id: c.id }, data: { genStatus: "failed" } });
+        await finalizeGenJob(c.id, "failed");
+        continue;
       }
 
       courses.push({

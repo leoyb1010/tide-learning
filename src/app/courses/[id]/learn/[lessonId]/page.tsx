@@ -65,6 +65,7 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
       initialNotes={notes.map((n) => ({ ...n, updatedAt: n.updatedAt.toISOString() }))}
       posterSrc={trackStillSrc(course.category)}
       sceneBgSrc={trackSceneSrc(course.category)}
+      courseTemplate={course.template}
     />
   );
 }

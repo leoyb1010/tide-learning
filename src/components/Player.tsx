@@ -21,6 +21,7 @@ import { BlockRenderer } from "./BlockRenderer";
 import { BlockSlideshow } from "./BlockSlideshow";
 import { CompanionPanel } from "./CompanionPanel";
 import { validateBlocks } from "@/lib/blocks";
+import { coursewareThemeAttr } from "@/lib/ai/themes";
 import { trapFocus } from "./focus-trap";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
@@ -43,7 +44,7 @@ interface LessonData {
 export function Player({
   courseId, courseSlug, courseTitle, lesson, access, canCreateNote,
   outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialSlidePage, initialNotes,
-  posterSrc, sceneBgSrc,
+  posterSrc, sceneBgSrc, courseTemplate,
 }: {
   courseId: string; courseSlug: string; courseTitle: string;
   lesson: LessonData; access: boolean; canCreateNote: boolean;
@@ -55,9 +56,13 @@ export function Player({
   posterSrc?: string;
   /** 按赛道映射的 scene 块场景背景图路径（server 端按 course.category 解析）。透传给块渲染，作 SceneBlock 氛围底。 */
   sceneBgSrc?: string;
+  /** 课件视觉主题（= course.template）。挂到块课件外层 data-ct-theme，驱动 globals.css 换肤；空则默认皮肤。 */
+  courseTemplate?: string | null;
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
+  // 课件视觉主题：course.template → data-ct-theme（未选模板的旧课为 undefined，回落默认皮肤）。
+  const ctTheme = coursewareThemeAttr(courseTemplate);
   const router = useRouter();
   const [time, setTime] = useState(initialProgress);
   const [playing, setPlaying] = useState(false);
@@ -843,7 +848,8 @@ export function Player({
                   )
                 ) : (
                   // 图文课件：翻页（黑板式单屏，默认）/ 滚动（长列表）二选一。
-                  <div>
+                  // data-ct-theme：按 course.template 给整套块课件换肤（见 globals.css .ct-theme 段）。
+                  <div className="ct-theme" data-ct-theme={ctTheme}>
                     {/* 排布切换段控件：翻页 / 滚动。压缩上下留白，把纵向空间让给学习画面。 */}
                     <div className="mb-2 flex items-center justify-end">
                       <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">

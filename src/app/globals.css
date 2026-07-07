@@ -1732,3 +1732,95 @@ body::before {
   .demo-progress-sheen::after { animation: none !important; display: none !important; }
   .demo-ai-flow::before { animation: none !important; display: none !important; }
 }
+
+/* ============================================================
+   v3.3 · 课件视觉主题层（.ct-theme[data-ct-theme="<templateKey>"]）
+   —— 根治「六模板播放出来长一个样」：模板此前只改内容结构，视觉永远同一套。
+   这里按 course.template 在课件外层换一小组设计 token，块组件本就全部消费这些 token，
+   故一处覆盖即整套课件换肤，零改块组件（见 src/lib/ai/themes.ts 说明）。
+
+   亮/暗自适应铁律：
+     - 强调三阶 --red / --red-hover / --red-active 用「亮暗两用」中间调，直接给死值；
+     - 软色/墨色（--red-ink/--red-soft/--red-soft-border/--red-glow）一律用 color-mix 从
+       「模式感知」的 --surface / --ink 派生 —— 亮色下混向亮 surface、暗色下混向暗 surface，
+       两种模式都读得清，无需为每个主题手写暗色变体。
+     - 表面/文字/边框仍交给全站亮暗系统（不在此改），避免破坏暗色对比。
+   template 为空（旧课）→ 不挂 data-ct-theme → 回落默认 STUDIO 皮肤，旧课零回归。
+   ============================================================ */
+/* position: relative 承载下方 ::before 纹理层。注意：.ct-theme 必须保持「无独立堆叠上下文」
+   （勿在其上加 transform/filter/opacity<1/isolation），否则 z-index:-1 的纹理会被困在局部上下文里。 */
+.ct-theme { position: relative; }
+
+/* —— 各主题：强调三阶 + 场景板渐变 + 圆角 + 标题字体（纹理见下方 ::before）—— */
+.ct-theme[data-ct-theme="classic"] {
+  --red: #3f51b5; --red-hover: #354499; --red-active: #2c3a85;
+  --radius-card: 14px; --radius-card-sm: 10px;
+  --video-grad: linear-gradient(140deg, #2b3358 0%, #1e2440 46%, #151a30 100%);
+  --ct-title-font: Georgia, "Songti SC", "Noto Serif SC", serif;
+}
+.ct-theme[data-ct-theme="case_driven"] {
+  --red: #9c5f16; --red-hover: #855013; --red-active: #6f430f;
+  --radius-card: 6px; --radius-card-sm: 5px;
+  --video-grad: linear-gradient(140deg, #3a2c20 0%, #2a1f16 46%, #1c140d 100%);
+  --ct-title-font: Georgia, "Songti SC", "Noto Serif SC", serif;
+}
+.ct-theme[data-ct-theme="story"] {
+  --red: #9333c7; --red-hover: #7e2bab; --red-active: #6b2492;
+  --radius-card: 22px; --radius-card-sm: 18px;
+  --video-grad: linear-gradient(140deg, #3a2450 0%, #2a1a3c 46%, #1c1128 100%);
+}
+.ct-theme[data-ct-theme="socratic"] {
+  --red: #128a5a; --red-hover: #0f764d; --red-active: #0c6341;
+  --radius-card: 16px; --radius-card-sm: 12px;
+  --video-grad: linear-gradient(140deg, #1c3b30 0%, #132a22 46%, #0d1e18 100%);
+}
+.ct-theme[data-ct-theme="workshop"] {
+  --red: #0e7490; --red-hover: #0c637b; --red-active: #0a5367;
+  --radius-card: 5px; --radius-card-sm: 4px;
+  --video-grad: linear-gradient(140deg, #123246 0%, #0d2636 46%, #081a26 100%);
+  --ct-title-font: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, monospace;
+}
+.ct-theme[data-ct-theme="exam_sprint"] {
+  --red: #d5261d; --red-hover: #ba1f18; --red-active: #a01a14;
+  --radius-card: 12px; --radius-card-sm: 9px;
+  --video-grad: linear-gradient(140deg, #3e1f22 0%, #2c1418 46%, #1e0d10 100%);
+}
+
+/* —— 统一从各主题的 --red 派生软色/墨色/柔光（模式感知，亮暗自适应）——
+   与上方等特异性，但只写这几个「派生属性」，源顺序在后即生效；各主题 --red 不同 → 派生自然不同。 */
+.ct-theme[data-ct-theme] {
+  --red-ink: color-mix(in srgb, var(--red) 68%, var(--ink));
+  --red-soft: color-mix(in srgb, var(--red) 9%, var(--surface));
+  --red-soft-border: color-mix(in srgb, var(--red) 26%, var(--surface));
+  --red-glow: 0 4px 20px -4px color-mix(in srgb, var(--red) 42%, transparent);
+}
+
+/* —— 标题字体（衬线/等宽）：作用到课件内所有块标题 h3；无 --ct-title-font 的主题自然回落默认 —— */
+.ct-theme[data-ct-theme] h3 { font-family: var(--ct-title-font, inherit); }
+
+/* —— 背景纹理：极淡、置于内容之下（z-index:-1，外层透明故显于页背景之上、块之下）——
+   仅在滚动模式的留白 / 卡间隙可见，作氛围点缀；翻页模式的不透明板会盖住，主差异仍靠强调色+板渐变+字体+圆角。 */
+.ct-theme[data-ct-theme]::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: -1; opacity: .5;
+}
+.ct-theme[data-ct-theme="classic"]::before {
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 26px 26px; opacity: .18;
+}
+.ct-theme[data-ct-theme="case_driven"]::before {
+  background-image: repeating-linear-gradient(45deg, var(--border) 0 1px, transparent 1px 11px);
+  opacity: .16;
+}
+.ct-theme[data-ct-theme="workshop"]::before {
+  background-image:
+    linear-gradient(var(--red-soft-border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--red-soft-border) 1px, transparent 1px);
+  background-size: 22px 22px; opacity: .22;
+}
+.ct-theme[data-ct-theme="socratic"]::before {
+  background-image: radial-gradient(circle at 1px 1px, var(--border2) 1px, transparent 0);
+  background-size: 18px 18px; opacity: .3;
+}
+/* 纹理为纯静态，无 reduce-motion 降级需求。 */
