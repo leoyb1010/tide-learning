@@ -1,5 +1,7 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
+import { readFileSync } from "fs";
+import { join } from "path";
 import QRCode from "qrcode";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
@@ -148,6 +150,19 @@ function waveDataUri(w: number, p: Palette): string {
   return "data:image/svg+xml;utf8," + encodeURIComponent(svg);
 }
 
+// ── 校徽（public/brand/studio-emblem.png → base64，satori 只认 dataURL/绝对 URL）──
+let cachedEmblem: string | null | undefined;
+function emblemDataUri(): string | null {
+  if (cachedEmblem !== undefined) return cachedEmblem;
+  try {
+    const buf = readFileSync(join(process.cwd(), "public/brand/studio-emblem.png"));
+    cachedEmblem = `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    cachedEmblem = null; // 文件缺失回落红方块字标
+  }
+  return cachedEmblem;
+}
+
 // ── 二维码（传播闭环；深/浅统一渲染为白底深码芯片）──────────
 async function qrDataUri(url: string): Promise<string | null> {
   try {
@@ -213,9 +228,15 @@ function Shell(props: {
         style={{ position: "absolute", left: 0, bottom: 0, width: size.w, height: 240 }}
       />
 
-      {/* 顶部品牌带：eyebrow */}
+      {/* 顶部品牌带：校徽 + eyebrow（校徽缺失时回落红方块字标） */}
       <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
-        <div style={{ display: "flex", width: 26, height: 26, borderRadius: 8, backgroundColor: p.red, alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>有</div>
+        {emblemDataUri() ? (
+          <div style={{ display: "flex", width: 34, height: 34, borderRadius: 10, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
+            <img src={emblemDataUri()!} width={28} height={28} style={{ width: 28, height: 28 }} />
+          </div>
+        ) : (
+          <div style={{ display: "flex", width: 26, height: 26, borderRadius: 8, backgroundColor: p.red, alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>有</div>
+        )}
         <div style={{ display: "flex", fontSize: 21, letterSpacing: 4, fontWeight: 700, color: p.ink2, fontFamily: MONO }}>{eyebrow}</div>
       </div>
 

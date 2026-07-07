@@ -52,6 +52,8 @@ export function TemplateModelPicker({
   const [templates, setTemplates] = useState<TemplateOpt[]>([]);
   const [models, setModels] = useState<ModelOpt[]>([]);
   const [lockedModels, setLockedModels] = useState<LockedModelOpt[]>([]);
+  // 模板缩略图（public/templates/template-<key>.jpg）加载失败的卡回落成图标渲染。
+  const [thumbFail, setThumbFail] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let alive = true;
@@ -96,15 +98,28 @@ export function TemplateModelPicker({
                 }`}
               >
                 {active && (
-                  <span className="absolute right-2 top-2 grid h-4 w-4 place-items-center rounded-full bg-[var(--red)] text-white">
+                  <span className="absolute right-2 top-2 z-10 grid h-4 w-4 place-items-center rounded-full bg-[var(--red)] text-white">
                     <Check size={10} weight="bold" />
                   </span>
                 )}
-                <TIcon
-                  size={18}
-                  weight={active ? "fill" : "regular"}
-                  className={active ? "text-[var(--red)]" : "text-[var(--ink3)]"}
-                />
+                {/* 缩略图（生图资产）优先；加载失败回落图标 */}
+                {!thumbFail[t.key] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/templates/template-${t.key}.jpg`}
+                    alt=""
+                    loading="lazy"
+                    draggable={false}
+                    onError={() => setThumbFail((m) => ({ ...m, [t.key]: true }))}
+                    className={`h-16 w-full rounded-[8px] object-cover transition-opacity ${active ? "" : "opacity-90 group-hover:opacity-100"}`}
+                  />
+                ) : (
+                  <TIcon
+                    size={18}
+                    weight={active ? "fill" : "regular"}
+                    className={active ? "text-[var(--red)]" : "text-[var(--ink3)]"}
+                  />
+                )}
                 <span className={`text-[13px] font-semibold ${active ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
                   {t.label}
                 </span>

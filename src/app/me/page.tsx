@@ -502,6 +502,12 @@ export default async function MePage() {
                   first_note: "/badges/badge-note.png",
                   first_tide: "/badges/badge-tide.png",
                   cocreator: "/badges/badge-vote.png",
+                  // 预备徽章（图已就位，对应成就落 seed + 发放逻辑后即点亮）：
+                  month_streak: "/badges/badge-moon.png", // 满月三十天
+                  hundred_streak: "/badges/badge-hundred.png", // 百日成潮
+                  first_course_done: "/badges/badge-graduate.png", // 首门完课
+                  first_stall: "/badges/badge-stall.png", // 首次摆摊
+                  first_sale: "/badges/badge-sale.png", // 首笔成交
                 };
                 const img = badgeImg[a.key];
                 return (

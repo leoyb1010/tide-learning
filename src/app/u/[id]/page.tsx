@@ -209,6 +209,12 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                 first_note: "/badges/badge-note.png",
                 first_tide: "/badges/badge-tide.png",
                 cocreator: "/badges/badge-vote.png",
+                // 预备徽章（图已就位，对应成就落 seed + 发放逻辑后即点亮）：
+                month_streak: "/badges/badge-moon.png",
+                hundred_streak: "/badges/badge-hundred.png",
+                first_course_done: "/badges/badge-graduate.png",
+                first_stall: "/badges/badge-stall.png",
+                first_sale: "/badges/badge-sale.png",
               };
               const img = badgeImg[a.achievement.key];
               return (

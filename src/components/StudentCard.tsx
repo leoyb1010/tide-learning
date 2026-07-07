@@ -1,6 +1,6 @@
 import { headers } from "next/headers";
 import QRCode from "qrcode";
-import { GraduationCap, Quotes, SealCheck } from "@phosphor-icons/react/dist/ssr";
+import { Quotes, SealCheck } from "@phosphor-icons/react/dist/ssr";
 import { deriveLevel } from "@/lib/level";
 
 /**
@@ -96,8 +96,10 @@ export async function StudentCard({ data, headerAction }: { data: StudentCardDat
         />
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[var(--red)] text-white shadow-[var(--red-glow)]">
-              <GraduationCap size={17} weight="fill" />
+            {/* 校徽（public/brand/studio-emblem.png，红色单色浮雕）：白底芯片衬托，证件感 */}
+            <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-white/95 shadow-[var(--red-glow)]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/brand/studio-emblem.png" alt="" className="h-7 w-7" draggable={false} />
             </span>
             <div className="leading-tight">
               <p className="text-[14px] font-bold tracking-[0.04em] text-[var(--ink-on-dark)]">有道自习室</p>

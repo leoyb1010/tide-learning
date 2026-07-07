@@ -89,10 +89,13 @@ const COVER_POOL: Record<string, string[]> = {
   english_foundation: ["english-1", "english-2", "english-3"],
   silver_english: ["silver-1", "silver-2", "silver-3"],
   life: ["life-1", "life-2", "life-3"],
+  // 用户造课/导入课专属池（红底浪潮知识意象 4 张）：导入课 category=user_imported 直接命中；
+  // 未识别 category 也落到这个池（见 FALLBACK），不再挤占 AI 赛道的图，缓解集市同质化。
+  user_imported: ["user-1", "user-2", "user-3", "user-4"],
 };
 
-/** category 无对应池时的兜底池（仍是真实封面，非渐变）。 */
-const COVER_POOL_FALLBACK = COVER_POOL.ai_skill;
+/** category 无对应池时的兜底池（未识别一律视作用户自造内容，走 user 池，仍是真实封面）。 */
+const COVER_POOL_FALLBACK = COVER_POOL.user_imported;
 
 /**
  * 稳定 hash：把 seed（course id 或 slug）散成非负整数。
