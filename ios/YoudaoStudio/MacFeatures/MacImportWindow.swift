@@ -29,7 +29,7 @@ final class MacImportVM {
             templates = res.templates
             models = res.models
             template = res.defaultTemplate
-            model = res.defaultModel
+            if let dm = res.defaultModel { model = dm }
         }
     }
 

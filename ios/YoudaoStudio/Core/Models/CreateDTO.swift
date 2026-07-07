@@ -41,7 +41,8 @@ struct AiModelsResponse: Decodable {
     }
     let models: [Model]
     let lockedModels: [LockedModel]
-    let defaultModel: String
+    /// 默认模型 key。服务端在「无可用模型（env 未配 key）」时返回 null，故为可选。
+    let defaultModel: String?
     let templates: [Template]
     let defaultTemplate: String
     let isSubscriber: Bool

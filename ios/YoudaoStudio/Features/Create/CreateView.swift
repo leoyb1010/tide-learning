@@ -57,7 +57,7 @@ final class CreateViewModel {
             models = res.models
             lockedModels = res.lockedModels
             if template.isEmpty { template = res.defaultTemplate }
-            if model.isEmpty { model = res.defaultModel }
+            if model.isEmpty, let dm = res.defaultModel { model = dm }
             optionsLoaded = true
         } catch {
             // 拉取失败不阻塞造课：走后端默认模板/模型。
