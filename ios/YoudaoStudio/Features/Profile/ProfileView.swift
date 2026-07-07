@@ -9,6 +9,7 @@ final class ProfileViewModel {
     var credits: CreditsData?
     var entitlement: EntitlementData?
     var resumeList: [DeskData.Resume] = []
+    var overview: MeOverview?   // v3.2 数据总览/资产/创作者摘要
 
     var error: String?
     var loading = false
@@ -35,6 +36,10 @@ final class ProfileViewModel {
         if let desk = try? await API.shared.get("/api/desk", as: DeskData.self) {
             resumeList = desk.resumeList
         }
+        // 数据总览：非核心，独立拉取，失败静默（老服务端无此端点时档案页仍正常）。
+        if let ov = try? await API.shared.get("/api/me/overview", as: MeOverview.self) {
+            overview = ov
+        }
     }
 
     /// 累计学习小时数（优先后端 totalStudyMinutes，否则用日历分钟累加）。
@@ -54,6 +59,7 @@ struct ProfileView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var vm = ProfileViewModel()
     @State private var goSettings = false
+    @State private var showShareCard = false
     /// 进场编排：内容就绪后置真，驱动各分区交错浮现。
     @State private var appeared = false
 
@@ -105,6 +111,12 @@ struct ProfileView: View {
                 .modifier(SectionEntrance(index: 0, appeared: appeared, reduceMotion: reduceMotion))
             }
 
+            // 1.5 数据总览条 + 学习资产 + 创作者摘要（v3.2）
+            if let ov = vm.overview {
+                OverviewStrip(overview: ov)
+                    .modifier(SectionEntrance(index: 1, appeared: appeared, reduceMotion: reduceMotion))
+            }
+
             // 2. 学习进度
             if let g = vm.gamification {
                 VStack(alignment: .leading, spacing: 24) {
@@ -145,14 +157,13 @@ struct ProfileView: View {
         }
     }
 
-    /// 分享成长档案：走公开落地页链接 /u/{id}（无鉴权，最可靠）。
+    /// 分享成长档案：v3.2 弹分享卡片（服务端出周报图 + 深/浅切换），替代旧的仅分享链接。
     @ViewBuilder private var shareProfileRow: some View {
-        if let user = auth.user, let url = AppConfig.profileShareURL(userId: user.id) {
-            ShareLink(
-                item: url,
-                subject: Text("\(user.nickname)的有道自习室成长档案"),
-                message: Text("这是我在有道自习室的学习足迹，来看看")
-            ) {
+        if let user = auth.user {
+            Button {
+                Haptics.light()
+                showShareCard = true
+            } label: {
                 HStack(spacing: 12) {
                     Image(systemName: "square.and.arrow.up")
                         .font(.system(size: 15, weight: .semibold))
@@ -164,9 +175,15 @@ struct ProfileView: View {
                 .studioCard()
             }
             .buttonStyle(.plain)
-            .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
             .accessibilityLabel("分享成长档案")
-            .accessibilityHint("分享你的个人主页链接")
+            .sheet(isPresented: $showShareCard) {
+                ShareCardSheet(
+                    kind: "week-report",
+                    shareUrl: AppConfig.profileShareURL(userId: user.id),
+                    title: "分享学习周报"
+                )
+                .presentationDetents([.large])
+            }
         }
     }
 

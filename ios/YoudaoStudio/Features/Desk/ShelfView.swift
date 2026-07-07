@@ -308,24 +308,14 @@ struct ShelfCard: View {
     let course: ShelfCourse
     var tint: Color = Studio.ink2
 
-    /// 任意 category → trackGradient 的 4 赛道键，回退 nil（中性灰渐变）。
-    private var trackKey: String? {
-        let c = course.category.lowercased()
-        if c.contains("ai") || c.contains("智能") || c.contains("人工") { return "ai" }
-        if c.contains("english") || c.contains("英语") || c.contains("语言") { return "english" }
-        if c.contains("elder") || c.contains("老") || c.contains("银发") || c.contains("养") { return "elder" }
-        if c.contains("life") || c.contains("生活") || c.contains("兴趣") { return "life" }
-        return nil
-    }
-
     private var done: Bool { course.progress >= 100 && course.lessonsCount > 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .bottomLeading) {
-                Studio.trackGradient(trackKey)
+                // v3.2：真实封面图（服务端 coverSrc），失败回落赛道渐变
+                CoverImage(coverSrc: course.coverSrc, category: course.category)
                     .frame(height: 84)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                     .overlay(
                         LinearGradient(colors: [.clear, .black.opacity(0.30)],
                                        startPoint: .center, endPoint: .bottom)

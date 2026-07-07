@@ -376,6 +376,18 @@ assert_dto "entitlement/me" "/api/entitlement/me" '{
   "dates":["validUntil"]
 }'
 
+# me/overview（v3.2 成长档案聚合，iOS/Mac 消费）
+assert_dto "me/overview" "/api/me/overview" '{
+  "root":"data",
+  "fields":{
+    "totalStudySec":"int","completedCount":"int","notesCount":"int","notebookCount":"int",
+    "purchasedCount":"int","dueReviewCount":"int","currentStreak":"int","longestStreak":"int",
+    "achievementsCount":"int","creditBalance":"int","isSubscriber":"bool","statusLabel":"str",
+    "creator":"dict","creator.totalIncome":"int","creator.totalSales":"int","creator.stallCount":"int"
+  },
+  "dates":["validUntil"]
+}'
+
 # subscription/me
 assert_dto "subscription/me" "/api/subscription/me" '{
   "root":"data",

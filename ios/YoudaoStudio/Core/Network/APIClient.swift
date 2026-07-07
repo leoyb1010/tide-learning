@@ -69,17 +69,28 @@ final class API {
         return comps.url ?? base.appending(path: rawPath)
     }
 
-    private func send<B: Encodable, T: Decodable>(_ path: String, method: String, body: B?, as: T.Type) async throws -> T {
+    /// 组装带鉴权头（Bearer + X-App-Origin）的请求。upload/getData 与 send 共用，保证鉴权一致。
+    private func authorizedRequest(_ path: String, method: String) async -> URLRequest {
         var req = URLRequest(url: makeURL(path))
         req.httpMethod = method
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(AppConfig.appOrigin, forHTTPHeaderField: "X-App-Origin")
         if let token = await AuthManager.shared.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
+        return req
+    }
+
+    private func send<B: Encodable, T: Decodable>(_ path: String, method: String, body: B?, as: T.Type) async throws -> T {
+        var req = await authorizedRequest(path, method: method)
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let body, !(body is EmptyBody) {
             req.httpBody = try JSONEncoder().encode(body)
         }
+        return try await run(req, as: T.self)
+    }
+
+    /// 执行请求并解码统一信封。send/upload 共用。
+    private func run<T: Decodable>(_ req: URLRequest, as: T.Type) async throws -> T {
         let data: Data, resp: URLResponse
         do { (data, resp) = try await session.data(for: req) }
         catch { throw APIError.network("网络连接失败，请稍后重试") }
@@ -101,11 +112,55 @@ final class API {
         return value
     }
 
+    /// multipart/form-data 上传（造课文件导入用；未来笔记截图/头像上传复用）。
+    /// 文件字段名固定 `file`；其余标量字段走 `fields`。响应仍是统一信封。
+    func upload<T: Decodable>(_ path: String, fileData: Data, fileName: String, mimeType: String,
+                             fields: [String: String] = [:], as: T.Type) async throws -> T {
+        let boundary = "tide-\(UUID().uuidString)"
+        var body = Data()
+        for (k, v) in fields {
+            body.appendString("--\(boundary)\r\n")
+            body.appendString("Content-Disposition: form-data; name=\"\(k)\"\r\n\r\n")
+            body.appendString("\(v)\r\n")
+        }
+        body.appendString("--\(boundary)\r\n")
+        body.appendString("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n")
+        body.appendString("Content-Type: \(mimeType)\r\n\r\n")
+        body.append(fileData)
+        body.appendString("\r\n--\(boundary)--\r\n")
+
+        var req = await authorizedRequest(path, method: "POST")
+        req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return try await run(req, as: T.self)
+    }
+
+    /// 带鉴权拉二进制（分享图 PNG 用）：返回原始 Data，非信封。4xx/5xx 折叠为 APIError。
+    func getData(_ path: String) async throws -> Data {
+        let req = await authorizedRequest(path, method: "GET")
+        let data: Data, resp: URLResponse
+        do { (data, resp) = try await session.data(for: req) }
+        catch { throw APIError.network("网络连接失败，请稍后重试") }
+        let http = resp as! HTTPURLResponse
+        guard http.statusCode < 400 else {
+            await handleAuthExpiredIfNeeded(status: http.statusCode)
+            throw APIError.from(status: http.statusCode, message: nil)
+        }
+        return data
+    }
+
     /// 全局 401 处理：任意请求命中 401（token 失效）即触发本地登出，
     /// AuthManager 内部幂等（已登出则跳过），RootView 观察登录态自动回登录页。
     /// iOS / macOS 双端共享此逻辑。
     private func handleAuthExpiredIfNeeded(status: Int) async {
         guard status == 401 else { return }
         await AuthManager.shared.handleAuthExpired()
+    }
+}
+
+private extension Data {
+    /// multipart 拼装用：追加 UTF-8 字符串。
+    mutating func appendString(_ s: String) {
+        if let d = s.data(using: .utf8) { append(d) }
     }
 }

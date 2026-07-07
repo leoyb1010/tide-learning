@@ -18,6 +18,8 @@ struct StudentCardView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     /// 积分数字入场脉冲。
     @State private var creditPulse = false
+    /// 分享卡片弹窗（v3.2：服务端出图，深/浅可切）。
+    @State private var showShareCard = false
 
     private var userId: String { user?.id ?? "guest" }
     private var nickname: String { user?.nickname ?? "同学" }
@@ -46,6 +48,14 @@ struct StudentCardView: View {
         .shadow(color: cardShadow.color, radius: cardShadow.radius, x: 0, y: cardShadow.y)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("学生证，\(nickname)，学号 \(studentNo)，等级 \(level.title)")
+        .sheet(isPresented: $showShareCard) {
+            ShareCardSheet(
+                kind: "student-card",
+                shareUrl: AppConfig.profileShareURL(userId: userId),
+                title: "分享学生证"
+            )
+            .presentationDetents([.large])
+        }
     }
 
     private var cardShadow: (color: Color, radius: CGFloat, y: CGFloat) {
@@ -56,12 +66,14 @@ struct StudentCardView: View {
 
     private var crestBand: some View {
         HStack(alignment: .center, spacing: 10) {
-            // 校徽：红点内嵌于白圈，压在深色带上更立体。
-            ZStack {
-                Circle().fill(.white.opacity(0.12)).frame(width: 26, height: 26)
-                Circle().fill(Studio.red).frame(width: 11, height: 11)
-                    .shadow(color: Studio.red.opacity(0.6), radius: 4, y: 0)
-            }
+            // 校徽（浪潮托书圆形浮雕，白芯片衬托），压在深色带上更立体，证件感。
+            Image("StudioEmblem")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+                .padding(3)
+                .background(.white.opacity(0.95))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
             Text("有道自习室")
                 .font(.studio(15, .bold))
                 .foregroundStyle(.white)
@@ -90,24 +102,22 @@ struct StudentCardView: View {
 
     // MARK: 分享（落地页链接 /u/{id}，公开可访问，无鉴权）
 
-    @ViewBuilder private var shareButton: some View {
-        if let url = AppConfig.profileShareURL(userId: userId) {
-            ShareLink(
-                item: url,
-                subject: Text("\(nickname)的有道自习室学生证"),
-                message: Text("我在有道自习室学习 \(level.title)，来看看我的学生证")
-            ) {
-                Image(systemName: "square.and.arrow.up")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 30, height: 30)
-                    .background(.white.opacity(0.12))
-                    .clipShape(Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1))
-            }
-            .simultaneousGesture(TapGesture().onEnded { Haptics.light() })
-            .accessibilityLabel("分享学生证")
+    private var shareButton: some View {
+        // 点开分享卡片弹窗（服务端出图 + 深/浅切换 + 存相册/系统分享），替代旧的仅分享 URL。
+        Button {
+            Haptics.light()
+            showShareCard = true
+        } label: {
+            Image(systemName: "square.and.arrow.up")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(.white.opacity(0.85))
+                .frame(width: 30, height: 30)
+                .background(.white.opacity(0.12))
+                .clipShape(Circle())
+                .overlay(Circle().strokeBorder(.white.opacity(0.2), lineWidth: 1))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("分享学生证")
     }
 
     // MARK: 纸质主体
@@ -176,18 +186,21 @@ struct StudentCardView: View {
     }
 
     @ViewBuilder private var qrCode: some View {
-        if let img = Self.qrImage(for: "/u/\(userId)") {
-            // 平台适配 Image 由 platformImage(_:) 构造（iOS→UIImage / macOS→NSImage），
-            // 之后统一挂修饰链。不能在 ViewBuilder 里用 #if 后接尾随链——尾随修饰会落空。
-            Self.platformImage(img)
-                .interpolation(.none)
-                .resizable()
-                .frame(width: 58, height: 58)
-                .padding(4)
-                .background(Studio.surface)
-                .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Studio.border, lineWidth: 1))
-                .accessibilityLabel("个人主页二维码")
+        // 编码完整可扫链接（origin + /u/{id}）而非裸路径，才能真正扫码跳主页。
+        if let img = Self.qrImage(for: AppConfig.profileShareURL(userId: userId)?.absoluteString ?? "\(AppConfig.shareBaseURL)/u/\(userId)") {
+            VStack(spacing: 4) {
+                Self.platformImage(img)
+                    .interpolation(.none)
+                    .resizable()
+                    .frame(width: 58, height: 58)
+                    .padding(4)
+                    .background(Studio.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(Studio.border, lineWidth: 1))
+                Text("扫码看主页")
+                    .font(.system(size: 9)).foregroundStyle(Studio.ink4)
+            }
+            .accessibilityLabel("个人主页二维码，扫码可访问")
         }
     }
 

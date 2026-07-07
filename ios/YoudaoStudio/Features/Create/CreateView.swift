@@ -1,29 +1,9 @@
 import SwiftUI
 import Observation
+import UniformTypeIdentifiers
 
-// MARK: - DTO（字段对齐后端 camelCase）
-
-/// POST /api/ai/generate-course 返回。
-struct GeneratedCourse: Decodable {
-    let courseId: String
-    let slug: String
-    let lessons: [GeneratedLesson]
-}
-
-/// 大纲里的单节。
-struct GeneratedLesson: Decodable, Identifiable {
-    let id: String
-    let title: String
-}
-
-/// POST /api/ai/generate-lesson 返回（能拿到的统计用于完成页；缺省兜底）。
-/// 后端实际返回 { lessonId, blocks:Int(写入块数), allReady }；quizCount 为可选，
-/// 后端暂未下发时解码为 nil（完成页据 quizCount>0 才展示「N 测验」，缺省即不展示，安全）。
-/// blockCount 曾定义但从未被后端下发、也无消费点（永远 nil），删除以消除死字段告警。
-struct GeneratedLessonResult: Decodable {
-    let lessonId: String?
-    let quizCount: Int?
-}
+// DTO（GeneratedCourse / GeneratedLesson / GeneratedLessonResult / AiModelsResponse）
+// 已上移至 Core/Models/CreateDTO.swift，iOS 造课页与 Mac 导入窗共用。
 
 // MARK: - 造课阶段机
 
@@ -44,12 +24,45 @@ enum CreateStage: Equatable {
     case finished       // 完成页
 }
 
+/// 造课台输入模式：AI 一句话生成 / 导入资料（文本粘贴 + 文件上传）。
+enum CreateMode: Equatable { case generate, importSource }
+
 // MARK: - ViewModel
 
 @Observable @MainActor
 final class CreateViewModel {
     // 输入
     var prompt = ""
+
+    // 造课模式 + 导入输入
+    var mode: CreateMode = .generate
+    var importTitle = ""
+    var importText = ""
+    var flowSubtitle = ""   // 剧场副标题（AI=需求原文；导入=标题/摘要）
+
+    // v3.2 课件模板 + 生成模型（对齐 Web）。template 默认经典；model 空=用默认模型。
+    var template = "classic"
+    var model = ""
+    var templates: [AiModelsResponse.Template] = []
+    var models: [AiModelsResponse.Model] = []
+    var lockedModels: [AiModelsResponse.LockedModel] = []
+    private var optionsLoaded = false
+
+    /// 拉取可选模板/模型（进造课台时调一次）。失败静默：模板区不显示、model 走后端默认。
+    func loadOptions() async {
+        guard !optionsLoaded else { return }
+        do {
+            let res = try await API.shared.get("/api/ai/models", as: AiModelsResponse.self)
+            templates = res.templates
+            models = res.models
+            lockedModels = res.lockedModels
+            if template.isEmpty { template = res.defaultTemplate }
+            if model.isEmpty { model = res.defaultModel }
+            optionsLoaded = true
+        } catch {
+            // 拉取失败不阻塞造课：走后端默认模板/模型。
+        }
+    }
 
     // 阶段
     var stage: CreateStage = .idle
@@ -142,13 +155,75 @@ final class CreateViewModel {
         paywallMessage = nil
     }
 
-    /// 主流程入口：占位守卫 → 递增并快照 runID → 存 Task 句柄 → 跑本轮流程。
-    /// 存句柄使 cancel() 能真取消在途请求；快照 runID 使旧任务返回后被判为陈旧、不写状态。
+    /// AI 一句话生成入口。
     func generate() async {
         let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !generating else { return }
+        flowSubtitle = trimmed
+        await startFlow {
+            struct CourseBody: Encodable { let prompt: String; let template: String; let model: String? }
+            return try await API.shared.post(
+                "/api/ai/generate-course",
+                body: CourseBody(prompt: trimmed, template: self.template, model: self.model.isEmpty ? nil : self.model),
+                as: GeneratedCourse.self)
+        }
+    }
 
-        // 发起新一轮前先取消上一轮在途任务（防御性：正常情况下 UI 已禁止并发发起）。
+    /// 导入：粘贴文本入口。
+    func importTextFlow() async {
+        let text = importText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !generating else { return }
+        guard text.count >= 100 else { error = "资料太短啦，至少 100 字才好拆成课"; return }
+        let title = importTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        flowSubtitle = title.isEmpty ? String(text.prefix(24)) : title
+        await startFlow {
+            struct Body: Encodable { let title: String?; let rawText: String; let template: String; let model: String? }
+            return try await API.shared.post(
+                "/api/ai/import-source",
+                body: Body(title: title.isEmpty ? nil : title, rawText: text, template: self.template, model: self.model.isEmpty ? nil : self.model),
+                as: GeneratedCourse.self)
+        }
+    }
+
+    /// 导入：文件上传入口。fileURL 由 fileImporter/NSOpenPanel 提供，需在读取前进安全作用域。
+    func importFileFlow(_ fileURL: URL) async {
+        guard !generating else { return }
+        let scoped = fileURL.startAccessingSecurityScopedResource()
+        defer { if scoped { fileURL.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: fileURL) else { error = "读取文件失败，请重试"; return }
+        guard data.count > 0 else { error = "文件内容为空"; return }
+        guard data.count <= 15_000_000 else { error = "文件过大（上限 15MB）"; return }
+        let name = fileURL.lastPathComponent
+        let ext = fileURL.pathExtension.lowercased()
+        guard ["pdf", "docx", "txt", "md", "markdown"].contains(ext) else {
+            error = "仅支持 PDF / Word(.docx) / TXT / Markdown 文件"; return
+        }
+        let mime = Self.mime(for: ext)
+        let title = importTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        flowSubtitle = title.isEmpty ? name : title
+        var fields = ["template": template]
+        if !title.isEmpty { fields["title"] = title }
+        if !model.isEmpty { fields["model"] = model }
+        await startFlow {
+            return try await API.shared.upload(
+                "/api/ai/import-file",
+                fileData: data, fileName: name, mimeType: mime, fields: fields,
+                as: GeneratedCourse.self)
+        }
+    }
+
+    private static func mime(for ext: String) -> String {
+        switch ext {
+        case "pdf": return "application/pdf"
+        case "docx": return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        case "md", "markdown": return "text/markdown"
+        default: return "text/plain"
+        }
+    }
+
+    /// 共享造课流程：占位守卫 → runID 快照 → 存 Task → 理解/大纲(fetchCourse)/逐节写作。
+    /// AI 生成与导入共用；差异只在 fetchCourse 打哪个接口。
+    private func startFlow(_ fetchCourse: @escaping () async throws -> GeneratedCourse) async {
         genTask?.cancel()
         runID &+= 1
         let myRun = runID
@@ -156,31 +231,25 @@ final class CreateViewModel {
         error = nil
         needsPaywall = false
         paywallMessage = nil
-
         let task = Task { [weak self] in
             guard let self else { return }
-            await self.runGenerate(trimmed, myRun: myRun)
+            await self.runFlow(myRun: myRun, fetchCourse: fetchCourse)
         }
         genTask = task
         await task.value
     }
 
-    /// 本轮造课流程。每个 await 返回后先 `isStale(myRun)` 比对，陈旧则立即退出、绝不写共享状态。
-    private func runGenerate(_ trimmed: String, myRun: Int) async {
+    /// 本轮流程。每个 await 返回后先 `isStale(myRun)` 比对，陈旧则立即退出、绝不写共享状态。
+    private func runFlow(myRun: Int, fetchCourse: @escaping () async throws -> GeneratedCourse) async {
         // 步骤1：理解需求（瞬时 ✓，短暂停顿营造过程感）
         stage = .understanding
         try? await Task.sleep(nanoseconds: 500_000_000)
         if isStale(myRun) { return }
 
-        // 步骤2：搭建大纲
+        // 步骤2：搭建大纲（AI=generate-course / 导入=import-source|import-file）
         stage = .outlining
-        struct CourseBody: Encodable { let prompt: String }
         do {
-            let course = try await API.shared.post(
-                "/api/ai/generate-course",
-                body: CourseBody(prompt: trimmed),
-                as: GeneratedCourse.self
-            )
+            let course = try await fetchCourse()
             if isStale(myRun) { return }
             courseId = course.courseId
             slug = course.slug
@@ -205,7 +274,7 @@ final class CreateViewModel {
         }
 
         guard !lessons.isEmpty else {
-            error = "AI 没有生成任何章节，请换个说法再试。"
+            error = "没有生成任何章节，请调整后再试。"
             generating = false
             return
         }
@@ -280,6 +349,9 @@ final class CreateViewModel {
     /// 造好一门后，从头再来。
     func startOver() {
         prompt = ""
+        importTitle = ""
+        importText = ""
+        flowSubtitle = ""
         resetToIdle()
     }
 }
@@ -290,6 +362,7 @@ final class CreateViewModel {
 struct CreateView: View {
     @State private var vm = CreateViewModel()
     @State private var showRecharge = false
+    @State private var showFileImporter = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     // 消费书桌「今天想学」带来的需求，出现时预填输入框。
     @Environment(TabRouter.self) private var router
@@ -309,7 +382,10 @@ struct CreateView: View {
             .background(Studio.bg)
             .navigationTitle("造课")
             // 书桌「今天想学」切来时预填需求：进入本 Tab（出现）与待处理意图变化都消费一次。
-            .onAppear { consumePendingPrompt() }
+            .onAppear {
+                consumePendingPrompt()
+                Task { await vm.loadOptions() }
+            }
             .onChange(of: router.pendingCreatePrompt) { _, _ in consumePendingPrompt() }
             // 生成中不可返回：隐藏返回并锁交互式下滑关闭。
             .toolbar {
@@ -370,22 +446,49 @@ struct CreateView: View {
                         Image(systemName: "sparkles").foregroundStyle(Studio.red)
                         Text("AI 造课").font(.mono(12, .bold)).foregroundStyle(Studio.ink3).tracking(1)
                     }
-                    Text("今天想学点什么？")
+                    Text(vm.mode == .generate ? "今天想学点什么？" : "把任何资料，变成一门课")
                         .font(.studio(26, .bold))
                         .foregroundStyle(Studio.ink)
-                    Text("描述你的目标，AI 为你从大纲到讲解逐节生成一门课。")
+                    Text(vm.mode == .generate
+                         ? "描述你的目标，AI 为你从大纲到讲解逐节生成一门课。"
+                         : "上传或粘贴学习资料，AI 现场拆章、配测验，资料立刻能学。")
                         .font(.studio(14))
                         .foregroundStyle(Studio.ink3)
                 }
                 .padding(.top, 8)
 
-                // 中央大输入框
-                promptField
+                // 模式切换：AI 生成 | 导入资料
+                Picker("造课方式", selection: $vm.mode) {
+                    Text("AI 生成").tag(CreateMode.generate)
+                    Text("导入资料").tag(CreateMode.importSource)
+                }
+                .pickerStyle(.segmented)
 
-                // 示例灵感
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("试试这些").font(.studio(12, .semibold)).foregroundStyle(Studio.ink3)
-                    FlowChips(items: vm.examples) { vm.fill($0) }
+                if vm.mode == .generate {
+                    // 中央大输入框
+                    promptField
+                    // 示例灵感
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("试试这些").font(.studio(12, .semibold)).foregroundStyle(Studio.ink3)
+                        FlowChips(items: vm.examples) { vm.fill($0) }
+                    }
+                } else {
+                    importPanel
+                }
+
+                // v3.2 课件模板 + 生成模型选择（两种模式共用）
+                if !vm.templates.isEmpty {
+                    TemplateModelPicker(
+                        templates: vm.templates,
+                        models: vm.models,
+                        lockedModels: vm.lockedModels,
+                        template: $vm.template,
+                        model: $vm.model,
+                        onLockedTap: {
+                            vm.needsPaywall = true
+                            vm.paywallMessage = "高级模型为会员专享，订阅后即可选用"
+                        }
+                    )
                 }
 
                 // 积分预估
@@ -403,15 +506,104 @@ struct CreateView: View {
                         .transition(.opacity.combined(with: .move(edge: .top)))
                 }
 
-                StudioButton(title: "开始生成", kind: .red, icon: "wand.and.stars") {
-                    Task { await vm.generate() }
+                // 主 CTA（AI=开始生成 / 导入=粘贴文本升维；文件上传在导入面板内即选即传）
+                if vm.mode == .generate {
+                    StudioButton(title: "开始生成", kind: .red, icon: "wand.and.stars") {
+                        Task { await vm.generate() }
+                    }
+                    .disabled(!vm.canSubmit)
+                    .opacity(vm.canSubmit ? 1 : 0.5)
+                    .animation(reduceMotion ? nil : StudioMotion.smooth, value: vm.canSubmit)
+                } else {
+                    StudioButton(title: "把粘贴的资料升维成课", kind: .red, icon: "wand.and.stars") {
+                        Task { await vm.importTextFlow() }
+                    }
+                    .disabled(vm.importText.trimmingCharacters(in: .whitespacesAndNewlines).count < 100)
+                    .opacity(vm.importText.trimmingCharacters(in: .whitespacesAndNewlines).count >= 100 ? 1 : 0.5)
                 }
-                .disabled(!vm.canSubmit)
-                .opacity(vm.canSubmit ? 1 : 0.5)
-                .animation(reduceMotion ? nil : StudioMotion.smooth, value: vm.canSubmit)
             }
             .padding(16)
             .animation(reduceMotion ? nil : StudioMotion.smooth, value: vm.error)
+            .animation(reduceMotion ? nil : StudioMotion.smooth, value: vm.mode)
+        }
+        .fileImporter(isPresented: $showFileImporter, allowedContentTypes: importContentTypes, allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                Task { await vm.importFileFlow(url) }
+            }
+        }
+    }
+
+    /// 允许导入的文件类型：PDF / Word(.docx) / TXT / Markdown。
+    private var importContentTypes: [UTType] {
+        var types: [UTType] = [.pdf, .plainText]
+        if let docx = UTType("org.openxmlformats.wordprocessingml.document") { types.append(docx) }
+        if let md = UTType(filenameExtension: "md") { types.append(md) }
+        return types
+    }
+
+    // MARK: 导入面板（文件上传 + 粘贴文本）
+
+    @FocusState private var importFocused: Bool
+
+    private var importPanel: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            // 标题
+            TextField("课程标题（可留空，AI 帮你起）", text: $vm.importTitle)
+                .font(.studio(15))
+                .padding(.horizontal, 14).padding(.vertical, 12)
+                .background(Studio.surfaceInset)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Studio.border, lineWidth: 1))
+
+            // 文件上传卡（点击 → fileImporter；Mac 上自动是 NSOpenPanel）
+            Button {
+                Haptics.selection()
+                showFileImporter = true
+            } label: {
+                VStack(spacing: 8) {
+                    Image(systemName: "arrow.up.doc.fill").font(.system(size: 26)).foregroundStyle(Studio.red)
+                    Text("点击上传文件").font(.studio(14, .semibold)).foregroundStyle(Studio.ink)
+                    Text("PDF · Word · TXT · Markdown · 单个 ≤ 15MB")
+                        .font(.studio(11.5)).foregroundStyle(Studio.ink3)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 22)
+                .background(Studio.surfaceInset)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .strokeBorder(style: StrokeStyle(lineWidth: 2, dash: [6]))
+                        .foregroundStyle(Studio.border2)
+                )
+            }
+            .buttonStyle(.plain)
+            .pressable(scale: 0.98)
+
+            // 分隔
+            HStack(spacing: 10) {
+                Rectangle().fill(Studio.border).frame(height: 1)
+                Text("或直接粘贴文本").font(.studio(11)).foregroundStyle(Studio.ink4).fixedSize()
+                Rectangle().fill(Studio.border).frame(height: 1)
+            }
+
+            // 粘贴文本
+            ZStack(alignment: .topLeading) {
+                if vm.importText.isEmpty {
+                    Text("把学习资料 / 文章 / 讲义正文粘贴进来，AI 帮你整理成可学的课")
+                        .font(.studio(15)).foregroundStyle(Studio.ink4)
+                        .padding(.horizontal, 14).padding(.vertical, 16)
+                        .allowsHitTesting(false)
+                }
+                TextEditor(text: $vm.importText)
+                    .font(.studio(15)).foregroundStyle(Studio.ink)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .frame(minHeight: 140)
+                    .focused($importFocused)
+            }
+            .background(Studio.surfaceInset)
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(importFocused ? Studio.red : Studio.border, lineWidth: importFocused ? 1.5 : 1))
         }
     }
 
@@ -490,7 +682,7 @@ private struct ProcessTheaterView: View {
                     Text(headline).font(.studio(20, .bold)).foregroundStyle(Studio.ink)
                         .contentTransition(.opacity)
                         .animation(reduceMotion ? nil : StudioMotion.smooth, value: vm.stage)
-                    Text(vm.prompt.trimmingCharacters(in: .whitespacesAndNewlines))
+                    Text(vm.flowSubtitle)
                         .font(.studio(13)).foregroundStyle(Studio.ink3)
                         .lineLimit(2)
                 }

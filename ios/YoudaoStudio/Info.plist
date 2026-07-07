@@ -38,6 +38,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>拍照记笔记 / 截取学习画面</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>把分享卡片保存到相册</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>从相册选择图片附加到笔记</string>
 	<key>UIApplicationSceneManifest</key>

@@ -43,6 +43,7 @@ targets:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "拍照记笔记 / 截取学习画面"
         NSPhotoLibraryUsageDescription: "从相册选择图片附加到笔记"
+        NSPhotoLibraryAddUsageDescription: "把分享卡片保存到相册"
         # 深链：注册自定义 scheme youdaostudio://（供 onOpenURL 解析跳转），与 Mac 端对齐。
         # youdaostudio://note/<id> | course/<slug> | review | exam | desk 等。
         CFBundleURLTypes:

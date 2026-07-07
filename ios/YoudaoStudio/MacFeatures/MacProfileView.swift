@@ -123,8 +123,11 @@ struct MacProfileView: View {
         let ent = me.entitlement
         return VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 6) {
-                Image(systemName: "graduationcap.fill")
-                    .font(.system(size: 11, weight: .bold)).foregroundStyle(.white.opacity(0.85))
+                // v3.2 校徽（与 iOS / 分享卡一致），白芯片衬托
+                Image("StudioEmblem")
+                    .resizable().scaledToFit().frame(width: 16, height: 16)
+                    .padding(2).background(.white.opacity(0.95))
+                    .clipShape(RoundedRectangle(cornerRadius: 5, style: .continuous))
                 Text("STUDENT ID · 有道自习室")
                     .font(.mono(10, .bold)).foregroundStyle(.white.opacity(0.7)).tracking(2)
             }

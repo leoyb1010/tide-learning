@@ -68,6 +68,17 @@ enum Studio {
         colors: [Color(hex: "#2a3140"), Color(hex: "#1c2331"), Color(hex: "#141a24")],
         startPoint: .topLeading, endPoint: .bottomTrailing)
 
+    /// 任意 category 文本 → trackGradient 的 4 赛道键，无法归类回退 nil（中性灰渐变）。
+    /// 收敛原先散落在各卡片里的重复启发式，供 CoverImage / 各卡统一调用。
+    static func trackKey(from category: String?) -> String? {
+        let c = (category ?? "").lowercased()
+        if c.contains("ai") || c.contains("智能") || c.contains("人工") { return "ai" }
+        if c.contains("english") || c.contains("英语") || c.contains("语言") || c.contains("oral") || c.contains("口语") { return "english" }
+        if c.contains("elder") || c.contains("老") || c.contains("银发") || c.contains("silver") { return "elder" }
+        if c.contains("life") || c.contains("生活") || c.contains("兴趣") { return "life" }
+        return nil
+    }
+
     /// 赛道渐变封面（按 category 映射）。
     static func trackGradient(_ category: String?) -> LinearGradient {
         let pairs: [String: (String, String)]

@@ -96,6 +96,12 @@ final class MarketViewModel {
     /// 余额不足（402）的摊位 id 集合：卡内错误行额外露「去充值」引导。
     var paywallIds: Set<String> = []
 
+    /// 本人集市收益摘要（v3.2）：有在架课时在顶部显示单行收益条。失败静默。
+    var overview: MeOverview?
+    func loadOverview() async {
+        overview = try? await API.shared.get("/api/me/overview", as: MeOverview.self)
+    }
+
     /// GET /api/market → { items: [...] }（真实 API，主路径）。
     /// 后端与 web 集市页共用 buildMarketStalls 组装，字段/语义一致，直接解码。
     func load() async {
@@ -253,8 +259,10 @@ struct MarketView: View {
             guard vm.stalls == nil else { return }
             // 摊位与余额并行拉取（余额供付费确认层/氛围条，失败静默不阻断）。
             async let balance: Void = vm.loadBalance()
+            async let overview: Void = vm.loadOverview()
             await vm.load()
             await balance
+            await overview
         }
         .refreshable {
             await vm.load()
@@ -329,6 +337,9 @@ struct MarketView: View {
             } else {
                 VStack(alignment: .leading, spacing: 14) {
                     ambienceBar
+                    if let ov = vm.overview, ov.creator.stallCount > 0 {
+                        earningsBar(ov.creator)
+                    }
                     sortBar(count: stalls.count)
                     LazyVStack(spacing: 14) {
                         ForEach(Array(vm.sortedStalls.enumerated()), id: \.element.id) { idx, stall in
@@ -353,6 +364,35 @@ struct MarketView: View {
                 .padding(.top, 40)
         } else {
             loadingSkeleton
+        }
+    }
+
+    // MARK: 我的集市收益（单行条，对齐 Web 压缩版；仅有在架课时显示）
+
+    private func earningsBar(_ c: MeOverview.Creator) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: "chart.line.uptrend.xyaxis").font(.system(size: 14, weight: .bold)).foregroundStyle(Studio.red)
+            Text("我的集市收益").font(.studio(12.5, .semibold)).foregroundStyle(Studio.ink2)
+            Spacer(minLength: 8)
+            HStack(spacing: 12) {
+                labelNum("累计", "\(c.totalIncome)", accent: true)
+                labelNum("成交", "\(c.totalSales)")
+                labelNum("在架", "\(c.stallCount)")
+            }
+        }
+        .padding(.horizontal, 14).padding(.vertical, 10)
+        .background(Studio.surface)
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Studio.border, lineWidth: 1))
+        .overlay(alignment: .leading) {
+            RoundedRectangle(cornerRadius: 2).fill(Studio.red).frame(width: 3, height: 22)
+        }
+    }
+
+    private func labelNum(_ label: String, _ value: String, accent: Bool = false) -> some View {
+        HStack(spacing: 3) {
+            Text(label).font(.studio(11)).foregroundStyle(Studio.ink3)
+            Text(value).font(.mono(13, .bold)).foregroundStyle(accent ? Studio.red : Studio.ink)
         }
     }
 
@@ -519,9 +559,9 @@ struct MarketStallCard: View {
         VStack(alignment: .leading, spacing: 12) {
             // 渐变封面 + 标题叠字 + 来源徽标 + 价签（免费/N积分/已拥有，对齐 web 摊位卡封面区）
             ZStack(alignment: .bottomLeading) {
-                CourseCover.gradient(for: stall.coverColor ?? "slate")
+                // v3.2：真实封面图（服务端 coverSrc，含用户造课封面池），失败回落赛道渐变
+                CoverImage(coverSrc: stall.coverSrc, category: stall.category ?? stall.coverColor)
                     .frame(height: 110)
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 LinearGradient(colors: [.clear, .black.opacity(0.45)],
                                startPoint: .top, endPoint: .bottom)
                     .frame(height: 110)

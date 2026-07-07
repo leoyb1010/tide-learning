@@ -59,6 +59,17 @@ struct YoudaoStudioAppMac: App {
         .windowStyle(.titleBar)
         .defaultSize(width: 480, height: 640)
 
+        // 「导入资料」窗（文件 → 导入资料… / ⌘⇧I 打开）：上传/粘贴资料 → AI 拆章生成课。
+        WindowGroup(id: "import") {
+            MacImportWindow()
+                .environment(auth)
+                .environment(router)
+                .tint(Studio.red)
+                .frame(minWidth: 460, minHeight: 560)
+        }
+        .windowStyle(.titleBar)
+        .defaultSize(width: 520, height: 680)
+
         // 菜单栏常驻项：今日学习速览 + 快速入口（记一条 / 打开主窗）。
         // .menu 样式渲染为下拉菜单；注入 auth 供内容判登录态、拉 /api/desk。
         MenuBarExtra("有道自习室", systemImage: "book.closed") {
@@ -101,6 +112,7 @@ struct YoudaoStudioAppMac: App {
             // 的 wrapper 承载（App struct 内不能直接取 openWindow）。
             CommandGroup(after: .newItem) {
                 NewNoteCommandButton()
+                ImportMaterialCommandButton()
             }
             CommandMenu("账号") {
                 Button("退出登录") {
@@ -182,6 +194,17 @@ struct NewNoteCommandButton: View {
             openWindow(id: "compose")
         }
         .keyboardShortcut("n", modifiers: .command)
+    }
+}
+
+/// 「导入资料… ⌘⇧I」命令按钮 wrapper：打开 Mac 导入窗（文件菜单，紧随「记一条」）。
+struct ImportMaterialCommandButton: View {
+    @Environment(\.openWindow) private var openWindow
+    var body: some View {
+        Button("导入资料…") {
+            openWindow(id: "import")
+        }
+        .keyboardShortcut("i", modifiers: [.command, .shift])
     }
 }
 
