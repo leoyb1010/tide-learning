@@ -90,7 +90,8 @@ export function highlightCodeLine(raw: string): string {
   while (i < s.length) {
     const rest = s.slice(i);
     let m: RegExpExecArray | null;
-    if ((m = /^(?:\/\/.*|#.*|--.*)/.exec(rest))) { put("tok-com", m[0]); i += m[0].length; continue; } // 行注释
+    // 行注释：// 通用；# 与 -- 须后随空白/行尾才算（避开自减 i--、CSS 变量 --x、hex 色值 #fff）。
+    if ((m = /^(?:\/\/.*|#(?=\s|$).*|--(?=\s|$).*)/.exec(rest))) { put("tok-com", m[0]); i += m[0].length; continue; }
     if ((m = /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/.exec(rest))) { put("tok-str", m[0]); i += m[0].length; continue; } // 字符串
     if ((m = /^\d[\d_]*\.?\d*(?:[eE][+-]?\d+)?/.exec(rest))) { put("tok-num", m[0]); i += m[0].length; continue; } // 数字
     if ((m = /^[A-Za-z_$][\w$]*/.exec(rest))) { // 标识符 / 关键字 / 函数名
@@ -411,7 +412,12 @@ const RUNTIME_SCRIPT = `
     var io = new IntersectionObserver(function(ents){
       ents.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
     },{rootMargin:'0px 0px -8% 0px',threshold:.08});
-    els.forEach(function(e){ io.observe(e); });
+    els.forEach(function(e){
+      // 分步页(data-steps)内的 stagger 容器**绝不交给 IO**：否则翻到该页时 IO 会给容器加 .in、
+      // CSS 令所有子项一次性全显，击穿逐条揭示。这些容器的子项只受 show()/nav() 的 .frag-in 驱动。
+      if (e.matches && e.matches('[data-stagger]') && e.closest && e.closest('[data-steps]')) return;
+      io.observe(e);
+    });
   }
   function quiz(){
     document.querySelectorAll('.quiz').forEach(function(q){
@@ -478,6 +484,9 @@ const RUNTIME_SCRIPT = `
       if (stepped && frags && frags.length > 1) {
         // 分步页：先揭示标题/容器与第一条，其余等「下一步」逐条（→先看一条再看下一条）。
         sec.querySelectorAll('[data-reveal]').forEach(function(e){ e.classList.add('in'); });
+        // 关键：清掉本页 stagger 容器可能残留的 .in（滚动模式/回看留下的），
+        // 否则 CSS [data-stagger].in>* 会令子项一次性全显、击穿逐条揭示。子项此后只受 .frag-in 控制。
+        sec.querySelectorAll('[data-stagger]').forEach(function(e){ e.classList.remove('in'); });
         for (var f = 0; f < frags.length; f++) frags[f].classList.remove('frag-in');
         frags[0].classList.add('frag-in');
         fragEls = frags; fragIdx = 1;
@@ -804,14 +813,17 @@ export interface CoursewareDiversity {
   svgCount: number;
   sectionCount: number;
   distinctBackgrounds: number;
+  textLen: number;
+  substantial: boolean;
   ok: boolean;
   reasons: string[];
 }
 
 /**
  * 评估一段 bespoke 课件 HTML 的「视觉分化度」（防 LLM 产出纯文字墙/同底色堆叠）。
- * 通用启发（不依赖我方类名，适配 LLM 自由产物）：内联 SVG 数、section 数、不同 background 声明数。
- * 仅对有体量(section≥4)的产物要求分化；不达标 → 建议拒收回落确定性渲染器（它天生分化）。
+ * 通用启发（不依赖我方类名，也不依赖 <section> 计数——LLM 可能用 div/article 包文字墙）：
+ * 按**正文体量**（去标签后可见文字长度，或区块数）触发闸门；达标产物需满足「有内联 SVG 图形 **或** 背景/表面有分化」，
+ * 二者皆无即判为纯文字墙/同底色堆叠 → 建议拒收回落确定性渲染器（它天生分化）。允许合法的纯排版讲义（靠背景分化过关）。
  */
 export function assessCoursewareDiversity(html: string): CoursewareDiversity {
   const h = html || "";
@@ -821,10 +833,18 @@ export function assessCoursewareDiversity(html: string): CoursewareDiversity {
     (h.match(/background(?:-color|-image)?\s*:\s*[^;"}]+/gi) || []).map((s) => s.toLowerCase().replace(/\s+/g, "")),
   );
   const distinctBackgrounds = bgs.size;
+  // 去标签后的可见文字长度（不依赖 section）：div/article 包裹的文字墙同样能被量到体量。
+  const textLen = h
+    .replace(/<(?:script|style)[\s\S]*?<\/(?:script|style)>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&[a-z#0-9]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim().length;
+  const blockCount = (h.match(/<(?:section|article|div)[\s>]/gi) || []).length;
+  const substantial = textLen >= 400 || sectionCount >= 4 || blockCount >= 6;
   const reasons: string[] = [];
-  if (sectionCount >= 4) {
-    if (svgCount === 0) reasons.push("零内联 SVG 图形（课件应有图形化元素，非纯文字堆叠）");
-    if (distinctBackgrounds < 2) reasons.push("背景/表面无分化（页型构图单一，未破同底色堆叠）");
+  if (substantial && svgCount === 0 && distinctBackgrounds < 2) {
+    reasons.push("既无内联 SVG 图形、背景/表面也无分化（纯文字墙/同底色堆叠，未破单调）");
   }
-  return { svgCount, sectionCount, distinctBackgrounds, ok: reasons.length === 0, reasons };
+  return { svgCount, sectionCount, distinctBackgrounds, textLen, substantial, ok: reasons.length === 0, reasons };
 }

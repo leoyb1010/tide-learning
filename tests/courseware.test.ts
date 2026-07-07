@@ -296,6 +296,13 @@ describe("页型档案 + 签名母题（§2 P0：破单调）", () => {
     const evil = highlightCodeLine('x = "<script>alert(1)</script>"');
     expect(evil).not.toContain("<script>");
     expect(evil).toContain("&lt;script&gt;");
+    // 回归（审查 P2）：自减 i--、CSS 变量 --x、hex #fff 不得被误染成注释色。
+    expect(highlightCodeLine("for (i=n; i>0; i--) {}")).not.toContain('class="tok-com"');
+    expect(highlightCodeLine("--ct-bg: red;")).not.toContain('class="tok-com"');
+    expect(highlightCodeLine("color: #fff;")).not.toContain('class="tok-com"');
+    // 真注释仍着色：# 后有空格（shell/py）、-- 后有空格（sql）
+    expect(highlightCodeLine("# 这是注释")).toContain('class="tok-com"');
+    expect(highlightCodeLine("-- sql 注释")).toContain('class="tok-com"');
   });
 
   it("keypoint kpi 版式 + 暗场 spotlight 页型 + 可分步页 data-steps", () => {

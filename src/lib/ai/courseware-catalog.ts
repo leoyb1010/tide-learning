@@ -162,10 +162,13 @@ export function resolveCoursewareMode(input: {
   template?: string | null;
   artKey?: string | null;
 }): CoursewareMode {
+  // artKey 优先：艺术方向是已锁定的视觉决策（且它本身已吸收标题的内容信号），
+  // 据它反推 mode，保证注入 LLM 的风格指令/范例与 art token 同源不矛盾（见审查 P2）。
+  if (input.artKey && ART_TO_MODE[input.artKey]) return ART_TO_MODE[input.artKey];
+  // 无已定 artKey（如独立调用）才用标题启发式。
   if (input.title) {
     for (const h of MODE_HINTS) if (h.re.test(input.title)) return h.mode;
   }
-  if (input.artKey && ART_TO_MODE[input.artKey]) return ART_TO_MODE[input.artKey];
   if (input.template && TEMPLATE_MODE[input.template]) return TEMPLATE_MODE[input.template];
   return "scroll-lesson";
 }
