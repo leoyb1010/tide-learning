@@ -295,10 +295,9 @@ struct MacMarketView: View {
 
     private func stallCard(_ stall: MacMarketStall) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            // 封面头：赛道渐变 + 价签徽章。
+            // 封面头：v3.2 真实封面图（含用户造课封面池），失败回落赛道渐变 + 价签徽章。
             ZStack(alignment: .topTrailing) {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Studio.trackGradient(stall.category))
+                CoverImage(coverSrc: stall.coverSrc, category: stall.category)
                     .frame(height: 108)
                     .overlay(alignment: .bottomLeading) {
                         Text(stall.title)
