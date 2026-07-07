@@ -32,10 +32,15 @@ export async function POST(req: NextRequest) {
     const view = await getLessonForUser(lessonId, user.id);
     if (!view) return fail("无权访问该课程", 403);
 
+    // P1-1：写门与页面 paywall 对齐——无访问权（付费节未订阅/未买断）时直接 403，绝不写入任何进度。
+    // 此前仅在 completed 时校验 view.access，普通 progress 仍会 upsert，污染学习时长/续学派生/运营指标，
+    // 甚至可能被误用作「已学习/已拥有」信号放大为权益绕过。免费节 isFree→access=true，不受影响。
+    if (!view.access) return fail("无权访问该课节", 403);
+
     // 翻页进度写 lastSlideIndex，视频/模拟播放进度写 progressSec；二者隔离，互不污染另一视图的续读点。
     const isSlide = kind === "slide";
-    // completed 仅在有访问权（付费门通过）时才允许置真：防止无权用户对付费节标记完成。
-    const canComplete = completed === true && view.access;
+    // 到此 view.access 必为 true（上方已挡）；completed 直接以入参为准。
+    const canComplete = completed === true;
 
     await prisma.learningProgress.upsert({
       where: { userId_lessonId: { userId: user.id, lessonId } },

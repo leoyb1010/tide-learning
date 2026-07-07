@@ -1,9 +1,8 @@
-import { redirect } from "next/navigation";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
-import { getCurrentUser } from "@/lib/session";
 import { getLogDir } from "@/lib/api";
 import { Badge, EmptyState } from "@/components/ui";
+import { requireAdminPage } from "@/lib/admin-guard";
 
 export const metadata = { title: "500 错误日志" };
 
@@ -65,11 +64,9 @@ async function readTodayErrors(): Promise<{ day: string; rows: ErrLog[]; totalTo
 }
 
 export default async function AdminErrorsPage() {
-  // 页级鉴权：错误日志含堆栈（潜在敏感），仅超级管理员可看。
-  // layout 已保证是后台角色，此处再收窄到 admin。
-  const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/admin/errors");
-  if (user.role !== "admin") redirect("/admin");
+  // 页级鉴权（P0-1）：错误日志含堆栈（潜在敏感），仅超级管理员可看。
+  // layout 只保证是后台角色，此处收窄到 admin；无权者干净重定向到可访问页。
+  await requireAdminPage("admin", "/admin/errors");
 
   const { day, rows, totalToday, available } = await readTodayErrors();
 

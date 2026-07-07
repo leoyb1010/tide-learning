@@ -1,17 +1,14 @@
-import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
 import { RedemptionCodeManager } from "@/components/admin/RedemptionCodeManager";
+import { requireAdminPage } from "@/lib/admin-guard";
 
 export const metadata = { title: "兑换码管理" };
 
 /**
  * 兑换码管理后台：批量生成积分/会员兑换码 + 列表（含已兑次数）+ 复制/导出 + 作废/启用。
- * 高危发放页 → 仅超级管理员（role==="admin"）可访问；非 admin redirect 回后台首页。
+ * 高危发放页（P0-1）→ 仅超级管理员（role==="admin"）可访问；无权者重定向到可访问页。
  */
 export default async function AdminRedemptionCodesPage() {
-  const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/admin/redemption-codes");
-  if (user.role !== "admin") redirect("/admin");
+  await requireAdminPage("admin", "/admin/redemption-codes");
 
   return (
     <div className="space-y-4">

@@ -1,6 +1,9 @@
 import { AdminDemandManager } from "@/components/admin/AdminDemandManager";
+import { requireAdminPage } from "@/lib/admin-guard";
 
-export default function AdminDemandsPage() {
+export default async function AdminDemandsPage() {
+  // 页面级权限门（P0-1）：与需求审核 API 的 requirePermission("demand:moderate") 对齐。
+  await requireAdminPage("demand:moderate", "/admin/demands");
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold text-ink-950">需求审核</h1>

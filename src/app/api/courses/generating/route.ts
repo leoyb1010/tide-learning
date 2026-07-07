@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { ok, handle } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { getGenJobsFor, finalizeGenJob, isGenJobStale } from "@/lib/course-gen";
+import { getGenJobsFor, finalizeGenJob, isGenJobStale, reconcileStaleGenJobs } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   return handle(async () => {
     const user = await requireUser();
+
+    // P1-4：先兜底对账「本人」名下 status=running 但心跳过期的僵尸 job（不依赖 genStatus）。
+    // 借前端 8s 轮询这条高频路径顺手驱动收尾，避免 job 与 course 状态分叉后永久卡 running。
+    await reconcileStaleGenJobs(user.id);
 
     const rows = await prisma.course.findMany({
       where: {

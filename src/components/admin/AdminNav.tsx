@@ -4,28 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { GearSix } from "@phosphor-icons/react/dist/ssr";
 
-const ITEMS = [
-  { href: "/admin", label: "数据看板" },
-  { href: "/admin/courses", label: "课程管理" },
-  { href: "/admin/content-calendar", label: "内容排期" },
-  { href: "/admin/demands", label: "需求审核" },
-  { href: "/admin/moderation", label: "内容审核" },
-  { href: "/admin/leads", label: "建联队列" },
-  { href: "/admin/orders", label: "订单/订阅" },
-  { href: "/admin/credits", label: "积分管理" },
-  { href: "/admin/users", label: "用户管理" },
-];
+/**
+ * 后台侧栏导航。展示项由服务端 layout 按用户有效权限过滤后传入（P2-1）——
+ * 本组件不再自行硬编码全量入口，避免向低权限角色暴露越权页面链接。
+ */
+type NavItem = { href: string; label: string };
 
-// 仅超级管理员可见的入口（权限矩阵为高危管理页）
-const ADMIN_ONLY_ITEMS = [
-  { href: "/admin/redemption-codes", label: "兑换码" },
-  { href: "/admin/permissions", label: "权限管理" },
-  { href: "/admin/errors", label: "500 日志" },
-];
-
-export function AdminNav({ role }: { role: string }) {
+export function AdminNav({ role, items }: { role: string; items: NavItem[] }) {
   const pathname = usePathname();
-  const items = role === "admin" ? [...ITEMS, ...ADMIN_ONLY_ITEMS] : ITEMS;
   return (
     <aside className="md:sticky md:top-24 md:h-fit">
       <div className="mb-4 flex items-center gap-2 px-2">

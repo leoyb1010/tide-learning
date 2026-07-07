@@ -561,10 +561,11 @@ export function Player({
               />
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={togglePlay} className={`studio-press grid h-8 w-8 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white ${hit44}`} title={playing ? "暂停" : "播放"} aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
-            <span className="mono text-xs tabular-nums text-white/70"><span className="text-white/90">{mmss(Math.floor(time))}</span> / {mmss(playbackDurationSec)}</span>
-            <div className="flex-1" />
+          {/* P1-3：flex-wrap 让超窄屏(≤360)控件换行而非被卡片 overflow-hidden 裁掉倍速选择器；≥375 仍单行。 */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+            <button onClick={togglePlay} className={`studio-press grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/10 text-white/90 transition-colors hover:bg-white/20 hover:text-white ${hit44}`} title={playing ? "暂停" : "播放"} aria-label={playing ? "暂停" : "播放"}>{playing ? <Pause size={17} weight="fill" /> : <Play size={17} weight="fill" className="ml-0.5" />}</button>
+            <span className="mono shrink-0 text-xs tabular-nums text-white/70"><span className="text-white/90">{mmss(Math.floor(time))}</span> / {mmss(playbackDurationSec)}</span>
+            <div className="ml-auto" />
             {CaptureBar}
             <Tooltip label={theme === "deep" ? "浅色" : "深海模式"}>
               <button onClick={toggleTheme} className={`studio-press group inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-white/10 transition-colors hover:bg-white/20 ${hit44}`} aria-label="切换主题">
@@ -804,11 +805,11 @@ export function Player({
         </div>
       )}
 
-      {/* 面包屑 */}
-      <div className="focus-hide flex items-center gap-2 text-sm text-[var(--ink3)]">
-        <Link href={`/courses/${courseSlug}`} className="truncate transition-colors hover:text-[var(--red)]">{courseTitle}</Link>
-        <span className="text-[var(--ink4)]">/</span>
-        <span className="truncate font-medium text-[var(--ink)]">{lesson.title}</span>
+      {/* 面包屑。P1-3：min-w-0 让 truncate 生效，长标题不再撑宽窄屏。 */}
+      <div className="focus-hide flex min-w-0 items-center gap-2 text-sm text-[var(--ink3)]">
+        <Link href={`/courses/${courseSlug}`} className="min-w-0 shrink truncate transition-colors hover:text-[var(--red)]">{courseTitle}</Link>
+        <span className="shrink-0 text-[var(--ink4)]">/</span>
+        <span className="min-w-0 shrink truncate font-medium text-[var(--ink)]">{lesson.title}</span>
       </div>
 
       {!access ? (
@@ -817,9 +818,9 @@ export function Player({
           <Paywall remainingLessons={remainingLessons} courseTitle={courseTitle} isLoggedIn={isLoggedIn} />
         </div>
       ) : (
-        <div className={`grid gap-4 xl:gap-5 ${focus ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
-          {/* 左：视频/图文 */}
-          <div className={focus ? "mx-auto w-full max-w-4xl" : ""}>
+        <div className={`grid min-w-0 gap-4 xl:gap-5 ${focus ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
+          {/* 左：视频/图文。P1-3：min-w-0 让窄屏单列可收缩到视口宽度，杜绝 390px 下 412 横向溢出。 */}
+          <div className={focus ? "mx-auto w-full max-w-4xl" : "min-w-0"}>
             {isHtmlLesson ? (
               // v3.3 多样化 HTML 课件：沙箱 iframe 渲染 AI 生成的自包含高级课件（见 HtmlCourseware / 计划 §7）。
               <HtmlCourseware html={htmlContract!.html as string} />
@@ -1133,7 +1134,7 @@ function Outline({ courseSlug, outline }: { courseSlug: string; outline: Outline
               <Link
                 href={`/courses/${courseSlug}/learn/${o.id}`}
                 aria-current={o.current ? "true" : undefined}
-                className={`group relative flex items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
+                className={`group relative flex min-w-0 items-center gap-3 px-4 py-2.5 text-sm transition-colors ${
                   o.current
                     ? "bg-[var(--red-soft)] font-semibold text-[var(--red-ink)]"
                     : "text-[var(--ink2)] hover:bg-[var(--surface2)]"
@@ -1141,8 +1142,9 @@ function Outline({ courseSlug, outline }: { courseSlug: string; outline: Outline
               >
                 {/* 当前节：左侧红色游标，明确定位 */}
                 {o.current && <span className="absolute inset-y-1.5 left-0 w-[3px] rounded-r bg-[var(--red)]" aria-hidden />}
-                <span className={`mono w-5 text-center text-xs tabular-nums ${o.current ? "text-[var(--red-ink)]" : "text-[var(--ink4)]"}`}>{i + 1}</span>
-                <span className="flex-1 truncate">{o.title}</span>
+                <span className={`mono w-5 shrink-0 text-center text-xs tabular-nums ${o.current ? "text-[var(--red-ink)]" : "text-[var(--ink4)]"}`}>{i + 1}</span>
+                {/* P1-3：min-w-0 让 flex-1 truncate 真正生效，长课节标题不撑宽目录/整列。 */}
+                <span className="min-w-0 flex-1 truncate">{o.title}</span>
                 {o.isFree ? (
                   <span className="mono rounded bg-[var(--ok-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ok)]">免费</span>
                 ) : (

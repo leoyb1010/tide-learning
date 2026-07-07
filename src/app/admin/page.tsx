@@ -1,11 +1,15 @@
 import { prisma } from "@/lib/db";
 import { CHANNEL_LABELS } from "@/lib/format";
 import { trackLabel, TRACKS } from "@/lib/tracks";
+import { requireAdminPage } from "@/lib/admin-guard";
 
 export const metadata = { title: "数据看板" };
 
 // §8.2.5 运营数据看板：P1 十项指标
 export default async function AdminDashboard() {
+  // 页面级权限门（P0-1）：与 /api/admin/dashboard 的 requirePermission("dashboard:read") 对齐。
+  await requireAdminPage("dashboard:read", "/admin");
+
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 

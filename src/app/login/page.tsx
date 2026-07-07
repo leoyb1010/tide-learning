@@ -48,33 +48,44 @@ function LoginInner() {
 
         <form onSubmit={submit} className="mt-6 space-y-4">
           <div>
-            <label className="mb-1.5 block text-sm text-ink-800">用户名 / 手机号 / 邮箱</label>
+            {/* P2-2：label 用 htmlFor 关联 input id，input 用 aria-describedby 指向错误提示（屏幕阅读器 + 语义自动化）。 */}
+            <label htmlFor="login-identifier" className="mb-1.5 block text-sm text-ink-800">用户名 / 手机号 / 邮箱</label>
             <input
+              id="login-identifier"
+              name="identifier"
+              autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
               placeholder="手机号或邮箱"
+              aria-invalid={err ? true : undefined}
+              aria-describedby={err ? "login-error" : undefined}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]"
               required
             />
           </div>
           {mode === "signup" && (
             <div>
-              <label className="mb-1.5 block text-sm text-ink-800">昵称（可选）</label>
-              <input value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
+              <label htmlFor="login-nickname" className="mb-1.5 block text-sm text-ink-800">昵称（可选）</label>
+              <input id="login-nickname" name="nickname" autoComplete="nickname" value={nickname} onChange={(e) => setNickname(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
             </div>
           )}
           <div>
-            <label className="mb-1.5 block text-sm text-ink-800">密码</label>
+            <label htmlFor="login-password" className="mb-1.5 block text-sm text-ink-800">密码</label>
             <input
+              id="login-password"
+              name="password"
               type="password"
+              autoComplete={mode === "signup" ? "new-password" : "current-password"}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder={mode === "signup" ? "至少 8 位，含字母和数字" : "输入密码"}
+              aria-invalid={err ? true : undefined}
+              aria-describedby={err ? "login-error" : undefined}
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]"
               required
             />
           </div>
-          {err && <p className="text-sm text-error">{err}</p>}
+          {err && <p id="login-error" role="alert" className="text-sm text-error">{err}</p>}
           <Button type="submit" full size="lg" loading={loading}>
             {mode === "login" ? "登录" : "注册并登录"}
           </Button>

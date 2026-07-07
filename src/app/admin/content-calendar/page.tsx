@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui";
+import { requireAdminPage } from "@/lib/admin-guard";
 
 export const metadata = { title: "内容排期" };
 
@@ -15,6 +16,9 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
 
 // §8.2.2 内容排期
 export default async function ContentCalendarPage() {
+  // 页面级权限门（P0-1）：与内容排期 API 的 requirePermission("course:write") 对齐。
+  await requireAdminPage("course:write", "/admin/content-calendar");
+
   const items = await prisma.contentCalendar.findMany({
     orderBy: { plannedPublishDate: "asc" },
     include: { course: { select: { title: true } } },

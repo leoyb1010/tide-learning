@@ -1,13 +1,14 @@
 import { prisma } from "@/lib/db";
-import { requirePermission } from "@/lib/session";
 import { ModerationConsole, type ModPost, type ModCourse } from "@/components/admin/ModerationConsole";
+import { requireAdminPage } from "@/lib/admin-guard";
 
 export const metadata = { title: "内容审核台" };
 
 // 内容审核台：帖子 + 课程集市待审。入口权限 content:review（健康/财务/防诈骗内容审核）。
 // 课程集市审批的写操作在 /api/admin/moderation/course 内以 demand:moderate 再校验。
 export default async function AdminModerationPage() {
-  await requirePermission("content:review");
+  // 页面级权限门（P0-1）：无权者干净重定向到可访问页（原 requirePermission 抛错会渲染成 500 错误页）。
+  await requireAdminPage("content:review", "/admin/moderation");
 
   const [posts, courses] = await Promise.all([
     prisma.post.findMany({

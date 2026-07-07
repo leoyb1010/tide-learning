@@ -8,7 +8,7 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "prisma generate && next build",
+    "build": "node scripts/gen-version.mjs && prisma generate && next build",
     "start": "next start",
     "preview": "npm run build && DATABASE_URL=\"file:./dev.db\" PORT=3100 next start -p 3100",
     "lint": "next lint",

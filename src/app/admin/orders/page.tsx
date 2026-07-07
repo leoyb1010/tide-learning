@@ -1,10 +1,15 @@
 import { prisma } from "@/lib/db";
 import { Badge } from "@/components/ui";
 import { yuan } from "@/lib/format";
+import { requireAdminPage } from "@/lib/admin-guard";
 
 export const metadata = { title: "订单/订阅" };
 
 export default async function AdminOrdersPage() {
+  // 页面级权限门（P0-1）：与 /api/admin/orders 的 requirePermission("order:read") 对齐。
+  // 修复审计发现的 PII 泄露——reviewer 曾能经本页读取订单、用户邮箱/手机号。
+  await requireAdminPage("order:read", "/admin/orders");
+
   const [orders, webhookLogs] = await Promise.all([
     prisma.order.findMany({ orderBy: { createdAt: "desc" }, take: 100, include: { plan: true, user: { select: { nickname: true, email: true, phone: true } } } }),
     prisma.paymentWebhookLog.findMany({ orderBy: { createdAt: "desc" }, take: 20 }),

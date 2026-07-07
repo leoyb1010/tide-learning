@@ -1,6 +1,4 @@
-import { redirect } from "next/navigation";
 import {
-  getCurrentUser,
   primePermissionCache,
   effectivePermissions,
   ALL_ROLES,
@@ -8,16 +6,15 @@ import {
   ROLE_PERMISSIONS,
   ADMIN_LOCKED_PERMISSIONS,
 } from "@/lib/session";
+import { requireAdminPage } from "@/lib/admin-guard";
 import { PermissionMatrix, type RoleRow } from "./PermissionMatrix";
 
 export const metadata = { title: "权限矩阵" };
 export const dynamic = "force-dynamic";
 
 export default async function AdminPermissionsPage() {
-  // 仅超级管理员可访问：无权直接 redirect（不走细粒度权限点，避免自锁死循环）
-  const user = await getCurrentUser();
-  if (!user) redirect("/login?next=/admin/permissions");
-  if (user.role !== "admin") redirect("/admin");
+  // 仅超级管理员可访问（P0-1）：无权者重定向到可访问页（不走细粒度权限点，避免自锁死循环）。
+  await requireAdminPage("admin", "/admin/permissions");
 
   await primePermissionCache(true);
 

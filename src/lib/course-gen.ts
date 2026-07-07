@@ -723,6 +723,51 @@ export async function finalizeGenJob(courseId: string, status: "done" | "failed"
 }
 
 /**
+ * 兜底对账（P1-4）：直接扫描 status="running" 的 course_gen job，凡心跳过期（僵尸）即收敛，
+ * **不依赖 Course.genStatus**。
+ *
+ * 修复的缺口：此前所有自愈路径（/courses/generating、/gen-progress）都只扫 genStatus="generating" 的课；
+ * 一旦 job 仍 running 但对应 course 的 genStatus 已是 null/ready（二者状态源分叉），就再也没有任何路径
+ * 会收尾这个 job——它永远停在 running，管理员/用户无从判断是完成、失败还是可续跑（审计发现 running=3 卡死）。
+ *
+ * 收敛规则（以 lesson 表实际就绪度为准，单一事实源）：
+ *   - 全部 lesson 就绪 → job=done + course.genStatus=ready；
+ *   - 仍有空节        → job=failed + course.genStatus=failed（前端露出「继续生成」入口，可续跑）。
+ *
+ * 传 userId 只对账该用户的僵尸 job（供 /courses/generating 的高频轮询顺手驱动，避免每次全表扫描）。
+ * 容错：单课失败只记日志、不打断整体；课已删则忽略更新。返回被收敛的 job 数。
+ */
+export async function reconcileStaleGenJobs(userId?: string): Promise<{ reconciled: number }> {
+  const runningJobs = await prisma.generationJob.findMany({
+    where: { type: GEN_JOB_TYPE, status: "running", ...(userId ? { userId } : {}) },
+    select: { id: true, resultRef: true, createdAt: true, inputJson: true },
+  });
+
+  let reconciled = 0;
+  for (const job of runningJobs) {
+    if (!job.resultRef) continue;
+    if (!isGenJobStale(job)) continue; // 心跳仍新鲜（真在生成）→ 绝不打断
+    try {
+      const [total, remaining] = await Promise.all([
+        prisma.lesson.count({ where: { courseId: job.resultRef } }),
+        prisma.lesson.count({ where: { courseId: job.resultRef, blocksJson: null } }),
+      ]);
+      const allReady = total > 0 && remaining === 0;
+      // updateMany：课已被删除时返回 count:0 而非抛错（避免无谓 Prisma 错误日志）；finalizeGenJob 仍收尾 job。
+      await prisma.course.updateMany({
+        where: { id: job.resultRef },
+        data: { genStatus: allReady ? "ready" : "failed" },
+      });
+      await finalizeGenJob(job.resultRef, allReady ? "done" : "failed");
+      reconciled++;
+    } catch (e) {
+      console.error("[course-gen] reconcileStaleGenJobs failed for", job.resultRef, e);
+    }
+  }
+  return { reconciled };
+}
+
+/**
  * best-effort：为一门课的所有已就绪节渲染确定性 HTML 课件（Web 端多样化高级课件层）。
  * 全段包 try/catch，任何失败都不冒泡（HTML 只是块的表现层，块永远是兜底）。持久化课级 designJson 保稳定。
  */

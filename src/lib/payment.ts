@@ -167,6 +167,11 @@ export async function createCheckoutSession(
   const { discountCents, couponId } = await applyCoupon(couponCode, planId, base);
   const amount = Math.max(0, base - discountCents);
 
+  // P0-2：先校验渠道 provider，再落订单。不支持渠道 / 生产禁用 mock 时直接拒绝，
+  // 绝不先创建 pending 订单——否则失败请求会在订单列表/财务对账留下用户从未进入收银台的孤儿单。
+  const provider = getProvider(channel);
+  if (!provider) throw new AppError("不支持的支付渠道");
+
   const externalOrderId = channel + "_" + randomBytes(10).toString("hex");
   const order = await prisma.order.create({
     data: {
@@ -180,15 +185,21 @@ export async function createCheckoutSession(
     },
   });
 
-  const provider = getProvider(channel);
-  if (!provider) throw new AppError("不支持的支付渠道");
-  const ticket = await provider.createCheckout({
-    orderId: order.id,
-    externalOrderId,
-    amountCents: amount,
-    currency: plan.currency,
-    subject: plan.name,
-  });
+  // P0-2：收银台票据创建失败（真实渠道网络/配置异常）时补偿——把刚建的订单标记为 failed（可追踪、
+  // 不计入 pending/首单判定），绝不静默留 pending。mock provider 不会抛，此路径服务于真实渠道。
+  let ticket;
+  try {
+    ticket = await provider.createCheckout({
+      orderId: order.id,
+      externalOrderId,
+      amountCents: amount,
+      currency: plan.currency,
+      subject: plan.name,
+    });
+  } catch (e) {
+    await prisma.order.update({ where: { id: order.id }, data: { status: "failed" } }).catch(() => {});
+    throw e;
+  }
 
   await track({ eventName: "checkout_start", userId, properties: { plan_id: planId, channel, coupon: couponCode ?? null } });
   return { orderId: order.id, externalOrderId, amountCents: amount, discountCents, channel, ticket };
