@@ -22,6 +22,7 @@ const TOKENS_PER_CREDIT = 1000; // 1000 token = 1 积分（基准）
 const SCENE_WEIGHT = {
   generate_course: 1.0,
   generate_lesson: 1.0,
+  generate_lesson_html: 1.5, // v3.3 HTML 课件 LLM 增强：token 重于逐节块生成，权重上调
   import_source: 1.0,
   generate_exam: 1.0,
   review_card: 0.8, // 复习卡批量生成（原借用 note_transform 权重，现独立成键）

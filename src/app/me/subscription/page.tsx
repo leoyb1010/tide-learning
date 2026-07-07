@@ -13,6 +13,7 @@ import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { CancelSubscription, RestoreButton } from "@/components/AccountActions";
 import { ChangePlanButton } from "@/components/SubscriptionManager";
+import { RedeemBox } from "@/components/RedeemBox";
 import { WaveProgress, TidalReveal } from "@/components/motion";
 import { yuan, PLAN_PERIOD_LABELS } from "@/lib/format";
 
@@ -170,6 +171,9 @@ export default async function SubscriptionPage() {
         <ShieldCheck size={16} weight="fill" className="mt-0.5 shrink-0" />
         取消订阅后：课程锁定，但笔记永久保留、可继续查看和导出。这是我们的承诺。
       </p>
+
+      {/* 兑换码入口 */}
+      <RedeemBox />
 
       {/* 账单历史 */}
       <section>

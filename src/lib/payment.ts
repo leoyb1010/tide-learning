@@ -33,6 +33,107 @@ function periodEnd(billingPeriod: string, from = new Date()): Date {
   return d;
 }
 
+/**
+ * 订阅激活/续期的**共享核心**（v3.3）——把此前内联在 iap/verify 与 processWebhook 里的
+ * 「已有有效订阅→续期(叠加时长)，否则新建」逻辑提炼为一处，供三方复用且行为一致：
+ *   1) iap/verify 的订阅发放（按周期）；
+ *   2) 管理员「赠会员」/ 兑换码 membership 类（按天数）。
+ * 与 iap/webhook 语义严格对齐：
+ *   - 全站 scope（scope="all"）下找当前有效订阅（未过期的可续期态），有则延长有效期、否则新建；
+ *   - canceled_but_active 续期后回到 active；trial 保持 trial（不误升级）。
+ * 差异点仅在「延长多少」：这里按天数（days）叠加，避免与按月钳制耦合；
+ * 从「原到期时间与当下的较晚者」起算，既不缩短远期权益也不凭空延长已过期订阅。
+ *
+ * 入参 tx 为 Prisma 事务客户端（Prisma.TransactionClient）：调用方须在一个 $transaction 内传入，
+ * 保证「找/建订阅」与调用方的其他写（如兑换核销记录）同事务原子提交。
+ * 返回激活/续期后的订阅 id；权益快照由调用方在事务外 resolveEntitlement 刷新。
+ */
+export async function activateMembershipDays(
+  tx: Prisma.TransactionClient,
+  params: {
+    userId: string;
+    planId: string;
+    channel: string;
+    days: number;
+    scope?: string;
+    priceSnapshotCents?: number;
+  },
+): Promise<string> {
+  const { userId, planId, channel } = params;
+  const scope = params.scope ?? "all";
+  const days = Math.max(1, Math.floor(params.days));
+  const priceSnapshotCents = params.priceSnapshotCents ?? 0;
+  const now = new Date();
+
+  // 同 scope 下已有有效订阅 → 续期（叠加天数）；否则新建（对齐 iap/verify、processWebhook）。
+  const existing = await tx.subscription.findFirst({
+    where: {
+      userId,
+      scope,
+      status: { in: ["trial", "active", "grace_period", "billing_retry", "canceled_but_active"] },
+      currentPeriodEnd: { gte: now },
+    },
+    orderBy: { currentPeriodEnd: "desc" },
+  });
+
+  if (existing) {
+    // 从「原到期时间与当下的较晚者」往后叠加天数（远期权益不缩短，过期订阅不凭空延长）。
+    const from = existing.currentPeriodEnd > now ? existing.currentPeriodEnd : now;
+    const end = new Date(from.getTime() + days * 864e5);
+    const sub = await tx.subscription.update({
+      where: { id: existing.id },
+      data: {
+        planId,
+        scope,
+        channel,
+        // canceled_but_active 续期回 active；其余状态保持（trial 不误升级）。
+        status: existing.status === "canceled_but_active" ? "active" : existing.status,
+        priceSnapshotCents,
+        currentPeriodEnd: end,
+        cancelAtPeriodEnd: false,
+        billingRetryCount: 0,
+      },
+    });
+    return sub.id;
+  }
+
+  const end = new Date(now.getTime() + days * 864e5);
+  const sub = await tx.subscription.create({
+    data: {
+      userId,
+      planId,
+      channel,
+      scope,
+      status: "active",
+      priceSnapshotCents,
+      currentPeriodStart: now,
+      currentPeriodEnd: end,
+      cancelAtPeriodEnd: false,
+    },
+  });
+  return sub.id;
+}
+
+/**
+ * 为某用户挑一个用于「赠会员/兑换会员」挂载的套餐（Subscription 必须挂 planId）。
+ * 优先用调用方指定的 planId；否则取任一全站(scope="all")启用套餐（价格最低者，元数据最小惊讶）。
+ * 找不到任何套餐时抛错（种子数据保证至少存在全站套餐）。
+ */
+export async function resolveGrantPlan(preferredPlanId?: string | null) {
+  if (preferredPlanId) {
+    const p = await prisma.plan.findUnique({ where: { id: preferredPlanId } });
+    if (!p) throw new AppError("指定套餐不存在");
+    if (!p.isActive) throw new AppError("指定套餐已停用");
+    return p;
+  }
+  const plan = await prisma.plan.findFirst({
+    where: { scope: "all", isActive: true },
+    orderBy: { priceCents: "asc" },
+  });
+  if (!plan) throw new AppError("未配置可用的全站套餐，无法发放会员", 500);
+  return plan;
+}
+
 /** 校验并结算优惠券，返回折扣分与券 id。 */
 async function applyCoupon(code: string | undefined, planId: string, baseCents: number) {
   if (!code) return { discountCents: 0, couponId: null as string | null };

@@ -7,6 +7,7 @@ import { addMonthsClamped } from "@/lib/payment";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
 import { assertUserRateLimit } from "@/lib/rate-limit";
+import { verifyAppleTransaction } from "@/lib/apple-iap";
 
 export const dynamic = "force-dynamic";
 
@@ -19,8 +20,9 @@ export const dynamic = "force-dynamic";
  *   - 积分类：查 CreditLedger 是否已有 refId=transactionId 的入账，处理过则直接返回成功、不重复发放。
  *   - 订阅类：查 Order 是否已有 externalOrderId=iap_<transactionId> 的 paid 单，处理过则直接返回成功。
  *
- * 当前为 MVP/mock 模式（无 Apple 配置）：按 productId 映射直接发放。
- * 生产环境需接入真实 Apple 校验（见下方 TODO）。
+ * Apple 校验（verifyWithApple → src/lib/apple-iap.ts）：已配置 APPLE_BUNDLE_ID /
+ * APPLE_IAP_ENVIRONMENT 时对 jwsRepresentation 做完整 JWS + 证书链 + claims 校验；
+ * 未配置且非生产时走 mock 直发（本机/测试不变），生产则被闸门 + apple-iap 双重拦截。
  */
 
 // —— productId → 发放映射（对齐文档，写死在顶部）——
@@ -49,24 +51,32 @@ function periodEnd(billingPeriod: "month" | "quarter" | "year", from = new Date(
 }
 
 /**
- * TODO（生产环境 Apple 真实校验）：
- *   接入 App Store Server API 的 verifyTransaction / Get Transaction Info，
- *   用 jwsRepresentation（JWS 签名）离线校验，或用 transactionId 在线拉取交易详情。
- *   必须校验：
- *     1. JWS 签名有效（Apple x5c 证书链，根为 Apple Root CA）；
- *     2. bundleId 与本 App 的 bundle 一致；
- *     3. environment（Sandbox / Production）与部署环境匹配；
- *     4. productId 与签名内容一致，transactionId 未被篡改。
+ * 生产环境 Apple 真实校验（已实现，见 src/lib/apple-iap.ts）：
+ *   离线校验 App Store Server API 的 jwsRepresentation（signedTransactionInfo，JWS 签名）。
+ *   校验项：
+ *     1. JWS 签名有效（Apple x5c 证书链，逐级签发校验 + 有效期，根到 Apple Root CA - G3）；
+ *     2. bundleId 与 APPLE_BUNDLE_ID 一致；
+ *     3. environment（Sandbox / Production）与 APPLE_IAP_ENVIRONMENT 匹配；
+ *     4. productId 与签名内容一致，transactionId 与请求一致（未被篡改）；
+ *     5. 过期 / 撤销的交易一律拒绝。
  *   校验通过后再走下方发放逻辑（发放本身已按 transactionId 幂等）。
+ *
+ * 校验失败：对客户端只回模糊错误（不泄漏内部原因），reason 落 console.error 供服务端排查。
+ * 未配置 Apple（缺 APPLE_BUNDLE_ID / APPLE_IAP_ENVIRONMENT）时：
+ *   非生产 → mock 放行（本机 / 测试直发不变）；生产 → 拒绝（apple-iap 内部双保险）。
  */
-async function verifyWithApple(_input: {
+async function verifyWithApple(input: {
   productId: string;
   transactionId: string;
   jwsRepresentation?: string;
   receiptData?: string;
 }): Promise<void> {
-  // 未配置 Apple 凭据 → mock 模式，跳过真实校验。
-  return;
+  const result = await verifyAppleTransaction(input);
+  if (!result.ok) {
+    // 内部原因仅记服务端日志；对客户端统一「内购校验失败」，不泄漏证书/签名/claims 细节。
+    console.error(`[iap/verify] Apple 校验失败 tx=${input.transactionId} product=${input.productId}: ${result.reason}`);
+    throw new AppError("内购校验失败", 400);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -74,9 +84,9 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
     const user = await requireUser();
 
-    // P0-1 生产闸门：verifyWithApple 目前是 no-op，生产环境未接入真实 Apple 校验前禁止发放，
-    // 否则可无限白刷积分 / 年卡。需真实校验就绪后置 APPLE_IAP_ENABLED=1 放行。
-    // 非生产（本机 / 测试）保持 mock 直发行为不变。
+    // P0-1 生产闸门：verifyWithApple 现已接入真实 Apple 校验（apple-iap.ts），但仍保留此闸门作总开关——
+    // 置 APPLE_IAP_ENABLED=1 前须先配好 APPLE_BUNDLE_ID / APPLE_IAP_ENVIRONMENT（否则 apple-iap 生产分支亦会拒绝）。
+    // 非生产（本机 / 测试）无此闸门，未配 Apple 时走 mock 直发，行为不变。
     if (process.env.NODE_ENV === "production" && process.env.APPLE_IAP_ENABLED !== "1") {
       return fail("内购校验未启用", 403);
     }
@@ -90,7 +100,8 @@ export async function POST(req: NextRequest) {
     const transactionId = (body?.transactionId ?? "").trim();
     if (!productId || !transactionId) return fail("缺少 productId 或 transactionId");
 
-    // 真实 Apple 校验（mock 模式为 no-op；生产按上方 TODO 接入）
+    // 真实 Apple 校验（已实现，见 apple-iap.ts）：失败即抛 AppError("内购校验失败",400)，
+    // 由 handle 统一转成 fail；未配置且非生产时走 mock 放行，本机/测试直发不变。
     await verifyWithApple({
       productId,
       transactionId,

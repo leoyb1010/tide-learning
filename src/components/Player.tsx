@@ -22,6 +22,7 @@ import { BlockSlideshow } from "./BlockSlideshow";
 import { CompanionPanel } from "./CompanionPanel";
 import { validateBlocks } from "@/lib/blocks";
 import { coursewareThemeAttr } from "@/lib/ai/themes";
+import { HtmlCourseware } from "./HtmlCourseware";
 import { trapFocus } from "./focus-trap";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
@@ -32,6 +33,7 @@ interface LessonData {
   liveStartAt?: string | null; liveSeatLimit?: number | null;
   subtitles?: SubtitleCue[];
   blocksJson?: string | null; // ai_block 类型：结构化块课件 JSON 字符串
+  htmlJson?: string | null; // v3.3 ai_html 类型：自包含 HTML 课件渲染契约 {html, hasScript, checksum, ...}
   videoGenStatus?: string | null; // v3.1 视频课件生成态：null / pending / generating / ready / failed
   videoDurationSec?: number | null; // v3.1 视频课件时长（秒）：与图文阅读语义的 durationSec 隔离，仅驱动「视频」Tab 的时间轴/续播
 }
@@ -383,6 +385,13 @@ export function Player({
   const activeCue = lesson.subtitles?.find((c) => time >= c.startSec && time < c.endSec);
   // 时间轴百分比用有效播放时长：块课视频视图取 videoDurationSec，其余取 durationSec。
   const progress = playbackDurationSec > 0 ? time / playbackDurationSec : 0;
+
+  // v3.3 多样化 HTML 课件：只要本节有渲染契约 htmlJson 就用沙箱 iframe 渲染（HtmlCourseware）。
+  // 关键：以「htmlJson 是否存在」为准而非 contentType——课仍保持 contentType=ai_block，
+  // 于是 Web 渲染 HTML 课件、iOS 原生按 blocks 渲染（不认 htmlJson 字段），iOS 零破坏。
+  // 门控随 access（付费节无权益时 htmlJson 为 null）；契约脏/无 html 时回落到块渲染。
+  const htmlContract = safeParseJson(lesson.htmlJson) as { html?: string } | null;
+  const isHtmlLesson = Boolean(htmlContract && typeof htmlContract.html === "string" && htmlContract.html);
 
   // ai_block 块课件：解析并校验块数组（validateBlocks 永不抛错，脏数据归空数组）。
   // 块课无视频时间轴，不做截帧 / 时间进度条；MVP 笔记走普通笔记（anchorRef 可空），先保证能记能显示。
@@ -811,7 +820,10 @@ export function Player({
         <div className={`grid gap-4 xl:gap-5 ${focus ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
           {/* 左：视频/图文 */}
           <div className={focus ? "mx-auto w-full max-w-4xl" : ""}>
-            {isBlockLesson ? (
+            {isHtmlLesson ? (
+              // v3.3 多样化 HTML 课件：沙箱 iframe 渲染 AI 生成的自包含高级课件（见 HtmlCourseware / 计划 §7）。
+              <HtmlCourseware html={htmlContract!.html as string} />
+            ) : isBlockLesson ? (
               // 块课件：左侧内容区渲染块。v3.1 若有视频课件（ready/生成中），先给出「图文 / 视频」切换 Tab。
               <div>
                 {(hasVideoCourseware || videoGenerating) && (

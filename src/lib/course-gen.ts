@@ -5,6 +5,8 @@ import { track } from "./analytics";
 import { validateBlocks, type Block } from "./blocks";
 import { simpleOutlinePrompt, lessonVoiceLine, lessonRecipeBlock, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
 import { getTemplate, templateHardRequirement, checkTemplateAdherence } from "./ai/templates";
+import { resolveCourseDesign, serializeCourseDesign } from "./ai/courseware-design";
+import { renderAndStoreLessonHtml } from "./ai/courseware-gen";
 
 /**
  * 造课内核 —— 引擎A 的可复用逻辑层（供 route / after() 后台续跑 / 共创闭环共用）。
@@ -721,6 +723,40 @@ export async function finalizeGenJob(courseId: string, status: "done" | "failed"
 }
 
 /**
+ * best-effort：为一门课的所有已就绪节渲染确定性 HTML 课件（Web 端多样化高级课件层）。
+ * 全段包 try/catch，任何失败都不冒泡（HTML 只是块的表现层，块永远是兜底）。持久化课级 designJson 保稳定。
+ */
+async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, category: true, template: true, designJson: true },
+    });
+    if (!course) return;
+    const design = resolveCourseDesign(course);
+    if (!course.designJson) {
+      await prisma.course
+        .update({ where: { id: courseId }, data: { designJson: serializeCourseDesign(design) } })
+        .catch(() => {});
+    }
+    const lessons = await prisma.lesson.findMany({
+      where: { courseId, blocksJson: { not: null } },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, title: true, sortOrder: true, blocksJson: true },
+    });
+    for (const l of lessons) {
+      try {
+        await renderAndStoreLessonHtml(courseId, l, design);
+      } catch (e) {
+        console.error("[course-gen] html render failed for lesson", l.id, e);
+      }
+    }
+  } catch (e) {
+    console.error("[course-gen] renderCourseHtmlBestEffort failed:", courseId, e);
+  }
+}
+
+/**
  * 后台续跑内核 —— 对某课所有空节依次 generateLessonCore，逐节更新进度。
  *
  * 供 generate-course 的 after() 与 resume-gen 的 after() 共用。
@@ -761,6 +797,9 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     // 收尾：以 DB 重新统计为准。无空节 → ready；仍有空节再看是否为「另一流水在生成」。
     const remaining = await prisma.lesson.count({ where: { courseId, blocksJson: null } });
     if (remaining === 0) {
+      // v3.3：块全就绪后，为每节渲染确定性 HTML 课件（Web 端多样化高级课件；免费/瞬时；不动 contentType）。
+      // best-effort：整段包 try/catch，HTML 渲染失败绝不影响块课件的 ready 收尾（块永远是兜底）。
+      await renderCourseHtmlBestEffort(courseId);
       await prisma.course.update({ where: { id: courseId }, data: { genStatus: "ready" } });
       await finalizeGenJob(courseId, "done");
     } else {

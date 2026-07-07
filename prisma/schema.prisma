@@ -62,6 +62,8 @@ model User {
   inviteCode     InviteCode?       @relation("InviteCodeOwner")
   referralsMade  Referral[]        @relation("ReferralInviter")
   referralReceived Referral?       @relation("ReferralInvitee")
+  redemptions    RedemptionRecord[]
+  createdRedemptionCodes RedemptionCode[] @relation("RedemptionCodeCreator")
 
   @@index([role])
 }
@@ -132,6 +134,7 @@ model Course {
   genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
   template         String?   // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
   modelUsed        String?   // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
+  designJson       String?   // v3.3 课级设计系统（艺术方向 + 配色/字体 token + 动效旋钮）JSON，供 HTML 课件生成注入（见 src/lib/ai/courseware-design.ts）
   sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
   instructorName   String?
   reviewerName     String? // 健康/财务/防诈骗类必填
@@ -165,11 +168,13 @@ model Lesson {
   title         String
   summary       String?
   sortOrder     Int       @default(0)
-  contentType   String    @default("video") // video / article / mixed / live / ai_block
+  contentType   String    @default("video") // video / article / mixed / live / ai_block / ai_html
   videoAssetId  String? // 指向受控视频资源，非订阅用户拿不到直链
   videoUrl      String? // demo 真实媒体直链（/videos/.../*.mp4）：有值且有权益时优先于 mock 受控流，供 <video> 真播放
   articleMd     String?
-  blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）
+  blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）；也是 ai_html 课的内容层真值源 + 兜底
+  htmlJson      String? // ai_html 类型：AI 生成的自包含沙箱 HTML 课件渲染契约 {renderMode, contractVersion, html, hasScript, checksum}（见 src/lib/ai/courseware-html.ts）
+  htmlGenClaimedAt DateTime? // HTML 课件生成并发所有权占位（对齐 genClaimedAt 语义）
   genClaimedAt  DateTime? // 造课并发所有权占位：generateLessonCore 生成前原子 claim，防两条流水双写双扣（见 src/lib/course-gen.ts）
   // —— 视频课件生成（v3.1）：把块课件转成带旁白/字幕的视频。留接口，模型后补 ——
   // null=未发起 / pending=已排队 / generating=生成中 / ready=已就绪(videoAssetId 指向占位或真实资源) / failed=失败可重试
@@ -485,6 +490,46 @@ model CouponRedemption {
   createdAt DateTime @default(now())
 
   @@unique([couponId, orderId])
+  @@index([userId])
+}
+
+// ---------- 兑换码体系（v3.3）----------
+// 与 Coupon（仅支付折扣）正交：兑换码可直接发放积分 / 会员天数，有独立用户兑换入口。
+// 管理员批量生成（一批 batchId）→ 用户输入码兑换 → 原子核销（码状态翻转 + 积分/会员发放同事务）。
+model RedemptionCode {
+  id          String    @id @default(cuid())
+  code        String    @unique // 兑换码明文（生成时分组格式，如 TIDE-XXXX-XXXX-XXXX）
+  batchId     String    // 批次号：一次批量生成共用，便于按批作废/统计
+  type        String    // credits（发积分）/ membership（发会员天数）
+  value       Int       // credits: 积分数；membership: 会员天数
+  planId      String?   // membership 类可选指定 plan（空则用默认全站会员发放逻辑）
+  maxUses     Int       @default(1) // 可被兑换次数（1=一次性单人；>1=多人共用码）
+  usedCount   Int       @default(0)
+  status      String    @default("active") // active / disabled（作废）
+  note        String?   // 备注（活动名等）
+  expiresAt   DateTime?
+  createdById String?   // 生成的管理员
+  createdBy   User?     @relation("RedemptionCodeCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  records     RedemptionRecord[]
+
+  @@index([batchId])
+  @@index([status, expiresAt])
+}
+
+// 核销记录：谁在何时兑了哪张码得到什么。(codeId,userId) 唯一 —— 同一人对同一码只兑一次（防重放）。
+model RedemptionRecord {
+  id           String   @id @default(cuid())
+  codeId       String
+  code         RedemptionCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedType  String   // credits / membership（快照，便于审计）
+  grantedValue Int      // 实发积分数 / 会员天数
+  createdAt    DateTime @default(now())
+
+  @@unique([codeId, userId])
   @@index([userId])
 }
 

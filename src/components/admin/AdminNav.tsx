@@ -18,6 +18,7 @@ const ITEMS = [
 
 // 仅超级管理员可见的入口（权限矩阵为高危管理页）
 const ADMIN_ONLY_ITEMS = [
+  { href: "/admin/redemption-codes", label: "兑换码" },
   { href: "/admin/permissions", label: "权限管理" },
   { href: "/admin/errors", label: "500 日志" },
 ];
