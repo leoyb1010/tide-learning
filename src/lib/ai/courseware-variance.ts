@@ -27,7 +27,7 @@ const EXAMPLE_LAYOUTS = ["quote-card", "ticket", "inline-mark"] as const;
 const STEPS_LAYOUTS = ["timeline", "numbered-cards", "rail"] as const;
 const COMPARE_LAYOUTS = ["duel", "stacked", "ledger"] as const;
 const QUIZ_LAYOUTS = ["stage", "split"] as const;
-const KEYPOINT_LAYOUTS = ["wall", "checklist"] as const;
+const KEYPOINT_LAYOUTS = ["wall", "checklist", "kpi"] as const;
 const SUMMARY_LAYOUTS = ["band", "card"] as const;
 
 export type MotionParadigm = "reveal-up" | "reveal-fade" | "stagger" | "scale-in";

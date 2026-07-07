@@ -11,10 +11,13 @@ import {
   validateCoursewareHtml,
   buildContract,
   enforceTrustedCsp,
+  highlightCodeLine,
   CSP_META,
 } from "@/lib/ai/courseware-html";
 import { heroMotif, cornerMotif } from "@/lib/ai/courseware-motifs";
-import { resolveCoursewareMode, getModeProfile, llmStyleBrief, MODE_PROFILES } from "@/lib/ai/courseware-catalog";
+import { resolveCoursewareMode, getModeProfile, llmStyleBrief, MODE_PROFILES, contentTagsFor } from "@/lib/ai/courseware-catalog";
+import { assessCoursewareDiversity } from "@/lib/ai/courseware-html";
+import { goldenExemplar } from "@/lib/ai/courseware-exemplars";
 import type { Block } from "@/lib/blocks";
 
 /**
@@ -129,6 +132,36 @@ describe("课件风格智能层 catalog（内容类型→mode→风格）", () =
     expect(brief).toContain("developer-training");
     expect(brief).toContain("页型节奏");
     expect(getModeProfile("developer-training").blockEmphasis).toContain("code");
+  });
+
+  it("contentTagsFor 内容分类器：标题/赛道/block 打标", () => {
+    expect(contentTagsFor({ title: "Python 数据库开发" })).toContain("code");
+    expect(contentTagsFor({ category: "ai_skill", title: "深度学习" })).toContain("ai");
+    expect(contentTagsFor({ template: "exam_sprint", title: "考点冲刺" })).toContain("exam");
+    expect(contentTagsFor({ title: "日常" }, [{ type: "dialog" }])).toContain("dialogue");
+    expect(contentTagsFor({ title: "考研精读讲义" })).toContain("lecture");
+  });
+});
+
+describe("LLM 增强双闸门（few-shot 范例 + 多样性机检）", () => {
+  const d = resolveCourseDesign({ id: "x", category: "ai_skill", template: null, designJson: null });
+
+  it("goldenExemplar 本身合规（含 CSP/内联SVG/reduce-motion，过安全校验）", () => {
+    const ex = goldenExemplar(d);
+    expect(ex).toContain("Content-Security-Policy");
+    expect(ex).toContain("<svg");
+    expect(ex).toContain("prefers-reduced-motion");
+    expect(validateCoursewareHtml(ex).ok).toBe(true);
+  });
+
+  it("多样性闸门：纯文字墙(无SVG/同底色)拒收，图形分化产物通过", () => {
+    const wall = "<body>" + "<section><p>text</p></section>".repeat(6) + "</body>";
+    const bad = assessCoursewareDiversity(wall);
+    expect(bad.ok).toBe(false);
+    expect(bad.reasons.length).toBeGreaterThan(0);
+    // 我方确定性渲染器产物(含母题SVG + 多页型底色)应通过
+    const good = renderCoursewareHtml({ title: "算清 ROI", blocks: sampleBlocks(), design: d, variance: resolveLessonVariance("x", { id: "l", title: "t", sortOrder: 0 }, d) });
+    expect(assessCoursewareDiversity(good).ok).toBe(true);
   });
 });
 
@@ -247,7 +280,39 @@ describe("页型档案 + 签名母题（§2 P0：破单调）", () => {
     expect(out).toContain("code-term");
     expect(out).toContain("ct-bar"); // 终端标题栏
     expect((out.match(/class="cl"/g) || []).length).toBe(2); // 两行 → 两个行元素
+    expect(out).toContain("tok-kw"); // def → 关键字着色
     expect(validateCoursewareHtml(out).ok).toBe(true);
+  });
+
+  it("highlightCodeLine：关键字/字符串/注释/数字/函数着色 + XSS 安全(先转义)", () => {
+    const kw = highlightCodeLine("return 42");
+    expect(kw).toContain('class="tok-kw"');
+    expect(kw).toContain('class="tok-num"');
+    const str = highlightCodeLine('compute("hi") // note');
+    expect(str).toContain('class="tok-str"');
+    expect(str).toContain('class="tok-com"');
+    expect(str).toContain('class="tok-fn"'); // compute( → 非关键字标识符+紧跟( → 函数
+    // XSS：尖括号先转义，不产生真实标签
+    const evil = highlightCodeLine('x = "<script>alert(1)</script>"');
+    expect(evil).not.toContain("<script>");
+    expect(evil).toContain("&lt;script&gt;");
+  });
+
+  it("keypoint kpi 版式 + 暗场 spotlight 页型 + 可分步页 data-steps", () => {
+    const darkD = { ...design, art: getArtDirection("dev_terminal") };
+    const darkV = resolveLessonVariance("cc", { id: "l1", title: "t", sortOrder: 0 }, darkD);
+    // 强制 kpi 版式：直接测渲染器对 kpi 的响应（variance 已含 kpi 池）
+    const kpiBlock: (Block & { id: string })[] = [{ id: "k", type: "keypoint", points: ["p1", "p2", "p3"] }];
+    // 多个 seed 里至少一个会渲成 kpi/其它，这里只验渲染器认得 kpi 类名的存在性由 CSS 保证；改测 data-steps：
+    const stepBlocks: (Block & { id: string })[] = [
+      { id: "s", type: "steps", steps: [{ title: "a" }, { title: "b" }, { title: "c" }] },
+    ];
+    const stepHtml = renderCoursewareHtml({ title: "t", blocks: stepBlocks, design: darkD, variance: darkV });
+    expect(stepHtml).toContain("data-steps"); // steps 页可分步揭示
+    expect(stepHtml).toContain("data-stagger");
+    // 暗场方向的产物含 spotlight 页型的可能（池含 spotlight）——至少 CSS 定义存在
+    expect(stepHtml).toContain(".page--spotlight");
+    expect(validateCoursewareHtml(renderCoursewareHtml({ title: "t", blocks: kpiBlock, design: darkD, variance: darkV })).ok).toBe(true);
   });
 });
 

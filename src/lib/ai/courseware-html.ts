@@ -66,6 +66,46 @@ function md(s: string): string {
   return renderMarkdown(s || "");
 }
 
+// —— 轻量确定性语法着色（代码课件 IDE 质感）——
+// 跨语言通用 tokenizer：逐行扫描，先切 token 再对**每个 token 文本 esc()**、再包类名 span。
+// 安全铁律：所有输出文本恒经 esc（先 tokenize 后 escape），class 由本文件控制，无 XSS 面。块注释/跨行串按行处理（学习片段足够）。
+const CODE_KEYWORDS = new Set([
+  "def","class","function","func","fn","return","import","from","export","default","package","use",
+  "const","let","var","new","await","async","yield","lambda","this","self","super",
+  "if","else","elif","for","while","do","in","of","switch","case","break","continue","pass",
+  "try","except","catch","finally","with","as","throw","raise","match",
+  "true","false","null","none","nil","void","int","str","float","bool","string","number","boolean",
+  "public","private","protected","static","interface","type","struct","enum","typedef","namespace",
+  "print","echo","and","or","not","is","typeof","instanceof","require","module",
+]);
+
+/** 单行代码 → 着色后的安全 HTML（每 token 先 esc 再包 span）。 */
+export function highlightCodeLine(raw: string): string {
+  const s = raw;
+  let i = 0;
+  let out = "";
+  const put = (cls: string | null, text: string) => {
+    out += cls ? `<span class="${cls}">${esc(text)}</span>` : esc(text);
+  };
+  while (i < s.length) {
+    const rest = s.slice(i);
+    let m: RegExpExecArray | null;
+    if ((m = /^(?:\/\/.*|#.*|--.*)/.exec(rest))) { put("tok-com", m[0]); i += m[0].length; continue; } // 行注释
+    if ((m = /^(?:"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)/.exec(rest))) { put("tok-str", m[0]); i += m[0].length; continue; } // 字符串
+    if ((m = /^\d[\d_]*\.?\d*(?:[eE][+-]?\d+)?/.exec(rest))) { put("tok-num", m[0]); i += m[0].length; continue; } // 数字
+    if ((m = /^[A-Za-z_$][\w$]*/.exec(rest))) { // 标识符 / 关键字 / 函数名
+      const w = m[0];
+      const isFn = /^\s*\(/.test(s.slice(i + w.length));
+      put(CODE_KEYWORDS.has(w.toLowerCase()) ? "tok-kw" : isFn ? "tok-fn" : null, w);
+      i += w.length;
+      continue;
+    }
+    put(null, s[i]); // 运算符/标点/空白：原样（经 esc）
+    i++;
+  }
+  return out;
+}
+
 // ————————————————————————————————————————————————————————————
 //  样式（CSS 变量 = 设计 token；动画 GPU 安全；reduce-motion 降级）
 // ————————————————————————————————————————————————————————————
@@ -105,7 +145,7 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
 .page--surface{background:var(--ct-surface);border:1px solid var(--ct-border);border-radius:var(--ct-radius);box-shadow:var(--ct-shadow);padding:clamp(20px,4vw,34px)}
 .page--figure{background:var(--ct-surface2);border-left:3px solid var(--ct-accent);border-radius:var(--ct-radius);padding:clamp(20px,4vw,34px)}
 /* 翻页模式：舞台已占满整页，内边距收紧给内容更多纵向空间（少触发缩放/滚动）。 */
-body.ct-paged .page--band,body.ct-paged .page--surface,body.ct-paged .page--figure{padding:clamp(14px,2.6vh,24px)}
+body.ct-paged .page--band,body.ct-paged .page--surface,body.ct-paged .page--figure,body.ct-paged .page--spotlight{padding:clamp(14px,2.6vh,24px)}
 /* hero/plain 不加框：hero 承载全出血签名母题背景，plain 交给内容自身结构，形成留白节奏。 */
 .sec-fig{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
 .sec-fig svg{width:100%;height:100%;display:block}
@@ -264,6 +304,21 @@ a{color:var(--ct-accent-ink)}
 .code-term .cl{display:block;padding:0 16px 0 52px;position:relative;white-space:pre}
 .code-term .cl::before{counter-increment:ln;content:counter(ln);position:absolute;left:0;width:38px;text-align:right;color:var(--ct-ink3);opacity:.55}
 .code-term .ct-note{padding:12px 16px;border-top:1px solid var(--ct-border);font-size:14.5px;color:var(--ct-ink2)}
+/* 语法着色（substrate 调优：暗场用亮色、亮场用深色，均高对比，是代码课件的专属语义色板） */
+.code-term .tok-kw{color:${dark ? "#c792ea" : "#8250df"};font-weight:600}
+.code-term .tok-str{color:${dark ? "#7ee787" : "#0a7d33"}}
+.code-term .tok-com{color:var(--ct-ink3);font-style:italic;opacity:.85}
+.code-term .tok-num{color:${dark ? "#f0a35e" : "#953800"}}
+.code-term .tok-fn{color:${dark ? "#79c0ff" : "#0550ae"}}
+/* —— spotlight 页型（暗场专属戏剧页：径向聚光 + 顶部霓虹细线）—— */
+.page--spotlight{border-radius:var(--ct-radius);overflow:hidden;padding:clamp(20px,4vw,34px);background:radial-gradient(120% 92% at 50% 3%, var(--ct-accent-soft) 0%, transparent 58%), var(--ct-surface)}
+.page--spotlight::after{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--ct-accent),transparent);opacity:.85}
+/* —— keypoint kpi（大数字玻璃要点墙，吸收 html-ppt-skill 的 kpi-grid）—— */
+.kp--kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.kp--kpi .item{flex-direction:column;align-items:flex-start;gap:8px;padding:16px}
+.kp--kpi .item .b{width:auto;height:auto;background:none;padding:0;font-family:${a.fontMono};font-size:26px;font-weight:700;color:var(--ct-accent-ink)}
+/* —— 页内分步揭示（fragment）：data-steps 页的 stagger 子项逐个 frag-in（其余页仍整页入场）—— */
+[data-stagger]>*.frag-in{opacity:1;transform:none}
 /* —— 入场动效（GPU 安全：只动 transform/opacity）—— */
 [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ct-ease),transform .7s var(--ct-ease)}
 [data-reveal].m-fade{transform:none}
@@ -397,23 +452,53 @@ const RUNTIME_SCRIPT = `
     if (ideal >= 0.56) { w.style.transform = 'scale(' + ideal.toFixed(3) + ')'; }
     else { s.classList.add('ct-scroll'); } // 缩到下限仍超高 → 本页可滚（顶对齐），内容不丢
   }
-  function show(i){
+  // 页内分步揭示（fragment）状态：fragEls=当前页可逐条揭示的子项，fragIdx=已揭示到第几条。
+  var fragEls = null, fragIdx = 0;
+  function revealNow(sec){ // 整页揭示（非分步页 / 回看 / reduce）：所有 reveal+stagger+frag 全显。
+    var cw = sec.querySelectorAll('[data-reveal],[data-stagger]');
+    for (var q = 0; q < cw.length; q++) cw[q].classList.add('in');
+    var fr = sec.querySelectorAll('[data-stagger]>*');
+    for (var k = 0; k < fr.length; k++) fr[k].classList.add('frag-in');
+  }
+  function updateNav(){
+    if (prevBtn) prevBtn.disabled = cur === 0;
+    // 末页且本页 frag 已揭完才禁用「下一页」；否则「下一页」还要用于逐条揭示。
+    if (nextBtn) nextBtn.disabled = (cur === secs.length - 1) && !(fragEls && fragIdx < fragEls.length);
+  }
+  function show(i, revealAll){
     if (!secs.length) return;
     cur = Math.max(0, Math.min(secs.length - 1, i));
     secs.forEach(function(s, j){ s.classList[j === cur ? 'add' : 'remove']('ct-cur'); });
-    // 翻页模式下不能只靠 IntersectionObserver（页在 display:none↔显示间切换时不可靠）：
-    // 每次翻到某页，显式给该页的入场元素加 .in（既保证可见，又让每页翻入时重放一次入场动效）。
+    // 翻页模式下不能只靠 IntersectionObserver（页在 display:none↔显示间切换时不可靠），显式揭示当前页。
+    fragEls = null; fragIdx = 0;
+    var sec = secs[cur];
     if (!reduce) {
-      var cw = secs[cur].querySelectorAll('[data-reveal],[data-stagger]');
-      for (var q = 0; q < cw.length; q++) cw[q].classList.add('in');
+      var stepped = sec.hasAttribute('data-steps') && !revealAll;
+      var frags = stepped ? sec.querySelectorAll('[data-stagger]>*') : null;
+      if (stepped && frags && frags.length > 1) {
+        // 分步页：先揭示标题/容器与第一条，其余等「下一步」逐条（→先看一条再看下一条）。
+        sec.querySelectorAll('[data-reveal]').forEach(function(e){ e.classList.add('in'); });
+        for (var f = 0; f < frags.length; f++) frags[f].classList.remove('frag-in');
+        frags[0].classList.add('frag-in');
+        fragEls = frags; fragIdx = 1;
+      } else {
+        revealNow(sec); // 非分步 / 回看 / ≤1 条：整页揭示
+      }
+    } else {
+      revealNow(sec); // reduce：全显不分步（不强迫多次点击，无障碍）
     }
-    if (prevBtn) { prevBtn.disabled = cur === 0; nextBtn.disabled = cur === secs.length - 1; }
+    updateNav();
     if (count) count.textContent = (cur + 1) + ' / ' + secs.length;
     progress.style.width = (((cur + 1) / secs.length) * 100) + '%';
     fit();
-    try{ parent.postMessage({type:'ct-page', index: cur, total: secs.length}, '*'); }catch(e){}
+    try{ parent.postMessage({type:'ct-page', index: cur, total: secs.length, frags: fragEls ? fragEls.length : 0}, '*'); }catch(e){}
   }
-  function nav(d){ if (mode === 'paged') show(cur + d); }
+  function nav(d){
+    if (mode !== 'paged') return;
+    // 前进时：本页还有未揭示的 frag → 先揭下一条（不翻页）；否则翻页。回看(←)直接整页全显。
+    if (d === 1 && fragEls && fragIdx < fragEls.length) { fragEls[fragIdx].classList.add('frag-in'); fragIdx++; updateNav(); fit(); return; }
+    show(cur + d, d < 0);
+  }
   function setMode(m){
     if (m !== 'paged' && m !== 'scroll') return;
     mode = m;
@@ -566,7 +651,7 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     }
     case "keypoint":
       return `<section ${rv}><span class="eyebrow">本节要点</span>
-        <div class="kp ${variant === "checklist" ? "kp--list" : ""}" data-stagger>${b.points
+        <div class="kp ${variant === "checklist" ? "kp--list" : variant === "kpi" ? "kp--kpi" : ""}" data-stagger>${b.points
           .map((p, k) => `<div class="item" style="--i:${k}"><span class="b">${k + 1}</span><span>${esc(p)}</span></div>`)
           .join("")}</div></section>`;
     case "callout":
@@ -576,7 +661,7 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     case "code": {
       // 终端/编辑器镜框 + 行号（交通灯点 + 文件名 tab + 逐行行号栏），远比裸 <pre> 专业。
       const lines = String(b.code || "").split("\n");
-      const codeBody = lines.map((l) => `<span class="cl">${esc(l) || "&nbsp;"}</span>`).join("");
+      const codeBody = lines.map((l) => `<span class="cl">${highlightCodeLine(l) || "&nbsp;"}</span>`).join("");
       return `<section ${rv}><div class="code-term">
         <div class="ct-bar"><span class="ct-dot r"></span><span class="ct-dot y"></span><span class="ct-dot g"></span><span class="ct-fname">${esc(b.lang || "code")}</span></div>
         <pre class="ct-code"><code>${codeBody}</code></pre>${
@@ -631,27 +716,34 @@ export interface RenderInput {
 // —— 页型档案（Page Archetype）：给每个 block 的整页一个「舞台」，翻页时构图有对比 ——
 // 打破「每页都是 小字→标题→段落→卡片 的同底色纵向堆叠」。scene/summary 为情绪书挡 → hero 母题背景；
 // 其余按 (seed+index) 确定性在 band/surface/figure/plain 间轮转，且不与相邻页同型（保证翻页视觉分化）。
-const STAGE_POOL = ["band", "surface", "figure", "plain"] as const;
-type Stage = (typeof STAGE_POOL)[number] | "hero";
+type Stage = "band" | "surface" | "figure" | "plain" | "spotlight" | "hero";
+const STAGE_POOL: readonly Stage[] = ["band", "surface", "figure", "plain"];
+// 暗场额外掺入 spotlight（径向聚光戏剧页），给深色方向更强的构图对比。
+const STAGE_POOL_DARK: readonly Stage[] = ["band", "surface", "figure", "spotlight", "plain"];
+// 这些 block 天然可「逐条揭示」，其页启用 fragment 分步（data-steps）。
+const FRAG_TYPES = new Set(["steps", "keypoint", "objectives", "dialog"]);
 
-function stageFor(type: string, i: number, seed: number, prev: Stage | null): Stage {
+function stageFor(type: string, i: number, seed: number, prev: Stage | null, pool: readonly Stage[]): Stage {
   if (type === "scene" || type === "summary") return "hero";
-  let s: Stage = STAGE_POOL[(seed + i) % STAGE_POOL.length];
-  if (s === prev) s = STAGE_POOL[(seed + i + 1) % STAGE_POOL.length];
+  let s: Stage = pool[(seed + i) % pool.length];
+  if (s === prev) s = pool[(seed + i + 1) % pool.length];
   return s;
 }
 
 /** 确定性渲染：给定输入必产同一自包含 HTML（含 CSP、内联样式脚本、reduce-motion、页型舞台+签名母题）。 */
 export function renderCoursewareHtml(input: RenderInput): string {
   const { title, blocks, design, variance } = input;
+  const pool = design.art.substrate === "dark" ? STAGE_POOL_DARK : STAGE_POOL;
   let prev: Stage | null = null;
   const body = blocks
     .map((b, i) => {
-      const stage = stageFor(b.type, i, variance.seed >>> 0, prev);
+      const stage = stageFor(b.type, i, variance.seed >>> 0, prev, pool);
       prev = stage;
       // 全出血装饰层（不随内容缩放，见运行时 wrapping 保留逻辑）：hero 用大幅母题背景，figure 用角标。
       const deco = stage === "hero" ? heroMotif(design.art, (variance.seed + i) >>> 0) : stage === "figure" ? cornerMotif(design.art) : "";
-      return `<section class="page page--${stage}">${deco}${renderBlock(b, i, design, variance)}</section>`;
+      // 可分步页加 data-steps：翻页运行时会让其 stagger 子项逐条揭示（先看一条再看下一条）。
+      const steps = FRAG_TYPES.has(b.type) ? " data-steps" : "";
+      return `<section class="page page--${stage}"${steps}>${deco}${renderBlock(b, i, design, variance)}</section>`;
     })
     .join("\n");
   return (
@@ -702,4 +794,37 @@ export function validateCoursewareHtml(html: string): CoursewareLint {
   if (/颠覆认知|全网最强|小白秒变|Unleash|Seamless|Next-Gen/i.test(h)) issues.push("含 AI 陈词/夸张营销");
 
   return { ok: issues.length === 0, issues };
+}
+
+// ————————————————————————————————————————————————————————————
+//  多样性机检闸门（LLM 增强产物专用）—— 吸收模板侦察的「剪影测试」思想
+// ————————————————————————————————————————————————————————————
+
+export interface CoursewareDiversity {
+  svgCount: number;
+  sectionCount: number;
+  distinctBackgrounds: number;
+  ok: boolean;
+  reasons: string[];
+}
+
+/**
+ * 评估一段 bespoke 课件 HTML 的「视觉分化度」（防 LLM 产出纯文字墙/同底色堆叠）。
+ * 通用启发（不依赖我方类名，适配 LLM 自由产物）：内联 SVG 数、section 数、不同 background 声明数。
+ * 仅对有体量(section≥4)的产物要求分化；不达标 → 建议拒收回落确定性渲染器（它天生分化）。
+ */
+export function assessCoursewareDiversity(html: string): CoursewareDiversity {
+  const h = html || "";
+  const svgCount = (h.match(/<svg[\s>]/gi) || []).length;
+  const sectionCount = (h.match(/<section[\s>]/gi) || []).length;
+  const bgs = new Set(
+    (h.match(/background(?:-color|-image)?\s*:\s*[^;"}]+/gi) || []).map((s) => s.toLowerCase().replace(/\s+/g, "")),
+  );
+  const distinctBackgrounds = bgs.size;
+  const reasons: string[] = [];
+  if (sectionCount >= 4) {
+    if (svgCount === 0) reasons.push("零内联 SVG 图形（课件应有图形化元素，非纯文字堆叠）");
+    if (distinctBackgrounds < 2) reasons.push("背景/表面无分化（页型构图单一，未破同底色堆叠）");
+  }
+  return { svgCount, sectionCount, distinctBackgrounds, ok: reasons.length === 0, reasons };
 }

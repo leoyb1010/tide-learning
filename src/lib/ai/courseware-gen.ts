@@ -13,12 +13,14 @@ import { creditingOnUsage } from "../credits";
 import { track } from "../analytics";
 import { resolveCourseDesign, serializeCourseDesign, type CourseDesign } from "./courseware-design";
 import { resolveLessonVariance } from "./courseware-variance";
-import { llmStyleBrief } from "./courseware-catalog";
+import { llmStyleBrief, resolveCoursewareMode } from "./courseware-catalog";
+import { goldenExemplar, exemplarNoteFor } from "./courseware-exemplars";
 import {
   renderCoursewareHtml,
   buildContract,
   validateCoursewareHtml,
   enforceTrustedCsp,
+  assessCoursewareDiversity,
   type CoursewareContract,
 } from "./courseware-html";
 
@@ -90,6 +92,10 @@ async function synthesizeViaLLM(
     "- 要有编辑级排版层级、macro 留白、入场动效、交互（quiz 判分/记忆卡翻转），高级不廉价。\n" +
     // 吸收 20 源模板侦察：按内容类型 mode 注入呈现风格指令，让 bespoke HTML 贴合内容而非千篇一律。
     llmStyleBrief(design, title) +
+    exemplarNoteFor(resolveCoursewareMode({ title, artKey: design.art.key })) +
+    // few-shot：给一个自包含+页型分化+内联SVG+终端+reduce-motion 都齐全的黄金骨架，对标其完备度（风格按本课方向重做）。
+    "\n" +
+    goldenExemplar(design) +
     "\n只输出 HTML，不要任何解释文字或代码围栏。";
   const user =
     `课件标题：《${title}》\n本节内容块（JSON，作为你的内容素材，忠于其信息，可重排版式但不虚构）：\n` +
@@ -155,14 +161,16 @@ export async function generateLessonHtml(
   if (opts.enhance) {
     const llm = await synthesizeViaLLM(design, blocks, lesson.title, userId, opts.model ?? course.modelUsed);
     if (llm) {
-      // 安全铁律：绝不信任模型自带 CSP —— 强制注入我方可信 CSP（剥离模型的），再过校验才采用。
+      // 安全铁律：绝不信任模型自带 CSP —— 强制注入我方可信 CSP（剥离模型的），再过双闸门才采用。
       const safe = enforceTrustedCsp(llm);
-      const lint = validateCoursewareHtml(safe);
-      if (lint.ok) {
+      const lint = validateCoursewareHtml(safe); // ① 安全/反slop
+      const diversity = assessCoursewareDiversity(safe); // ② 多样性（防纯文字墙/同底色堆叠）
+      if (lint.ok && diversity.ok) {
         html = safe;
         engine = "llm";
       } else {
-        lintIssues = lint.issues; // 记录被拒原因，用回落
+        // 任一闸门不过 → 回落确定性渲染器（它天生分化）；记录被拒原因供排障。
+        lintIssues = [...lint.issues, ...diversity.reasons];
       }
     }
   }
