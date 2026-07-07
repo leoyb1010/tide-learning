@@ -56,7 +56,9 @@ export async function chat(opts: ChatOptions): Promise<string> {
     temperature = 0.7,
     maxTokens = 8000, // 推理模型：思维链先耗 token，正文需在其后生成，故预算调大
     json = false,
-    timeoutMs = 45_000,
+    // 45s → 60s：NewAPI 网关下部分模型（如 glm-5.2）单次响应可逼近 40s，
+    // 45s 会偶发 504 让造课「生成失败」。给足头寸，仍由 AbortController 兜底封顶。
+    timeoutMs = 60_000,
     retries = 1,
     onUsage,
   } = opts;
@@ -162,21 +164,56 @@ export async function chat(opts: ChatOptions): Promise<string> {
   throw lastErr ?? new AppError("AI 服务暂时不可用", 502);
 }
 
-/** JSON 输出包装：内部 json:true + 解析，失败降级为 AppError。 */
+/**
+ * 从模型原始输出里稳健抽取 JSON —— 兼容各家模型的常见「不规矩」输出：
+ *  1) 直接就是合法 JSON（多数情况）。
+ *  2) 包在 ```json ... ``` 代码围栏里（claude-sonnet-5 即便要求 json_object 仍会这么干）。
+ *  3) JSON 前后夹带说明性散文（截取第一个 { 到最后一个 } / 第一个 [ 到最后一个 ]）。
+ * 任一步解析成功即返回；全部失败返回 undefined，由调用方折叠为 502。
+ */
+function extractJson<T>(raw: string): T | undefined {
+  const tryParse = (s: string): T | undefined => {
+    try {
+      return JSON.parse(s) as T;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const trimmed = raw.trim();
+  const direct = tryParse(trimmed);
+  if (direct !== undefined) return direct;
+
+  // 代码围栏：取第一段 ```...``` 内容
+  const fence = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fence) {
+    const inFence = tryParse(fence[1].trim());
+    if (inFence !== undefined) return inFence;
+  }
+
+  // 夹带散文：截取最外层对象 / 数组字面量
+  const firstObj = trimmed.indexOf("{");
+  const lastObj = trimmed.lastIndexOf("}");
+  if (firstObj >= 0 && lastObj > firstObj) {
+    const obj = tryParse(trimmed.slice(firstObj, lastObj + 1));
+    if (obj !== undefined) return obj;
+  }
+  const firstArr = trimmed.indexOf("[");
+  const lastArr = trimmed.lastIndexOf("]");
+  if (firstArr >= 0 && lastArr > firstArr) {
+    const arr = tryParse(trimmed.slice(firstArr, lastArr + 1));
+    if (arr !== undefined) return arr;
+  }
+  return undefined;
+}
+
+/** JSON 输出包装：内部 json:true + 稳健解析，失败降级为 AppError。 */
 export async function chatJson<T>(opts: Omit<ChatOptions, "json">): Promise<T> {
   const raw = await chat({ ...opts, json: true });
-  try {
-    return JSON.parse(raw) as T;
-  } catch {
-    // 有时模型会在 JSON 外包 ```json fence，尝试剥离
-    const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
-    try {
-      return JSON.parse(stripped) as T;
-    } catch {
-      console.error("[llm] JSON parse failed:", raw.slice(0, 300));
-      throw new AppError("AI 返回格式异常，请重试", 502);
-    }
-  }
+  const parsed = extractJson<T>(raw);
+  if (parsed !== undefined) return parsed;
+  console.error("[llm] JSON parse failed:", raw.slice(0, 300));
+  throw new AppError("AI 返回格式异常，请重试", 502);
 }
 
 function sleep(ms: number): Promise<void> {

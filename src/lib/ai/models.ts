@@ -62,7 +62,10 @@ export const LLM_MODELS: LlmModelEntry[] = [
     costWeight: 3,
     envKeyName: NEWAPI_KEY_ENV,
     baseUrlEnvName: NEWAPI_BASE_URL_ENV,
-    enabled: true,
+    // 2026-07-07 实测经 NewAPI 网关 claude-sonnet-5 单次响应频繁 > 60s（探针偶发 7s，但造课
+    // 大纲/逐节请求多次超时，两次尝试累计 120s），导致「生成失败」。网关侧稳定前暂时下架，
+    // 只保留稳定可用的 gpt-5.5（默认，~8s）与 glm-5.2（~40s）。网关修复后改回 true 即可。
+    enabled: false,
   },
   // ↓↓↓ Leo 录入位（enabled:false 时不出现在任何 UI / 校验里，配好 key 后翻 true 即上线）↓↓↓
   // {

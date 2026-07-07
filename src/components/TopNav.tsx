@@ -165,7 +165,8 @@ export function TopNav({ user }: { user: NavUser | null }) {
         className="sticky top-0 border-b border-[var(--border)] backdrop-blur-md"
         style={{ zIndex: "var(--z-sticky)", background: "color-mix(in srgb, var(--bg) 88%, transparent)" }}
       >
-        <div className="mx-auto flex h-[60px] max-w-[1320px] items-center gap-3 px-4 sm:px-6">
+        <div className="mx-auto max-w-[1320px] px-4 sm:px-6">
+          <div className="flex h-[60px] items-center gap-3">
           {/* Logo */}
           <Link href={loggedIn ? "/desk" : "/"} className="group flex shrink-0 items-center gap-2 pr-1">
             <YoudaoLogo variant="red" height={14} priority className="transition-opacity group-hover:opacity-80" />
@@ -185,7 +186,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                 <Link
                   key={l.href}
                   href={l.href}
-                  className={`rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${lateItem ? "hidden lg:block" : ""} ${
+                  className={`shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${lateItem ? "hidden lg:block" : ""} ${
                     active ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
                   }`}
                 >
@@ -197,9 +198,6 @@ export function TopNav({ user }: { user: NavUser | null }) {
 
           {/* 右侧工具区 */}
           <div className="ml-auto flex items-center gap-2">
-            {/* 生产中指示（有生成中的课时出现，点击回到剧场） */}
-            {loggedIn && <GenNavIndicator />}
-
             {/* 续学胶囊（v3.0：点击展开最近 5 门课 + 全部学习记录入口） */}
             {resume && (
               <div ref={resumeRef} className="relative hidden lg:block">
@@ -400,6 +398,15 @@ export function TopNav({ user }: { user: NavUser | null }) {
               <List size={18} />
             </button>
           </div>
+          </div>
+
+          {/* 生产中指示：单独放到第二行（头像下方右对齐），避免挤占顶栏一行导致导航文字堆叠换行。
+              无生成中课时 GenNavIndicator 返回 null，此容器为空、不占高度。 */}
+          {loggedIn && (
+            <div className="flex justify-end">
+              <GenNavIndicator />
+            </div>
+          )}
         </div>
       </header>
 

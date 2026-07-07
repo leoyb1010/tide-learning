@@ -91,6 +91,9 @@ export async function POST(req: NextRequest) {
         temperature: 0.5,
         maxTokens: 6000,
         model: modelKey,
+        // 大纲是用户点击后同步等待的调用：不做超时重试，避免慢模型「60s×2=120s」的漫长转圈；
+        // 单次 60s 仍失败即快速回错，前端明确提示而非久等。逐节生成（后台）仍保留默认重试。
+        retries: 0,
         onUsage: creditingOnUsage(user.id, "generate_course"),
       });
 

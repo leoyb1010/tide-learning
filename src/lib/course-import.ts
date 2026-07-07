@@ -66,6 +66,9 @@ export async function structureImportedTextIntoCourse(opts: {
       temperature: 0.3,
       maxTokens: 6000,
       model,
+      // 切章是导入点击后同步等待的调用：不做超时重试，避免慢模型 120s 漫长转圈；
+      // 失败会走下方「退回单章」兜底，导入不空。逐节生成（后台）仍保留默认重试。
+      retries: 0,
       onUsage: creditingOnUsage(userId, "import_source"),
     });
     const raw = Array.isArray(result?.outline) ? result.outline : [];
