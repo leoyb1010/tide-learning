@@ -10,8 +10,12 @@ import {
   joseToDer,
   validateClaims,
   verifyJwsSignature,
+  verifyCertChain,
+  certHasOid,
   verifyAppleTransaction,
   appleRootFingerprintSha256,
+  RECEIPT_SIGNING_OID_TLV,
+  WWDR_OID_TLV,
   type AppleTransactionPayload,
 } from "@/lib/apple-iap";
 
@@ -229,6 +233,44 @@ describe("verifyJwsSignature (以自签 P-256 验签逻辑本身)", () => {
     const bad = Buffer.from(rawSig);
     bad[0] ^= 0xff;
     expect(verifyJwsSignature(leaf, signingInput, bad)).toBe(false);
+  });
+});
+
+// —— OID pinning + 链长（P0-2：防根到 G3 的其他 Apple 证书冒充交易签名证书）——
+describe("verifyCertChain OID pinning / 链长", () => {
+  it("链长非 3（1/2/4 段）一律拒绝，且在解析证书前就拒（不构造 X509）", () => {
+    expect(() => verifyCertChain(["only-one"])).toThrow(/链长度非法/);
+    expect(() => verifyCertChain(["a", "b"])).toThrow(/链长度非法/);
+    expect(() => verifyCertChain(["a", "b", "c", "d"])).toThrow(/链长度非法/);
+  });
+
+  it("标记 OID 常量为合法 DER TLV（tag=0x06 + 正确长度 + Apple 前缀 2A 86 48 86 F7 63 64 06）", () => {
+    const applePrefix = Buffer.from([0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x06]);
+    for (const tlv of [RECEIPT_SIGNING_OID_TLV, WWDR_OID_TLV]) {
+      expect(tlv[0]).toBe(0x06); // OBJECT IDENTIFIER
+      expect(tlv[1]).toBe(tlv.length - 2); // 长度字节自洽
+      expect(tlv.subarray(2, 2 + applePrefix.length).equals(applePrefix)).toBe(true);
+    }
+    // 收据签名 OID 尾部 ...06 0B 01；WWDR 尾部 ...06 02 01
+    expect(RECEIPT_SIGNING_OID_TLV.subarray(-3).equals(Buffer.from([0x06, 0x0b, 0x01]))).toBe(true);
+    expect(WWDR_OID_TLV.subarray(-3).equals(Buffer.from([0x06, 0x02, 0x01]))).toBe(true);
+  });
+
+  it("certHasOid：普通自签证书不含 Apple 标记 OID（能区分「非交易签名证书」）", async () => {
+    const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
+    const { execFileSync } = await import("node:child_process");
+    const os = await import("node:os");
+    const fs = await import("node:fs");
+    const path = await import("node:path");
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "iap-oid-"));
+    const keyPath = path.join(dir, "key.pem");
+    const certPath = path.join(dir, "cert.pem");
+    fs.writeFileSync(keyPath, privateKey.export({ type: "pkcs8", format: "pem" }) as string);
+    execFileSync("openssl", ["req", "-new", "-x509", "-key", keyPath, "-out", certPath, "-days", "1", "-subj", "/CN=not-apple"]);
+    const cert = new X509Certificate(fs.readFileSync(certPath, "utf8"));
+    fs.rmSync(dir, { recursive: true, force: true });
+    expect(certHasOid(cert, RECEIPT_SIGNING_OID_TLV)).toBe(false);
+    expect(certHasOid(cert, WWDR_OID_TLV)).toBe(false);
   });
 });
 

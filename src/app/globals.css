@@ -1432,6 +1432,45 @@ body::before {
 }
 
 /* ============================================================
+   BeamFrame —— 原生「动态边框光束」（border-beam 的零依赖等价实现）
+   一道 conic 高光沿圆角边缘扫一圈：用 transform:rotate（GPU 友好，不动 layout）
+   + mask 只保留边框环。颜色全走 CSS 变量（var(--red)/var(--info)/var(--ink3)），
+   亮暗与 data-theme 多主题自动适配，绝不硬编码色值。
+   仅用于极少数高价值区域（核心 AI 输入 / 主 CTA / 精选卡），禁批量列表使用。
+   ============================================================ */
+.beam-frame { position: relative; isolation: isolate; }
+.beam-frame__beam {
+  position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  padding: var(--beam-w, 1.5px); overflow: hidden; z-index: 1;
+  /* 只显示边框环：外框实心 − 内容框实心 = 一圈 padding 宽的环。 */
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+          mask-composite: exclude;
+}
+.beam-frame__beam::before {
+  content: ""; position: absolute; inset: -75%;
+  /* 彗星式扫光：0° 满色 → var(--beam-arc) 处淡出，其余透明，随 transform 旋转扫一圈。 */
+  background: conic-gradient(from 0deg, var(--beam-color, var(--red)), transparent var(--beam-arc, 82deg));
+  opacity: var(--beam-opacity, .9);
+  animation: beam-spin var(--beam-dur, 3.4s) linear infinite;
+}
+@keyframes beam-spin { to { transform: rotate(360deg); } }
+/* 色调（默认品牌红；克制起见非品牌处用中性/信息蓝）。 */
+.beam-frame--brand   { --beam-color: var(--red); }
+.beam-frame--neutral { --beam-color: var(--ink3); --beam-opacity: .65; }
+.beam-frame--ocean   { --beam-color: var(--info); }
+/* 变体 */
+.beam-frame--line .beam-frame__beam { padding: 1px; }
+.beam-frame--line .beam-frame__beam::before { --beam-dur: 4.4s; }
+.beam-frame--outside .beam-frame__beam { inset: -2px; padding: 2px; }
+.beam-frame--outside { filter: drop-shadow(0 0 6px color-mix(in srgb, var(--beam-color, var(--red)) 38%, transparent)); }
+@media (prefers-reduced-motion: reduce) {
+  /* 降级：停旋转、留一圈静态柔光（仍是品牌信号，不闪不动）。 */
+  .beam-frame__beam::before { animation: none; opacity: .45; }
+}
+
+/* ============================================================
    SharePanel（v3.0 全局分享面板）辅助动效
    预览骨架 shimmer 复用现有 @keyframes shimmer；spinner 独立 keyframe。
    两者均在 reduce-motion 下降级为静态。

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkle, ArrowRight } from "@phosphor-icons/react/dist/ssr";
+import { BeamFrame } from "@/components/ui/BeamFrame";
 
 /* ============================================================
    HeroPromptInput —— 首屏悬浮输入框（局部化状态）
@@ -28,7 +29,13 @@ export function HeroPromptInput() {
           注意不加 backdrop-blur：输入框叠在呼吸的台灯光晕上，backdrop-filter 会随
           背后每帧变化持续重采样，是首屏帧率黑洞；半透明底色本身已足够融合。
           宽屏内边距/字号随视口放大，与第一幕响应式阶梯同步。 */}
-      <div className="hero-prompt group relative flex items-center gap-2 rounded-[16px] p-2 pl-4 lg:gap-2.5 lg:rounded-[18px] lg:p-2.5 lg:pl-5">
+      {/* 边框扫光：把视线引向「一句话造课」这个产品核心动作。极细红环、慢扫、随主题自适应，
+          与 .hero-prompt 自身的聚焦呼吸底光互补（一个走边缘、一个走底线）。line 变体最克制。 */}
+      <BeamFrame
+        variant="line"
+        tone="brand"
+        className="hero-prompt group relative flex items-center gap-2 rounded-[16px] p-2 pl-4 lg:gap-2.5 lg:rounded-[18px] lg:p-2.5 lg:pl-5"
+      >
         <Sparkle
           size={18}
           weight="fill"
@@ -66,7 +73,7 @@ export function HeroPromptInput() {
           开始造课
           <ArrowRight size={14} weight="bold" aria-hidden />
         </button>
-      </div>
+      </BeamFrame>
     </form>
   );
 }

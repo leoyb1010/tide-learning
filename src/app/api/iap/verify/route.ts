@@ -7,7 +7,8 @@ import { addMonthsClamped } from "@/lib/payment";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { verifyAppleTransaction } from "@/lib/apple-iap";
+import { verifyAppleTransaction, type AppleTransactionPayload } from "@/lib/apple-iap";
+import { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -70,13 +71,16 @@ async function verifyWithApple(input: {
   transactionId: string;
   jwsRepresentation?: string;
   receiptData?: string;
-}): Promise<void> {
+}): Promise<AppleTransactionPayload> {
   const result = await verifyAppleTransaction(input);
   if (!result.ok) {
     // 内部原因仅记服务端日志；对客户端统一「内购校验失败」，不泄漏证书/签名/claims 细节。
     console.error(`[iap/verify] Apple 校验失败 tx=${input.transactionId} product=${input.productId}: ${result.reason}`);
     throw new AppError("内购校验失败", 400);
   }
+  // 返回**经签名验证的** payload：幂等键须取 payload.transactionId（而非客户端提交值），
+  // 否则同一 JWS 可分别以 transactionId / originalTransactionId 提交、在两个幂等键下各领一次。
+  return result.payload;
 }
 
 export async function POST(req: NextRequest) {
@@ -102,25 +106,31 @@ export async function POST(req: NextRequest) {
 
     // 真实 Apple 校验（已实现，见 apple-iap.ts）：失败即抛 AppError("内购校验失败",400)，
     // 由 handle 统一转成 fail；未配置且非生产时走 mock 放行，本机/测试直发不变。
-    await verifyWithApple({
+    const verified = await verifyWithApple({
       productId,
       transactionId,
       jwsRepresentation: body?.jwsRepresentation,
       receiptData: body?.receiptData,
     });
 
+    // 幂等键：优先用**签名验证过的** payload.transactionId（防同一 JWS 以 transactionId /
+    // originalTransactionId 两次提交各领一次）；mock 路径（本机/测试无 payload）回落客户端提交值。
+    const idempotencyTxId = (typeof verified.transactionId === "string" && verified.transactionId) || transactionId;
+
     // —— 积分类充值 ——
     if (productId in CREDIT_PRODUCTS) {
       const amount = CREDIT_PRODUCTS[productId];
 
-      // 幂等：以 (userId, type=recharge, refId=transactionId) 作幂等键。
-      // 事务内「查重 → 入账」原子完成，二次确认放行闸门，杜绝并发同 transactionId 双发积分。
+      // 幂等：以 (type=recharge, refId=idempotencyTxId) 作**全局**幂等键。
+      // 注意去重不带 userId：recharge 的 refId 即 Apple 全局唯一 transactionId，若只在本人范围去重，
+      // 同一笔真实购买的 JWS 可被分享给 N 个账号各领一次积分（消耗型无 expiresDate、永久可用）。全局查重堵死此资损面。
+      // 事务内「全局查重 → 入账」原子完成，二次确认放行闸门，杜绝并发同 transactionId 双发。
       // （CreditLedger 无法用 @@unique([type,refId])：llm_spend/monthly_grant 的 refId 天然重复，
-      //   全局唯一会破坏计费/月赠契约；故用事务内二次确认，等价幂等且不改 schema。）
+      //   全局唯一会破坏计费/月赠契约；故用事务内全局二次确认，等价幂等且不改 schema。）
       await ensureAccount(user.id);
       const result = await prisma.$transaction(async (tx) => {
         const dup = await tx.creditLedger.findFirst({
-          where: { userId: user.id, type: "recharge", refId: transactionId },
+          where: { type: "recharge", refId: idempotencyTxId },
           select: { id: true },
         });
         if (dup) {
@@ -135,20 +145,20 @@ export async function POST(req: NextRequest) {
         });
         const balanceAfter = updated.balance;
         await tx.creditLedger.create({
-          data: { userId: user.id, delta: amount, type: "recharge", refId: transactionId, reason: "IAP充值", balanceAfter },
+          data: { userId: user.id, delta: amount, type: "recharge", refId: idempotencyTxId, reason: "IAP充值", balanceAfter },
         });
         return { balance: balanceAfter, duplicate: false };
       });
 
       if (result.duplicate) return ok({ balance: result.balance, duplicate: true });
-      await track({ eventName: "iap_recharge", userId: user.id, properties: { product_id: productId, amount, transaction_id: transactionId } });
+      await track({ eventName: "iap_recharge", userId: user.id, properties: { product_id: productId, amount, transaction_id: idempotencyTxId } });
       return ok({ balance: result.balance });
     }
 
     // —— 订阅类 ——
     if (productId in SUBSCRIPTION_PRODUCTS) {
       const cfg = SUBSCRIPTION_PRODUCTS[productId];
-      const externalOrderId = `iap_${transactionId}`;
+      const externalOrderId = `iap_${idempotencyTxId}`;
 
       // 幂等：该 transactionId 对应的订单是否已处理（越权铁律无关，externalOrderId 全局唯一）
       const existingOrder = await prisma.order.findUnique({
@@ -168,7 +178,9 @@ export async function POST(req: NextRequest) {
       if (!plan) throw new AppError("对应套餐未配置", 500);
 
       const start = new Date();
-      const result = await prisma.$transaction(async (tx) => {
+      let result: string;
+      try {
+        result = await prisma.$transaction(async (tx) => {
         // 记账订单（幂等键 externalOrderId 全局唯一，并发下重复插入会被 unique 拦截）
         const order = await tx.order.create({
           data: {
@@ -226,11 +238,20 @@ export async function POST(req: NextRequest) {
         }
         await tx.order.update({ where: { id: order.id }, data: { subscriptionId: sub.id } });
         return sub.id;
-      });
+        });
+      } catch (e) {
+        // 并发同 transactionId：预检在事务外，后到者会撞 externalOrderId 唯一约束（P2002）。
+        // 优雅转 duplicate 语义（对齐积分类 / redemption 的处理），而非抛 500。
+        if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+          const entitlement = await resolveEntitlement(user.id);
+          return ok({ entitlement, duplicate: true });
+        }
+        throw e;
+      }
 
       // 事务外：刷新权益快照 + 埋点
       const entitlement = await resolveEntitlement(user.id);
-      await track({ eventName: "iap_subscription", userId: user.id, properties: { product_id: productId, subscription_id: result, transaction_id: transactionId } });
+      await track({ eventName: "iap_subscription", userId: user.id, properties: { product_id: productId, subscription_id: result, transaction_id: idempotencyTxId } });
       return ok({ entitlement });
     }
 

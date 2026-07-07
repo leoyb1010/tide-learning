@@ -42,6 +42,27 @@ at+qIxUCMG1mihDK1A3UT82NQz60imOlM27jbdoXt2QfyFMm+YhidDkLF1vLUagM
 // P-256（prime256v1）ECDSA 签名分量长度：r、s 各 32 字节。
 const P256_COMPONENT_LEN = 32;
 
+// —— 标记 OID（DER TLV，用于 OID pinning，防「其他 Apple 签发证书」冒充收据签名证书）——
+// 单纯「链根到 Apple Root CA - G3」不足：Apple 开发者账号可申请多种根到 G3 的 EC 证书
+// （如 Apple Pay 商户处理证书），持私钥即可签出任意 claims 的「合法」JWS。真正的收据/交易
+// 签名证书由 Apple CA 额外植入下列标记 OID，攻击者无法自行给别的 Apple 证书添加（需 Apple CA 重签）。
+// 故校验叶证书含「App Store 收据签名」OID、中间证书含「WWDR」OID，即可区分真正的交易签名链。
+// OID 值（base-128）复用同一前缀 1.2.840.113635.100.6（Apple: 2A 86 48 86 F7 63 64 06）。
+/** 叶证书标记：1.2.840.113635.100.6.11.1（App Store 收据/交易签名）。DER: 06 0A <value>。 */
+export const RECEIPT_SIGNING_OID_TLV = Buffer.from([0x06, 0x0a, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x06, 0x0b, 0x01]);
+/** 中间证书标记：1.2.840.113635.100.6.2.1（Apple WWDR CA）。DER: 06 0A <value>（10 个值字节）。 */
+export const WWDR_OID_TLV = Buffer.from([0x06, 0x0a, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x63, 0x64, 0x06, 0x02, 0x01]);
+/** Apple 交易 JWS 的 x5c 链固定为 3 段：叶（交易签名）→ 中间（WWDR）→ 根（Root CA - G3）。 */
+const APPLE_JWS_CHAIN_LEN = 3;
+
+/**
+ * 证书 DER 是否包含某标记 OID 的 TLV（纯字节包含判定，导出以便单测）。
+ * 证书整体由 Apple CA 签名，攻击者无法在不失效签名的前提下植入该 OID 字节，故字节包含即等价「Apple 确植入此扩展」。
+ */
+export function certHasOid(cert: X509Certificate, oidTlv: Buffer): boolean {
+  return cert.raw.includes(oidTlv);
+}
+
 export type AppleEnvironment = "Sandbox" | "Production";
 
 /** 解码后的交易载荷（只声明我们校验/使用到的字段；其余保留为宽松索引）。 */
@@ -174,12 +195,19 @@ function x5cEntryToPem(b64Der: string): string {
 
 /**
  * 校验 x5c 证书链：
+ *   - 链长恰为 3（叶→WWDR→Root G3），拒绝多塞/少塞证书；
  *   - 逐级验证 cert[i] 由 cert[i+1] 签发（X509Certificate.verify(issuerPublicKey)）；
  *   - 每张证书在有效期内（validFrom ≤ now ≤ validTo）；
- *   - 链尾根证书必须等于（或由）已内置的 Apple Root CA - G3 签发。
+ *   - 链尾根证书必须等于（或由）已内置的 Apple Root CA - G3 签发；
+ *   - **OID pinning**：叶证书含「收据/交易签名」OID、中间证书含「WWDR」OID
+ *     （防根到 G3 的其他 Apple 证书冒充交易签名证书，见常量注释）。
  * 返回叶证书（用于核验 JWS 签名）。失败抛错。
  */
 export function verifyCertChain(x5c: string[], now: Date = new Date()): X509Certificate {
+  // 链长硬校验：Apple 交易 JWS 的 x5c 恒为 3 段。多/少即拒（防塞入攻击者自签中间层）。
+  if (x5c.length !== APPLE_JWS_CHAIN_LEN) {
+    throw new Error(`证书链长度非法：期望 ${APPLE_JWS_CHAIN_LEN} 段，实际 ${x5c.length}`);
+  }
   const chain = x5c.map((entry) => new X509Certificate(x5cEntryToPem(entry)));
   const appleRoot = new X509Certificate(APPLE_ROOT_CA_G3_PEM);
 
@@ -210,7 +238,17 @@ export function verifyCertChain(x5c: string[], now: Date = new Date()): X509Cert
     throw new Error("证书链未根到 Apple Root CA - G3");
   }
 
-  return chain[0];
+  // OID pinning：叶证书须为「收据/交易签名」证书，中间证书须为「WWDR CA」。
+  // 仅链根到 G3 不足以证明这是交易签名链——此二 OID 才能区分（见常量注释）。
+  const leaf = chain[0];
+  if (!certHasOid(leaf, RECEIPT_SIGNING_OID_TLV)) {
+    throw new Error("叶证书缺少 App Store 收据/交易签名 OID（非交易签名证书）");
+  }
+  if (!certHasOid(chain[1], WWDR_OID_TLV)) {
+    throw new Error("中间证书缺少 Apple WWDR OID");
+  }
+
+  return leaf;
 }
 
 /**

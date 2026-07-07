@@ -15,8 +15,9 @@ import type { Block } from "../blocks";
 import { renderMarkdown } from "../markdown";
 import type { CourseDesign } from "./courseware-design";
 import type { LessonVariance } from "./courseware-variance";
+import { heroMotif, cornerMotif } from "./courseware-motifs";
 
-export const HTML_CONTRACT_VERSION = 1;
+export const HTML_CONTRACT_VERSION = 2; // v2: 内置翻页/滚动双模式运行时（默认翻页）
 
 /** 渲染契约 DTO（web/iOS 共用；见计划 §6.3）。落库为 Lesson.htmlJson。 */
 export interface CoursewareContract {
@@ -96,6 +97,20 @@ body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   ${a.texture === "none" ? "" : `background-image:${a.texture};background-size:26px 26px;opacity:.5;`}}
 .deck{max-width:${design.density <= 4 ? 720 : 760}px;margin:0 auto;display:flex;flex-direction:column;gap:${sectionGap}px}
 .sec{position:relative}
+/* —— 页型舞台（Page Archetype）：给每页一个「底」，翻页时构图有对比，破「全课一底色」—— */
+.page{position:relative}
+.page>section{position:relative;z-index:1}
+.ct-fit{position:relative;z-index:1}
+.page--band{background:var(--ct-accent-soft);border-radius:var(--ct-radius);padding:clamp(20px,4vw,34px)}
+.page--surface{background:var(--ct-surface);border:1px solid var(--ct-border);border-radius:var(--ct-radius);box-shadow:var(--ct-shadow);padding:clamp(20px,4vw,34px)}
+.page--figure{background:var(--ct-surface2);border-left:3px solid var(--ct-accent);border-radius:var(--ct-radius);padding:clamp(20px,4vw,34px)}
+/* 翻页模式：舞台已占满整页，内边距收紧给内容更多纵向空间（少触发缩放/滚动）。 */
+body.ct-paged .page--band,body.ct-paged .page--surface,body.ct-paged .page--figure{padding:clamp(14px,2.6vh,24px)}
+/* hero/plain 不加框：hero 承载全出血签名母题背景，plain 交给内容自身结构，形成留白节奏。 */
+.sec-fig{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.sec-fig svg{width:100%;height:100%;display:block}
+.sec-corner{position:absolute;top:14px;right:14px;width:24px;height:24px;z-index:0;pointer-events:none}
+.sec-corner svg{width:100%;height:100%;display:block}
 h1,h2,h3{font-family:${a.fontDisplay};font-weight:${a.displayWeight};letter-spacing:${a.displayTracking};line-height:1.14}
 .eyebrow{font-family:${a.fontMono};font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ct-ink3);display:inline-block;margin-bottom:14px}
 .lead{font-family:${a.fontDisplay};font-weight:${a.displayWeight};letter-spacing:${a.displayTracking};
@@ -227,6 +242,33 @@ a{color:var(--ct-accent-ink)}
   .cmp,.kp{grid-template-columns:1fr}
   .turn{max-width:92%}
 }
+/* —— 翻页模式（默认；body.ct-paged 由运行时切换，父页可发 ct-mode 覆盖）——
+   每个 .deck>section 即一页：单屏居中呈现，超高内容由 .ct-fit 等比缩放到一屏（不滚）。 */
+body.ct-paged{height:100vh;overflow:hidden;padding:0}
+body.ct-paged .deck{height:100%;max-width:880px;display:block;padding:clamp(16px,3.5vh,32px) clamp(18px,4.5vw,44px) 78px}
+body.ct-paged .deck>section{display:none;height:100%}
+body.ct-paged .deck>section.ct-cur{display:grid;place-items:center;overflow:hidden}
+/* 缩到下限仍超高的页：改为本页内部纵向滚动 + 顶对齐，绝不裁切内容（长 steps/quiz/代码块保底可读）。 */
+body.ct-paged .deck>section.ct-cur.ct-scroll{place-items:start center;overflow-y:auto;overflow-x:hidden}
+body.ct-paged .deck>section.ct-cur.ct-scroll .ct-fit{padding-bottom:10px}
+.ct-fit{width:100%;transform-origin:center center}
+body.ct-paged .ct-fit{transition:transform .28s var(--ct-ease)}
+.ct-progress{position:fixed;top:0;left:0;height:3px;width:0;z-index:7;display:none;background:var(--ct-accent);transition:width .35s var(--ct-ease)}
+body.ct-paged .ct-progress{display:block}
+.ct-pager{position:fixed;left:0;right:0;bottom:0;z-index:6;display:none;align-items:center;justify-content:center;gap:14px;
+  padding:14px clamp(16px,4vw,40px) 16px;background:linear-gradient(to top,var(--ct-bg) 55%,transparent)}
+body.ct-paged .ct-pager{display:flex}
+.ct-pager button{font:inherit;font-size:13.5px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;
+  height:38px;min-width:44px;padding:0 16px;border-radius:999px;border:1px solid var(--ct-border);
+  background:var(--ct-surface);color:var(--ct-ink2);
+  transition:border-color .2s var(--ct-ease),color .2s var(--ct-ease),transform .15s var(--ct-ease)}
+.ct-pager button:hover{border-color:var(--ct-accent);color:var(--ct-ink)}
+.ct-pager button:active{transform:scale(.97)}
+.ct-pager button[disabled]{opacity:.35;cursor:default;pointer-events:none}
+.ct-pager .ct-count{font-family:${a.fontMono};font-size:12px;letter-spacing:.12em;color:var(--ct-ink3);min-width:64px;text-align:center}
+@media (prefers-reduced-motion: reduce){
+  body.ct-paged .ct-fit,.ct-progress{transition:none}
+}
 `;
 }
 
@@ -237,9 +279,42 @@ a{color:var(--ct-accent-ink)}
 const RUNTIME_SCRIPT = `
 (function(){
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var secs = Array.prototype.slice.call(document.querySelectorAll('main.deck > section'));
+  var mode = 'paged'; // 默认翻页；父页可发 {type:'ct-mode', mode:'scroll'} 切竖向长滚动
+  var cur = 0;
+
+  // 每页内容包进 .ct-fit，供翻页模式等比缩放到一屏（transform 不改布局，滚动模式零影响）。
+  // 全出血装饰层（.sec-fig/.sec-corner）保留为 section 直接子级：不随内容缩放/居中，始终铺满整页作背景母题。
+  secs.forEach(function(s){
+    var w = document.createElement('div'); w.className = 'ct-fit';
+    var kids = [];
+    for (var k = 0; k < s.childNodes.length; k++) kids.push(s.childNodes[k]);
+    kids.forEach(function(n){
+      if (n.nodeType === 1 && n.classList && (n.classList.contains('sec-fig') || n.classList.contains('sec-corner'))) return;
+      w.appendChild(n);
+    });
+    s.appendChild(w);
+  });
+
+  // 翻页控件（顶部进度条 + 底部 上一页/页码/下一页）；滚动模式下由 CSS 隐藏。
+  var progress = document.createElement('div'); progress.className = 'ct-progress';
+  document.body.appendChild(progress);
+  var pager = null, prevBtn = null, nextBtn = null, count = null;
+  if (secs.length > 1) {
+    pager = document.createElement('div'); pager.className = 'ct-pager';
+    prevBtn = document.createElement('button'); prevBtn.type = 'button'; prevBtn.textContent = '\\u2039 上一页'; prevBtn.setAttribute('aria-label','上一页');
+    count = document.createElement('span'); count.className = 'ct-count';
+    nextBtn = document.createElement('button'); nextBtn.type = 'button'; nextBtn.textContent = '下一页 \\u203a'; nextBtn.setAttribute('aria-label','下一页');
+    pager.appendChild(prevBtn); pager.appendChild(count); pager.appendChild(nextBtn);
+    document.body.appendChild(pager);
+    prevBtn.addEventListener('click', function(){ nav(-1); });
+    nextBtn.addEventListener('click', function(){ nav(1); });
+  }
+
   function reveal(){
     var els = document.querySelectorAll('[data-reveal],[data-stagger]');
     if(reduce || !('IntersectionObserver' in window)){ els.forEach(function(e){e.classList.add('in');}); return; }
+    // 翻页模式下隐藏页不相交；翻到某页其元素才相交入场 —— 同一个 IO 天然兼容两种模式。
     var io = new IntersectionObserver(function(ents){
       ents.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); } });
     },{rootMargin:'0px 0px -8% 0px',threshold:.08});
@@ -264,16 +339,92 @@ const RUNTIME_SCRIPT = `
     });
   }
   function postHeight(){
+    if (mode === 'paged') return; // 翻页模式高度由父页固定，不上报
     try{
       var h = Math.max(document.documentElement.scrollHeight, document.body.scrollHeight);
       parent.postMessage({type:'ct-height', height:h}, '*');
     }catch(e){}
   }
+  // 超高页处理：轻度超高→等比缩到一屏；重度超高（缩到 0.6 下限仍放不下）→本页内部滚动，绝不裁切。
+  // 先复位（清 transform + ct-scroll）再量自然高度。
+  function fit(){
+    if (mode !== 'paged') return;
+    var s = secs[cur]; if (!s) return;
+    var w = s.querySelector('.ct-fit'); if (!w) return;
+    w.style.transform = '';
+    s.classList.remove('ct-scroll');
+    var avail = s.clientHeight, natural = w.scrollHeight;
+    if (avail <= 0 || natural <= avail) return; // 一屏放得下
+    var ideal = avail / natural;
+    if (ideal >= 0.56) { w.style.transform = 'scale(' + ideal.toFixed(3) + ')'; }
+    else { s.classList.add('ct-scroll'); } // 缩到下限仍超高 → 本页可滚（顶对齐），内容不丢
+  }
+  function show(i){
+    if (!secs.length) return;
+    cur = Math.max(0, Math.min(secs.length - 1, i));
+    secs.forEach(function(s, j){ s.classList[j === cur ? 'add' : 'remove']('ct-cur'); });
+    // 翻页模式下不能只靠 IntersectionObserver（页在 display:none↔显示间切换时不可靠）：
+    // 每次翻到某页，显式给该页的入场元素加 .in（既保证可见，又让每页翻入时重放一次入场动效）。
+    if (!reduce) {
+      var cw = secs[cur].querySelectorAll('[data-reveal],[data-stagger]');
+      for (var q = 0; q < cw.length; q++) cw[q].classList.add('in');
+    }
+    if (prevBtn) { prevBtn.disabled = cur === 0; nextBtn.disabled = cur === secs.length - 1; }
+    if (count) count.textContent = (cur + 1) + ' / ' + secs.length;
+    progress.style.width = (((cur + 1) / secs.length) * 100) + '%';
+    fit();
+    try{ parent.postMessage({type:'ct-page', index: cur, total: secs.length}, '*'); }catch(e){}
+  }
+  function nav(d){ if (mode === 'paged') show(cur + d); }
+  function setMode(m){
+    if (m !== 'paged' && m !== 'scroll') return;
+    mode = m;
+    document.body.classList[m === 'paged' ? 'add' : 'remove']('ct-paged');
+    if (m === 'paged') { show(cur); }
+    else {
+      secs.forEach(function(s){
+        s.classList.remove('ct-cur');
+        var w = s.querySelector('.ct-fit'); if (w) w.style.transform = '';
+        // 滚动模式内容即刻可见（IO 已 unobserve 的元素不会再触发）。
+        s.querySelectorAll('[data-reveal],[data-stagger]').forEach(function(e){ e.classList.add('in'); });
+        if (s.hasAttribute('data-reveal')) s.classList.add('in');
+      });
+      postHeight();
+    }
+  }
+
+  // 键盘翻页（iframe 获焦时）；父页也会转发 ct-nav 兜没获焦的场景。
+  window.addEventListener('keydown', function(e){
+    if (mode !== 'paged') return;
+    var tag = ((e.target && e.target.tagName) || '').toUpperCase();
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); nav(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); nav(1); }
+    else if ((e.key === ' ' || e.key === 'Spacebar') && tag !== 'BUTTON') { e.preventDefault(); nav(1); }
+  });
+  // 能力宣告：父页可能晚于本脚本挂监听（SSR 下 iframe 先于 hydration 加载），
+  // 故初始 + 延时重播 + 响应父页 ct-hello 握手，三路保证父页必收到。
+  function announce(){
+    try{ parent.postMessage({type:'ct-ready', pages: secs.length, contract: 2}, '*'); }catch(e){}
+  }
+  window.addEventListener('message', function(e){
+    var d = e.data || {};
+    if (d.type === 'ct-mode') setMode(d.mode);
+    else if (d.type === 'ct-nav') nav(d.dir === -1 ? -1 : 1);
+    else if (d.type === 'ct-hello') announce();
+  });
+
   reveal(); quiz(); cards();
-  postHeight();
-  window.addEventListener('load', postHeight);
-  if('ResizeObserver' in window){ new ResizeObserver(postHeight).observe(document.body); }
-  setTimeout(postHeight, 400); setTimeout(postHeight, 1200);
+  setMode('paged');
+  announce();
+  window.addEventListener('load', function(){ postHeight(); fit(); });
+  if('ResizeObserver' in window){
+    var ro = new ResizeObserver(function(){ postHeight(); fit(); });
+    ro.observe(document.body);
+    secs.forEach(function(s){ var w = s.querySelector('.ct-fit'); if (w) ro.observe(w); });
+  }
+  setTimeout(function(){ announce(); postHeight(); fit(); }, 400);
+  setTimeout(function(){ announce(); postHeight(); fit(); }, 1200);
 })();
 `;
 
@@ -407,10 +558,32 @@ export interface RenderInput {
   variance: LessonVariance;
 }
 
-/** 确定性渲染：给定输入必产同一自包含 HTML（含 CSP、内联样式脚本、reduce-motion）。 */
+// —— 页型档案（Page Archetype）：给每个 block 的整页一个「舞台」，翻页时构图有对比 ——
+// 打破「每页都是 小字→标题→段落→卡片 的同底色纵向堆叠」。scene/summary 为情绪书挡 → hero 母题背景；
+// 其余按 (seed+index) 确定性在 band/surface/figure/plain 间轮转，且不与相邻页同型（保证翻页视觉分化）。
+const STAGE_POOL = ["band", "surface", "figure", "plain"] as const;
+type Stage = (typeof STAGE_POOL)[number] | "hero";
+
+function stageFor(type: string, i: number, seed: number, prev: Stage | null): Stage {
+  if (type === "scene" || type === "summary") return "hero";
+  let s: Stage = STAGE_POOL[(seed + i) % STAGE_POOL.length];
+  if (s === prev) s = STAGE_POOL[(seed + i + 1) % STAGE_POOL.length];
+  return s;
+}
+
+/** 确定性渲染：给定输入必产同一自包含 HTML（含 CSP、内联样式脚本、reduce-motion、页型舞台+签名母题）。 */
 export function renderCoursewareHtml(input: RenderInput): string {
   const { title, blocks, design, variance } = input;
-  const body = blocks.map((b, i) => renderBlock(b, i, design, variance)).join("\n");
+  let prev: Stage | null = null;
+  const body = blocks
+    .map((b, i) => {
+      const stage = stageFor(b.type, i, variance.seed >>> 0, prev);
+      prev = stage;
+      // 全出血装饰层（不随内容缩放，见运行时 wrapping 保留逻辑）：hero 用大幅母题背景，figure 用角标。
+      const deco = stage === "hero" ? heroMotif(design.art, (variance.seed + i) >>> 0) : stage === "figure" ? cornerMotif(design.art) : "";
+      return `<section class="page page--${stage}">${deco}${renderBlock(b, i, design, variance)}</section>`;
+    })
+    .join("\n");
   return (
     `<!doctype html><html lang="zh-CN"><head>${CSP_META}` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
