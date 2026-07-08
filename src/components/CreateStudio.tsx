@@ -155,6 +155,10 @@ export function CreateStudio({
   // v3.2：课件模板（默认经典）与生成模型（空=用默认模型）。造课/导入共用，透传进生成请求体。
   const [template, setTemplate] = useState<string>("classic");
   const [model, setModel] = useState<string>("");
+  // P1-1：AI 是否可用（服务端配了可用模型）。默认 true 避免加载态闪禁用；TemplateModelPicker
+  // 拉到 defaultModel=null（未配 key）时置 false，据此禁用生成 CTA 并显示维护横幅，
+  // 避免用户填完表单点生成才收到 503。
+  const [aiAvailable, setAiAvailable] = useState(true);
 
   // —— 导入资料状态 ——
   const [importTitle, setImportTitle] = useState("");
@@ -714,7 +718,7 @@ export function CreateStudio({
               </div>
 
               {/* v3.2：课件模板 + 生成模型选择 */}
-              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} />
+              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} onAvailability={setAiAvailable} />
 
               {/* v3.1：生成视频课件开关。选中后逐节写完块课件，再把课件转成带旁白的视频课件。 */}
               <button
@@ -754,13 +758,20 @@ export function CreateStudio({
                 </span>
               </button>
 
+              {/* P1-1：AI 未配置（无可用模型）时显式维护提示，避免用户填完表单点生成才收到 503。 */}
+              {!aiAvailable && (
+                <p className="rounded-[12px] border border-[var(--warn-soft-border,var(--border))] bg-[var(--warn-soft)] px-4 py-3 text-[13px] text-[var(--ink2)]">
+                  AI 生成服务暂未配置或维护中，暂时无法造课，请稍后再试。
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleGenerate}
-                className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
+                disabled={!aiAvailable}
+                className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-inset)] disabled:text-[var(--ink4)] disabled:hover:bg-[var(--surface-inset)]"
               >
                 <Sparkle size={17} weight="fill" />
-                生成课程
+                {aiAvailable ? "生成课程" : "AI 维护中"}
                 <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
             </div>
@@ -792,7 +803,7 @@ export function CreateStudio({
               />
 
               {/* v3.2：课件模板 + 模型（放上传区之上——拖入文件即刻开始生成，须先选好）*/}
-              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} />
+              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} onAvailability={setAiAvailable} />
 
               {/* 文件上传区：点击整卡或拖拽文件入内均可选择；支持 PDF / Word / TXT / MD。 */}
               <input
@@ -876,13 +887,19 @@ export function CreateStudio({
                   {importText.length}/50000
                 </span>
               </div>
+              {!aiAvailable && (
+                <p className="rounded-[12px] border border-[var(--warn-soft-border,var(--border))] bg-[var(--warn-soft)] px-4 py-3 text-[13px] text-[var(--ink2)]">
+                  AI 生成服务暂未配置或维护中，暂时无法改课，请稍后再试。
+                </p>
+              )}
               <button
                 type="button"
                 onClick={handleImport}
-                className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)]"
+                disabled={!aiAvailable}
+                className="cta-glow studio-press group inline-flex w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 py-3.5 text-[15px] font-semibold text-white transition-colors duration-200 hover:bg-[var(--red-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-inset)] disabled:text-[var(--ink4)] disabled:hover:bg-[var(--surface-inset)]"
               >
                 <FilePlus size={17} weight="fill" />
-                把粘贴的资料升维成课
+                {aiAvailable ? "把粘贴的资料升维成课" : "AI 维护中"}
                 <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
               <p className="text-center text-[11.5px] text-[var(--ink3)]">AI 会把长文拆成章节，配上要点与测验，帮你把资料变成能学的课。</p>

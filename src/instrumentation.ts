@@ -58,6 +58,28 @@ export async function register() {
 
   if (process.env.NODE_ENV === "production") {
     validateProductionEnv();
+    // P1-2：生产环境显式启用 mock 支付渠道时高声告警（不阻断——staging/内部演示确有此需求）。
+    // 提醒运维：mock 是演示通道，真实收款须切到 web_wechat/web_alipay/stripe 的真实实现。
+    if (process.env.MOCK_PAY_ENABLED === "1") {
+      console.warn(
+        "[instrumentation] ⚠️ 生产环境启用了 MOCK_PAY_ENABLED=1（mock 演示支付通道）。" +
+          "确认这是 staging/演示环境；正式收款请接入真实支付渠道并关闭该开关。",
+      );
+    }
+    // P2-2：公开站点基址若缺失或为 localhost，会被烤进 OG/分享卡链接，导致分享预览指向本地。
+    // 不阻断（本地跑生产构建做验收时地址本就是 localhost），但高声告警提醒真实部署改真实域名。
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!siteUrl) {
+      console.warn(
+        "[instrumentation] ⚠️ 未设置 NEXT_PUBLIC_SITE_URL，OG/分享卡/robots/sitemap 将回落默认域名。" +
+          "真实部署请在【构建期与运行期】都设置为公开域名（如 https://tide.learning）。",
+      );
+    } else if (/localhost|127\.0\.0\.1/.test(siteUrl)) {
+      console.warn(
+        `[instrumentation] ⚠️ NEXT_PUBLIC_SITE_URL 当前为本地地址（${siteUrl}）。` +
+          "OG/分享卡链接会烤成本地域名，分享到微信/X 预览图失效。正式部署请改为公开域名后【重新构建】。",
+      );
+    }
   }
 
   // SIGTERM 优雅退出：断开 Prisma 连接（SQLite WAL checkpoint 落盘）。

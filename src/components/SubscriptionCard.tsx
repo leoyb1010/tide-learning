@@ -90,7 +90,13 @@ export function SubscriptionCard({
       const s = await fetch("/api/checkout/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ planId: plan.id, channel: "mock", couponCode: couponCode || undefined }),
+        // P1-2：渠道不再硬编码 mock——按环境 NEXT_PUBLIC_PAY_CHANNEL 读取（默认 mock 供开发/演示），
+        // 部署接入真实渠道（web_wechat/web_alipay/stripe）后置该 env 即可，无需改代码。
+        body: JSON.stringify({
+          planId: plan.id,
+          channel: process.env.NEXT_PUBLIC_PAY_CHANNEL || "mock",
+          couponCode: couponCode || undefined,
+        }),
       }).then((r) => r.json());
       if (!s.ok) throw new Error(s.error);
 
@@ -101,7 +107,11 @@ export function SubscriptionCard({
       router.push(`${payUrl}${payUrl.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}`);
     } catch (e) {
       setStep("idle");
-      toast((e as Error).message || "发起支付失败，请重试", { tone: "warn" });
+      const msg = (e as Error).message || "";
+      // P1-2：生产未开放 mock 渠道时后端回「不支持的支付渠道」——给用户明确「暂未开放」文案，
+      // 不把技术错误抛到脸上（真实渠道接入前的过渡态）。
+      const friendly = /不支持的支付渠道/.test(msg) ? "支付暂未开放，敬请期待" : msg || "发起支付失败，请重试";
+      toast(friendly, { tone: "warn" });
     }
   }, 20000);
 

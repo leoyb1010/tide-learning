@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { TRACK_MAP } from "@/lib/tracks";
 import { weekKey, WEEKLY_VOTE_BUDGET } from "@/lib/week";
+import { assessDemandRisk } from "@/lib/demand-score";
 
 const DEMAND_TITLE_MAX = 80;
 const DEMAND_DESC_MAX = 2000;
@@ -71,6 +72,9 @@ export async function POST(req: NextRequest) {
     if (!TRACK_MAP[category]) return fail("分类不存在");
     const desiredDepth = body.desiredDepth ?? "intro";
     if (!DEMAND_DEPTHS.has(desiredDepth)) return fail("深度取值不合法");
+    // P2-3：提交阶段做风险初评（XSS 载荷 / 外链 / 导流联系方式），写入 riskLevel，
+    // 让审核队列拿到正确优先级（此前恒为默认 low，恶意导流也被当低危）。
+    const riskLevel = assessDemandRisk(title, description);
     const demand = await prisma.demand.create({
       data: {
         userId: user.id,
@@ -79,6 +83,7 @@ export async function POST(req: NextRequest) {
         category,
         desiredDepth,
         status: "pending_review",
+        riskLevel,
       },
     });
     await prisma.demandStatusLog.create({

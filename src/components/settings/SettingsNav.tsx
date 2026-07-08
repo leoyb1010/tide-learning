@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import type { Icon } from "@phosphor-icons/react";
 import {
   IdentificationCard,
@@ -29,6 +30,12 @@ const ITEMS: { href: string; label: string; icon: Icon }[] = [
 
 export function SettingsNav() {
   const pathname = usePathname();
+  // P3-1：移动端横滑 tab 行下，把「当前页」的 tab 滚进可视区，避免它停在右侧被裁成只剩 icon、
+  // 让用户看不到自己在哪一栏（block:nearest 只横向滚 nav 容器，不动页面纵向滚动）。
+  const activeRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    activeRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname]);
 
   return (
     <nav
@@ -42,6 +49,7 @@ export function SettingsNav() {
           <Link
             key={it.href}
             href={it.href}
+            ref={active ? activeRef : undefined}
             aria-current={active ? "page" : undefined}
             className={`group flex min-h-[44px] shrink-0 items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-[13px] font-medium transition-colors ${
               active

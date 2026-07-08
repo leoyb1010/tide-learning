@@ -27,8 +27,13 @@ const PREVIEW_POSTER: Record<string, string> = {
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const detail = await getCourseDetail(id, null);
-  if (!detail) return { title: "课程不存在" };
+  // P2-1：metadata 带当前用户上下文——作者看自己私有课 title 为课程名（此前固定传 null，作者也被判「不存在」）。
+  const user = await getCurrentUser();
+  const detail = await getCourseDetail(id, user?.id ?? null);
+  // 不存在 / 对当前用户不可见 → notFound()，渲染 not-found 页（其自带 noindex，非作者不泄露私有课标题）。
+  // 注：因 app 级 loading.tsx 全站流式，shell 200 先于此决出，故 HTTP 状态仍是 200（Next App Router 流式
+  // 限制，见审计 P1-3 说明）；真正 404 需禁用全站骨架或中间件级存在性校验，属需权衡的取舍，未在此改。
+  if (!detail) notFound();
   return { title: detail.course.title, description: detail.course.description ?? detail.course.subtitle ?? "" };
 }
 

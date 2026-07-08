@@ -70,6 +70,21 @@ function shortStudentId(userId: string): string {
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser();
 
+  // P1-4：登录用户的适老/字号偏好从 UserProfile 读出，作为 ModeProvider 初值与 anti-FOUC 脚本兜底，
+  // 使银发用户首次登录（本机无 localStorage）即自动进入 elder 大字模式。未登录/无 profile 回落 standard/1。
+  let initialMode: "standard" | "elder" = "standard";
+  let initialFontScale = 1;
+  if (user) {
+    const profile = await prisma.userProfile.findUnique({
+      where: { userId: user.id },
+      select: { preferredMode: true, fontScale: true },
+    });
+    if (profile) {
+      initialMode = profile.preferredMode === "elder" ? "elder" : "standard";
+      if (profile.fontScale > 0) initialFontScale = profile.fontScale;
+    }
+  }
+
   // TopNav 顶栏所需的用户数据（学号/积分/续学）。entitlement 被 React cache 去重，不会重复查库。
   let navUser: {
     nickname: string;
@@ -192,12 +207,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var e=document.documentElement;var g=function(k){try{return localStorage.getItem(k)}catch(_){return null}};var m=g("tide_mode")||"standard";e.dataset.mode=m;var s=parseFloat(g("tide_font_scale"));if(!s||isNaN(s))s=1;e.style.setProperty("--font-scale",String(s));var t=g("tide_theme")||"light";var c=g("studio_color_scheme")||"system";if(t==="deep"){e.dataset.theme="deep"}else if(c==="system"){delete e.dataset.theme}else{e.dataset.theme=c}}catch(_){}})();`,
+            // P1-4：mode/font-scale 的 localStorage 兜底改为服务端注入的 profile 初值（${initialMode}/${initialFontScale}），
+            // 无本机记录的银发用户在 paint 前即命中 elder，不再先闪 standard 再切。
+            __html: `(function(){try{var e=document.documentElement;var g=function(k){try{return localStorage.getItem(k)}catch(_){return null}};var m=g("tide_mode")||"${initialMode}";e.dataset.mode=m;var s=parseFloat(g("tide_font_scale"));if(!s||isNaN(s))s=${initialFontScale};e.style.setProperty("--font-scale",String(s));var t=g("tide_theme")||"light";var c=g("studio_color_scheme")||"system";if(t==="deep"){e.dataset.theme="deep"}else if(c==="system"){delete e.dataset.theme}else{e.dataset.theme=c}}catch(_){}})();`,
           }}
         />
       </head>
       <body>
-        <ModeProvider>
+        <ModeProvider initialMode={initialMode} initialFontScale={initialFontScale}>
           <ToastProvider>
             {/* v3.0 页面转场：软导航 View Transitions 驱动（无 UI，渐进增强） */}
             <ViewTransitions />

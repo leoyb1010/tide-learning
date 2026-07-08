@@ -43,11 +43,14 @@ export function TemplateModelPicker({
   setTemplate,
   model,
   setModel,
+  onAvailability,
 }: {
   template: string;
   setTemplate: (v: string) => void;
   model: string;
   setModel: (v: string) => void;
+  /** P1-1：AI 是否可用（服务端配了可用模型）。null=未探明；据此上层可禁用生成 CTA、避免填完表单才失败。 */
+  onAvailability?: (available: boolean) => void;
 }) {
   const [templates, setTemplates] = useState<TemplateOpt[]>([]);
   const [models, setModels] = useState<ModelOpt[]>([]);
@@ -67,6 +70,9 @@ export function TemplateModelPicker({
         setLockedModels(j.data.lockedModels ?? []);
         setDefaultModel(j.data.defaultModel ?? null);
         if (!model && j.data.defaultModel) setModel(j.data.defaultModel);
+        // P1-1：defaultModel 为 null = 服务端无可用模型（未配 key）。明确上报「不可用」，让上层禁用生成。
+        // 仅在响应 ok 时判定，网络异常（下方 catch）不误判为不可用。
+        onAvailability?.(Boolean(j.data.defaultModel));
       })
       .catch(() => {});
     return () => {

@@ -31,16 +31,33 @@ interface ModeState {
 
 const ModeCtx = createContext<ModeState | null>(null);
 
-export function ModeProvider({ children }: { children: ReactNode }) {
-  const [mode, setModeState] = useState<Mode>("standard");
-  const [fontScale, setFontScaleState] = useState(1);
+/**
+ * initialMode/initialFontScale：服务端从登录用户 UserProfile 注入的偏好初值（P1-4）。
+ * 未登录/无 profile 时为 standard/1。localStorage 作为「显式本机覆盖」优先于服务端初值；
+ * 无 localStorage 时以服务端 profile 为准——银发用户首次登录（无本机记录）即自动生效大字模式。
+ */
+export function ModeProvider({
+  children,
+  initialMode = "standard",
+  initialFontScale = 1,
+}: {
+  children: ReactNode;
+  initialMode?: Mode;
+  initialFontScale?: number;
+}) {
+  const [mode, setModeState] = useState<Mode>(initialMode);
+  const [fontScale, setFontScaleState] = useState(initialFontScale);
   const [theme, setThemeState] = useState<Theme>("light");
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>("system");
   const [systemDark, setSystemDark] = useState(false);
 
   useEffect(() => {
-    const savedMode = (localStorage.getItem("tide_mode") as Mode) || "standard";
-    const savedScale = Number(localStorage.getItem("tide_font_scale")) || 1;
+    // localStorage 存在即为本机显式选择，优先；否则回落服务端注入的 profile 初值（不写回 localStorage，
+    // 保持服务端为真值源）。字号同理。
+    const lsMode = localStorage.getItem("tide_mode") as Mode | null;
+    const lsScale = Number(localStorage.getItem("tide_font_scale"));
+    const savedMode: Mode = lsMode || initialMode;
+    const savedScale = lsScale > 0 ? lsScale : initialFontScale;
     const savedTheme = (localStorage.getItem("tide_theme") as Theme) || "light";
     const savedCS = (localStorage.getItem("studio_color_scheme") as ColorScheme) || "system";
     setModeState(savedMode);
@@ -53,7 +70,8 @@ export function ModeProvider({ children }: { children: ReactNode }) {
     const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, []);
+    // initialMode/initialFontScale 在会话内稳定；纳入依赖以对齐 lint，实际只在挂载时读一次。
+  }, [initialMode, initialFontScale]);
 
   useEffect(() => {
     document.documentElement.dataset.mode = mode;

@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from "vitest";
 // demand-score.ts 顶层 import 了 ./db（prisma），只测纯计分函数 demandScore，故 mock 掉。
 vi.mock("@/lib/db", () => ({ prisma: {} }));
 
-import { demandScore, type DemandScoreInput } from "@/lib/demand-score";
+import { demandScore, assessDemandRisk, type DemandScoreInput } from "@/lib/demand-score";
 
 /**
  * v1.0 计分：score = base + base*0.12*freshness - riskPenalty
@@ -106,5 +106,22 @@ describe("demandScore — 排序性质", () => {
   it("高风险惩罚拉低排名", () => {
     const base: DemandScoreInput = { ...ZERO, totalVotes: 100 };
     expect(demandScore({ ...base, riskPenalty: 20 })).toBeLessThan(demandScore(base));
+  });
+});
+
+describe("assessDemandRisk（P2-3 需求提交风险初评）", () => {
+  it("正常需求为 low", () => {
+    expect(assessDemandRisk("想学 Excel 数据透视表", "希望有实操案例")).toBe("low");
+  });
+  it("含 HTML/脚本载荷为 high", () => {
+    expect(assessDemandRisk("<img src=x onerror=alert(1)> 想学", undefined)).toBe("high");
+    expect(assessDemandRisk("正常标题", "<script>alert(1)</script>")).toBe("high");
+  });
+  it("外链+导流联系方式组合为 high", () => {
+    expect(assessDemandRisk("加我微信领资料", "详情 http://evil.example 加微信 abc")).toBe("high");
+  });
+  it("单一信号（仅外链 或 仅导流）为 medium", () => {
+    expect(assessDemandRisk("参考这个网站", "https://example.com 有教程")).toBe("medium");
+    expect(assessDemandRisk("有问题加我微信", "想深入交流")).toBe("medium");
   });
 });

@@ -46,6 +46,28 @@ export function demandScore(i: DemandScoreInput): number {
   return base + base * FRESHNESS_WEIGHT * freshness - i.riskPenalty;
 }
 
+/**
+ * 需求提交风险初评（P2-3）：对疑似 XSS 载荷 / 外链 / 导流联系方式做规则打分。
+ * 现状展示层已默认转义（React 文本节点不执行 HTML），故无实际 XSS；但风险原文仍会进审核队列，
+ * 审核员需要正确的优先级信号，且为未来若引入富文本/Markdown 渲染预留「高危」判据。
+ * 返回 low/medium/high，写入 Demand.riskLevel，驱动后台排序与惩罚项（见 RISK_PENALTY）。
+ */
+export function assessDemandRisk(title: string, description?: string | null): "low" | "medium" | "high" {
+  const text = `${title}\n${description ?? ""}`;
+  // HTML 标签 / 事件属性 / 伪协议：任一命中即高危（典型注入载荷）。
+  const hasHtmlOrScript =
+    /<\s*\/?\s*[a-z][^>]*>/i.test(text) || /on(error|load|click)\s*=|javascript:|<\s*script/i.test(text);
+  // 外链：http(s) / www / 常见顶级域。
+  const hasExternalLink = /https?:\/\/|www\.[a-z]|[a-z0-9-]+\.(com|cn|net|org|xyz|top|vip|shop)\b/i.test(text);
+  // 导流联系方式：加微信/vx/qq/群、联系方式、私聊、扫码等。
+  const hasContactSolicit = /加\s*(微信|weixin|vx|wx|qq|群|我)|微信号|联系方式|私聊|扫码|v\s*[:：]/i.test(text);
+  // 高危：HTML/脚本载荷，或「外链 + 导流」组合（典型钓鱼/导流）。
+  if (hasHtmlOrScript || (hasExternalLink && hasContactSolicit)) return "high";
+  // 中危：单一风险信号。
+  if (hasExternalLink || hasContactSolicit) return "medium";
+  return "low";
+}
+
 const STATUS_STRATEGY: Record<string, number> = {
   scheduled: 80,
   producing: 90,
