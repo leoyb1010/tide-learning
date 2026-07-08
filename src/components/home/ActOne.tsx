@@ -195,8 +195,8 @@ export function ActOne({
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
               >
-                一间自习室,三种开学方式:挑一门现成好课、一句话让 AI 造一门、
-                或把你的资料升维成课。此刻{" "}
+                三种开学方式:挑一门现成好课、一句话让 AI 造一门、
+                或把你的资料升维成课——都在你的自习室里完成。此刻{" "}
                 <span className="whitespace-nowrap font-semibold text-[var(--scene-ink)]">
                   <span className="mono num-pop text-[var(--red)]">
                     {onlineCount.toLocaleString()}

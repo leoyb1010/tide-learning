@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent } from "react";
+import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -79,6 +79,17 @@ export interface StudyDeskProps {
 // 快捷灵感胶囊（造课主入口的示范需求）。
 const SPARKS = ["面试英语口语", "用 AI 做周报", "给爸妈的智能手机课", "30 分钟学会番茄炒蛋"] as const;
 
+// 复合搜索联想：只取 course 域（平台课程库），与 /api/search 契约一致的最小子集。
+interface DeskSuggestion {
+  type: "course";
+  id: string;
+  title: string;
+  snippet: string;
+  href: string;
+}
+const SUGGEST_MIN = 2; // 输入达到该长度才触发联想（避免单字刷接口/被限流）
+const SUGGEST_DEBOUNCE_MS = 300; // 与 /api/search 30 次/60s 限流匹配的节流
+
 export function StudyDesk({
   nickname,
   greeting,
@@ -101,8 +112,59 @@ export function StudyDesk({
   // 从集市「去书架」/造课「查看我的书架」带 ?shelf=1 进来时，自动展开书架弹层（含全五层，collected 在此可见）。
   const [shelfOpen, setShelfOpen] = useState(searchParams.get("shelf") === "1");
 
-  // 中央输入框「三合一」：把需求带去 /create 造课（AI 自习室主入口）。
-  // 内容较像「找现成课程」的短查询走 /courses?q=；否则默认造课意图带 prompt 过去。
+  // 复合搜索框（问题③）：输入框既能「找现成课程」也能「AI 造课」。输入 ≥2 字 debounce 打
+  // /api/search 拉平台课程库联想，下拉面板上区展示课程结果、底部固定「AI 造一门」动作。
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
+  const [suggestions, setSuggestions] = useState<DeskSuggestion[]>([]);
+  const [searching, setSearching] = useState(false);
+  const reqSeq = useRef(0);
+  const query = value.trim();
+  const panelOpen = focused && query.length >= SUGGEST_MIN;
+
+  // 输入 ≥2 字 → debounce 300ms 联搜课程库（只采纳最后一次请求，丢弃过期响应）。
+  useEffect(() => {
+    if (query.length < SUGGEST_MIN) {
+      setSuggestions([]);
+      setSearching(false);
+      return;
+    }
+    const seq = ++reqSeq.current;
+    setSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=6`, {
+          headers: { Accept: "application/json" },
+        });
+        const json = (await res.json()) as {
+          ok: boolean;
+          data?: { results: Array<DeskSuggestion & { type: string }> };
+        };
+        if (seq !== reqSeq.current) return; // 过期响应丢弃
+        const courses = (json.data?.results ?? [])
+          .filter((r): r is DeskSuggestion => r.type === "course")
+          .slice(0, 6);
+        setSuggestions(courses);
+      } catch {
+        if (seq !== reqSeq.current) return;
+        setSuggestions([]);
+      } finally {
+        if (seq === reqSeq.current) setSearching(false);
+      }
+    }, SUGGEST_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  // 反馈②「点击输入框部分位置无法激活」：容器是带内边距 + 前置图标 + 按钮的 flex 行，
+  // 点在图标/内边距/间隙上会落到容器而非 <input>。这里把非按钮点击统一转焦到输入框。
+  function focusInput(e: React.MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target === inputRef.current || target.closest("button")) return;
+    e.preventDefault();
+    inputRef.current?.focus();
+  }
+
+  // Enter 兜底：保留原「三合一」启发式——短查询走课程库搜索，否则带 prompt 去造课。
   function go() {
     const q = value.trim();
     if (!q) return;
@@ -116,6 +178,15 @@ export function StudyDesk({
   function onSubmit(e: FormEvent) {
     e.preventDefault();
     go();
+  }
+  // 显式选择：点课程结果直达详情；点「AI 造一门」带 prompt 去造课。
+  function pickCourse(href: string) {
+    setFocused(false);
+    router.push(href);
+  }
+  function createFromQuery() {
+    setFocused(false);
+    router.push(`/create?prompt=${encodeURIComponent(query)}`);
   }
 
   // 断点续播链接：学习页按 userId+lessonId 查该章节已存的 progressSec 自动定位。
@@ -163,20 +234,25 @@ export function StudyDesk({
           说出想学的，AI 帮你造一门课；或直接找到现成的。
         </p>
 
-        {/* Hero 输入框：主入口 → 动态边框光束(BeamFrame，流转)包一圈；去掉硬描边，只留极淡轮廓 + 光束。 */}
+        {/* Hero 复合输入框（问题③）：既搜平台课程库、又能 AI 造课。动态边框光束包一圈；
+            输入 ≥2 字弹课程库联想面板，底部固定「AI 造一门」。 */}
         <BeamFrame className="mt-7 w-full max-w-[640px] rounded-[18px]" radius={18} variant="line">
         <form
           onSubmit={onSubmit}
-          className="group relative w-full overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none"
+          onMouseDown={focusInput}
+          className="group relative w-full cursor-text overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none"
         >
           <div className="flex items-center gap-2.5">
             <Sparkle size={20} weight="fill" className="ml-2.5 shrink-0 text-[var(--red)]" />
             <input
+              ref={inputRef}
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="例如：想练面试英语口语 / 30 分钟学会做番茄炒蛋"
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder="搜课程，或说出想学的让 AI 造一门…"
               maxLength={200}
-              aria-label="今天想学点什么"
+              aria-label="搜索课程或描述想学的"
               className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink4)] focus:outline-none sm:text-[16px]"
             />
             <button
@@ -190,6 +266,59 @@ export function StudyDesk({
             </button>
           </div>
         </form>
+
+        {/* 联想面板：绝对定位于 BeamFrame（position:relative）下方，覆盖其后内容。
+            面板按钮 onMouseDown preventDefault 保持输入框焦点，使 onClick 前面板不因 blur 收起。 */}
+        {panelOpen && (
+          <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-20 overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] text-left shadow-[var(--lift)]">
+            {suggestions.length > 0 && (
+              <div className="max-h-[300px] overflow-y-auto py-1.5">
+                <p className="px-3.5 pb-1 pt-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink4)]">
+                  课程库
+                </p>
+                {suggestions.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => pickCourse(s.href)}
+                    className="group flex w-full items-start gap-2.5 px-3.5 py-2.5 text-left transition-colors hover:bg-[var(--surface2)]"
+                  >
+                    <BookOpen size={16} weight="fill" className="mt-0.5 shrink-0 text-[var(--red)]" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">{s.title}</span>
+                      {s.snippet && (
+                        <span className="mt-0.5 block truncate text-[12px] text-[var(--ink4)]">{s.snippet}</span>
+                      )}
+                    </span>
+                    <ArrowRight
+                      size={13}
+                      weight="bold"
+                      className="mt-0.5 shrink-0 text-[var(--ink4)] opacity-0 transition-opacity group-hover:opacity-100"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+            {suggestions.length === 0 && (
+              <p className="px-3.5 py-2.5 text-[12px] text-[var(--ink4)]">
+                {searching ? "搜索课程库中…" : "课程库暂无匹配，试试让 AI 造一门"}
+              </p>
+            )}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={createFromQuery}
+              className="flex w-full items-center gap-2.5 border-t border-[var(--border)] bg-[var(--surface2)] px-3.5 py-3 text-left transition-colors hover:bg-[var(--surface-inset)]"
+            >
+              <Sparkle size={16} weight="fill" className="shrink-0 text-[var(--red)]" />
+              <span className="min-w-0 flex-1 truncate text-[13px] text-[var(--ink2)]">
+                用 AI 造一门「<span className="font-semibold text-[var(--ink)]">{query}</span>」的课
+              </span>
+              <ArrowRight size={13} weight="bold" className="shrink-0 text-[var(--ink3)]" />
+            </button>
+          </div>
+        )}
         </BeamFrame>
 
         {/* 快捷灵感胶囊 */}

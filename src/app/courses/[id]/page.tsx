@@ -6,7 +6,6 @@ import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
 import { Button } from "@/components/ui";
 import { AmbientVideo } from "@/components/AmbientVideo";
-import { UpdateLog } from "@/components/UpdateLog";
 import { CourseCard } from "@/components/CourseCard";
 import { SmartBackLink } from "@/components/SmartBackLink";
 import { RatingStars } from "@/components/RatingStars";
@@ -39,7 +38,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const detail = await getCourseDetail(id, user?.id ?? null);
   if (!detail) notFound();
 
-  const { course, snapshot, categoryLabel, durationText, lessons, updateLogs } = detail;
+  const { course, snapshot, categoryLabel, durationText, lessons } = detail;
   const firstFree = lessons.find((l) => l.isFree);
   const firstLesson = lessons[0];
   const needsCompliance = ["life", "silver_english"].includes(course.category) && course.reviewerName;
@@ -245,17 +244,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             </div>
           )}
 
-          {/* 更新日志（强化持续更新，§6.3 验收 1） */}
-          <div>
-            <h2 className="mb-3 text-[18px] font-bold text-[var(--ink)]">更新日志</h2>
-            <UpdateLog logs={updateLogs} ownerName={course.instructorName} />
-          </div>
-
-          {/* 学员评价（S5 评价系统闭环）：真实聚合 + 列表 + 写评价入口（学过才可评）。
-              client 组件自持三态（加载/空/错误），数据走 /api/courses/:id/reviews。 */}
-          <CourseReviews courseId={course.id} isLoggedIn={Boolean(user)} />
-
-          {/* 适合谁 / 学完获得 */}
+          {/* 适合谁 / 学完获得（问题⑬：前移到「学员评价」之前——先帮用户判断「这课适不适合我、学完得到什么」，
+              再看他人评价，决策链更顺。更新日志（原此处上方）已从 C 端详情页移除，仅保留后台/模型，避免误导。 */}
           <div className="grid gap-4 sm:grid-cols-2">
             <InfoCard title="适合谁学">
               <li>想用 {categoryLabel} 提升效率或达成目标的人</li>
@@ -268,6 +258,10 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               <li>属于自己的结构化学习笔记</li>
             </InfoCard>
           </div>
+
+          {/* 学员评价（S5 评价系统闭环）：真实聚合 + 列表 + 写评价入口（学过才可评）。
+              client 组件自持三态（加载/空/错误），数据走 /api/courses/:id/reviews。 */}
+          <CourseReviews courseId={course.id} isLoggedIn={Boolean(user)} />
         </div>
 
         {/* ---------- 右列 sticky ---------- */}

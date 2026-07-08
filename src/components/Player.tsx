@@ -7,7 +7,7 @@ import { NoteEditor, type NoteItem, type NoteEditorHandle } from "./NoteEditor";
 import { Paywall } from "./Paywall";
 import { Badge } from "./ui";
 import { Tooltip } from "./Tooltip";
-import { SheetDrag, WaveProgress } from "./motion";
+import { SheetDrag } from "./motion";
 import { useToast } from "./Toast";
 import { useMode } from "./ModeProvider";
 import {
@@ -46,7 +46,7 @@ interface LessonData {
 export function Player({
   courseId, courseSlug, courseTitle, lesson, access, canCreateNote,
   outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialSlidePage, initialNotes,
-  posterSrc, sceneBgSrc, courseTemplate,
+  posterSrc, sceneBgSrc, courseTemplate, dueReviewCount = 0,
 }: {
   courseId: string; courseSlug: string; courseTitle: string;
   lesson: LessonData; access: boolean; canCreateNote: boolean;
@@ -60,6 +60,8 @@ export function Player({
   sceneBgSrc?: string;
   /** 课件视觉主题（= course.template）。挂到块课件外层 data-ct-theme，驱动 globals.css 换肤；空则默认皮肤。 */
   courseTemplate?: string | null;
+  /** 问题⑧：当前用户到期待复习卡数量（server 端 count）。>0 时在课末插入「顺手复习」触点，把复习带进学习流。 */
+  dueReviewCount?: number;
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
@@ -944,7 +946,14 @@ export function Player({
                 )}
               </div>
               {lesson.summary && <p className="mt-1.5 text-sm leading-relaxed text-[var(--ink3)]">{lesson.summary}</p>}
-              {!isBlockLesson && <div className="mt-3.5"><WaveProgress value={progress} /></div>}
+              {/* 问题⑪：此处原有一条 WaveProgress 进度条，与视频画面内控制条水位进度用同一 progress 值、
+                  语义重复。移除该条，保留上方「已学 N%」数字徽章（有信息量，进度条冗余）。 */}
+            </div>
+
+            {/* 课程目录（问题⑪备注）：从右栏移到视频/标题下方，便于用户在画面下方滑动选取想看的课节。
+                桌面显示于此；移动端沿用下方已有的目录块（避免重复渲染两份）。 */}
+            <div className="focus-hide mt-4 hidden lg:block">
+              <Outline courseSlug={courseSlug} outline={outline} />
             </div>
 
             {/* 上一讲/下一讲 */}
@@ -956,6 +965,26 @@ export function Player({
                 <Link href={`/courses/${courseSlug}/learn/${nextLessonId}`} onClick={() => saveProgress()} className="studio-press group inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-medium text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]">下一讲 <CaretRight size={15} className="transition-transform group-hover:translate-x-0.5" /></Link>
               ) : <span className="text-sm text-[var(--ink4)]">已是最后一讲</span>}
             </div>
+
+            {/* 下课复习触点（问题⑧）：把「复习」从独立板块带进学习流——课末若有到期复习卡，
+                在此顺手提示，一步进复习室。仅登录且有到期卡时出现，不打扰无卡用户。 */}
+            {dueReviewCount > 0 && (
+              <Link
+                href="/review"
+                className="focus-hide studio-press group mt-4 flex items-center gap-3 rounded-[var(--radius-card)] border border-[color-mix(in_srgb,var(--warn)_28%,transparent)] bg-[var(--warn-soft)] px-4 py-3 shadow-[var(--card)] transition-colors"
+              >
+                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-[color-mix(in_srgb,var(--warn)_18%,transparent)] text-[var(--warn)]">
+                  <Cards size={18} weight="fill" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-semibold text-[var(--ink)]">
+                    顺手复习 {dueReviewCount} 张到期卡
+                  </span>
+                  <span className="block text-[12px] text-[var(--ink3)]">趁热复习，记得更牢</span>
+                </span>
+                <CaretRight size={16} weight="bold" className="shrink-0 text-[var(--ink4)] transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            )}
 
             {/* 移动端：打开笔记 Sheet + 目录 */}
             <div className="focus-hide mt-4 lg:hidden">
@@ -986,10 +1015,11 @@ export function Player({
                     <span className="whitespace-nowrap">AI 伴侣</span>
                   </button>
                 </div>
-                <div className="h-[540px] overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
+                {/* 问题⑪备注：目录已移到左栏视频下方，右栏只留笔记/AI 伴侣；面板高度由固定 540 拉长为
+                    随视口自适应（min 520 保证矮屏可用，max 820 防超高屏过长），便于记笔记时有更大输入区。 */}
+                <div className="h-[calc(100vh-8.5rem)] min-h-[520px] max-h-[820px] overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
                   {panelTab === "notes" ? noteEditor : <CompanionPanel lessonId={lesson.id} courseId={courseId} />}
                 </div>
-                <Outline courseSlug={courseSlug} outline={outline} />
               </div>
             </aside>
           )}

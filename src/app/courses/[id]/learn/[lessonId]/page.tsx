@@ -47,6 +47,11 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
 
   const lockedCount = outline.filter((o) => !o.isFree).length;
 
+  // 问题⑧：当前用户到期待复习卡数量（与书桌 dueReviewCount 同口径），传给 Player 在课末插入复习触点。
+  const dueReviewCount = user
+    ? await prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: new Date() } } })
+    : 0;
+
   return (
     <Player
       courseId={course.id}
@@ -66,6 +71,7 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
       posterSrc={trackStillSrc(course.category)}
       sceneBgSrc={trackSceneSrc(course.category)}
       courseTemplate={course.template}
+      dueReviewCount={dueReviewCount}
     />
   );
 }

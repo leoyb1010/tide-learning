@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     template: "%s · 有道自习室",
   },
   description:
-    "有道自习室 STUDIO，订阅制学习平台：口语实战、AI 技能、银发英语、生活实用。视频与笔记在同一张桌面，边看边记，随手截帧成卡。",
+    "有道自习室 STUDIO：说出想学的，AI 帮你造一门课，边看边记、到点复习，陪你学完。覆盖口语实战、AI 技能、银发英语、生活实用，持续更新。",
   keywords: ["有道自习室", "STUDIO", "订阅学习", "口语", "AI技能", "银发英语", "在线课程", "持续更新"],
   manifest: "/manifest.webmanifest",
   openGraph: {

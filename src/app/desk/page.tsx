@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import type { User } from "@prisma/client";
-import { listUpdates, formatDuration, relativeTime } from "@/lib/queries";
+import { listCourses, listUpdates, formatDuration, relativeTime } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { shanghaiDayKey } from "@/lib/week";
@@ -11,6 +11,7 @@ import { getWeeklyReport } from "@/lib/weekly-report";
 import { getShelfCount } from "@/lib/shelf";
 import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
+import { CourseCard } from "@/components/CourseCard";
 import { StudyDesk, type DeskResume, type DeskNote } from "@/components/StudyDesk";
 
 export const metadata = { title: "书桌" };
@@ -41,6 +42,7 @@ async function StudyDeskHome({ user }: { user: User }) {
     dueReviewCount,
     weeklyReport,
     shelfCount,
+    recommendedRaw,
   ] = await Promise.all([
       // 连续天数
       prisma.streak.findUnique({ where: { userId } }),
@@ -73,6 +75,9 @@ async function StudyDeskHome({ user }: { user: User }) {
       getWeeklyReport(userId),
       // 书架藏书总册数（书桌书架入口角标；书架明细由弹层打开时按需拉 /api/shelf）
       getShelfCount(userId),
+      // 问题⑥：为你推荐——平台课程库「精选优先 + 学习人数」排序（复用 listCourses recommended），
+      // 取一批，render 前再剔除「正在学的」，避免推荐用户已在进行中的课。
+      listCourses({ sort: "recommended" }),
     ]);
 
   // —— 派生：问候 + 今日状态 ——
@@ -99,6 +104,10 @@ async function StudyDeskHome({ user }: { user: User }) {
       };
     });
   const resume = resumeList[0] ?? null;
+
+  // —— 派生：为你推荐（剔除正在学的课，取前 4）——
+  const resumeSlugs = new Set(resumeList.map((r) => r.courseSlug));
+  const recommended = recommendedRaw.filter((c) => !resumeSlugs.has(c.slug)).slice(0, 4);
 
   // —— 派生：最近笔记 ——
   const recentNotes: DeskNote[] = recentNoteRows.map((n) => ({
@@ -146,9 +155,40 @@ async function StudyDeskHome({ user }: { user: User }) {
           shelfCount={shelfCount}
         />
       </Suspense>
+      {/* 为你推荐（问题⑥）：给意图不明确的用户以引导——精选课程网格，补齐「只有搜索」的空白。*/}
+      <RecommendBoard courses={recommended} />
       {/* 底部：书架上新（降权展示，复用 listUpdates）*/}
       <ShelfNew />
     </>
+  );
+}
+
+/* 为你推荐——精选课程网格（问题⑥）。数据由父级 listCourses(recommended) 派生并剔除在学课。 */
+function RecommendBoard({ courses }: { courses: Awaited<ReturnType<typeof listCourses>> }) {
+  if (courses.length === 0) return null;
+  return (
+    <Reveal>
+      <section className="mx-auto mt-12 max-w-[960px] md:mt-14">
+        <div className="mb-4 flex items-end justify-between">
+          <div className="flex items-baseline gap-2.5">
+            <h2 className="text-[16px] font-bold text-[var(--ink)]">为你推荐</h2>
+            <span className="text-[12px] text-[var(--ink4)]">精选好课，挑一门开始</span>
+          </div>
+          <Link
+            href="/courses?sort=recommended"
+            className="group inline-flex shrink-0 items-center gap-1 text-[12px] font-semibold text-[var(--red)]"
+          >
+            逛课程库
+            <ArrowRight size={13} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+        <div className="grid gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          {courses.map((c) => (
+            <CourseCard key={c.id} course={c} />
+          ))}
+        </div>
+      </section>
+    </Reveal>
   );
 }
 

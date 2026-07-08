@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkle, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { BeamFrame } from "@/components/ui/BeamFrame";
@@ -16,11 +16,22 @@ import { BeamFrame } from "@/components/ui/BeamFrame";
 export function HeroPromptInput() {
   const router = useRouter();
   const [value, setValue] = useState("");
+  const inputRef = useRef<HTMLInputElement>(null);
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = value.trim();
     router.push(q ? `/create?prompt=${encodeURIComponent(q)}` : "/create");
+  }
+
+  // 反馈「点击输入框部分位置无法激活输入」：输入框是带内边距 + 前置图标 + 提交按钮的 flex 行，
+  // 点在图标/内边距/空白间隙上会落到容器而非 <input>。这里在容器 mousedown 时把非按钮、非输入框
+  // 本身的点击统一转焦到输入框（preventDefault 防止焦点被 mousedown 移走而闪烁）。
+  function focusInput(e: React.MouseEvent) {
+    const target = e.target as HTMLElement;
+    if (target === inputRef.current || target.closest("button")) return;
+    e.preventDefault();
+    inputRef.current?.focus();
   }
 
   return (
@@ -34,7 +45,8 @@ export function HeroPromptInput() {
       <BeamFrame
         variant="line"
         tone="brand"
-        className="hero-prompt group relative flex items-center gap-2 rounded-[16px] p-2 pl-4 lg:gap-2.5 lg:rounded-[18px] lg:p-2.5 lg:pl-5"
+        onMouseDown={focusInput}
+        className="hero-prompt group relative flex cursor-text items-center gap-2 rounded-[16px] p-2 pl-4 lg:gap-2.5 lg:rounded-[18px] lg:p-2.5 lg:pl-5"
       >
         <Sparkle
           size={18}
@@ -49,6 +61,7 @@ export function HeroPromptInput() {
           aria-hidden
         />
         <input
+          ref={inputRef}
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder="说出想学的，AI 帮你造一门课…"

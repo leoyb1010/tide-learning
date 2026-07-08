@@ -1391,43 +1391,18 @@ body::before {
   border: 1px solid var(--scene-hairline);
   background: var(--scene-card-2);
   box-shadow: var(--scene-card-shadow-sm);
-  transition: box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.45s ease;
-}
-.hero-prompt::after {
-  /* 底部呼吸光线：静息隐藏，聚焦时点亮并做「吸气—呼气」的透明度脉动 */
-  content: "";
-  position: absolute;
-  left: 12%;
-  right: 12%;
-  bottom: 0;
-  height: 1px;
-  border-radius: 1px;
-  background: linear-gradient(90deg, transparent, var(--red), transparent);
-  opacity: 0;
-  transform: scaleX(0.6);
-  transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  pointer-events: none;
+  transition: box-shadow 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .hero-prompt:focus-within {
-  /* 不再改硬描边（去掉「点击后出现一道边线」）：聚焦只以柔光外扩 + 底部呼吸线（+ 外层 BeamFrame 流转光束）提示。 */
+  /* 聚焦只叠一层柔和外光——不加硬描边、不加内环、不加底部呼吸线。
+     反馈「点击输入框后又冒出一道边缘线」：这里此前叠了 4px 红环 + 呼吸底线两道「线」，
+     现全部去除，方向指引统一交给外层 BeamFrame 的流转光束这一个信号，聚焦观感更干净。 */
   box-shadow:
     var(--scene-card-shadow-sm),
-    0 0 0 4px rgba(252, 1, 26, 0.1),
-    0 0 26px -2px rgba(252, 1, 26, 0.28);
-}
-.hero-prompt:focus-within::after {
-  opacity: 1;
-  transform: scaleX(1);
-  animation: hero-prompt-breathe 2.6s ease-in-out infinite;
-}
-@keyframes hero-prompt-breathe {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
+    0 0 22px -4px rgba(252, 1, 26, 0.22);
 }
 @media (prefers-reduced-motion: reduce) {
-  /* 降级：保留静态柔光与底线，取消呼吸脉动与过渡位移 */
-  .hero-prompt, .hero-prompt::after { transition: none; }
-  .hero-prompt:focus-within::after { animation: none; opacity: 0.85; transform: none; }
+  .hero-prompt { transition: none; }
 }
 
 /* ============================================================

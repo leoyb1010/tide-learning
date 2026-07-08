@@ -11,8 +11,10 @@ import {
 import { getCurrentUser } from "@/lib/session";
 import { buildMarketStalls } from "@/lib/market-data";
 import { getAuthorEarnings } from "@/lib/credit-trade";
+import { trackLabel, TRACK_MAP } from "@/lib/tracks";
 import { MarketStallCard } from "@/components/market/MarketStallCard";
 import { MarketSortTabs } from "@/components/market/MarketSortTabs";
+import { MarketCategoryTabs } from "@/components/market/MarketCategoryTabs";
 import { SellerEarningsCard } from "@/components/market/SellerEarningsCard";
 import {
   normalizeSort,
@@ -49,15 +51,25 @@ function startOfTodayMs(): number {
 export default async function MarketPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sort?: string }>;
+  searchParams: Promise<{ sort?: string; category?: string }>;
 }) {
   const [user, sp] = await Promise.all([getCurrentUser(), searchParams]);
   const sort = normalizeSort(sp.sort);
+  // 分类筛选（问题⑨）：非法/缺省视为「全部」；只认真实存在的赛道 key，其余（含脏数据）当全部。
+  const category = sp.category && TRACK_MAP[sp.category] ? sp.category : "all";
 
   // 摊位视图模型：与 GET /api/market 共用同一份组装逻辑（src/lib/market-data.ts），
   // 保证 Web 与 iOS 集市字段/语义完全一致（拿走数排除作者本人、越权铁律 where userId）。
   const stalls: MarketStall[] = await buildMarketStalls(user?.id ?? null);
   const sorted = sortStalls(stalls, sort);
+  // 当前市集实际有货的赛道（问题⑨：只列非空分类，观感专业，不摆空赛道 Tab）。按 TRACKS 顺序稳定。
+  const presentCategories = Object.keys(TRACK_MAP)
+    .filter((key) => stalls.some((s) => s.category === key))
+    .map((key) => ({ key, label: trackLabel(key) }));
+  // 按分类筛选（保持排序后的相对顺序）。
+  const visible = category === "all" ? sorted : sorted.filter((s) => s.category === category);
+  // #13 轻量：从集市侧发起造课带上下文——选中某赛道时，造课 CTA 用该赛道中文名作 prompt 预填。
+  const createHref = category === "all" ? "/create" : `/create?prompt=${encodeURIComponent(trackLabel(category))}`;
 
   // 我的集市收益（仅登录用户查一次；无在架课时不渲染入口）。越权铁律：where userId=我。
   const earnings = user ? await getAuthorEarnings(user.id) : null;
@@ -200,30 +212,63 @@ export default async function MarketPage({
         </div>
       ) : (
         <>
-          {/* ——— 排序切换 ——— */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[13px] text-[var(--ink3)]">
-              共 <span className="mono text-[var(--ink)]">{stalls.length}</span> 件商品在架
-            </p>
-            <MarketSortTabs />
+          {/* ——— 分类筛选（问题⑨）+ 排序切换 ——— */}
+          <div className="flex flex-col gap-3">
+            {presentCategories.length > 0 && <MarketCategoryTabs categories={presentCategories} />}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[13px] text-[var(--ink3)]">
+                {category === "all" ? (
+                  <>共 <span className="mono text-[var(--ink)]">{stalls.length}</span> 件商品在架</>
+                ) : (
+                  <>
+                    <span className="font-semibold text-[var(--ink)]">{trackLabel(category)}</span>
+                    {" · "}
+                    <span className="mono text-[var(--ink)]">{visible.length}</span> 件在架
+                  </>
+                )}
+              </p>
+              <MarketSortTabs />
+            </div>
           </div>
 
-          {/* ——— 橱窗商品网格：stagger 递延进场；items-stretch + 卡片 h-full 同行等高（问题③）——— */}
-          <div className="stagger grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {sorted.map((stall, idx) => (
-              <div key={stall.id} className="h-full" style={{ "--i": idx } as React.CSSProperties}>
-                <MarketStallCard stall={stall} isLoggedIn={Boolean(user)} />
+          {visible.length === 0 ? (
+            // 分类命中空：把它变成造课机会（#13 轻量）——该赛道还没货，AI 帮你造一门（带 prompt 上下文）。
+            <div className="flex flex-col items-center justify-center gap-4 rounded-[16px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-14 text-center shadow-[var(--inner-hi)]">
+              <span className="grid h-12 w-12 place-items-center rounded-[14px] bg-[var(--red-soft)]">
+                <Sparkle size={22} weight="fill" className="text-[var(--red)]" />
+              </span>
+              <div>
+                <p className="text-[15px] font-bold text-[var(--ink)]">集市里还没有「{trackLabel(category)}」类课</p>
+                <p className="mt-1 text-[13px] leading-[1.6] text-[var(--ink2)]">
+                  你可以第一个把它造出来，摆到集市让同学们拿走。
+                </p>
               </div>
-            ))}
-          </div>
+              <Link
+                href={createHref}
+                className="cta-glow studio-press inline-flex min-h-[44px] items-center gap-2 rounded-[12px] bg-[var(--red)] px-5 py-3 text-[14px] font-bold text-white transition-all hover:brightness-105"
+              >
+                <Sparkle size={16} weight="fill" />
+                AI 造一门「{trackLabel(category)}」课
+              </Link>
+            </div>
+          ) : (
+            /* ——— 橱窗商品网格：stagger 递延进场；items-stretch + 卡片 h-full 同行等高（问题③）——— */
+            <div className="stagger grid grid-cols-1 items-stretch gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {visible.map((stall, idx) => (
+                <div key={stall.id} className="h-full" style={{ "--i": idx } as React.CSSProperties}>
+                  <MarketStallCard stall={stall} isLoggedIn={Boolean(user)} />
+                </div>
+              ))}
+            </div>
+          )}
 
-          {/* ——— 底部引导：也来摆一摊 ——— */}
+          {/* ——— 底部引导：也来摆一摊（带当前分类上下文，#13 轻量）——— */}
           <Link
-            href="/create"
+            href={createHref}
             className="group flex items-center justify-center gap-2 rounded-[14px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-5 py-4 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--inner-hi)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
           >
             <Sparkle size={16} weight="fill" className="text-[var(--red)]" />
-            造一门课，也来集市摆一摊
+            {category === "all" ? "造一门课，也来集市摆一摊" : `造一门「${trackLabel(category)}」课，也来摆一摊`}
             <ArrowRight size={15} weight="bold" className="transition-transform group-hover:translate-x-0.5" />
           </Link>
         </>

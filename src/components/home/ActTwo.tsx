@@ -104,8 +104,11 @@ function ActTwoImmersive({ tracks, totalCourses }: { tracks: TrackCardData[]; to
   const deskY = useTransform(scrollYProgress, [0, 1], [0, -32]);
   const vignette = useTransform(scrollYProgress, [0, 1], [0.28, 0.5]);
 
+  // 问题①：原 h-[380vh] + 逐桌 start 间隔 0.26，要滚约三屏、点三次才看全三桌，体验割裂。
+  // 压到 h-[190vh]（sticky 只钉约一屏），配合下方 DeskCard 更紧凑且重叠的点亮区间，
+  // 一次顺畅下滑即可看全三桌，保留镜头推近质感。
   return (
-    <section ref={ref} aria-label="三种开学方式" className="relative h-[380vh]">
+    <section ref={ref} aria-label="三种开学方式" className="relative h-[190vh]">
       <div
         className="sticky top-0 flex h-[100svh] items-center justify-center overflow-hidden"
         style={{
@@ -176,9 +179,11 @@ function DeskCard({
   tracks: TrackCardData[];
   totalCourses: number;
 }) {
-  const start = 0.1 + index * 0.26;
+  // 问题①：更早起始 + 更密间隔（0.06/0.18/0.30），三桌在一次下滑内相继点亮、约 44% 行程即全亮；
+  // 起始亮度抬高（0.5 而非 0.35），未点亮的桌子也可见，减轻「藏起来要滚出来」的割裂感。
+  const start = 0.06 + index * 0.12;
   const lit = useTransform(progress, [start, start + 0.14], [0, 1]);
-  const opacity = useTransform(lit, [0, 1], [0.35, 1]);
+  const opacity = useTransform(lit, [0, 1], [0.5, 1]);
   const y = useTransform(lit, [0, 1], [26, 0]);
   const glowOpacity = useTransform(lit, [0, 1], [0, 1]);
   const dimOverlay = useTransform(lit, [0, 1], [0.45, 0]);
