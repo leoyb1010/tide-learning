@@ -33,18 +33,6 @@ export const LLM_MODELS: LlmModelEntry[] = [
     enabled: true,
   },
   {
-    key: "MiniMax-M3",
-    label: "MiniMax-M3",
-    desc: "中文表达与长内容组织稳定，适合导入资料改课",
-    tier: "premium",
-    costWeight: 2,
-    envKeyName: NEWAPI_KEY_ENV,
-    baseUrlEnvName: NEWAPI_BASE_URL_ENV,
-    // 2026-07-07 实测 NewAPI /v1/chat/completions 返回上游 401（Missing required field: model），
-    // 暂时下架，避免会员选择后造课/导入生成失败；网关修复后改回 true 即可。
-    enabled: false,
-  },
-  {
     key: "glm-5.2",
     label: "GLM-5.2",
     desc: "推理与知识结构化均衡，适合专业主题大纲",
@@ -55,29 +43,55 @@ export const LLM_MODELS: LlmModelEntry[] = [
     enabled: true,
   },
   {
-    key: "claude-sonnet-5",
-    label: "Claude Sonnet 5",
-    desc: "强规划与长上下文理解，适合复杂课程与多章节生成",
+    key: "qwen3.7-max",
+    label: "Qwen3.7 Max",
+    desc: "中文知识与任务执行能力强，适合结构化课程生成",
+    tier: "premium",
+    costWeight: 2,
+    envKeyName: NEWAPI_KEY_ENV,
+    baseUrlEnvName: NEWAPI_BASE_URL_ENV,
+    enabled: true,
+  },
+  {
+    key: "claude-opus-4-8",
+    label: "Claude Opus 4.8",
+    desc: "长文本理解与课程规划能力强，适合复杂主题深度生成",
     tier: "premium",
     costWeight: 3,
     envKeyName: NEWAPI_KEY_ENV,
     baseUrlEnvName: NEWAPI_BASE_URL_ENV,
-    // 2026-07-07 实测经 NewAPI 网关 claude-sonnet-5 单次响应频繁 > 60s（探针偶发 7s，但造课
-    // 大纲/逐节请求多次超时，两次尝试累计 120s），导致「生成失败」。网关侧稳定前暂时下架，
-    // 只保留稳定可用的 gpt-5.5（默认，~8s）与 glm-5.2（~40s）。网关修复后改回 true 即可。
-    enabled: false,
+    enabled: true,
   },
-  // ↓↓↓ Leo 录入位（enabled:false 时不出现在任何 UI / 校验里，配好 key 后翻 true 即上线）↓↓↓
-  // {
-  //   key: "deepseek-v4-flash",
-  //   label: "潮汐 · 快速",
-  //   desc: "响应快、成本低，日常造课默认",
-  //   tier: "free",
-  //   costWeight: 1,
-  //   envKeyName: "DEEPSEEK_API_KEY",
-  //   baseUrlEnvName: "DEEPSEEK_BASE_URL",
-  //   enabled: false,
-  // },
+  {
+    key: "MiniMax-M3",
+    label: "MiniMax-M3",
+    desc: "中文表达与长内容组织稳定，适合导入资料改课",
+    tier: "premium",
+    costWeight: 2,
+    envKeyName: NEWAPI_KEY_ENV,
+    baseUrlEnvName: NEWAPI_BASE_URL_ENV,
+    enabled: true,
+  },
+  {
+    key: "deepseek-v4-pro",
+    label: "DeepSeek V4 Pro",
+    desc: "推理能力强，适合需要严谨步骤与解释的课程生成",
+    tier: "premium",
+    costWeight: 2,
+    envKeyName: NEWAPI_KEY_ENV,
+    baseUrlEnvName: NEWAPI_BASE_URL_ENV,
+    enabled: true,
+  },
+  {
+    key: "gemini-3.1-pro",
+    label: "Gemini 3.1 Pro",
+    desc: "多领域综合能力稳定，适合跨学科内容组织",
+    tier: "premium",
+    costWeight: 3,
+    envKeyName: NEWAPI_KEY_ENV,
+    baseUrlEnvName: NEWAPI_BASE_URL_ENV,
+    enabled: true,
+  },
 ];
 
 export const DEFAULT_MODEL_KEY =

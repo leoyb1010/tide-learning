@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   House, GraduationCap, Sparkle, NotePencil, CardsThree,
   MagnifyingGlass, Moon, Sun, Monitor, Play, List, X,
@@ -17,6 +17,7 @@ import { GenNavIndicator } from "./GenNavIndicator";
 import { track } from "@/lib/analytics-client";
 import { trapFocus } from "./focus-trap";
 import type { NavUser } from "./nav-types";
+import { useToast } from "./Toast";
 
 const ADMIN_ROLES = ["admin", "content_manager", "demand_moderator", "support", "finance", "reviewer"];
 
@@ -72,10 +73,13 @@ function primaryLinks(loggedIn: boolean): NavLink[] {
 
 export function TopNav({ user }: { user: NavUser | null }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { toast } = useToast();
   const { colorScheme, cycleColorScheme } = useMode();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false); // 头像下拉
   const [resumeOpen, setResumeOpen] = useState(false); // v3.0 续学胶囊下拉
+  const [logoutPending, setLogoutPending] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const resumeRef = useRef<HTMLDivElement>(null);
   const drawerRef = useRef<HTMLDivElement>(null); // 移动抽屉面板：focus trap 边界
@@ -96,6 +100,26 @@ export function TopNav({ user }: { user: NavUser | null }) {
     if (href === "/" || href === "/desk") return pathname === href;
     return pathname.startsWith(href);
   };
+
+  async function logout() {
+    if (logoutPending) return;
+    setLogoutPending(true);
+    try {
+      const res = await fetch("/api/auth/logout", { method: "POST" });
+      if (!res.ok) {
+        toast("退出失败，请稍后重试", { tone: "warn" });
+        setLogoutPending(false);
+        return;
+      }
+      setMenuOpen(false);
+      setDrawerOpen(false);
+      router.push("/");
+      router.refresh();
+    } catch {
+      toast("网络异常，退出失败，请重试", { tone: "warn" });
+      setLogoutPending(false);
+    }
+  }
 
   // 点击外部关闭下拉：挂载一次的事件委托（空依赖只绑一次），
   // 回调内经 ref 判断当前开合，仅在确有下拉打开且点到外部时才 setState。
@@ -371,11 +395,14 @@ export function TopNav({ user }: { user: NavUser | null }) {
                       {ADMIN_ROLES.includes(user.role) && <MenuItem href="/admin" Icon={SquaresFour} label="管理后台" />}
                     </div>
                     <div className="border-t border-[var(--border)] p-1.5">
-                      <form action="/api/auth/logout" method="post">
-                        <button type="submit" className="flex w-full items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--red)]">
-                          <SignOut size={16} /> 退出登录
-                        </button>
-                      </form>
+                      <button
+                        type="button"
+                        onClick={logout}
+                        disabled={logoutPending}
+                        className="flex w-full items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--red)] disabled:cursor-wait disabled:opacity-60"
+                      >
+                        <SignOut size={16} /> {logoutPending ? "退出中..." : "退出登录"}
+                      </button>
                     </div>
                   </div>
                 )}
