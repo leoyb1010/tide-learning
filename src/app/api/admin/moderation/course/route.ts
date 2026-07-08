@@ -9,10 +9,14 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 // body: { courseId, action: "approve" | "reject" | "unshare", reason? }
 // approve → sharedStatus=shared；reject → sharedStatus=rejected（两者仅对 pending 课）；
 // unshare → 把已上架（shared）课强制置 private 并通知作者（reason 必填）。已购者权益不受影响。
+// 权限：content:review——课程集市待审属「内容审核台」（/admin/moderation, gate=content:review）的工作，
+// 与同台的帖子审核（moderation/post）一致。此前误用 demand:moderate（那是需求广场审核的权限），
+// 导致能进审核台的 reviewer 无权执行课程审核、而有 demand:moderate 的 demand_moderator 又进不了页面——
+// page/nav/API 三处权限对齐后，reviewer 可完整处理课程集市审核闭环（审计 P1-new-1）。
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req); // A2：写操作 CSRF 防护
-    const admin = await requirePermission("demand:moderate");
+    const admin = await requirePermission("content:review");
 
     const body = (await req.json()) as {
       courseId?: string;

@@ -45,6 +45,17 @@ describe("canAccessGate —— 页面 gate 与角色权限对齐", () => {
     expect(canAccessGate("demand_moderator", "course:write")).toBe(false);
   });
 
+  it("内容审核台闭环一致（P1-new-1）：入口与帖子/课程审核写权限统一 content:review", () => {
+    // /admin/moderation 台内含帖子审核 + 课程集市审核，两个写接口(moderation/post、moderation/course)
+    // 均以 content:review 校验，与本页 gate 一致——故能进台的 reviewer 必须能执行两类审核；
+    // demand_moderator（需求广场审核）不越界到内容审核台，reviewer 也不碰需求广场审核。
+    const modGate = ADMIN_NAV.find((n) => n.href === "/admin/moderation")?.gate;
+    expect(modGate).toBe("content:review");
+    expect(canAccessGate("reviewer", "content:review")).toBe(true);
+    expect(canAccessGate("demand_moderator", "content:review")).toBe(false);
+    expect(canAccessGate("reviewer", "demand:moderate")).toBe(false);
+  });
+
   it("admin：所有 gate 放行，含超级管理员专属 admin gate", () => {
     for (const item of ADMIN_NAV) expect(canAccessGate("admin", item.gate)).toBe(true);
     expect(canAccessGate("admin", "admin")).toBe(true);
