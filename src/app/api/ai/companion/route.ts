@@ -209,7 +209,8 @@ export async function POST(req: NextRequest) {
         : undefined;
     const notebookId = typeof body?.notebookId === "string" && body.notebookId.trim() ? body.notebookId.trim() : undefined;
     const hasNoteScope = Boolean((noteIds && noteIds.length) || notebookId);
-    const scope = body?.scope?.trim() || (hasNoteScope ? "notes" : lessonId ? `lesson:${lessonId}` : "studio");
+    // scope 入库前钳长（≤64）：客户端可传任意长字符串，无上限会污染 ChatThread.scope。
+    const scope = (body?.scope?.trim() || (hasNoteScope ? "notes" : lessonId ? `lesson:${lessonId}` : "studio")).slice(0, 64);
 
     // —— 校验/取回 thread（越权铁律：强制 userId）——
     let thread = null;

@@ -48,7 +48,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ cha
     }
     if (!body.externalOrderId) return fail("缺少订单号");
 
-    const eventType = body.eventType ?? "payment.succeeded";
+    // 事件类型白名单（禁 fail-open）：缺省/未知事件一律拒绝。
+    // 此前缺省按 payment.succeeded 处理——真实渠道字段名不同(如用 event 而非 eventType)时，
+    // 任意签名合法的回调（含支付失败/关单）都会被误当成功支付而激活订单，接真渠道前必堵。
+    const eventType = body.eventType;
+    if (eventType !== "payment.succeeded" && eventType !== "payment.refunded") {
+      return fail("不支持的事件类型", 400);
+    }
     // 幂等键绑定事件类型：支付成功与退款是两个独立事件，即使渠道不提供 externalId
     // 也不能因回退到同一 externalOrderId 而让退款被误判为「支付回调的重复」而丢弃。
     const externalId = `${eventType}:${body.externalId ?? body.externalOrderId}`;

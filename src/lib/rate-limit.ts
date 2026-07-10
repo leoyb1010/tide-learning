@@ -47,10 +47,12 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
  * 优先信任平台注入的不可伪造 header（x-real-ip 由反代设置）。
  */
 const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? "1");
-export function clientIp(req: NextRequest): string {
-  const realIp = req.headers.get("x-real-ip");
+
+// 共享取 IP 逻辑：NextRequest.headers 与 next/headers 的 ReadonlyHeaders 都实现 get(name)。
+function pickClientIp(get: (name: string) => string | null): string {
+  const realIp = get("x-real-ip");
   if (realIp) return realIp.trim();
-  const xff = req.headers.get("x-forwarded-for");
+  const xff = get("x-forwarded-for");
   if (xff) {
     const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);
     if (parts.length > 0) {
@@ -60,6 +62,15 @@ export function clientIp(req: NextRequest): string {
     }
   }
   return "unknown";
+}
+
+export function clientIp(req: NextRequest): string {
+  return pickClientIp((name) => req.headers.get(name));
+}
+
+/** 供 Server Component（无 NextRequest）用：传入 next/headers 的 headers() 结果。 */
+export function clientIpFromHeaders(h: { get(name: string): string | null }): string {
+  return pickClientIp((name) => h.get(name));
 }
 
 export class RateLimitError extends Error {

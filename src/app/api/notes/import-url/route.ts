@@ -34,6 +34,7 @@ function isBlockedIp(ip: string): boolean {
     if (a === 10) return true; // 私有 A
     if (a === 192 && b === 168) return true; // 私有 C
     if (a === 172 && b >= 16 && b <= 31) return true; // 私有 B
+    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10（阿里云 metadata 100.100.100.200 属此段）
     if (a === 169 && b === 254) return true; // 链路本地 / 云 metadata (169.254.169.254)
     if (a === 0) return true; // 0.0.0.0/8
     if (a >= 224) return true; // 组播 / 保留

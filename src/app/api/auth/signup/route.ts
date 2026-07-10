@@ -4,9 +4,13 @@ import { hashPassword, createSession, validatePasswordStrength } from "@/lib/ses
 import { ok, fail, handle } from "@/lib/api";
 import { track } from "@/lib/analytics";
 import { ensureAccount } from "@/lib/credits";
+import { assertRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
+    // 与 login/改密/重置对齐：注册也须限流。每次注册自动建号并发放注册积分，
+    // 无限流可被脚本批量刷号薅积分/灌垃圾账号。按 IP 限：同 IP 5 次/分。
+    assertRateLimit(req, "signup", 5, 60_000);
     const body = await req.json();
     const { identifier, password, nickname } = body as {
       identifier?: string;

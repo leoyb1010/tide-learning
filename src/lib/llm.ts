@@ -99,7 +99,9 @@ export async function chat(opts: ChatOptions): Promise<string> {
         console.error(`[llm] upstream ${res.status}: ${upstreamText.slice(0, 300)}`);
         if (res.status >= 400 && res.status < 500) {
           if (res.status === 429) throw new AppError("AI 请求过于频繁，请稍后再试", 429);
-          throw new AppError("AI 服务暂时不可用", 502);
+          // 上游 4xx（配置错/payload 超限/鉴权失效）折叠为客户端可见 502，但标记不可重试：
+          // 确定性失败，重试只会白打第二次上游调用。retryable=false 供下方 catch 识别。
+          throw new AppError("AI 服务暂时不可用", 502, false);
         }
         // 5xx → 落入重试
         lastErr = new AppError("AI 服务暂时不可用", 502);
@@ -142,8 +144,8 @@ export async function chat(opts: ChatOptions): Promise<string> {
     } catch (e) {
       // AppError 直接上抛（业务级，已折叠）
       if (e instanceof AppError) {
-        // 4xx AppError 不重试
-        if (e.status >= 400 && e.status < 500) throw e;
+        // 不重试：4xx 业务错，或显式标记 retryable=false 的上游 4xx（已折叠为 502）。
+        if ((e.status >= 400 && e.status < 500) || e.retryable === false) throw e;
         lastErr = e;
       } else if (e instanceof Error && e.name === "AbortError") {
         lastErr = new AppError("AI 响应超时，请重试", 504);
@@ -225,9 +227,21 @@ function sleep(ms: number): Promise<void> {
  * 服务端直接调用（课程库页），任何失败/未配置都降级为 [q]，保证搜索永不中断。
  * 始终包含原始 q，不丢召回。
  */
+// 关键词扩展短缓存：热门/重复查询直接命中，不重复烧 LLM（配合 SSR 侧 IP 限流双保险）。
+// 有界 + TTL，防内存无限增长；query 已 trim+lowercase 归一化为键。
+const SEARCH_CACHE_TTL = 5 * 60_000;
+const SEARCH_CACHE_MAX = 500;
+const searchKeywordCache = new Map<string, { terms: string[]; at: number }>();
+
 export async function expandSearchKeywords(q: string): Promise<string[]> {
   const query = q.trim();
   if (!query || !isLLMConfigured()) return query ? [query] : [];
+
+  const cacheKey = query.toLowerCase();
+  const now = Date.now();
+  const cached = searchKeywordCache.get(cacheKey);
+  if (cached && now - cached.at < SEARCH_CACHE_TTL) return cached.terms;
+
   try {
     const result = await chatJson<{ keywords: string[] }>({
       system: SEARCH_KEYWORDS_SYSTEM,
@@ -238,7 +252,14 @@ export async function expandSearchKeywords(q: string): Promise<string[]> {
       retries: 0,
     });
     const kws = Array.isArray(result.keywords) ? result.keywords.filter((k) => typeof k === "string" && k.trim()).slice(0, 6) : [];
-    return Array.from(new Set([query, ...kws]));
+    const terms = Array.from(new Set([query, ...kws]));
+    // 写缓存前先淘汰：超上限删最早插入的一条（Map 迭代序即插入序）。
+    if (searchKeywordCache.size >= SEARCH_CACHE_MAX) {
+      const oldest = searchKeywordCache.keys().next().value;
+      if (oldest !== undefined) searchKeywordCache.delete(oldest);
+    }
+    searchKeywordCache.set(cacheKey, { terms, at: now });
+    return terms;
   } catch {
     return [query];
   }

@@ -379,6 +379,44 @@ export async function verifyAppleTransaction(input: VerifyInput): Promise<Verify
   return { ok: true, payload: parsed.payload };
 }
 
+/**
+ * 通用「验签 + 证书链」JWS 解码：只做签名/证书链校验，不做交易 claims 校验。
+ * 供 App Store Server Notifications V2 复用——通知的 signedPayload 与其内嵌的
+ * signedTransactionInfo 都是 Apple 签名的 JWS，验签逻辑与交易 JWS 完全一致，
+ * 但载荷结构不同（notificationType / data.* 而非交易字段），故不能套 validateClaims。
+ * 返回已验签的原始 payload（宽松对象），由调用方按通知语义取字段。
+ */
+export function verifySignedJws(
+  jws: string,
+  now: Date = new Date(),
+): { ok: true; payload: Record<string, unknown> } | { ok: false; reason: string } {
+  let parsed: ParsedJws;
+  try {
+    parsed = parseJws(jws);
+  } catch (e) {
+    return { ok: false, reason: `JWS 解析失败：${(e as Error).message}` };
+  }
+  let leaf: X509Certificate;
+  try {
+    leaf = verifyCertChain(parsed.header.x5c as string[], now);
+  } catch (e) {
+    return { ok: false, reason: `证书链校验失败：${(e as Error).message}` };
+  }
+  let signatureValid: boolean;
+  try {
+    signatureValid = verifyJwsSignature(leaf, parsed.signingInput, parsed.signature);
+  } catch (e) {
+    return { ok: false, reason: `JWS 签名核验异常：${(e as Error).message}` };
+  }
+  if (!signatureValid) return { ok: false, reason: "JWS 签名核验不通过" };
+  return { ok: true, payload: parsed.payload as Record<string, unknown> };
+}
+
+/** 当前配置的 Apple 环境（Sandbox/Production），供通知路由校验通知 environment。 */
+export function appleEnvironment(): AppleEnvironment {
+  return readEnvironment();
+}
+
 // createHash 仅为暴露给潜在的指纹自检（当前未在主流程使用，保留以便运维核对根证书）。
 export function appleRootFingerprintSha256(): string {
   const root = new X509Certificate(APPLE_ROOT_CA_G3_PEM);

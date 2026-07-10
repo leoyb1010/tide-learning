@@ -1,9 +1,11 @@
 import { Suspense } from "react";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { MagnifyingGlass, Compass, BookOpen, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { listCourses } from "@/lib/queries";
 import { expandSearchKeywords } from "@/lib/llm";
+import { rateLimit, clientIpFromHeaders } from "@/lib/rate-limit";
 import { TRACKS, TRACK_MAP } from "@/lib/tracks";
 import { CoursePreviewCard } from "@/components/CoursePreviewCard";
 import { CourseFilterBar } from "@/components/CourseFilterBar";
@@ -81,8 +83,15 @@ export default async function CoursesPage({
   const category = sp.category ?? "all";
   const sort = sp.sort ?? "recommended";
   const q = sp.q ?? "";
-  // 语义搜索（场景4）：有关键词时用 LLM 扩展同义词再检索；失败/未配置自动降级为原词（不阻塞）
-  const searchTerms = q ? await expandSearchKeywords(q) : undefined;
+  // 语义搜索（场景4）：有关键词时用 LLM 扩展同义词再检索；失败/未配置自动降级为原词（不阻塞）。
+  // 安全（匿名 LLM 敞口）：本 SSR 路径对任意访客直调 LLM，无登录/记账。补按 IP 限流——超限即
+  // 降级为原词纯文本检索（搜索仍可用），堵住「循环 GET /courses?q=<随机串>」刷运营方 LLM 账户。
+  let searchTerms: string[] | undefined;
+  if (q) {
+    const ip = clientIpFromHeaders(await headers());
+    const rl = rateLimit(`courses-search:${ip}`, 12, 60_000);
+    searchTerms = rl.ok ? await expandSearchKeywords(q) : [q];
+  }
   const [courses, user] = await Promise.all([
     listCourses({ category, sort, q: searchTerms }),
     // 登录用户在页顶展示「发现｜我的课程」切换（我的课程直达 /me/courses）

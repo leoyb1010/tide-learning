@@ -4,6 +4,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertCanSpend } from "@/lib/credits";
+import { assertUserRateLimit } from "@/lib/rate-limit";
 import { getGenJob, initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
@@ -24,10 +25,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const user = await requireUser();
 
-    // 权益闸门 + 余额预检（与首次造课一致）
+    // 限流 + 权益闸门 + 余额预检（与首次造课 generate-course 完全一致，避免续造成为绕过门槛的口子）。
+    // 此前无限流、且 assertCanSpend 未传 scene（门槛仅 1 分）——余额 1 分即可续造整门课欠账。
+    assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
-    await assertCanSpend(user.id);
+    await assertCanSpend(user.id, "generate_course");
 
     const course = await prisma.course.findUnique({
       where: { id },

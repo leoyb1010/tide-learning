@@ -34,6 +34,18 @@ function periodEnd(billingPeriod: string, from = new Date()): Date {
 }
 
 /**
+ * periodEnd 的逆：从到期时间回退「一个计费周期」的时长。
+ * 退款时用来精确扣掉「本笔订单贡献的那一段」，而不清零其他订单续期已付的周期。
+ */
+function rollbackOnePeriod(billingPeriod: string, end: Date): Date {
+  const d = new Date(end);
+  if (billingPeriod === "year") addMonthsClamped(d, -12);
+  else if (billingPeriod === "quarter") addMonthsClamped(d, -3);
+  else addMonthsClamped(d, -1); // month / month_recurring
+  return d;
+}
+
+/**
  * 订阅激活/续期的**共享核心**（v3.3）——把此前内联在 iap/verify 与 processWebhook 里的
  * 「已有有效订阅→续期(叠加时长)，否则新建」逻辑提炼为一处，供三方复用且行为一致：
  *   1) iap/verify 的订阅发放（按周期）；
@@ -158,11 +170,20 @@ export async function createCheckoutSession(
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan || !plan.isActive) throw new AppError("套餐不可用");
 
-  // 首单资格看「是否曾经成功支付过」——退款(refunded)也算用过，杜绝「买-退-再买」反复薅首单价
-  const priorPaidOrders = await prisma.order.count({
-    where: { userId, status: { in: ["paid", "refunded"] } },
+  // 首单资格看「是否曾经成功支付过」——退款(refunded)也算用过，杜绝「买-退-再买」反复薅首单价。
+  // 竞态加固：近 30 分钟内的 pending 订单也占用资格，堵住「并发/连发多笔 pending 各按首单价计价、
+  // 再逐一支付」薅多次首单价的窗口；又不惩罚早已放弃的历史 pending（那类用户回来仍应享首单价）。
+  // 残留：亚秒级并发仍可能各读到 0（由 checkout 限流 20/分兜底），无 schema 级唯一约束不做过度设计。
+  const priorConsuming = await prisma.order.count({
+    where: {
+      userId,
+      OR: [
+        { status: { in: ["paid", "refunded"] } },
+        { status: "pending", createdAt: { gte: new Date(Date.now() - 30 * 60_000) } },
+      ],
+    },
   });
-  const isFirstEver = priorPaidOrders === 0;
+  const isFirstEver = priorConsuming === 0;
   const base = isFirstEver && plan.firstPriceCents != null ? plan.firstPriceCents : plan.priceCents;
   const { discountCents, couponId } = await applyCoupon(couponCode, planId, base);
   const amount = Math.max(0, base - discountCents);
@@ -242,6 +263,9 @@ export async function processWebhook(channel: string, payload: {
         include: { plan: true, coupon: true },
       });
       if (!order) throw new AppError("订单不存在");
+      // 渠道匹配（防御纵深）：订单按 externalOrderId 全局查找，须校验回调渠道与下单渠道一致，
+      // 否则持任一渠道密钥者可对其他渠道的订单发确认/退款回调。
+      if (order.channel !== channel) throw new AppError("订单渠道不匹配");
 
       if (payload.eventType === "payment.succeeded") {
         if (order.status === "paid") return { ok: true, duplicate: true };
@@ -392,10 +416,23 @@ export async function processWebhook(channel: string, payload: {
         if (refundSubId) {
           const sub = await tx.subscription.findUnique({ where: { id: refundSubId } });
           if (sub && sub.status !== "expired" && sub.status !== "refunded") {
-            await tx.subscription.update({
-              where: { id: sub.id },
-              data: { status: "refunded", currentPeriodEnd: new Date() },
-            });
+            // 精确回退「本笔订单贡献的那段周期」，不清零其他订单续期已付的时长（修 P1）。
+            // 续期复用同一订阅行：退首单不应把后续续费已付的周期一并作废。
+            const now = new Date();
+            const rolledBack = rollbackOnePeriod(order.plan.billingPeriod, sub.currentPeriodEnd);
+            if (rolledBack > now) {
+              // 回退后到期时间仍在未来（有其他订单续期撑着）→ 订阅继续有效，仅缩短有效期，状态不改。
+              await tx.subscription.update({
+                where: { id: sub.id },
+                data: { currentPeriodEnd: rolledBack },
+              });
+            } else {
+              // 回退后已到期 → 本单是唯一/最后支撑，订阅置退款并即时失效。
+              await tx.subscription.update({
+                where: { id: sub.id },
+                data: { status: "refunded", currentPeriodEnd: now },
+              });
+            }
           }
         }
 
@@ -490,6 +527,19 @@ export async function changeSubscriptionPlan(userId: string, newPlanId: string) 
   const plan = await prisma.plan.findUnique({ where: { id: newPlanId } });
   if (!plan || !plan.isActive) throw new AppError("目标套餐不可用");
   if (plan.id === sub.planId) throw new AppError("已是当前套餐");
+
+  // Apple 自动续费商品的订阅须在 App Store 侧变更；Web 端改 plan 会与 IAP 商品脱钩、续费错乱。
+  if (sub.channel === "apple_iap") {
+    throw new AppError("App Store 订阅请在系统「订阅」中变更");
+  }
+
+  // scope 覆盖判定：全站(all)覆盖一切赛道，可向下切到任意单赛道（降级）；
+  // 但单赛道订阅只能在「同一 scope 内」改 plan（仅调价档），不得横跳到另一赛道——
+  // 否则同价单赛道之间可无限「平级」横跳，一份钱串行消费多个赛道内容（修越权/薅课）。
+  const scopeCovered = sub.scope === "all" || plan.scope === sub.scope;
+  if (!scopeCovered) {
+    throw new AppError("不支持跨赛道变更套餐，请就目标赛道单独下单");
+  }
 
   // 升级（目标价更高）必须补差价：引导走支付流程，不在此免费切换
   if (plan.priceCents > sub.priceSnapshotCents) {
