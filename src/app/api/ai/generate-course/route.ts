@@ -59,6 +59,7 @@ export async function POST(req: NextRequest) {
         category?: string;
         template?: string;
         model?: string;
+        qualityTier?: string;
       } | null;
       const prompt = body?.prompt?.trim();
       if (!prompt) return fail("请描述你想学的内容");
@@ -82,6 +83,10 @@ export async function POST(req: NextRequest) {
           : fail("AI 服务未配置", 503);
       }
       const modelKey = modelEntry.key;
+      const qualityTier = body?.qualityTier === "premium" ? "premium" : "standard";
+      if (qualityTier === "premium" && !snapshot.isSubscriber) {
+        return fail("精修排版为会员专享，请升级订阅或使用标准排版", 402);
+      }
 
       // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 模板结构 + 合规底线。
       // 输出契约不变：{title, subtitle, intro, outline:[{title, objective, difficulty}]}。
@@ -135,6 +140,7 @@ export async function POST(req: NextRequest) {
             genStatus: "generating",
             template: template ?? null,
             modelUsed: modelKey,
+            qualityTier,
             disclaimer: "本课程由 AI 生成，内容仅供学习参考",
           },
         });
@@ -169,7 +175,7 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             type: "course_outline",
             status: "done",
-            inputJson: JSON.stringify({ prompt, category, template: template ?? null, model: modelKey }),
+            inputJson: JSON.stringify({ prompt, category, template: template ?? null, model: modelKey, qualityTier }),
             resultRef: course.id,
             finishedAt: new Date(),
           },
@@ -181,7 +187,7 @@ export async function POST(req: NextRequest) {
       await track({
         eventName: "ai_gen_course",
         userId: user.id,
-        properties: { courseId: created.course.id, category, lessons: created.lessons.length },
+        properties: { courseId: created.course.id, category, lessons: created.lessons.length, qualityTier },
       });
 
       // —— v3.0 服务端后台续跑：大纲已落库，逐节生成交给 after() 在响应返回后接管 ——

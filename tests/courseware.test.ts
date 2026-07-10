@@ -50,9 +50,18 @@ describe("resolveCourseDesign —— 课级设计系统（确定性）", () => {
     expect(d1.motion).toBeLessThanOrEqual(10);
   });
 
-  it("模板提示优先命中（story → storybook）", () => {
+  it("模板提示会落入对应签名候选池", () => {
     const d = resolveCourseDesign({ id: "x", category: "life", template: "story", designJson: null });
-    expect(d.art.key).toBe("storybook");
+    expect(["storybook", "cinematic_neon", "journal_washi"]).toContain(d.art.key);
+  });
+
+  it("模板候选视觉稳定且有签名倾向", () => {
+    const storyA = resolveCourseDesign({ id: "story-a", category: "life", template: "story", designJson: null });
+    const storyB = resolveCourseDesign({ id: "story-a", category: "life", template: "story", designJson: null });
+    expect(storyA.art.key).toBe(storyB.art.key);
+    expect(["storybook", "cinematic_neon", "journal_washi"]).toContain(storyA.art.key);
+    const exam = resolveCourseDesign({ id: "exam-a", category: "exam", template: "exam_sprint", designJson: null });
+    expect(["scoreboard", "academic_lecture", "magazine_bold"]).toContain(exam.art.key);
   });
 
   it("已落库 designJson 精确复原", () => {
@@ -73,12 +82,11 @@ describe("resolveCourseDesign —— 课级设计系统（确定性）", () => {
 });
 
 describe("新艺术方向 + 内容信号路由（吸收 20 源模板：扩展视觉世界 + 内容→风格）", () => {
-  it("新增 3 个方向(cinematic_neon/dev_terminal/academic_lecture)存在且各自母题不同", () => {
-    for (const k of ["cinematic_neon", "dev_terminal", "academic_lecture"]) {
+  it("新增 6 个方向存在且各自母题不同", () => {
+    for (const k of ["cinematic_neon", "dev_terminal", "academic_lecture", "magazine_bold", "zen_mono", "journal_washi"]) {
       expect(ART_DIRECTIONS.some((a) => a.key === k)).toBe(true);
     }
-    // 共 9 个方向
-    expect(ART_DIRECTIONS.length).toBeGreaterThanOrEqual(9);
+    expect(ART_DIRECTIONS.length).toBeGreaterThanOrEqual(12);
   });
 
   it("内容信号路由：编程课→dev_terminal，讲义/精读→academic_lecture", () => {

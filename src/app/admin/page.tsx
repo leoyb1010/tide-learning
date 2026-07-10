@@ -13,7 +13,7 @@ export default async function AdminDashboard() {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [views, registers, trials, subs, playAgg, notes, demands, votesAgg, refunds, checkouts, leads, viewEvents, subsByScope] = await Promise.all([
+  const [views, registers, trials, subs, playAgg, notes, demands, votesAgg, refunds, checkouts, leads, viewEvents, subsByScope, premiumCourses, premiumHits, deterministicHits, rejectGroups, recentRendered] = await Promise.all([
     prisma.analyticsEvent.count({ where: { eventName: "homepage_view" } }),
     prisma.user.count({ where: { role: "user" } }),
     prisma.analyticsEvent.count({ where: { eventName: "lesson_trial_start" } }),
@@ -27,6 +27,11 @@ export default async function AdminDashboard() {
     prisma.lead.findMany({ select: { source: true, status: true } }),
     prisma.analyticsEvent.findMany({ where: { eventName: "homepage_view" }, select: { propertiesJson: true } }),
     prisma.subscription.groupBy({ by: ["scope"], where: { status: { in: ["active", "trial", "grace_period", "canceled_but_active"] } }, _count: true }),
+    prisma.course.count({ where: { qualityTier: "premium" } }),
+    prisma.lesson.count({ where: { renderEngine: "llm" } }),
+    prisma.lesson.count({ where: { renderEngine: "deterministic" } }),
+    prisma.lesson.groupBy({ by: ["renderRejectReason"], where: { renderRejectReason: { not: null } }, _count: true, orderBy: { _count: { renderRejectReason: "desc" } }, take: 5 }),
+    prisma.lesson.findMany({ where: { renderEngine: { not: null } }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, title: true, renderEngine: true, renderRejectReason: true, renderDurationMs: true, course: { select: { title: true, template: true, qualityTier: true } } } }),
   ]);
 
   // 渠道漏斗：曝光(埋点 source) → 留资(lead) → 转化(lead converted)
@@ -82,6 +87,20 @@ export default async function AdminDashboard() {
           homepage_view → course_card_click → lesson_trial_start → signup → paywall_view → checkout_start → subscription_success → lesson_continue_after_pay
         </p>
         <p className="mt-2 text-xs text-ink-400">埋点已全链路上报，事件明细见 analytics_events 表。</p>
+      </div>
+
+      <div className="rounded-2xl border border-ink-100 bg-paper-raised p-5">
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div><h2 className="font-medium text-ink-950">高级课件渲染</h2><p className="mt-1 text-xs text-ink-400">premium 命中、确定性回落与拒绝原因</p></div>
+          <div className="text-sm text-ink-500">精修课程 {premiumCourses} 门 · bespoke 命中率 {premiumHits + deterministicHits > 0 ? ((premiumHits / (premiumHits + deterministicHits)) * 100).toFixed(1) : "0"}%</div>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="rounded-xl bg-ink-50 p-3"><div className="text-xl font-semibold tabular text-ink-950">{premiumHits}</div><div className="text-xs text-ink-400">bespoke 章节</div></div>
+          <div className="rounded-xl bg-ink-50 p-3"><div className="text-xl font-semibold tabular text-ink-950">{deterministicHits}</div><div className="text-xs text-ink-400">确定性/回落</div></div>
+          <div className="rounded-xl bg-ink-50 p-3"><div className="text-xl font-semibold tabular text-ink-950">{rejectGroups.reduce((n, g) => n + g._count, 0)}</div><div className="text-xs text-ink-400">拒绝记录</div></div>
+        </div>
+        {rejectGroups.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{rejectGroups.map((g) => <span key={g.renderRejectReason} className="rounded-full border border-ink-100 px-3 py-1 text-xs text-ink-500">{g.renderRejectReason} · {g._count}</span>)}</div>}
+        <div className="mt-4 overflow-x-auto"><table className="w-full text-sm"><thead className="border-b border-ink-100 text-left text-ink-400"><tr><th className="py-2 pr-3">课程 / 章节</th><th className="py-2 pr-3">模板</th><th className="py-2 pr-3">引擎</th><th className="py-2">耗时</th></tr></thead><tbody className="divide-y divide-ink-100">{recentRendered.map((l) => <tr key={l.id}><td className="py-2.5 pr-3"><div className="font-medium text-ink-950">{l.course.title}</div><div className="text-xs text-ink-400">{l.title}</div></td><td className="py-2.5 pr-3 text-ink-500">{l.course.template ?? "classic"}</td><td className="py-2.5 pr-3 text-ink-500">{l.renderEngine}</td><td className="py-2.5 text-ink-500">{l.renderDurationMs ?? 0}ms</td></tr>)}</tbody></table></div>
       </div>
 
       {/* 渠道漏斗（融合有道端内/端外流量结构） */}

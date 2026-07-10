@@ -91,13 +91,13 @@ export function CompanionPanel({ lessonId, courseId }: { lessonId: string; cours
 
       {/* 输入区 */}
       <div className="border-t border-[var(--border)] bg-[var(--surface2)] p-3">
-        <div className="flex items-center gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-1 pl-3.5 pr-1">
+        <div className="flex items-center gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-1 pl-3.5 pr-1 transition-shadow focus-within:border-[var(--red-soft-border)] focus-within:shadow-[0_0_0_3px_var(--red-soft)]">
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && send()}
             placeholder="问伴侣任何关于本课的问题…"
-            className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink4)]"
+            className="min-w-0 flex-1 bg-transparent text-[13px] text-[var(--ink)] outline-none placeholder:text-[var(--ink4)] focus-visible:outline-none"
           />
           <button
             onClick={send}

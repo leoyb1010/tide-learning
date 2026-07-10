@@ -49,6 +49,11 @@ export async function GET(_req: NextRequest) {
       templates,
       defaultTemplate: DEFAULT_TEMPLATE,
       isSubscriber,
+      qualityTiers: [
+        { key: "standard", label: "标准排版", desc: "稳定、快速，由高级确定性引擎生成", available: true },
+        { key: "premium", label: "精修排版", desc: "优先使用强模型逐节定制，失败自动回落", available: isSubscriber },
+      ],
+      defaultQualityTier: "standard",
     });
   });
 }

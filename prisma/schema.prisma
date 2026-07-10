@@ -134,6 +134,9 @@ model Course {
   genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
   template         String?   // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
   modelUsed        String?   // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
+  qualityTier      String    @default("standard") // v3.4 standard=确定性 / premium=优先 bespoke 精修
+  premiumRenderCount Int     @default(0) // 成功命中 bespoke 的章节数
+  deterministicRenderCount Int @default(0) // 确定性渲染或回落的章节数
   designJson       String?   // v3.3 课级设计系统（艺术方向 + 配色/字体 token + 动效旋钮）JSON，供 HTML 课件生成注入（见 src/lib/ai/courseware-design.ts）
   sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
   instructorName   String?
@@ -175,6 +178,10 @@ model Lesson {
   blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）；也是 ai_html 课的内容层真值源 + 兜底
   htmlJson      String? // ai_html 类型：AI 生成的自包含沙箱 HTML 课件渲染契约 {renderMode, contractVersion, html, hasScript, checksum}（见 src/lib/ai/courseware-html.ts）
   htmlGenClaimedAt DateTime? // HTML 课件生成并发所有权占位（对齐 genClaimedAt 语义）
+  renderEngine  String? // v3.4 llm / deterministic，供命中率与回落排障
+  renderRejectReason String? // bespoke 被拒/预算/超时等原因（截断的人类可读摘要）
+  renderSourceHash String? // blocks+design+mode+渲染版本校验和；相同输入直接复用
+  renderDurationMs Int? // 本次 HTML 生成耗时
   genClaimedAt  DateTime? // 造课并发所有权占位：generateLessonCore 生成前原子 claim，防两条流水双写双扣（见 src/lib/course-gen.ts）
   // —— 视频课件生成（v3.1）：把块课件转成带旁白/字幕的视频。留接口，模型后补 ——
   // null=未发起 / pending=已排队 / generating=生成中 / ready=已就绪(videoAssetId 指向占位或真实资源) / failed=失败可重试

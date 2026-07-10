@@ -21,6 +21,14 @@ export interface LlmModelEntry {
   enabled: boolean; // 快速下架开关；env 没配 key 时服务端也会视为不可用
 }
 
+/** v3.4 bespoke HTML 只允许强模型；可用环境变量逗号列表覆盖，便于网关模型升级时零代码切换。 */
+const DEFAULT_BESPOKE_MODELS = ["claude-sonnet-5", "glm-5.2", "claude-opus-4-8", "gpt-5.5"];
+
+export function bespokeModelKeys(): string[] {
+  const configured = process.env.COURSEWARE_BESPOKE_MODELS?.split(",").map((v) => v.trim()).filter(Boolean);
+  return configured?.length ? configured : DEFAULT_BESPOKE_MODELS;
+}
+
 export const LLM_MODELS: LlmModelEntry[] = [
   {
     key: "gpt-5.5",
@@ -128,6 +136,17 @@ export function selectModelFor(requestedModel: string | undefined | null, isSubs
   const available = availableModelsFor(isSubscriber);
   if (requestedModel) return available.find((m) => m.key === requestedModel) ?? null;
   return available.find((m) => m.key === DEFAULT_MODEL_KEY) ?? available[0] ?? null;
+}
+
+/** 为 premium bespoke 选择第一个可用强模型。显式请求不在白名单时返回 null，不静默降级。 */
+export function selectBespokeModel(requested?: string | null): LlmModelEntry | null {
+  const allowed = new Set(bespokeModelKeys());
+  if (requested) {
+    return LLM_MODELS.find((m) => m.key === requested && allowed.has(m.key) && isModelUsable(m)) ?? null;
+  }
+  return bespokeModelKeys()
+    .map((key) => LLM_MODELS.find((m) => m.key === key && isModelUsable(m)))
+    .find((m): m is LlmModelEntry => Boolean(m)) ?? null;
 }
 
 /** 把一个 model key 解析成可用条目；非法 / 不可用 → 回落到默认可用模型条目。 */

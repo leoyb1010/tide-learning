@@ -38,6 +38,8 @@ export const COURSEWARE_THEMES: CoursewareTheme[] = [
   { key: "socratic", label: "黑板研讨", accent: "#128a5a", mood: "墨绿粉笔、点阵底纹，像围着一块黑板一起想通" },
   { key: "workshop", label: "车间蓝图", accent: "#0e7490", mood: "青蓝蓝图、等宽标题、网格底，像照着图纸动手" },
   { key: "exam_sprint", label: "冲刺计分", accent: "#d5261d", mood: "高对比红、紧凑直角，像倒计时里连打抢分" },
+  { key: "language_immersion", label: "语言片场", accent: "#147d92", mood: "清透青蓝、对话分镜与声波节奏，像进入真实交流现场" },
+  { key: "kids_bright", label: "童趣闯关", accent: "#e36b19", mood: "暖橙与湖蓝、大形状少文字，像轻快的互动绘本" },
 ];
 
 const THEME_KEYS = new Set(COURSEWARE_THEMES.map((t) => t.key));

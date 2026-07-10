@@ -270,6 +270,38 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     texture: "radial-gradient(circle at 1px 1px, rgba(60,70,90,.045) 1px, transparent 0)",
     ease: "cubic-bezier(0.16, 1, 0.3, 1)",
   },
+  {
+    key: "magazine_bold",
+    label: "大胆杂志",
+    mood: "高对比奶油纸 + 巨型黑体 + 珊瑚红，适合观点鲜明的编辑专题",
+    substrate: "light",
+    bg: "#f5f0e8", surface: "#fffaf2", surfaceAlt: "#e9dfd1", ink: "#171412", ink2: "#514941", ink3: "#81776d",
+    border: "#d9ccbd", accent: "#d94c32", accentInk: "#a93120", accentSoft: "#f6ddd6",
+    fontDisplay: "system-ui, -apple-system, 'PingFang SC', sans-serif", fontBody: "Georgia, 'Songti SC', serif", fontMono: "ui-monospace, 'SF Mono', Menlo, monospace",
+    displayWeight: 900, displayTracking: "-0.045em", radius: 4,
+    texture: "linear-gradient(90deg, rgba(40,30,20,.035) 1px, transparent 1px)", ease: "cubic-bezier(0.16, 1, 0.3, 1)",
+  },
+  {
+    key: "zen_mono",
+    label: "禅意极简",
+    mood: "雾白留白 + 墨灰细线 + 单一苔绿，安静而精确",
+    substrate: "light",
+    bg: "#f3f4ef", surface: "#fbfcf8", surfaceAlt: "#e9ece5", ink: "#20231f", ink2: "#555d53", ink3: "#858d82",
+    border: "#d8ddd3", accent: "#58755b", accentInk: "#3f5d43", accentSoft: "#e2ebe2",
+    fontDisplay: "Georgia, 'Songti SC', serif", fontBody: "system-ui, -apple-system, 'PingFang SC', sans-serif", fontMono: "ui-monospace, 'SF Mono', Menlo, monospace",
+    displayWeight: 600, displayTracking: "-0.015em", radius: 2, texture: "none", ease: "cubic-bezier(0.16, 1, 0.3, 1)",
+  },
+  {
+    key: "journal_washi",
+    label: "和纸手账",
+    mood: "暖和纸 + 胶带拼贴 + 靛青与朱砂，亲切但不幼稚",
+    substrate: "light",
+    bg: "#f4eddf", surface: "#fffaf0", surfaceAlt: "#ebe0ce", ink: "#2b2925", ink2: "#615b52", ink3: "#91877a",
+    border: "#ddcfb9", accent: "#b74b3d", accentInk: "#91382e", accentSoft: "#f2dcd4",
+    fontDisplay: "'Kaiti SC', 'Songti SC', Georgia, serif", fontBody: "system-ui, -apple-system, 'PingFang SC', sans-serif", fontMono: "ui-monospace, 'SF Mono', Menlo, monospace",
+    displayWeight: 700, displayTracking: "-0.01em", radius: 12,
+    texture: "radial-gradient(circle at 1px 1px, rgba(80,60,35,.055) 1px, transparent 0)", ease: "cubic-bezier(0.16, 1, 0.3, 1)",
+  },
 ];
 
 const ART_BY_KEY = new Map(ART_DIRECTIONS.map((a) => [a.key, a]));
@@ -286,13 +318,15 @@ const CATEGORY_CANDIDATES: Record<string, string[]> = {
   life: ["editorial_paper", "soft_structure", "storybook", "academic_lecture"],
 };
 
-const TEMPLATE_HINT: Record<string, string> = {
-  classic: "editorial_paper",
-  case_driven: "editorial_paper",
-  story: "storybook",
-  socratic: "dark_tech",
-  workshop: "blueprint",
-  exam_sprint: "scoreboard",
+const TEMPLATE_ART_CANDIDATES: Record<string, string[]> = {
+  classic: ["editorial_paper", "academic_lecture", "zen_mono"],
+  case_driven: ["magazine_bold", "editorial_paper", "blueprint"],
+  story: ["storybook", "cinematic_neon", "journal_washi"],
+  socratic: ["dark_tech", "academic_lecture", "zen_mono"],
+  workshop: ["dev_terminal", "blueprint", "soft_structure"],
+  exam_sprint: ["scoreboard", "academic_lecture", "magazine_bold"],
+  language_immersion: ["storybook", "soft_structure", "journal_washi"],
+  kids_bright: ["storybook", "journal_washi", "magazine_bold"],
 };
 
 /**
@@ -379,9 +413,12 @@ export function resolveCourseDesign(course: {
 
   // 内容信号路由优先（标题命中强信号→最契合方向），仅次于已落库 designJson。
   const contentArt = artKeyByContent(course.title);
-  // 否则模板提示（模板已强表达课型气质）。
-  const hinted = course.template ? TEMPLATE_HINT[course.template] : undefined;
-  let art = (contentArt && ART_BY_KEY.get(contentArt)) || (hinted ? ART_BY_KEY.get(hinted) : undefined);
+  // 否则模板签名候选：同一模板仍可在一组相近视觉世界内确定性分化。
+  const templateCandidates = course.template ? TEMPLATE_ART_CANDIDATES[course.template] : undefined;
+  const templateArt = templateCandidates?.length
+    ? ART_BY_KEY.get(templateCandidates[hashSeed(`template-art:${course.id}:${course.template}`) % templateCandidates.length])
+    : undefined;
+  let art = (contentArt && ART_BY_KEY.get(contentArt)) || templateArt;
 
   // 否则按赛道候选 + courseId 种子挑一个（软映射保契合，种子保多样）。
   if (!art) {

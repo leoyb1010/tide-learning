@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
         rawText?: string;
         template?: string;
         model?: string;
+        qualityTier?: string;
       } | null;
 
       const rawText = body?.rawText?.trim();
@@ -58,6 +59,11 @@ export async function POST(req: NextRequest) {
           : fail("AI 服务未配置", 503);
       }
 
+      const qualityTier = body?.qualityTier === "premium" ? "premium" : "standard";
+      if (qualityTier === "premium" && !snapshot.isSubscriber) {
+        return fail("精修排版为会员专享，请升级订阅或使用标准排版", 402);
+      }
+
       const result = await structureImportedTextIntoCourse({
         userId: user.id,
         rawText,
@@ -65,6 +71,7 @@ export async function POST(req: NextRequest) {
         title: body?.title,
         template,
         model: modelEntry.key,
+        qualityTier,
       });
 
       return ok(result);

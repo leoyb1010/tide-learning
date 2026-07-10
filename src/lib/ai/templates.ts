@@ -183,6 +183,50 @@ export const COURSE_TEMPLATES: CourseTemplate[] = [
 8. callout(warn)（1 个）：本考点“考前 10 秒最后看一眼”的一句话。
 9. summary（1 个）：本考点拿分口诀。`,
   },
+  {
+    key: "language_immersion",
+    label: "语言沉浸",
+    tagline: "高频对话、跟读纠错，开口即练",
+    icon: "BookOpen",
+    recommendedFor: "外语口语、听说训练、旅行与职场情境表达",
+    minInteractive: 2,
+    minVisual: 2,
+    mustInclude: { dialog: 2, flashcard: 1 },
+    signature: "语言沉浸：至少 2 个 dialog，先给自然对话再做替换练习；用 note 标重音/语气/易错点；flashcard 沉淀本节可直接开口的句型。",
+    temperature: 0.6,
+    outlineRules: "【结构模板：语言沉浸】全课按真实沟通任务推进，每章锁定一个场景与交付表达，从听懂范例、跟读替换到独立应答，末章完成连续情境挑战。",
+    lessonRecipe: `【本节块配方：语言沉浸】9-12 个块：
+1. scene：具体沟通场景与任务。
+2. objectives：3 条可开口验证的目标。
+3. dialog（2-3 个）：自然短对话、关键句替换、纠错对话，note 标注语气与发音。
+4. compare：直译表达 vs 地道表达。
+5. steps：跟读、替换、脱稿三步练习。
+6. quiz（1-2 个）：按情境选最自然表达。
+7. flashcard（1-2 个）：高频句型与应答。
+8. summary：本节可直接带走的表达 + 下一场景预告。`,
+  },
+  {
+    key: "kids_bright",
+    label: "少儿明亮",
+    tagline: "大图少字、即时反馈，轻快闯关",
+    icon: "Sparkle",
+    recommendedFor: "儿童启蒙、亲子共学、低龄知识与习惯培养",
+    minInteractive: 2,
+    minVisual: 3,
+    mustInclude: { scene: 1, quiz: 2 },
+    signature: "少儿明亮：短句、大画面、一次只讲一个动作；至少 2 个 quiz 形成即时反馈，不出现长段抽象定义或成人职场语境。",
+    temperature: 0.65,
+    outlineRules: "【结构模板：少儿明亮】章节像闯关地图，每章一个可观察的小目标，标题短而有动作感；难度小步递进，反复复现核心词与规则。",
+    lessonRecipe: `【本节块配方：少儿明亮】8-10 个块：
+1. scene：一个可想象的小故事或任务，80 字以内。
+2. objectives：2-3 条儿童能复述/指出/完成的目标。
+3. dialog 或 example：角色示范。
+4. steps：3-5 步动手任务，每步一句话。
+5. keypoint：3-5 条短句要点。
+6. quiz（2-3 个）：由易到难、反馈清楚。
+7. flashcard：图景式提问与短答案。
+8. summary：夸奖式核对清单 + 下一关预告。`,
+  },
 ];
 
 /** 取模板（非法 key → classic）。 */
@@ -201,7 +245,9 @@ export function pickTemplate(input: { category?: string | null; title?: string |
   const t = `${input.title ?? ""} ${input.prompt ?? ""}`;
   if (input.category === "exam" || /备考|考试|考点|冲刺|真题|模拟题|证书|面试题|刷题|自测|\bielts\b|雅思|托福/i.test(t)) return "exam_sprint";
   if (/编程|代码|程序|python|java(?:script)?|前端|后端|算法|开发|命令行|函数|接口|\bapi\b|\bsql\b|\bgit\b|脚本|部署|数据库|工具|操作|上手|实操|写作|设计|excel|\bppt\b|word|剪辑|做一个|做个/i.test(t)) return "workshop";
-  if (/口语|对话|会话|沟通|表达|speaking|情景|谈判|社交|亲子|银发|青少年|故事|职场沟通/i.test(t)) return "story";
+  if (/少儿|儿童|幼儿|小朋友|亲子|启蒙|小学低年级|闯关|童趣/i.test(t)) return "kids_bright";
+  if (/口语|听力|跟读|发音|对话|会话|外语|英语|日语|韩语|旅行表达|职场英语|speaking|情景/i.test(t)) return "language_immersion";
+  if (/沟通|表达|谈判|社交|银发|青少年|故事|职场沟通/i.test(t)) return "story";
   if (/案例|复盘|职场|商业|管理|营销|运营|决策|财务|投资|谈判/i.test(t)) return "case_driven";
   if (/思维|逻辑|误区|为什么|辨析|认知|批判|想通|方法论/i.test(t)) return "socratic";
   return DEFAULT_TEMPLATE;

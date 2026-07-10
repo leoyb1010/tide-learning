@@ -72,7 +72,7 @@ export function PriceField({
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               placeholder="如 30"
-              className="mono w-24 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)]"
+              className="mono w-24 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
             />
             <span className="text-[12px] text-[var(--ink3)]">积分</span>
           </div>
@@ -206,7 +206,7 @@ export function ShareToMarketButton({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   maxLength={80}
-                  className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)]"
+                  className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
@@ -216,7 +216,7 @@ export function ShareToMarketButton({
                   onChange={(e) => setSubtitle(e.target.value)}
                   maxLength={160}
                   rows={2}
-                  className="resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] leading-relaxed text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)]"
+                  className="resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] leading-relaxed text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
                 />
               </label>
             </>

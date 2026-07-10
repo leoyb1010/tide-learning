@@ -60,8 +60,8 @@ export function TrialBooking({ courseId, track, source }: { courseId: string; tr
   return (
     <div className="space-y-2 rounded-xl border border-ink-100 bg-paper-raised p-4">
       <p className="text-sm font-medium text-ink-950">留下联系方式，安排试听</p>
-      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="称呼（可选）" className="w-full rounded-lg border border-ink-200 bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-accent-400" />
-      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="手机号" className="w-full rounded-lg border border-ink-200 bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-accent-400" />
+      <input value={name} onChange={(e) => setName(e.target.value)} placeholder="称呼（可选）" className="w-full rounded-lg border border-ink-200 bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-100" />
+      <input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="手机号" className="w-full rounded-lg border border-ink-200 bg-paper-raised px-3 py-2 text-sm outline-none transition-colors focus:border-accent-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-100" />
       <button onClick={submit} disabled={loading || !phone} className="w-full rounded-lg bg-accent-600 py-2.5 text-sm font-medium text-white transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] hover:bg-accent-700 active:scale-[0.98] disabled:opacity-50">
         {loading ? "提交中…" : "确认预约"}
       </button>

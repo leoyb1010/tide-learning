@@ -145,6 +145,15 @@ export function heroMotif(art: ArtDirection, seed: number): string {
           ? `<text x="430" y="400" font-family="${art.fontDisplay}" font-size="120" fill="${a}" fill-opacity=".10">§</text>`
           : `<g stroke="${b}"><line x1="120" y1="210" x2="480" y2="210"/><line x1="120" y1="252" x2="440" y2="252"/><line x1="120" y1="294" x2="474" y2="294"/></g>`);
       break;
+    case "magazine_bold":
+      inner = `<g><rect x="45" y="55" width="210" height="410" fill="${a}" fill-opacity=".12"/><text x="80" y="360" font-family="${art.fontDisplay}" font-size="250" font-weight="900" fill="${a}" fill-opacity=".1">M</text><line x1="290" y1="95" x2="540" y2="95" stroke="${a}" stroke-width="10"/></g>`;
+      break;
+    case "zen_mono":
+      inner = `<g fill="none" stroke="${a}" stroke-opacity=".28"><circle cx="420" cy="170" r="105"/><path d="M70 390 C190 300 300 470 540 330" stroke-width="2"/></g>`;
+      break;
+    case "journal_washi":
+      inner = `<g><path d="M70 80 H360 V150 H70 Z" fill="${soft}" transform="rotate(-4 215 115)"/><path d="M300 300 H560 V370 H300 Z" fill="${a}" fill-opacity=".1" transform="rotate(3 430 335)"/><path d="M90 230 Q260 170 500 240" fill="none" stroke="${a}" stroke-opacity=".3" stroke-dasharray="5 7"/></g>`;
+      break;
     case "storybook":
     default:
       // 有机 blob + 波浪丝带（绘本代入感）。
@@ -205,6 +214,15 @@ export function cornerMotif(art: ArtDirection): string {
       break;
     case "academic_lecture":
       inner = `<g stroke="${a}" stroke-opacity=".5"><line x1="3" y1="7" x2="21" y2="7" stroke-width="1.5"/><line x1="3" y1="11" x2="21" y2="11"/></g>`;
+      break;
+    case "magazine_bold":
+      inner = `<path d="M2 3 H22 V8 H8 V22 H2 Z" fill="${a}" fill-opacity=".55"/>`;
+      break;
+    case "zen_mono":
+      inner = `<circle cx="12" cy="12" r="7" fill="none" stroke="${a}" stroke-opacity=".5"/><circle cx="12" cy="12" r="1.5" fill="${a}"/>`;
+      break;
+    case "journal_washi":
+      inner = `<path d="M3 7 H21 V17 H3 Z" fill="${a}" fill-opacity=".25" transform="rotate(-7 12 12)"/>`;
       break;
     default: // soft_structure
       inner = `<circle cx="12" cy="12" r="8" fill="none" stroke="${a}" stroke-opacity=".4"/>`;

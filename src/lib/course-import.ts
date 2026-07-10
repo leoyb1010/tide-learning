@@ -47,8 +47,10 @@ export async function structureImportedTextIntoCourse(opts: {
   template?: string;
   /** v3.2 生成所用模型 key（见 models.ts）；缺省默认模型。 */
   model?: string;
+  /** v3.4 排版质量档：standard / premium。 */
+  qualityTier?: "standard" | "premium";
 }): Promise<ImportCourseResult> {
-  const { userId, rawText, kind, template, model } = opts;
+  const { userId, rawText, kind, template, model, qualityTier = "standard" } = opts;
   const title = (opts.title?.trim() || rawText.slice(0, 20)).slice(0, 120);
 
   // —— 先落库 ImportedSource（已抽取出纯文本即 parsed）——
@@ -107,6 +109,7 @@ export async function structureImportedTextIntoCourse(opts: {
         genStatus: "generating",
         template: template ?? null,
         modelUsed: model ?? null,
+        qualityTier,
         disclaimer: "本课程由用户导入材料经 AI 结构化，内容仅供学习参考",
       },
     });
@@ -144,7 +147,7 @@ export async function structureImportedTextIntoCourse(opts: {
         userId,
         type: "import_structure",
         status: "done",
-        inputJson: JSON.stringify({ sourceId: source.id, charCount: rawText.length, kind, template: template ?? null, model: model ?? null }),
+        inputJson: JSON.stringify({ sourceId: source.id, charCount: rawText.length, kind, template: template ?? null, model: model ?? null, qualityTier }),
         resultRef: course.id,
         finishedAt: new Date(),
       },

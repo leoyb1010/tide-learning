@@ -157,6 +157,12 @@ export async function POST(req: NextRequest) {
           : fail("AI 服务未配置", 503);
       }
 
+      const qualityTierRaw = (form.get("qualityTier") as string | null)?.trim();
+      const qualityTier = qualityTierRaw === "premium" ? "premium" : "standard";
+      if (qualityTier === "premium" && !snapshot.isSubscriber) {
+        return fail("精修排版为会员专享，请升级订阅或使用标准排版", 402);
+      }
+
       const result = await structureImportedTextIntoCourse({
         userId: user.id,
         rawText,
@@ -164,6 +170,7 @@ export async function POST(req: NextRequest) {
         title,
         template,
         model: modelEntry.key,
+        qualityTier,
       });
 
       return ok(result);

@@ -43,12 +43,16 @@ export function TemplateModelPicker({
   setTemplate,
   model,
   setModel,
+  qualityTier,
+  setQualityTier,
   onAvailability,
 }: {
   template: string;
   setTemplate: (v: string) => void;
   model: string;
   setModel: (v: string) => void;
+  qualityTier: "standard" | "premium";
+  setQualityTier: (v: "standard" | "premium") => void;
   /** P1-1：AI 是否可用（服务端配了可用模型）。null=未探明；据此上层可禁用生成 CTA、避免填完表单才失败。 */
   onAvailability?: (available: boolean) => void;
 }) {
@@ -56,6 +60,7 @@ export function TemplateModelPicker({
   const [models, setModels] = useState<ModelOpt[]>([]);
   const [lockedModels, setLockedModels] = useState<LockedModelOpt[]>([]);
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
+  const [isSubscriber, setIsSubscriber] = useState(false);
   // 模板缩略图（public/templates/template-<key>.jpg）加载失败的卡回落成图标渲染。
   const [thumbFail, setThumbFail] = useState<Record<string, boolean>>({});
 
@@ -69,6 +74,8 @@ export function TemplateModelPicker({
         setModels(j.data.models ?? []);
         setLockedModels(j.data.lockedModels ?? []);
         setDefaultModel(j.data.defaultModel ?? null);
+        setIsSubscriber(Boolean(j.data.isSubscriber));
+        if (!j.data.isSubscriber && qualityTier === "premium") setQualityTier("standard");
         if (!model && j.data.defaultModel) setModel(j.data.defaultModel);
         // P1-1：defaultModel 为 null = 服务端无可用模型（未配 key）。明确上报「不可用」，让上层禁用生成。
         // 仅在响应 ok 时判定，网络异常（下方 catch）不误判为不可用。
@@ -136,6 +143,40 @@ export function TemplateModelPicker({
               </button>
             );
           })}
+        </div>
+      </div>
+
+      {/* —— 排版质量档 —— */}
+      <div className="flex flex-col gap-2">
+        <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
+          排版质量
+        </span>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setQualityTier("standard")}
+            aria-pressed={qualityTier === "standard"}
+            className={`studio-press rounded-[12px] border p-3 text-left transition-colors ${qualityTier === "standard" ? "border-[var(--red)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface2)]"}`}
+          >
+            <span className="block text-[13px] font-semibold text-[var(--ink)]">标准排版</span>
+            <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">稳定快速，确定性高级视觉</span>
+          </button>
+          {isSubscriber ? (
+            <button
+              type="button"
+              onClick={() => setQualityTier("premium")}
+              aria-pressed={qualityTier === "premium"}
+              className={`studio-press rounded-[12px] border p-3 text-left transition-colors ${qualityTier === "premium" ? "border-[var(--red)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface2)]"}`}
+            >
+              <span className="flex items-center gap-1 text-[13px] font-semibold text-[var(--ink)]"><Sparkle size={13} weight="fill" className="text-[var(--red)]" />精修排版</span>
+              <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">强模型逐节定制，失败自动回落</span>
+            </button>
+          ) : (
+            <Link href="/pricing" className="studio-press rounded-[12px] border border-dashed border-[var(--border2)] bg-[var(--surface)] p-3 text-left">
+              <span className="flex items-center gap-1 text-[13px] font-semibold text-[var(--ink3)]"><Lock size={13} weight="fill" />精修排版</span>
+              <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">会员专享，点击查看订阅</span>
+            </Link>
+          )}
         </div>
       </div>
 

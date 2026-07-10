@@ -14,8 +14,8 @@ import { coursewareThemeAttr, COURSEWARE_THEMES } from "@/lib/ai/themes";
  */
 
 describe("模板注册表基本约束", () => {
-  it("六个内置模板齐全，且每个都声明了 mustInclude / signature / temperature", () => {
-    expect(COURSE_TEMPLATES).toHaveLength(6);
+  it("八个内置模板齐全，且每个都声明了 mustInclude / signature / temperature", () => {
+    expect(COURSE_TEMPLATES).toHaveLength(8);
     for (const t of COURSE_TEMPLATES) {
       expect(typeof t.mustInclude).toBe("object");
       expect(typeof t.signature).toBe("string");
@@ -84,6 +84,11 @@ describe("checkTemplateAdherence —— 模板遵循度机检", () => {
   it("classic（mustInclude 仅 example）：含 example 即达标", () => {
     expect(checkTemplateAdherence([{ type: "example" }], "classic").ok).toBe(true);
     expect(checkTemplateAdherence([{ type: "concept" }], "classic").ok).toBe(false);
+  });
+
+  it("新增语言沉浸与少儿明亮模板具有可机检签名", () => {
+    expect(checkTemplateAdherence([{ type: "dialog" }, { type: "dialog" }, { type: "flashcard" }], "language_immersion").ok).toBe(true);
+    expect(checkTemplateAdherence([{ type: "scene" }, { type: "quiz" }, { type: "quiz" }], "kids_bright").ok).toBe(true);
   });
 
   it("空块数组：非空 mustInclude 的模板判不达标，不崩", () => {

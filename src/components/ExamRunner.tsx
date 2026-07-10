@@ -708,7 +708,7 @@ function ExamTaking({
                 onChange={(e) => setAnswer(q.id, e.target.value)}
                 rows={5}
                 placeholder="写下你的答案…"
-                className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] leading-[1.7] text-[var(--ink)] outline-none transition-[color,border-color,box-shadow] placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
+                className="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] leading-[1.7] text-[var(--ink)] outline-none transition-[color,border-color,box-shadow] placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:shadow-[0_0_0_3px_var(--red-soft)] focus-visible:outline-none"
               />
             ) : (
               <div className="space-y-2.5">

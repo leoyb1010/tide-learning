@@ -553,7 +553,7 @@ export function Player({
             <input
               type="range" min={0} max={playbackDurationSec} value={time} step={0.1}
               onChange={(e) => seek(Number(e.target.value))}
-              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]"
               aria-label="播放进度"
             />
             {seekPulse != null && playbackDurationSec > 0 && (
@@ -575,7 +575,7 @@ export function Player({
               </button>
             </Tooltip>
             {/* 倍速：与其它工具按钮统一 h-9 命中区 + hover 描边，不再是裸 white/10 方块 */}
-            <select value={rate} onChange={(e) => { setRate(Number(e.target.value)); track("lesson_speed_change", { rate: e.target.value }); }} className="mono h-9 cursor-pointer rounded-[10px] border border-transparent bg-white/10 px-2.5 text-xs tabular-nums text-white outline-none transition-colors hover:border-white/25 hover:bg-white/20" aria-label="播放速度">
+            <select value={rate} onChange={(e) => { setRate(Number(e.target.value)); track("lesson_speed_change", { rate: e.target.value }); }} className="mono h-9 cursor-pointer rounded-[10px] border border-transparent bg-white/10 px-2.5 text-xs tabular-nums text-white outline-none transition-colors hover:border-white/25 hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70" aria-label="播放速度">
               {[0.75, 1, 1.25, 1.5, 2].map((r) => <option key={r} value={r} className="text-[var(--ink)]">{r}x</option>)}
             </select>
           </div>
@@ -626,7 +626,7 @@ export function Player({
               onChange={(e) => setFocusGoal(e.target.value)}
               maxLength={200}
               placeholder="例如：看完本节并整理 3 条笔记"
-              className="mt-1.5 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-2.5 text-[14px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+              className="mt-1.5 w-full rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-2.5 text-[14px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
             />
 
             {/* 番茄钟时长 */}

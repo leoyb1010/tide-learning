@@ -155,6 +155,7 @@ export function CreateStudio({
   // v3.2：课件模板（默认经典）与生成模型（空=用默认模型）。造课/导入共用，透传进生成请求体。
   const [template, setTemplate] = useState<string>("classic");
   const [model, setModel] = useState<string>("");
+  const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
   // P1-1：AI 是否可用（服务端配了可用模型）。默认 true 避免加载态闪禁用；TemplateModelPicker
   // 拉到 defaultModel=null（未配 key）时置 false，据此禁用生成 CTA 并显示维护横幅，
   // 避免用户填完表单点生成才收到 503。
@@ -351,7 +352,7 @@ export function CreateStudio({
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: q, category: category || undefined, template, model: model || undefined }),
+        body: JSON.stringify({ prompt: q, category: category || undefined, template, model: model || undefined, qualityTier }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
@@ -524,7 +525,7 @@ export function CreateStudio({
         fetch("/api/ai/import-source", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: importTitle.trim() || undefined, rawText: text, template, model: model || undefined }),
+          body: JSON.stringify({ title: importTitle.trim() || undefined, rawText: text, template, model: model || undefined, qualityTier }),
         }),
       fallbackTitle: importTitle.trim(),
     });
@@ -555,6 +556,7 @@ export function CreateStudio({
     fd.append("file", file);
     if (importTitle.trim()) fd.append("title", importTitle.trim());
     fd.append("template", template);
+    fd.append("qualityTier", qualityTier);
     if (model) fd.append("model", model);
     await runImportTheater({
       outline: () => fetch("/api/ai/import-file", { method: "POST", body: fd }),
@@ -669,7 +671,7 @@ export function CreateStudio({
                   rows={5}
                   maxLength={500}
                   placeholder="描述你想学的，比如：讲讲 Python 装饰器，我是初学者"
-                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[16px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
+                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[16px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)] focus-visible:outline-none"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
                   {prompt.length}/500
@@ -718,7 +720,7 @@ export function CreateStudio({
               </div>
 
               {/* v3.2：课件模板 + 生成模型选择 */}
-              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} onAvailability={setAiAvailable} />
+              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
 
               {/* v3.1：生成视频课件开关。选中后逐节写完块课件，再把课件转成带旁白的视频课件。 */}
               <button
@@ -799,11 +801,11 @@ export function CreateStudio({
                 onChange={(e) => setImportTitle(e.target.value)}
                 maxLength={60}
                 placeholder="课程标题（可留空，AI 帮你起）"
-                className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
+                className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)] focus-visible:outline-none"
               />
 
               {/* v3.2：课件模板 + 模型（放上传区之上——拖入文件即刻开始生成，须先选好）*/}
-              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} onAvailability={setAiAvailable} />
+              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
 
               {/* 文件上传区：点击整卡或拖拽文件入内均可选择；支持 PDF / Word / TXT / MD。 */}
               <input
@@ -881,7 +883,7 @@ export function CreateStudio({
                   rows={7}
                   maxLength={50000}
                   placeholder="把学习资料 / 文章 / 讲义正文粘贴进来，AI 帮你整理成可学的课"
-                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)]"
+                  className="w-full resize-none rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3.5 text-[15px] leading-relaxed text-[var(--ink)] shadow-[var(--inner-hi)] outline-none transition-[border-color,background-color,box-shadow] duration-200 placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus:bg-[var(--surface)] focus:shadow-[0_0_0_3px_var(--red-soft)] focus-visible:outline-none"
                 />
                 <span className="mono pointer-events-none absolute bottom-3 right-3.5 text-[10px] text-[var(--ink4)]">
                   {importText.length}/50000

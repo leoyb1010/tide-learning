@@ -415,7 +415,7 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value.slice(0, 500))}
         rows={3}
         placeholder="说说这门课哪里帮到你了（选填，最多 500 字）"
-        className="mt-3 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[13.5px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)]"
+        className="mt-3 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[13.5px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
       />
 
       <div className="mt-3 flex items-center justify-between gap-3">

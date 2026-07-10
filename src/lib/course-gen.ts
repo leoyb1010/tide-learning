@@ -7,7 +7,7 @@ import { simpleOutlinePrompt, lessonVoiceLine, lessonRecipeBlock, sourceContextB
 import { getTemplate, templateHardRequirement, checkTemplateAdherence } from "./ai/templates";
 import { resolveCourseDesign, serializeCourseDesign } from "./ai/courseware-design";
 import { resolveCoursewareMode } from "./ai/courseware-catalog";
-import { renderAndStoreLessonHtml } from "./ai/courseware-gen";
+import { renderAndStoreLessonHtml, createCoursewareBudget } from "./ai/courseware-gen";
 
 /**
  * 造课内核 —— 引擎A 的可复用逻辑层（供 route / after() 后台续跑 / 共创闭环共用）。
@@ -134,8 +134,11 @@ export interface LessonQuality {
  * 只做「事后打分」，不改内容、不 throw、不触发重生成——由调用方据分数决定埋点/后续动作。
  * 降级占位节（单个 concept）会自然低分，调用方另行区分（usedFallback）不必依赖本分数。
  */
-export function scoreLesson(blocks: { type: string }[]): LessonQuality {
+export function scoreLesson(blocks: { type: string }[], templateKey?: string | null): LessonQuality {
   const total = blocks.length;
+  const tmpl = getTemplate(templateKey);
+  const minCount = templateKey === "exam_sprint" ? 10 : 6;
+  const maxCount = templateKey === "exam_sprint" ? 14 : templateKey === "kids_bright" ? 10 : 12;
   const conceptCount = blocks.filter((b) => b.type === "concept").length;
   const visualCount = blocks.filter((b) => VISUAL_BLOCK_TYPES.has(b.type)).length;
   const interactiveCount = blocks.filter((b) => INTERACTIVE_BLOCK_TYPES.has(b.type)).length;
@@ -145,11 +148,11 @@ export function scoreLesson(blocks: { type: string }[]): LessonQuality {
   const lastType = blocks[total - 1]?.type;
 
   const flags = {
-    countOk: total >= 6 && total <= 10,
+    countOk: total >= minCount && total <= maxCount,
     hasOpening: firstType === "scene" || firstType === "objectives",
     hasSummary: lastType === "summary",
-    hasInteractive: interactiveCount >= 1,
-    hasVisuals: visualCount >= 2,
+    hasInteractive: interactiveCount >= Math.max(1, tmpl.minInteractive),
+    hasVisuals: visualCount >= Math.max(2, tmpl.minVisual),
     // 空课/单块不参与占比判定：total<2 直接视为不达标（内容不足）。
     conceptRatioOk: total >= 2 && conceptRatio < 0.6,
   };
@@ -413,7 +416,7 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     // —— 层3 后处理质量评估（规则，轻量、不阻塞、不二次调用 LLM）——
     // 把原「块型混合度」观测升级为可查的质量分（六项规则，见 scoreLesson）：
     // 块数/开头钩子/结尾小结/交互块/视觉强块/concept 占比。只观测、不 throw、不重生成、不改内容。
-    const quality = scoreLesson(blocks);
+    const quality = scoreLesson(blocks, course.template);
     const { conceptCount, visualCount, conceptRatio } = quality;
     // v3.3 模板遵循度机检（与通用质量分正交）：查本节是否含本模板的签名块（story→dialog、
     // socratic→≥3 quiz…）。此前「选了模板却生成得千篇一律」完全无法发现，这里落成可查事件。
@@ -776,7 +779,7 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
   try {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, category: true, template: true, designJson: true },
+      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, qualityTier: true },
     });
     if (!course) return;
     const design = resolveCourseDesign(course);
@@ -790,15 +793,30 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
     const lessons = await prisma.lesson.findMany({
       where: { courseId, blocksJson: { not: null } },
       orderBy: { sortOrder: "asc" },
-      select: { id: true, title: true, sortOrder: true, blocksJson: true },
+      select: { id: true, title: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true },
     });
+    const premium = course.qualityTier === "premium" && Boolean(course.authorUserId);
+    const budget = createCoursewareBudget();
+    let premiumRenderCount = 0;
+    let deterministicRenderCount = 0;
     for (const l of lessons) {
       try {
-        await renderAndStoreLessonHtml(courseId, l, design, mode);
+        const result = await renderAndStoreLessonHtml(courseId, l, design, mode, {
+          enhance: premium,
+          userId: course.authorUserId,
+          model: course.modelUsed,
+          budget,
+        });
+        if (result.engine === "llm") premiumRenderCount += 1;
+        else if (result.engine === "deterministic") deterministicRenderCount += 1;
       } catch (e) {
         console.error("[course-gen] html render failed for lesson", l.id, e);
       }
     }
+    await prisma.course.update({
+      where: { id: courseId },
+      data: { premiumRenderCount, deterministicRenderCount },
+    }).catch(() => {});
   } catch (e) {
     console.error("[course-gen] renderCourseHtmlBestEffort failed:", courseId, e);
   }

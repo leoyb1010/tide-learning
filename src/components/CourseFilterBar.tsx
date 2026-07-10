@@ -28,7 +28,7 @@ export function CourseFilterBar({ category, sort, q }: { category: string; sort:
         defaultValue={q}
         onKeyDown={(e) => { if (e.key === "Enter") update("q", (e.target as HTMLInputElement).value); }}
         placeholder="搜索课程标题…"
-        className="w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+        className="w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
       />
       <div className="flex flex-wrap items-center gap-2">
         {CATEGORIES.map((c) => (
@@ -48,7 +48,7 @@ export function CourseFilterBar({ category, sort, q }: { category: string; sort:
         <select
           value={sort}
           onChange={(e) => update("sort", e.target.value)}
-          className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink2)] outline-none transition-colors hover:border-[var(--border2)] focus:border-[var(--ink3)]"
+          className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink2)] outline-none transition-colors hover:border-[var(--border2)] focus:border-[var(--ink3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
         >
           {SORTS.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}
         </select>

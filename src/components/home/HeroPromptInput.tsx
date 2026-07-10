@@ -70,7 +70,7 @@ export function HeroPromptInput() {
             placeholder="说出想学的，AI 帮你造一门课…"
             aria-label="想学什么"
             maxLength={200}
-            className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--scene-ink)] outline-none placeholder:text-[var(--scene-ink-3)] lg:text-[17px]"
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-[var(--scene-ink)] outline-none focus:outline-none focus-visible:outline-none placeholder:text-[var(--scene-ink-3)] lg:text-[17px]"
           />
           {/* 接近上限（>160/200）才显字数，平时不占视觉；到顶时红色提示已达上限。 */}
           {value.length > 160 && (

@@ -240,7 +240,7 @@ export function StudyDesk({
         <form
           onSubmit={onSubmit}
           onMouseDown={focusInput}
-          className="group relative w-full cursor-text overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none"
+          className="group relative w-full cursor-text overflow-hidden rounded-[18px] border border-[color-mix(in_srgb,var(--border)_50%,transparent)] bg-[var(--surface)] p-2.5 shadow-[var(--lift),var(--inner-hi)] outline-none transition-shadow duration-300 focus-within:shadow-[var(--lift),var(--inner-hi),0_0_22px_-4px_rgba(252,1,26,0.22)]"
         >
           <div className="flex items-center gap-2.5">
             <Sparkle size={20} weight="fill" className="ml-2.5 shrink-0 text-[var(--red)]" />
@@ -253,7 +253,7 @@ export function StudyDesk({
               placeholder="搜课程，或说出想学的让 AI 造一门…"
               maxLength={200}
               aria-label="搜索课程或描述想学的"
-              className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink4)] focus:outline-none sm:text-[16px]"
+              className="min-w-0 flex-1 bg-transparent py-2.5 text-[15px] text-[var(--ink)] placeholder:text-[var(--ink4)] outline-none focus:outline-none focus-visible:outline-none sm:text-[16px]"
             />
             <button
               type="submit"
