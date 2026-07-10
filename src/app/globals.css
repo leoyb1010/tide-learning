@@ -1315,12 +1315,18 @@ body::before {
 .rail::-webkit-scrollbar { display: none; }
 .rail > * { scroll-snap-align: start; flex: 0 0 auto; }
 
-/* 焦点环（无障碍键盘导航）：用中性 ink3，不用品牌红 —— 红框视觉过重且稀释红的信号语义。
-   保留 outline 本身以守住键盘用户的可见焦点（a11y 不回退）。 */
+/* 焦点环（无障碍键盘导航）：按钮、链接等通用交互保留中性焦点环。
+   原生表单控件已有 border / ring / focus-within 聚焦态，不再叠加偏移 outline，
+   否则大圆角输入框外会出现深灰双线。 */
 :focus-visible {
   outline: 2px solid var(--ink3);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+:is(input, textarea, select):focus-visible {
+  outline: none;
+  outline-offset: 0;
 }
 
 /* 选中态 */
