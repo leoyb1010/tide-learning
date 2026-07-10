@@ -80,11 +80,19 @@ export class RateLimitError extends Error {
   }
 }
 
-/** 便捷断言：超限直接抛 RateLimitError（由 handle 统一转 429）。 */
-export function assertRateLimit(req: NextRequest, scope: string, limit: number, windowMs: number) {
-  const res = rateLimit(`${scope}:${clientIp(req)}`, limit, windowMs);
+/**
+ * 纯 key 维度断言：不拼接客户端 IP。
+ * 用于登录账号、用户 ID 等必须跨 IP 聚合的身份维度，防止攻击者轮换出口绕过限流。
+ */
+export function assertKeyRateLimit(key: string, limit: number, windowMs: number) {
+  const res = rateLimit(key, limit, windowMs);
   if (!res.ok) throw new RateLimitError(res.retryAfterSec);
   return res;
+}
+
+/** 便捷断言：按可信客户端 IP 限流，超限由 handle 统一转成 429。 */
+export function assertRateLimit(req: NextRequest, scope: string, limit: number, windowMs: number) {
+  return assertKeyRateLimit(`${scope}:${clientIp(req)}`, limit, windowMs);
 }
 
 /**

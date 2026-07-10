@@ -27,8 +27,7 @@ const nextConfig: NextConfig = {
   },
 
   // 安全响应头 + 静态资源缓存。self-host next start 生效。
-  // TODO：HSTS（Strict-Transport-Security）与 CSP（Content-Security-Policy）
-  //       不在本轮范围——上线走 HTTPS 后再补 HSTS，CSP 需先梳理内联脚本/样式白名单。
+  // CSP 仍需专项梳理 Next 内联脚本、课件 srcDoc iframe 与现有内联样式，避免直接强上导致功能损坏。
   async headers() {
     return [
       {
@@ -38,6 +37,8 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          { key: "Strict-Transport-Security", value: "max-age=31536000" },
+          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), usb=()" },
         ],
       },
       {

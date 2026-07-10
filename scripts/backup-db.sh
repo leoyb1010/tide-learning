@@ -14,7 +14,7 @@
 #
 # 用法：bash scripts/backup-db.sh [DB_PATH] [BACKUP_DIR]
 # 可配（位置参数优先于环境变量）：
-#   $1 / DB_PATH      SQLite 库文件路径（默认 ./prisma/dev.db；生产传 /var/lib/tide/prod.db）
+#   $1 / DB_PATH      SQLite 库文件路径（默认 ./dev.db；生产传 /var/lib/tide/prod.db）
 #   $2 / BACKUP_DIR   备份目录（默认 ./backups）
 #   KEEP              保留份数（默认 14）
 #   UPLOADS_DIR       uploads 目录（默认 ./public/uploads；不存在则跳过打包）
@@ -23,7 +23,7 @@ set -euo pipefail
 
 export PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:${PATH:-}"
 
-DB_PATH="${1:-${DB_PATH:-./prisma/dev.db}}"
+DB_PATH="${1:-${DB_PATH:-./dev.db}}"
 BACKUP_DIR="${2:-${BACKUP_DIR:-./backups}}"
 KEEP="${KEEP:-14}"
 UPLOADS_DIR="${UPLOADS_DIR:-./public/uploads}"
@@ -38,13 +38,13 @@ DEST="$BACKUP_DIR/tide-$STAMP.db"
 
 # --- 在线热备：.backup 产出事务一致的快照（WAL 安全） ------------------------
 sqlite3 "$DB_PATH" ".backup '$DEST'"
-echo "✅ DB 备份完成：$DEST（$(du -h "$DEST" | cut -f1)）"
+echo "✅ DB 备份完成：${DEST}（$(du -h "$DEST" | cut -f1)）"
 
 # --- uploads 目录打包（若存在）----------------------------------------------
 if [ -d "$UPLOADS_DIR" ]; then
   TARBALL="$BACKUP_DIR/tide-$STAMP-uploads.tar.gz"
   tar -czf "$TARBALL" -C "$(dirname "$UPLOADS_DIR")" "$(basename "$UPLOADS_DIR")"
-  echo "✅ uploads 打包完成：$TARBALL（$(du -h "$TARBALL" | cut -f1)）"
+  echo "✅ uploads 打包完成：${TARBALL}（$(du -h "$TARBALL" | cut -f1)）"
 fi
 
 # --- 轮转清理：按文件名时间戳倒序，保留最近 KEEP 份 --------------------------
@@ -53,4 +53,4 @@ ls -1 "$BACKUP_DIR"/tide-*.db 2>/dev/null | sort -r | tail -n +$((KEEP + 1)) | w
   echo "🧹 清理过期备份：$OLD"
 done
 
-echo "完成。当前保留 $(ls -1 "$BACKUP_DIR"/tide-*.db 2>/dev/null | wc -l | tr -d ' ') 份 DB 备份（上限 $KEEP）。"
+echo "完成。当前保留 $(ls -1 "$BACKUP_DIR"/tide-*.db 2>/dev/null | wc -l | tr -d ' ') 份 DB 备份（上限 ${KEEP}）。"
