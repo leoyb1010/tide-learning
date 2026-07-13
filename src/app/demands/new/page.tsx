@@ -67,23 +67,23 @@ export default function NewDemandPage() {
 
       <form onSubmit={submit} className="mt-6 space-y-5">
         <div>
-          <label className="mb-1.5 block text-sm text-ink-800">想学的内容 *</label>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：AI 数据分析入门" required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
+          <label htmlFor="demand-title" className="mb-1.5 block text-sm text-ink-800">想学的内容 *</label>
+          <input id="demand-title" name="title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例如：AI 数据分析入门" required className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
         </div>
         <div>
-          <label className="mb-1.5 block text-sm text-ink-800">补充说明</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="你希望覆盖哪些场景、达到什么程度" className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
+          <label htmlFor="demand-description" className="mb-1.5 block text-sm text-ink-800">补充说明</label>
+          <textarea id="demand-description" name="description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} placeholder="你希望覆盖哪些场景、达到什么程度" className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none focus:border-[var(--ink3)]" />
         </div>
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="mb-1.5 block text-sm text-ink-800">分类</label>
-            <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none">
+            <label htmlFor="demand-category" className="mb-1.5 block text-sm text-ink-800">分类</label>
+            <select id="demand-category" name="category" value={category} onChange={(e) => setCategory(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none">
               {CATEGORIES.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </div>
           <div>
-            <label className="mb-1.5 block text-sm text-ink-800">深度</label>
-            <select value={desiredDepth} onChange={(e) => setDepth(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none">
+            <label htmlFor="demand-depth" className="mb-1.5 block text-sm text-ink-800">深度</label>
+            <select id="demand-depth" name="desiredDepth" value={desiredDepth} onChange={(e) => setDepth(e.target.value)} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 outline-none">
               {DEPTHS.map((d) => <option key={d.key} value={d.key}>{d.label}</option>)}
             </select>
           </div>

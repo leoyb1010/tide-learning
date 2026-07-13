@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         profile: { create: {} },
       },
     });
-    // 建积分账户 + 注册赠送（幂等，失败不阻断创建）。
+    // 建零余额积分账户（幂等，失败不阻断创建）。
     await ensureAccount(user.id).catch((e) => console.error("[admin:createUser:ensureAccount]", e));
 
     await audit({

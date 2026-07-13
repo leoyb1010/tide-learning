@@ -1,6 +1,6 @@
 # 🌊 潮汐学习 · Tide Learning
 
-> 全龄订阅制学习平台 · **v1.0（网易有道出品 · 融入 VIS 品牌）**
+> 全龄订阅制学习平台 · **v3.4 工程原型（融入有道 VIS 设计资料）**
 > 基于《潮汐学习产品计划书 v0.3》+《有道学习会员产品介绍》+《网易有道 VIS》+《v1.0 升级优化计划》
 
 用户按月订阅，解锁**持续更新**的体系化课程，支持**全站会员**与**单赛道会员自由组合**，
@@ -25,7 +25,7 @@
 | 鉴权 | Cookie Session + scrypt | 手机号/邮箱登录（§2.2）|
 | 权益 | 服务端 Entitlement 状态机 | 客户端不判断 paid（§7.3 / §17-4）|
 
-> 零外部依赖即可本地运行：数据库是 SQLite 文件，支付走 mock 渠道模拟微信/支付宝/Stripe 回调。
+> 本地可用 SQLite 与 mock 收银台演示业务状态机；生产会强制禁用 mock。已实现 Stripe 一次性 Checkout 与原生 webhook 验签，真实交易仍须使用商户测试账号和公网回调域名完成沙箱验收。
 
 ---
 
@@ -33,7 +33,8 @@
 
 ```bash
 npm install          # 安装依赖
-npm run setup        # 生成 Prisma client + 建库 + 灌入 8 门冷启动课程
+cp .env.example .env # 按需修改配置；本地默认 SQLite
+npm run setup        # migrate deploy 建库 + 灌入冷启动课程
 npm run dev          # 启动开发服务器 → http://localhost:3000
 # 生产：npm run build && npm run start
 ```
@@ -50,17 +51,18 @@ npm run dev          # 启动开发服务器 → http://localhost:3000
 
 ## v1.0 升级亮点（相较 v0.6）
 
-> 详见 [`docs/升级优化计划-v1.0.md`](./docs/升级优化计划-v1.0.md)。本轮在 P1 基础上补齐**差异化体验**与**生产级健壮性**：
+> 详见 [`docs/upgrade-plan-v1.0.md`](./docs/upgrade-plan-v1.0.md)以及后续 v2–v3.4 升级文档。
 
 - **笔记捕捉 2.0**：学习工作台化 —— 视频截帧(S)、快速批注(N)、字幕划线剪藏、焦点模式(F)、深海模式、Markdown 预览、时间戳编辑、删除撤销；移动端可拖拽笔记 Sheet。
 - **笔记馆**：三视图（时间线/画廊/课程归档）+ 标签 + 一键导出 Markdown。
 - **共创剧场**：需求评论/楼中楼、关注进度、制作阶段轨道、水滴票额与衰减机制。
-- **支付真实化**：渠道抽象 + HMAC 验签 webhook、mock 收银台、订阅管理（升降级/取消挽留/恢复购买）、优惠券、密码找回。
+- **支付状态机**：Stripe 一次性 Checkout + `stripe-signature` 原始 body 验签、金额/币种/渠道对账、幂等回调、仅非生产可用的 mock 收银台、订阅管理与优惠券。
 - **激励体系**：连续学习 streak、潮汐日历、成就徽章、激励页。
 - **Tide Motion 2.0**：潮汐主题动效系统（TidalReveal/Ripple/WaveProgress 等）+ 深海模式主题。
 - **SEO/运营**：波形 Hero 首页、CommandK 快捷搜索、sitemap/robots/terms/privacy。
 - **生产级健壮性**：webhook 强验签（无默认密钥）、细粒度 RBAC、登录/接口限流、CSRF、订阅状态机与退款/续期/优惠券的原子性与幂等、SSR/hydration 稳定性、React 竞态与内存泄漏治理。
-- **质量保障**：vitest 单测（55）+ GitHub Actions CI。
+- **质量保障**：vitest 单测 + GitHub Actions CI（迁移、lint、类型、测试、构建、依赖审计、恢复演练）。
+- **生产运维**：发布、加密备份、异地复制、RPO/RTO 与恢复演练见 [`docs/operations-runbook.md`](docs/operations-runbook.md)。
 
 ---
 
@@ -83,8 +85,8 @@ npm run dev          # 启动开发服务器 → http://localhost:3000
 
 ### 工程能力
 - **服务端权益判断**：`src/lib/entitlement.ts` 从订阅归约出权益快照，客户端只读
-- **支付 webhook 幂等**：`payment_webhook_logs` 唯一键去重，记录原始 payload
-- **付费视频访问控制**：`/api/stream/[assetId]` 短时签名 + 二次权益校验（非订阅 403）
+- **支付 webhook 状态机幂等**：`payment_webhook_logs` 唯一键去重；Stripe 成功/退款事件归一化，错金额、错币种、跨渠道和过期重放均拒绝
+- **付费视频访问控制**：私有 `.data/media` 落盘、MP4/WebM 魔数校验、`/api/stream/[assetId]` HMAC 短时签名 + 二次权益校验 + HTTP Range；付费视频不再放入 `public/`
 - **投票风控**：仅订阅用户、每周 5 票、单需求 ≤3 票、周一重置
 - **全链路埋点**：`analytics_events` 覆盖访问→试学→注册→付费墙→支付→学习→笔记→投票
 - **后台审计日志**：`audit_logs` 记录后台操作
@@ -115,11 +117,10 @@ src/
 
 ---
 
-## P1 未做（按计划书边界，§2.3 / P2 / P3）
+## 当前边界
 
-原生 App、完整 AI 助教、创作者入驻、家庭卡完整流程、结课卡裂变、健康诊疗。
-代码已为长辈模式（`fontScale`/`mode`）、AI 入口、家庭组数据表预留结构。
-（v1.0 已补齐：社区评论/共创剧场、笔记导出、激励体系、支付真实化。）
+仓库已包含 SwiftUI iOS/macOS 客户端源码、Stripe 一次性收款实现和单机私有媒体流。商户沙箱/退款对账、大规模 CDN/HLS 或 OSS/S3、APNs/App Store 产品和正式法务/品牌授权仍需在具体部署环境配置并验收。
+未获得书面授权前，本仓库中的品牌资料与文案不构成“网易有道官方出品”声明。
 
 ---
 
@@ -130,4 +131,4 @@ src/
 
 ---
 
-_v1.0 · 2026-07（网易有道出品）_
+_v3.4 工程原型 · 2026-07_

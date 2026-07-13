@@ -28,7 +28,7 @@
 
 - [x] 权益判断在服务端 — `src/lib/entitlement.ts`，客户端只读快照
 - [x] 支付 webhook 幂等 — `payment_webhook_logs` 唯一键 `(channel, externalId)`，实测重复返回 duplicate
-- [x] 视频 URL 有短时签名或访问控制 — `/api/stream/[assetId]` `exp` 参数 + 二次权益校验（匿名 403）
+- [x] 视频 URL 有短时签名和访问控制 — `/api/stream/[assetId]` HMAC `exp+sig` + 二次权益校验 + Range（匿名付费节 403）
 - [x] 笔记自动保存 — `NoteEditor` debounce PATCH
 - [x] 投票防重复、防超额 — 周票额 5、单需求 ≤3、`@@unique(demandId,userId,weekKey)`
 - [x] 后台操作有 audit log — `audit_logs` + `src/lib/audit.ts`
@@ -64,18 +64,18 @@
 
 # v1.0 验收补充（升级优化计划）
 
-> 在 P1 基础上补齐差异化体验与生产级健壮性；详见 [`docs/升级优化计划-v1.0.md`](./docs/升级优化计划-v1.0.md)。
+> 在 P1 基础上补齐差异化体验与生产级健壮性；详见 [`docs/upgrade-plan-v1.0.md`](./docs/upgrade-plan-v1.0.md)。
 
 ## 新增能力验收
 
 - [x] 笔记捕捉 2.0 — 学习工作台：截帧(S)/批注(N)/字幕剪藏/焦点(F)/深海模式/Markdown/时间戳编辑/删除撤销 — `src/components/Player.tsx`、`NoteEditor.tsx`（实测 S 键截帧生成 `capture` 笔记并落库）
 - [x] 笔记馆三视图 + 标签 + 导出 Markdown — `src/app/notes`、`src/app/api/notes/export`
 - [x] 共创剧场 — 评论/楼中楼、关注进度、制作阶段轨道、水滴票额与衰减 — `DemandComments.tsx`、`DemandStageTrack.tsx`
-- [x] 支付真实化 — 渠道抽象 + HMAC 验签、mock 收银台、订阅升降级/取消/恢复、优惠券、密码找回 — `src/lib/payment*.ts`、`src/app/api/checkout|subscription|coupons|auth`
+- [ ] 真实支付渠道（部分完成）— Stripe 一次性 Checkout/原生 webhook 已实现，生产拒绝 mock；尚需商户沙箱凭据与公网回调域名完成真实收款/退款/对账 E2E
 - [x] 激励体系 — streak / 潮汐日历 / 成就 / 激励页 — `src/lib/gamification.ts`、`TideCalendar.tsx`
 - [x] Tide Motion 2.0 + 深海模式 — `src/components/motion.tsx`、`globals.css`
 - [x] SEO/运营 — 波形 Hero、CommandK、sitemap/robots/terms/privacy
-- [x] 单测 + CI — vitest 55 用例、GitHub Actions
+- [x] 单测 + CI — vitest 247 用例、GitHub Actions
 
 ## 终审安全/支付/健壮性验收（多智能体六维度终审 + 对抗验证，共修 31 项 CONFIRMED）
 
@@ -95,8 +95,8 @@
 
 ## 回归验证
 
-`tsc --noEmit` 0 错误 · `vitest run` 55/55 · `next build` 成功。
+2026-07-13 本地复验：`tsc --noEmit` 0 错误 · `vitest run` 241/241 · `next build` 成功。GitHub 线上 Actions/分支保护仍须在推送后由仓库管理员确认。
 
 ---
 
-_v1.0 · 2026-07（网易有道出品）_
+_v3.4 工程原型 · 2026-07_

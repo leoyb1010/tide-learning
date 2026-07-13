@@ -2,7 +2,7 @@
   "name": "tide-learning",
   "version": "1.0.0",
   "private": true,
-  "description": "潮汐学习 — 全龄订阅制学习平台 v1.0（网易有道出品）",
+  "description": "潮汐学习 — 全龄订阅制学习平台 v3.4 工程原型",
   "engines": {
     "node": ">=20 <23"
   },
@@ -10,13 +10,13 @@
     "dev": "next dev",
     "build": "node scripts/gen-version.mjs && prisma generate && next build",
     "start": "next start",
-    "preview": "npm run build && DATABASE_URL=\"file:./dev.db\" PORT=3100 next start -p 3100",
-    "lint": "next lint",
+    "preview": "bash scripts/preview.sh",
+    "lint": "eslint . --max-warnings=0",
     "db:push": "prisma db push",
-    "db:deploy": "prisma db push",
+    "db:deploy": "bash scripts/migrate-deploy.sh",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma db push --force-reset && npm run db:seed",
-    "setup": "prisma generate && prisma db push && npm run db:seed",
+    "db:reset": "prisma migrate reset --force",
+    "setup": "prisma generate && npm run db:deploy && npm run db:seed",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -41,10 +41,16 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "eslint": "^9.31.0",
+    "eslint-config-next": "15.5.20",
+    "playwright": "^1.59.1",
     "prisma": "^6.1.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "postcss": ">=8.5.10"
   }
 }

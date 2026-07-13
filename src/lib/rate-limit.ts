@@ -1,12 +1,18 @@
 import { NextRequest } from "next/server";
+import { createHash, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 /**
- * A1-7：进程内滑动窗口限流。
- * 单实例足够拦住暴力枚举 / 刷量；多实例生产应换 Redis（接口保持不变）。
+ * 固定窗口限流。开发/测试使用内存；生产默认使用共享磁盘桶，与 SQLite 的单机持久卷部署一致，
+ * 可跨进程并在重启后继续生效。多主机部署时应把 RATE_LIMIT_DIR 指向共享文件系统，或改接外部限流层。
  */
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
+const useFileStore = process.env.NODE_ENV === "production" || process.env.RATE_LIMIT_STORE === "file";
+const fileRoot = process.env.RATE_LIMIT_DIR || path.join(process.cwd(), ".data", "rate-limits");
+let lastFileSweep = 0;
 
 // 周期性清理过期桶，避免内存无限增长
 let lastSweep = Date.now();
@@ -24,6 +30,7 @@ export interface RateLimitResult {
 
 /** 对 key 在 windowMs 窗口内限制 limit 次。 */
 export function rateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+  if (useFileStore) return fileRateLimit(key, limit, windowMs);
   const now = Date.now();
   sweep(now);
   const b = buckets.get(key);
@@ -36,6 +43,71 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
   }
   b.count += 1;
   return { ok: true, remaining: limit - b.count, retryAfterSec: 0 };
+}
+
+function fileRateLimit(key: string, limit: number, windowMs: number): RateLimitResult {
+  const now = Date.now();
+  const hash = createHash("sha256").update(key).digest("hex");
+  const file = path.join(fileRoot, `${hash}.json`);
+  const lock = path.join(fileRoot, `${hash}.lock`);
+  mkdirSync(fileRoot, { recursive: true });
+
+  try {
+    writeFileSync(lock, String(now), { flag: "wx", mode: 0o600 });
+  } catch {
+    // 进程若在持锁时崩溃，5 秒后清理陈旧锁；活跃锁则保守拒绝，避免并发穿透额度。
+    let lockedAt = Number.NaN;
+    try { lockedAt = Number.parseInt(readFileSync(lock, "utf8"), 10); } catch { /* 锁可能刚释放 */ }
+    if (!Number.isFinite(lockedAt) || now - lockedAt <= 5_000) {
+      return { ok: false, remaining: 0, retryAfterSec: 1 };
+    }
+    unlinkSync(lock);
+    try {
+      writeFileSync(lock, String(now), { flag: "wx", mode: 0o600 });
+    } catch {
+      return { ok: false, remaining: 0, retryAfterSec: 1 };
+    }
+  }
+
+  try {
+    let bucket: Bucket | null = null;
+    try {
+      bucket = JSON.parse(readFileSync(file, "utf8")) as Bucket;
+    } catch {
+      bucket = null;
+    }
+    if (!bucket || !Number.isFinite(bucket.count) || !Number.isFinite(bucket.resetAt) || bucket.resetAt < now) {
+      bucket = { count: 1, resetAt: now + windowMs };
+    } else if (bucket.count >= limit) {
+      return { ok: false, remaining: 0, retryAfterSec: Math.max(1, Math.ceil((bucket.resetAt - now) / 1000)) };
+    } else {
+      bucket.count += 1;
+    }
+
+    const tmp = `${file}.${process.pid}.${randomUUID()}.tmp`;
+    writeFileSync(tmp, JSON.stringify(bucket), { mode: 0o600 });
+    renameSync(tmp, file);
+
+    if (now - lastFileSweep >= 60_000) {
+      lastFileSweep = now;
+      for (const name of readdirSync(fileRoot)) {
+        if (!name.endsWith(".json") || name === `${hash}.json`) continue;
+        try {
+          const stale = JSON.parse(readFileSync(path.join(fileRoot, name), "utf8")) as Bucket;
+          if (!Number.isFinite(stale.resetAt) || stale.resetAt < now) unlinkSync(path.join(fileRoot, name));
+        } catch {
+          unlinkSync(path.join(fileRoot, name));
+        }
+      }
+    }
+
+    return { ok: true, remaining: Math.max(0, limit - bucket.count), retryAfterSec: 0 };
+  } catch (error) {
+    console.error("[rate-limit] persistent store failed closed", error);
+    return { ok: false, remaining: 0, retryAfterSec: 1 };
+  } finally {
+    try { unlinkSync(lock); } catch { /* 已清理由下次陈旧锁恢复 */ }
+  }
 }
 
 /**

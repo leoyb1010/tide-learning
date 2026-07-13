@@ -13,11 +13,15 @@ export function Paywall({
   remainingLessons,
   courseTitle,
   isLoggedIn,
+  returnTo,
 }: {
   remainingLessons: number;
   courseTitle: string;
   isLoggedIn: boolean;
+  returnTo: string;
 }) {
+  const pricingHref = `/pricing?next=${encodeURIComponent(returnTo)}`;
+  const loginHref = `/login?next=${encodeURIComponent(returnTo)}`;
   // 次级链接 = 放弃订阅、先去别处逛逛，记录 paywall_dismiss 用于转化分析
   const onDismiss = () => {
     track("paywall_dismiss", { courseTitle, remainingLessons });
@@ -65,7 +69,7 @@ export function Paywall({
 
         {/* 单一主 CTA + 次级文字链接（A3-6） */}
         <div className="mt-7">
-          <Button href="/pricing" variant="primary" size="lg" icon full>
+          <Button href={pricingHref} variant="primary" size="lg" icon full>
             {isLoggedIn ? "查看订阅方案" : "查看订阅方案"}
           </Button>
         </div>
@@ -75,7 +79,7 @@ export function Paywall({
               先去逛逛其他免费试学的课程
             </Link>
           ) : (
-            <Link href="/login" onClick={onDismiss} className="link-underline text-ink-400 hover:text-ink-600">
+            <Link href={loginHref} onClick={onDismiss} className="link-underline text-ink-400 hover:text-ink-600">
               已有账号？登录后继续
             </Link>
           )}

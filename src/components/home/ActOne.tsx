@@ -1,6 +1,7 @@
 "use client";
 
 import { motion, useTransform, type MotionValue } from "framer-motion";
+import Image from "next/image";
 import Link from "next/link";
 import {
   ArrowDown,
@@ -76,19 +77,21 @@ export function ActOne({
         >
           {/* 装饰性背景图：低优先级（fetchPriority=low）不与首屏 LCP 内容争带宽；
               暗版只在暗色态才需要，走 lazy。 */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          { }
+          <Image
             src="/marketing/classroom-hero-triptych.jpg"
             alt=""
-            fetchPriority="low"
-            decoding="async"
-            className="scene-light-only absolute inset-0 h-full w-full object-cover opacity-[0.34]"
+            fill
+            priority
+            quality={70}
+            sizes="100vw"
+            className="scene-light-only object-cover opacity-[0.34]"
             style={{
               maskImage: "radial-gradient(125% 90% at 50% 42%, #000 0%, rgba(0,0,0,.68) 60%, transparent 92%)",
               WebkitMaskImage: "radial-gradient(125% 90% at 50% 42%, #000 0%, rgba(0,0,0,.68) 60%, transparent 92%)",
             }}
           />
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <img
             src="/marketing/classroom-hero-triptych-dark.jpg"
             alt=""
@@ -168,7 +171,7 @@ export function ActOne({
               {/* 顶部微标 */}
               <motion.p
                 className="mono mb-5 text-[11px] uppercase tracking-[0.22em] text-[var(--scene-ink-3)] lg:text-[12px]"
-                initial={motionOk ? { opacity: 0, y: 8 } : false}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
               >
@@ -179,7 +182,7 @@ export function ActOne({
                   只保留一个红色专注词，字号收敛对齐设计系统 display 阶梯。 */}
               <motion.h1
                 className="text-balance text-[32px] font-bold leading-[1.18] tracking-[-0.02em] text-[var(--scene-ink)] sm:text-[44px] lg:text-[52px] lg:leading-[1.1] xl:text-[60px]"
-                initial={motionOk ? { opacity: 0, y: 14 } : false}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
               >
@@ -191,7 +194,7 @@ export function ActOne({
               {/* 副文案：一句话点出「一间自习室，三种开学方式」，接社会证明。 */}
               <motion.p
                 className="mt-5 max-w-[440px] text-[15px] leading-[1.8] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[500px] lg:text-[17px]"
-                initial={motionOk ? { opacity: 0, y: 12 } : false}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
               >
@@ -210,7 +213,7 @@ export function ActOne({
                   真实链接、冷灰卡 + 小图标，SSR 直出可点。 */}
               <motion.div
                 className="mt-5 flex flex-wrap items-center justify-center gap-2 lg:mt-6 lg:justify-start"
-                initial={motionOk ? { opacity: 0, y: 12 } : false}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
               >
@@ -222,7 +225,7 @@ export function ActOne({
               {/* —— 悬浮输入框：首屏即产品。提交跳造课（复用 /create?prompt=）—— */}
               <motion.div
                 className="mt-8 w-full max-w-[520px] lg:mt-9 lg:max-w-[560px] xl:max-w-[620px]"
-                initial={motionOk ? { opacity: 0, y: 12 } : false}
+                initial={false}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.24 }}
               >
@@ -242,7 +245,7 @@ export function ActOne({
             <motion.div
               className="w-full max-w-[460px] lg:max-w-[520px] lg:flex-1 xl:max-w-[620px] 2xl:max-w-[720px]"
               style={{ transform: immersive ? "translateZ(40px)" : undefined }}
-              initial={motionOk ? { opacity: 0, y: 20 } : false}
+              initial={false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.34 }}
             >
@@ -254,7 +257,7 @@ export function ActOne({
         {/* —— 向下滚动提示：把用户引向第二幕「走近书桌」—— */}
         <motion.div
           className="absolute bottom-6 left-1/2 z-[1] -translate-x-1/2"
-          initial={motionOk ? { opacity: 0 } : false}
+          initial={false}
           animate={{ opacity: 1 }}
           transition={{ delay: 1, duration: 0.8 }}
         >

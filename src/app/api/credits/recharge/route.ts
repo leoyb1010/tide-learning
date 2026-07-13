@@ -26,8 +26,8 @@ const PACKS: Record<string, { yuan: number; credits: number; label: string }> = 
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    // P0-3：生产默认禁用 mock 直接入账；仅当显式置 MOCK_PAY_ENABLED=1 时放行（供测试机演示支付）。
-    if (process.env.NODE_ENV === "production" && process.env.MOCK_PAY_ENABLED !== "1") {
+    // mock 直接入账只能用于非生产环境；生产无任何可误开的放行开关。
+    if (process.env.NODE_ENV === "production") {
       return fail("mock 充值仅限非生产环境", 403);
     }
     assertSameOrigin(req);

@@ -25,6 +25,8 @@ export function CourseFilterBar({ category, sort, q }: { category: string; sort:
   return (
     <div className="flex flex-col gap-4">
       <input
+        aria-label="搜索课程"
+        name="course-search"
         defaultValue={q}
         onKeyDown={(e) => { if (e.key === "Enter") update("q", (e.target as HTMLInputElement).value); }}
         placeholder="搜索课程标题…"
@@ -46,6 +48,8 @@ export function CourseFilterBar({ category, sort, q }: { category: string; sort:
         ))}
         <span className="mx-1 h-4 w-px bg-[var(--border)]" />
         <select
+          aria-label="课程排序"
+          name="course-sort"
           value={sort}
           onChange={(e) => update("sort", e.target.value)}
           className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3.5 py-1.5 text-sm text-[var(--ink2)] outline-none transition-colors hover:border-[var(--border2)] focus:border-[var(--ink3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"

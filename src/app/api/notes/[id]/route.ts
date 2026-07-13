@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { track } from "@/lib/analytics";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
+import { unlink } from "node:fs/promises";
+import { attachmentDiskPath } from "@/lib/private-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -97,9 +99,19 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     assertSameOrigin(req);
     const user = await requireUser();
     const { id } = await params;
-    const note = await prisma.note.findFirst({ where: { id, userId: user.id, deletedAt: null } });
+    const note = await prisma.note.findFirst({
+      where: { id, userId: user.id, deletedAt: null },
+      include: { attachments: { select: { path: true } } },
+    });
     if (!note) return fail("笔记不存在", 404);
-    await prisma.note.update({ where: { id }, data: { deletedAt: new Date() } });
+    await prisma.$transaction([
+      prisma.noteAttachment.deleteMany({ where: { noteId: id } }),
+      prisma.note.update({ where: { id }, data: { deletedAt: new Date(), captureUrl: null } }),
+    ]);
+    await Promise.all(note.attachments.map(({ path }) => {
+      const diskPath = attachmentDiskPath(path);
+      return diskPath ? unlink(diskPath).catch(() => {}) : Promise.resolve();
+    }));
     await track({ eventName: "note_delete", userId: user.id, properties: { note_id: id, kind: note.kind } });
     return ok({ deleted: true });
   });

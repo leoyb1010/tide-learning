@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans, Noto_Sans_SC, IBM_Plex_Mono } from "next/font/google";
+import { Plus_Jakarta_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import { ModeProvider } from "@/components/ModeProvider";
 import { ToastProvider } from "@/components/Toast";
@@ -13,9 +13,9 @@ import { prisma } from "@/lib/db";
 import { getBalance, ensureMonthlyGrant } from "@/lib/credits";
 import { shanghaiDayKey } from "@/lib/week";
 
-// STUDIO 字体系统：Plus Jakarta（UI/数字）+ Noto Sans SC（中文）+ IBM Plex Mono（数据）
+// STUDIO 字体系统：Plus Jakarta（UI/数字）+ 平台中文字体 + IBM Plex Mono（数据）。
+// 不在全站预加载 Noto Sans SC：它会按字形/字重拆成大量阻塞分片，移动慢网代价远高于系统中文字体的视觉差异。
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["400", "500", "600", "700", "800"], variable: "--font-jakarta", display: "swap" });
-const notoSC = Noto_Sans_SC({ subsets: ["latin"], weight: ["400", "500", "700", "900"], variable: "--font-noto-sc", display: "swap" });
 const plexMono = IBM_Plex_Mono({ subsets: ["latin"], weight: ["400", "500", "600"], variable: "--font-plex-mono", display: "swap" });
 
 export const metadata: Metadata = {
@@ -195,7 +195,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     // data-mode/data-theme/--font-scale（读 localStorage 的用户偏好），服务端渲染的
     // <html> 无这些属性，React 19 会报 attribute mismatch。这是主题脚本的预期差异，
     // 只压 <html> 自身的属性对比（不影响子树校验）。
-    <html lang="zh-CN" className={`${jakarta.variable} ${notoSC.variable} ${plexMono.variable}`} suppressHydrationWarning>
+    <html lang="zh-CN" className={`${jakarta.variable} ${plexMono.variable}`} suppressHydrationWarning>
       <head>
         {/*
           Anti-FOUC：paint 前从 localStorage 同步主题/字号/亮暗到 <html> dataset，

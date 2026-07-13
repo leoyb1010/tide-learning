@@ -19,8 +19,8 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
-    // P0-3：生产默认禁用 mock 收银台；仅当显式置 MOCK_PAY_ENABLED=1 时放行（供测试机演示支付）。
-    if (process.env.NODE_ENV === "production" && process.env.MOCK_PAY_ENABLED !== "1") {
+    // mock 收银台只能用于非生产环境；生产无任何可误开的放行开关。
+    if (process.env.NODE_ENV === "production") {
       return fail("mock 收银台仅限非生产环境", 403);
     }
     assertSameOrigin(req);
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
     // 只允许模拟本人订单，取回渠道
     const order = await prisma.order.findFirst({
       where: { externalOrderId, userId: user.id },
-      select: { channel: true, status: true },
+      select: { channel: true, status: true, amountCents: true, currency: true },
     });
     if (!order) throw new AppError("订单不存在");
 
@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
       // 幂等键与真实 webhook 路由保持一致：绑定事件类型，避免与退款事件共键
       externalId: `${eventType}:${externalOrderId}`,
       externalOrderId,
+      amountCents: order.amountCents,
+      currency: order.currency,
     };
     const rawBody = JSON.stringify(payload);
     const signature = signPayload(channel, rawBody);

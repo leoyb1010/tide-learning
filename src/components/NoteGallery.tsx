@@ -28,7 +28,7 @@ export function NoteGallery({ notes }: { notes: NoteRow[] }) {
             className="studio-lift group block overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]"
           >
             {/* 顶部标记点：截帧橙 */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
+            { }
             <img
               src={n.captureUrl ?? ""}
               alt={n.title ?? "截帧"}

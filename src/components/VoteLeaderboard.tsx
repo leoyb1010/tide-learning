@@ -18,7 +18,6 @@ import {
   Sparkle,
 } from "@phosphor-icons/react/dist/ssr";
 import { VoteButton } from "./VoteButton";
-import { AmbientVideo } from "./AmbientVideo";
 import { ProposalCard } from "./DemandCard";
 import { DEMAND_STATUS } from "@/lib/format";
 import { trackGradientVar, trackIconKey } from "@/lib/tracks";
@@ -83,7 +82,7 @@ function SupporterStack({
             className="inline-flex h-7 w-7 items-center justify-center overflow-hidden rounded-full ring-2 ring-white/15"
           >
             {u.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+
               <img
                 src={u.avatarUrl}
                 alt=""
@@ -307,13 +306,15 @@ function StarHero({
           </div>
         </div>
 
-        {/* 右：赛道封面视觉（真实需求预告视频铺底 + 赛道渐变镶边 + 大主题图标） */}
+        {/* 右：赛道封面视觉（静帧海报 + 赛道渐变镶边 + 大主题图标） */}
         <div className="relative order-1 min-h-[160px] overflow-hidden md:order-2">
-          {/* 需求预告视频作背景：赛道渐变作兜底底色 + 静帧 poster；reduce-motion 时只静帧不播放。 */}
-          <AmbientVideo
-            src="/videos/marketing/demand-course-teaser.mp4"
-            poster={STAR_POSTER[iconKey]}
-            gradient={trackGrad}
+          {/* 列表首屏只用静帧，避免用户未播放即下载 4.5MB 背景视频。 */}
+          <img
+            src={STAR_POSTER[iconKey]}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="absolute inset-0 h-full w-full object-cover"
           />
           {/* 赛道渐变镶边层（半透明叠在视频上，保留赛道个性同时让视频透出）。 */}
           <div className="absolute inset-0 opacity-45 mix-blend-soft-light" style={{ background: trackGrad }} aria-hidden />

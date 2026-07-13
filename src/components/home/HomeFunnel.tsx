@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
@@ -388,12 +389,13 @@ function CourseDrawerCard({ course, motionOk }: { course: FeaturedCourse; motion
         className="relative aspect-[4/3] w-full overflow-hidden"
         style={{ background: course.gradient }}
       >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        <Image
           src={course.cover}
           alt=""
           aria-hidden
-          loading="lazy"
+          fill
+          sizes="264px"
+          quality={68}
           className={`h-full w-full object-cover transition-transform duration-500 ease-out ${
             motionOk ? "group-hover/card:scale-[1.06]" : ""
           }`}
@@ -435,4 +437,3 @@ function CourseDrawerCard({ course, motionOk }: { course: FeaturedCourse; motion
     </Link>
   );
 }
-

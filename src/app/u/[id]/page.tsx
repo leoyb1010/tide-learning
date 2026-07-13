@@ -161,7 +161,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
         <div className="flex items-center gap-4">
           {/* 头像 */}
           {target.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img src={target.avatarUrl} alt="" className="h-16 w-16 shrink-0 rounded-full object-cover" />
           ) : (
             <span className="grid h-16 w-16 shrink-0 place-items-center rounded-full bg-[var(--surface-inset)] text-[26px] font-bold text-[var(--ink2)]">
@@ -224,7 +224,7 @@ export default async function UserProfilePage({ params }: { params: Promise<{ id
                   className="studio-lift flex flex-col items-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 text-center shadow-[var(--card),var(--inner-hi)]"
                 >
                   {img ? (
-                    // eslint-disable-next-line @next/next/no-img-element
+
                     <img src={img} alt={`${a.achievement.name} 徽章`} width={40} height={40} loading="lazy" className="h-10 w-10 object-contain" />
                   ) : (
                     <span className="grid h-10 w-10 place-items-center rounded-full bg-[var(--surface-inset)] text-[var(--ink2)]" aria-hidden>

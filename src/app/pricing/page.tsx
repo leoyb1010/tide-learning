@@ -8,11 +8,11 @@ import { monthlyGrantForPlan } from "@/lib/credits";
 import { TrackView } from "@/components/TrackView";
 import { trackLabel, FUTURE_TRACKS } from "@/lib/tracks";
 import { ShieldCheck, Sparkle, Quotes, Coins, Notebook } from "@phosphor-icons/react/dist/ssr";
+import { safeInternalPath } from "@/lib/safe-redirect";
 
 export const metadata = { title: "订阅方案" };
 
 const NO = "✕";
-const NEED_CREDIT = "需积分";
 
 /**
  * 权益对比（v3.0：4 列 × 14 行）。
@@ -25,8 +25,8 @@ const RIGHTS = [
   { name: "订阅赛道全部课程", free: NO, premium: "是", expired: NO },
   { name: "本周上新", free: "可浏览", premium: "可学习", expired: "可浏览" },
   { name: "每月赠送积分", free: "0", premium: "300 ~ 800", expired: "0" },
-  { name: "AI 造课", free: NEED_CREDIT, premium: "赠分即用", expired: NEED_CREDIT },
-  { name: "AI 笔记整理", free: NEED_CREDIT, premium: "赠分即用", expired: NEED_CREDIT },
+  { name: "AI 造课", free: NO, premium: "赠分即用", expired: NO },
+  { name: "AI 笔记整理", free: NO, premium: "赠分即用", expired: NO },
   { name: "模拟考试", free: NO, premium: "是", expired: NO },
   { name: "笔记创建", free: "3 篇", premium: "无限", expired: "仅查看" },
   { name: "笔记 · 截帧导出", free: NO, premium: "是", expired: "是" },
@@ -36,15 +36,15 @@ const RIGHTS = [
   { name: "优先客服 · 新功能抢先", free: NO, premium: "是", expired: NO },
 ];
 
-/** 学员心得（占位，可后续替换为集市真实引用）。 */
+/** 使用场景示例；不冒充真实用户证言。 */
 const TESTIMONIALS = [
   {
-    name: "口语实战 · 学员",
-    quote: "以前收藏一堆链接从不看，现在一句话让 AI 帮我造成一门课，通勤路上就学完了。",
+    name: "使用场景示例 · 通勤学习",
+    quote: "把零散资料整理成课程后，可以利用通勤时间按章节持续学习。",
   },
   {
-    name: "AI 技能 · 学员",
-    quote: "月赠积分刚好够把我想学的都造成课，笔记还能一键整理成复习提纲，很省心。",
+    name: "使用场景示例 · 复习整理",
+    quote: "课程笔记可以继续整理为复习提纲，帮助回顾已经学过的内容。",
   },
 ];
 
@@ -54,7 +54,13 @@ function niceCount(n: number): string {
   return n.toLocaleString("zh-CN");
 }
 
-export default async function PricingPage() {
+export default async function PricingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const { next } = await searchParams;
+  const redirectTo = safeInternalPath(next, "/me/subscription");
   const user = await getCurrentUser();
   const snapshot = await resolveEntitlement(user?.id ?? null);
 
@@ -67,11 +73,11 @@ export default async function PricingPage() {
     prisma.courseUpdateLog.count({ where: { publishedAt: { gte: weekAgo } } }),
   ]);
 
-  // 社会证明数字：用真实 count，但设合理下限，避免稀疏 DB 显示「0」削弱说服力。
+  // 只展示数据库真实值；禁止用营销下限伪造课程、用户或更新数量。
   const stats = {
-    courses: Math.max(courseCount, 120),
-    learners: Math.max(userCount, 8600),
-    weekly: Math.max(weekUpdates, 12),
+    courses: courseCount,
+    learners: userCount,
+    weekly: weekUpdates,
   };
 
   // 为每个 DB Plan 派生 monthlyGrant（前后端单一事实源：credits.ts）。
@@ -143,7 +149,7 @@ export default async function PricingPage() {
             一次订阅解锁全部赛道，年卡每月赠 {yearGrant} 积分 · 可造约 {coursesFromGrant(yearGrant)} 门课
           </p>
         </div>
-        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} />
+        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} />
         {anchor && (
           <p className="mono mt-6 text-center text-[13px] text-[var(--ink4)]">
             也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首期优惠，月赠 {anchor.monthlyGrant} 积分）
@@ -198,12 +204,12 @@ export default async function PricingPage() {
           </table>
         </div>
         <p className="mt-3 text-center text-[12px] leading-[1.6] text-[var(--ink4)]">
-          「需积分」= 免费用户也可用 AI 能力，按积分付费；订阅用户用每月赠送的积分即可，通常无需额外充值。
-          停订后课程锁定，但笔记永久保留、可查看导出。健康类内容仅供健康信息素养学习。
+          AI 能力当前仅对有效订阅开放，并使用每月赠送积分。停订后课程锁定，但笔记永久保留、可查看导出。
+          健康类内容仅供健康信息素养学习。
         </p>
       </section>
 
-      {/* 学员心得 */}
+      {/* 使用场景示例（非用户证言） */}
       <section className="mx-auto max-w-[860px]">
         <div className="grid gap-4 sm:grid-cols-2">
           {TESTIMONIALS.map((t) => (
@@ -225,7 +231,7 @@ export default async function PricingPage() {
           <TrustItem icon={<ShieldCheck size={16} weight="fill" className="text-[var(--ok)]" />} text="随时取消，笔记永远是你的" />
           <TrustItem icon={<Coins size={16} weight="fill" className="text-[var(--red)]" />} text="月赠积分，AI 造课即用" />
           <TrustItem icon={<Notebook size={16} weight="fill" className="text-[var(--info)]" />} text="多端同步，进度笔记不丢" />
-          <TrustItem icon={<Sparkle size={16} weight="fill" className="text-[var(--warn)]" />} text="支付宝 / 微信 · 学生 8 折" />
+          <TrustItem icon={<Sparkle size={16} weight="fill" className="text-[var(--warn)]" />} text="价格透明，不默认勾选附加服务" />
         </div>
       </div>
     </div>

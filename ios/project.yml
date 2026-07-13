@@ -21,6 +21,12 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: YoudaoStudio/YoudaoStudio.entitlements
+      configs:
+        Debug:
+          APS_ENVIRONMENT: development
+        Release:
+          APS_ENVIRONMENT: production
     sources:
       - path: YoudaoStudio
         # iOS 不编译 macOS 专属入口与其配置文件（虽已 #if 保护，显式排除更干净）。

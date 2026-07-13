@@ -9,7 +9,7 @@ import { defineConfig } from "prisma/config";
  * Prisma 配置（替代已废弃的 package.json#prisma；Prisma 7 将移除后者）。
  * - schema：schema 文件位置（保持默认 prisma/schema.prisma）。
  * - migrations.seed：`prisma db push`/`migrate reset` 后运行的 seed 命令（原 package.json 的 seed）。
- * 注意：本项目无迁移历史，改 schema 用 `prisma db push`（见 CLAUDE.md），seed 仍走 tsx。
+ * schema 变更必须提交 prisma/migrations，并通过 migrate deploy 应用；seed 仍走 tsx。
  */
 export default defineConfig({
   schema: path.join("prisma", "schema.prisma"),

@@ -43,27 +43,31 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const detail = await getCourseDetail(id, user?.id ?? null);
   if (!detail) notFound();
 
-  const { course, snapshot, categoryLabel, durationText, lessons } = detail;
+  const { course, snapshot, categoryLabel, durationText, lessons, owned, progress } = detail;
   const firstFree = lessons.find((l) => l.isFree);
   const firstLesson = lessons[0];
   const needsCompliance = ["life", "silver_english"].includes(course.category) && course.reviewerName;
-  const hasAccess = canAccessTrack(course.category, snapshot); // 按赛道判断，非全站
+  const hasAccess = owned || canAccessTrack(course.category, snapshot); // 买断或订阅均可访问
   const isEnglish = TRACK_MAP[course.category]?.isEnglish;
   const related = (await listCourses({ category: course.category })).filter((c) => c.id !== course.id).slice(0, 3);
 
-  // 大纲进度派生：可访问的章节视为已学，第一节不可访问的作为"在学"高亮，之后锁定；最后一节标 NEW。
-  const accessibleCount = lessons.filter((l) => l.canAccess).length;
-  const nowIndex = lessons.findIndex((l) => !l.canAccess);
-  const learnedCount = nowIndex === -1 ? Math.max(accessibleCount - 1, 0) : nowIndex;
+  // 学习进度只认 LearningProgress，绝不再把「有权访问」冒充「已经学完」。
+  const completedIds = new Set(progress.filter((p) => p.completedAt).map((p) => p.lessonId));
+  const activeLessonId =
+    progress.find((p) => !p.completedAt)?.lessonId ??
+    lessons.find((l) => l.canAccess && !completedIds.has(l.id))?.id ??
+    lessons.find((l) => l.canAccess)?.id ??
+    null;
+  const learnedCount = lessons.filter((l) => completedIds.has(l.id)).length;
   const progressPct = lessons.length ? Math.round((learnedCount / lessons.length) * 100) : 0;
   const freeCount = lessons.filter((l) => l.isFree).length;
   // 评分（S5 评价系统闭环）：读真实聚合——有真实评价读真实均分/条数；零评价回退占位派生
   // （isPlaceholder=true，RatingStars 标「示例」）。随第一条真实评价落地即自动切换，UI 不变。
   const rating = await getCourseRatingAggregate(course.id, course.learnersCount);
   // 完课判定：有权访问 + 大纲无「在学/锁定」节（nowIndex === -1 表示每节都可访问且已学过）。
-  const courseComplete = hasAccess && lessons.length > 0 && nowIndex === -1;
+  const courseComplete = hasAccess && lessons.length > 0 && learnedCount === lessons.length;
   const continueHref = hasAccess
-    ? `/courses/${course.slug}/learn/${firstLesson?.id}`
+    ? `/courses/${course.slug}/learn/${activeLessonId ?? firstLesson?.id}`
     : firstFree
       ? `/courses/${course.slug}/learn/${firstFree.id}`
       : "/pricing";
@@ -209,10 +213,10 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
             </div>
             <ul className="stagger overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
               {lessons.map((l, i) => {
-                const isNow = i === nowIndex;
-                const isDone = nowIndex === -1 ? true : i < nowIndex;
+                const isDone = completedIds.has(l.id);
+                const isNow = !isDone && l.id === activeLessonId;
                 const isLast = i === lessons.length - 1;
-                const locked = !l.canAccess && !isNow;
+                const locked = !l.canAccess;
                 return (
                   <li
                     key={l.id}
@@ -220,7 +224,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
                     className={`border-b border-[var(--border)] last:border-b-0 ${isNow ? "bg-[var(--red-soft)]" : ""}`}
                   >
                     <OutlineRow
-                      href={l.canAccess || isNow ? `/courses/${course.slug}/learn/${l.id}` : undefined}
+                      href={l.canAccess ? `/courses/${course.slug}/learn/${l.id}` : undefined}
                       index={i + 1}
                       title={l.title}
                       summary={l.summary}
@@ -315,7 +319,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               ) : (
                 <>
                   {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg" className="cta-glow">免费试学第一章</Button>}
-                  <Button href="/pricing" variant="secondary" full>订阅解锁全部</Button>
+                  <Button href={`/pricing?next=${encodeURIComponent(`/courses/${course.slug}/learn/${firstLesson?.id ?? ""}`)}`} variant="secondary" full>订阅解锁全部</Button>
                   {/* 英语赛道提供预约试听（有道 0转正入口） */}
                   {isEnglish && <TrialBooking courseId={course.id} track={course.category} source="youdao_dict" />}
                 </>

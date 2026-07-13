@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useReducer } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkle,
@@ -43,30 +42,6 @@ interface DemoState {
   cycle: number; // 循环计数，用于 key 重挂动画
 }
 
-type Action =
-  | { t: "tick-type" }
-  | { t: "to-generating" }
-  | { t: "tick-step" }
-  | { t: "to-revealed" }
-  | { t: "restart" };
-
-function reducer(s: DemoState, a: Action): DemoState {
-  switch (a.t) {
-    case "tick-type":
-      return { ...s, typed: Math.min(s.typed + 1, PROMPT.length) };
-    case "to-generating":
-      return { ...s, phase: "generating", typed: PROMPT.length, step: 0 };
-    case "tick-step":
-      return { ...s, step: Math.min(s.step + 1, STEPS.length) };
-    case "to-revealed":
-      return { ...s, phase: "revealed", step: STEPS.length };
-    case "restart":
-      return { phase: "typing", typed: 0, step: 0, cycle: s.cycle + 1 };
-    default:
-      return s;
-  }
-}
-
 const REVEALED_STATE: DemoState = {
   phase: "revealed",
   typed: PROMPT.length,
@@ -76,34 +51,12 @@ const REVEALED_STATE: DemoState = {
 
 export function DeskDemo() {
   const { motionOk } = useStudyRoom();
-  // 降级态：直接定格终态，不启定时器。
-  const [state, dispatch] = useReducer(reducer, motionOk ? { phase: "typing", typed: 0, step: 0, cycle: 0 } : REVEALED_STATE);
-
-  // 演示循环时间线：仅 motionOk 时运行。用一串 setTimeout 串起分镜，
-  // cycle 变化时重建（清理上一轮所有 timer，防泄漏/错帧）。
-  useEffect(() => {
-    if (!motionOk) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const at = (ms: number, fn: () => void) => timers.push(setTimeout(fn, ms));
-
-    // ① 打字：逐字（约 42ms/字），打完停顿再进入生成
-    const perChar = 42;
-    for (let i = 1; i <= PROMPT.length; i++) at(i * perChar, () => dispatch({ t: "tick-type" }));
-    const typeDone = PROMPT.length * perChar;
-    at(typeDone + 520, () => dispatch({ t: "to-generating" }));
-    // ② 生成：三步依次点亮（每步 ~640ms）
-    const genStart = typeDone + 520 + 260;
-    STEPS.forEach((_, i) => at(genStart + i * 640, () => dispatch({ t: "tick-step" })));
-    const genDone = genStart + STEPS.length * 640;
-    // ③ 成品卡浮现，停留展示后重启
-    at(genDone + 340, () => dispatch({ t: "to-revealed" }));
-    at(genDone + 340 + 3600, () => dispatch({ t: "restart" }));
-
-    return () => timers.forEach(clearTimeout);
-  }, [state.cycle, motionOk]);
+  // 首屏从 SSR 起固定展示成品态。定时替换整块 DOM 会让慢网浏览器把晚出现的
+  // 演示卡重新认定为 LCP；流光和局部合成动画仍保留，但不再改变首屏内容结构。
+  const state = REVEALED_STATE;
 
   const typedText = PROMPT.slice(0, state.typed);
-  const showCaret = motionOk && state.phase === "typing";
+  const showCaret = false;
 
   return (
     <div className="relative w-full" aria-hidden>
@@ -118,21 +71,17 @@ export function DeskDemo() {
       >
         {/* —— 屏内底纹：智性蓝图（细网格 + 中右柔光 + 淡连线），叠在 --scene-screen 之上、
             内容之下，低透明度当氛围底，让它更像一台真在跑 AI 的造课台。亮/暗两版随主题切。 —— */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/marketing/ai-forge-panel-bg.jpg"
-          alt=""
-          fetchPriority="low"
-          decoding="async"
-          className="scene-light-only pointer-events-none absolute inset-0 h-full w-full object-cover opacity-70"
+        {/* 小屏用渐变流光已足够；背景图只在 sm+ 下作 CSS 背景，
+            避免移动慢网为装饰图阻塞首屏。 */}
+        <div
+          aria-hidden
+          className="scene-light-only pointer-events-none absolute inset-0 hidden bg-cover bg-center opacity-70 sm:block"
+          style={{ backgroundImage: "url('/marketing/ai-forge-panel-bg.jpg')" }}
         />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src="/marketing/ai-forge-panel-bg-dark.jpg"
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="scene-dark-only pointer-events-none absolute inset-0 h-full w-full object-cover opacity-80"
+        <div
+          aria-hidden
+          className="scene-dark-only pointer-events-none absolute inset-0 hidden bg-cover bg-center opacity-80 sm:block"
+          style={{ backgroundImage: "url('/marketing/ai-forge-panel-bg-dark.jpg')" }}
         />
 
         {/* 屏内智能流光（AI 材质活感）；reduce-motion 静止 */}

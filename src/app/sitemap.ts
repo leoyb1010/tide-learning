@@ -21,7 +21,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 已发布课程与需求详情动态注入
   const [courses, demands] = await Promise.all([
     prisma.course.findMany({
-      where: { status: "published" },
+      where: { status: "published", visibility: "public" },
       select: { slug: true, lastUpdatedAt: true },
     }),
     prisma.demand.findMany({

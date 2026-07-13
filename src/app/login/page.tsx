@@ -4,17 +4,19 @@ import { useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui";
+import { safeInternalPath } from "@/lib/safe-redirect";
+import { CONSENT_VERSION } from "@/lib/consent";
 
 function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   // 只接受站内相对路径（挡 open redirect：外域 URL 与协议相对的 "//host"），否则回落 /me
-  const nextParam = params.get("next") || "";
-  const next = nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/me";
+  const next = safeInternalPath(params.get("next"), "/me");
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
+  const [consentAccepted, setConsentAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -26,7 +28,14 @@ function LoginInner() {
       const res = await fetch(`/api/auth/${mode === "login" ? "login" : "signup"}`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ identifier, password, nickname }),
+        body: JSON.stringify({
+          identifier,
+          password,
+          nickname,
+          termsAccepted: mode === "signup" ? consentAccepted : undefined,
+          privacyAccepted: mode === "signup" ? consentAccepted : undefined,
+          consentVersion: mode === "signup" ? CONSENT_VERSION : undefined,
+        }),
       });
       // 网关 502 等非 JSON 响应时不把解析原文当错误文案：解析失败兜底为 null，统一可读文案
       const json = await res.json().catch(() => null);
@@ -86,6 +95,15 @@ function LoginInner() {
             />
           </div>
           {err && <p id="login-error" role="alert" className="text-sm text-error">{err}</p>}
+          {mode === "signup" && (
+            <label className="flex items-start gap-2 text-xs leading-5 text-ink-500">
+              <input type="checkbox" checked={consentAccepted} onChange={(e) => setConsentAccepted(e.target.checked)} className="mt-1" required />
+              <span>
+                我已阅读并同意 <Link href="/terms" className="underline">用户协议</Link> 与{" "}
+                <Link href="/privacy" className="underline">隐私政策</Link>
+              </span>
+            </label>
+          )}
           <Button type="submit" full size="lg" loading={loading}>
             {mode === "login" ? "登录" : "注册并登录"}
           </Button>
@@ -99,7 +117,8 @@ function LoginInner() {
         </p>
       </div>
       <p className="mt-4 text-center text-xs text-ink-400">
-        登录即代表同意 <Link href="/" className="underline">服务条款</Link>
+        登录表示你将按已接受的 <Link href="/terms" className="underline">用户协议</Link> 使用服务；隐私处理见{" "}
+        <Link href="/privacy" className="underline">隐私政策</Link>
       </p>
     </div>
   );

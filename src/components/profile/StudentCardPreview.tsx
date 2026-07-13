@@ -90,7 +90,7 @@ export function StudentCardPreview({
 
         <div className="relative flex items-center gap-3.5">
           {avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={avatarUrl}
               alt=""

@@ -196,6 +196,13 @@ export const mockVideoProvider: VideoProvider = {
   },
 };
 
+const unavailableProductionVideoProvider: VideoProvider = {
+  name: "unavailable",
+  async generate(): Promise<VideoGenOutput> {
+    throw new Error("生产环境尚未配置真实视频生成提供商");
+  },
+};
+
 /**
  * 选择当前生效的 provider。
  * VIDEO_MODE=real 且真实 provider 已注册时用真实的；否则一律回落 mock（优雅降级）。
@@ -212,7 +219,9 @@ export const mockVideoProvider: VideoProvider = {
  * 上传到对象存储，返回 { assetId(=对象存储/CDN key), durationSec, kind }。其余流程零改动。
  */
 export function resolveVideoProvider(): VideoProvider {
-  // 真实 provider 尚未接入：即便 VIDEO_MODE=real 也回落 mock，保证流程不断。
+  // 生产绝不把占位资源伪装成已生成视频；真实 provider 未接入时显式失败并保留可重试态。
+  if (process.env.NODE_ENV === "production") return unavailableProductionVideoProvider;
+  // 本地演示允许 mock 跑通编排流程。
   return mockVideoProvider;
 }
 

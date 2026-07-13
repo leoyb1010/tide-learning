@@ -5,8 +5,10 @@ import { audit } from "@/lib/audit";
 import { track } from "@/lib/analytics";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { generateCourseOutline, slugifyCourse } from "@/lib/course-gen";
+import { canTransitionDemand } from "@/lib/demand-status";
+import { notify } from "@/lib/notify";
 
-const VALID = ["pending_review", "collecting", "evaluating", "scheduled", "producing", "launched", "rejected", "merged"];
+const VALID = ["pending_review", "collecting", "evaluating", "scheduled", "producing", "launched", "rejected"];
 
 /**
  * 共创闭环：从 demand 的 title+description 生成一版 AI 预览课（引擎A）。
@@ -78,6 +80,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const demand = await prisma.demand.findUnique({ where: { id } });
     if (!demand) return fail("需求不存在", 404);
+    if (!canTransitionDemand(demand.status, body.status)) {
+      return fail(`不允许从 ${demand.status} 直接变更为 ${body.status}`, 409);
+    }
+
+    const launchedCourseId = body.launchedCourseId?.trim() || demand.launchedCourseId;
+    let launchedCourse: { id: string; title: string } | null = null;
+    if (body.status === "launched") {
+      if (!launchedCourseId) return fail("上线需求必须关联已发布课程");
+      launchedCourse = await prisma.course.findFirst({
+        where: {
+          id: launchedCourseId,
+          status: "published",
+          visibility: { in: ["public", "unlisted"] },
+        },
+        select: { id: true, title: true },
+      });
+      if (!launchedCourse) return fail("关联课程不存在、未发布或不可访问");
+    }
 
     // —— 可选：共创闭环 · 生成 AI 预览课（仅在推进到 evaluating 时触发）——
     // 非阻塞主流程语义：预览生成失败只记日志、不回滚状态推进。
@@ -90,28 +110,51 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       }
     }
 
-    const updated = await prisma.demand.update({
-      where: { id },
-      data: {
-        status: body.status,
-        officialReply: body.officialReply ?? demand.officialReply,
-        // 预览课关联进 launchedCourseId（追溯共创产物），显式传入优先
-        launchedCourseId: body.launchedCourseId ?? previewCourseId ?? demand.launchedCourseId,
-        riskLevel: body.riskLevel ?? demand.riskLevel,
-      },
-    });
-    await prisma.demandStatusLog.create({
-      data: {
-        demandId: id,
-        fromStatus: demand.status,
-        toStatus: body.status,
-        operatorId: admin.id,
-        reason: body.reason ?? body.officialReply,
-      },
+    const updated = await prisma.$transaction(async (tx) => {
+      const next = await tx.demand.update({
+        where: { id },
+        data: {
+          status: body.status,
+          officialReply: body.officialReply ?? demand.officialReply,
+          launchedCourseId: body.status === "launched" ? launchedCourseId : demand.launchedCourseId,
+          riskLevel: body.riskLevel ?? demand.riskLevel,
+        },
+      });
+      if (demand.status !== body.status) {
+        await tx.demandStatusLog.create({
+          data: {
+            demandId: id,
+            fromStatus: demand.status,
+            toStatus: body.status,
+            operatorId: admin.id,
+            reason: body.reason ?? body.officialReply,
+          },
+        });
+      }
+      return next;
     });
     await audit({ operatorId: admin.id, action: "demand.status", targetType: "demand", targetId: id, detail: `${demand.status}→${body.status}${previewCourseId ? ` (ai-preview:${previewCourseId})` : ""}` });
     if (previewCourseId) {
       await track({ eventName: "demand_ai_preview", userId: admin.id, properties: { demandId: id, courseId: previewCourseId } });
+    }
+    if (demand.status !== body.status) {
+      const [voters, followers] = await Promise.all([
+        prisma.demandVote.findMany({ where: { demandId: id }, distinct: ["userId"], select: { userId: true } }),
+        prisma.demandFollow.findMany({ where: { demandId: id }, select: { userId: true } }),
+      ]);
+      const recipientIds = new Set([demand.userId, ...voters.map((v) => v.userId), ...followers.map((f) => f.userId)]);
+      await Promise.all(
+        [...recipientIds].map((userId) =>
+          notify({
+            userId,
+            type: "demand_update",
+            title: body.status === "launched" ? "你关注的需求已上线" : "你关注的需求有新进展",
+            body: body.status === "launched" ? `《${launchedCourse!.title}》现已可以学习` : `${demand.title}：${body.status}`,
+            refType: "demand",
+            refId: id,
+          }),
+        ),
+      );
     }
     return ok({ ...updated, previewCourseId });
   });

@@ -130,7 +130,7 @@ export function Lightbox({
         )}
 
         {/* 大图：key 绑 index，切换时重放缩放进场 */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
+        { }
         <img
           key={safeIndex}
           src={images[safeIndex]}

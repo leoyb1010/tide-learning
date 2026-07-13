@@ -7,9 +7,17 @@ struct LoginView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var isSignup = false
+    @State private var consentAccepted = false
 
     struct LoginBody: Encodable { let identifier: String; let password: String }
-    struct SignupBody: Encodable { let nickname: String; let identifier: String; let password: String }
+    struct SignupBody: Encodable {
+        let nickname: String
+        let identifier: String
+        let password: String
+        let termsAccepted: Bool
+        let privacyAccepted: Bool
+        let consentVersion: String
+    }
 
     var body: some View {
         ZStack {
@@ -28,7 +36,12 @@ struct LoginView: View {
                         Text(error).font(.studio(12)).foregroundStyle(Studio.red)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    if isSignup {
+                        Toggle("我已阅读并同意用户协议与隐私政策", isOn: $consentAccepted)
+                            .font(.studio(12)).foregroundStyle(Studio.ink3)
+                    }
                     StudioButton(title: isSignup ? "注册" : "登录", loading: loading) { Task { await submit() } }
+                        .disabled(isSignup && !consentAccepted)
                     Button(isSignup ? "已有账号？去登录" : "没有账号？去注册") {
                         withAnimation { isSignup.toggle(); error = nil }
                     }
@@ -60,7 +73,8 @@ struct LoginView: View {
             let u: AuthUser
             if isSignup {
                 let nickname = identifier.contains("@") ? String(identifier.split(separator: "@").first ?? "同学") : "同学"
-                u = try await API.shared.post("/api/auth/signup", body: SignupBody(nickname: nickname, identifier: identifier, password: password), as: AuthUser.self)
+                guard consentAccepted else { error = "请先同意用户协议与隐私政策"; return }
+                u = try await API.shared.post("/api/auth/signup", body: SignupBody(nickname: nickname, identifier: identifier, password: password, termsAccepted: true, privacyAccepted: true, consentVersion: "2026-07-13"), as: AuthUser.self)
             } else {
                 u = try await API.shared.post("/api/auth/login", body: LoginBody(identifier: identifier, password: password), as: AuthUser.self)
             }

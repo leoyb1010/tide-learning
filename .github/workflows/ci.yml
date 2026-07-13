@@ -1,23 +1,23 @@
 name: CI
 
-# 潮汐学习 CI：类型检查 + 单元测试 + 构建。
-# DATABASE_URL 用本地 SQLite 文件（file:./ci.db），构建前先 db push 生成表结构。
+# 潮汐学习 CI：迁移、静态检查、单测、构建、安全审计与恢复演练。
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      # CI 用一次性 SQLite；生产为 PostgreSQL（见 .env.example）。
-      DATABASE_URL: "file:./ci.db"
+      DATABASE_URL: "file:${{ github.workspace }}/ci.db"
       # 构建/运行时占位密钥（生产必须覆盖）。
       SESSION_SECRET: "ci-session-secret-not-for-production"
       PAY_MOCK_SECRET: "ci-mock-secret"
       NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+      STORAGE_MODE: "local"
+      STREAM_SIGNING_SECRET: "ci-stream-signing-secret-at-least-32-characters"
 
     steps:
       - uses: actions/checkout@v4
@@ -31,11 +31,22 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install browser runtime
+        run: npx playwright install --with-deps chromium
+
       - name: Generate Prisma client
         run: npx prisma generate
 
-      - name: Push database schema
-        run: npx prisma db push
+      - name: Deploy migrations to an empty database
+        run: npm run db:deploy
+
+      - name: Verify migration status and seed
+        run: |
+          npx prisma migrate status
+          npm run db:seed
+
+      - name: Lint
+        run: npm run lint
 
       - name: Typecheck
         run: npx tsc --noEmit
@@ -43,5 +54,36 @@ jobs:
       - name: Unit tests
         run: npm test
 
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=moderate
+
       - name: Build
         run: npm run build
+
+      - name: Runtime contracts and critical lifecycle flows
+        run: |
+          PORT=3100 npm start > "$RUNNER_TEMP/tide-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:3100/api/courses >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:3100/api/courses >/dev/null
+          CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts
+          RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
+          BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
+
+      - name: Backup and restore drill
+        run: |
+          printf '%s' 'ci-only-backup-password-32-bytes-minimum' > "$RUNNER_TEMP/backup-password"
+          REQUIRE_ENCRYPTION=1 BACKUP_ENCRYPTION_PASSWORD_FILE="$RUNNER_TEMP/backup-password" \
+            bash scripts/backup-db.sh "$GITHUB_WORKSPACE/ci.db" "$RUNNER_TEMP/backups"
+          backup="$(find "$RUNNER_TEMP/backups" -name 'tide-*.db.enc' -type f | head -1)"
+          archive="${backup%.db.enc}-uploads.tar.gz.enc"
+          test -f "$backup" && test -f "$archive"
+          test -z "$(find "$RUNNER_TEMP/backups" -type f ! -name '*.enc' ! -name '*.sha256' -print -quit)"
+          BACKUP_ENCRYPTION_PASSWORD_FILE="$RUNNER_TEMP/backup-password" ASSETS_DIR="$RUNNER_TEMP/restored-data" \
+            bash scripts/restore-db.sh "$backup" "$RUNNER_TEMP/restored.db" "$archive" --force
+          test "$(sqlite3 "$RUNNER_TEMP/restored.db" 'PRAGMA integrity_check;')" = "ok"
+          test "$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)" -ge 10

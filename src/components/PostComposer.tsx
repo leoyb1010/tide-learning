@@ -219,7 +219,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
               key={i}
               className="group relative aspect-square overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)]"
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img src={src} alt="" className="h-full w-full object-cover" />
               <button
                 onClick={() => removeImage(i)}

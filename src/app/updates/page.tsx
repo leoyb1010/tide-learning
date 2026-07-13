@@ -4,6 +4,7 @@ import { Badge, EmptyState } from "@/components/ui";
 import { UPDATE_TYPE_LABELS } from "@/lib/format";
 
 export const metadata = { title: "本周上新" };
+export const dynamic = "force-dynamic";
 
 export default async function UpdatesPage() {
   const updates = await listUpdates(40);

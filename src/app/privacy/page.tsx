@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <Reveal>
         <div className="overline mb-2 text-accent-600">PRIVACY</div>
         <h1 className="text-[1.9rem] font-semibold tracking-tight text-ink-950">隐私政策</h1>
-        <p className="mt-2 text-sm text-ink-400">最后更新：2026 年 7 月 1 日</p>
+        <p className="mt-2 text-sm text-ink-400">最后更新：2026 年 7 月 13 日</p>
       </Reveal>
 
       <div className="tide-md mt-10 space-y-8 text-ink-700">
@@ -60,12 +60,23 @@ export default function PrivacyPage() {
           <ul>
             <li>访问、更正您的账号与学习信息；</li>
             <li>导出您创建的笔记；</li>
-            <li>注销账号并删除关联的个人数据；</li>
+            <li>注销账号并删除学习内容、笔记附件、社交内容、设备标识、AI 对话等关联个人数据；</li>
             <li>在设置中调整个性化与通知偏好。</li>
           </ul>
         </Section>
 
-        <Section title="6. 联系我们">
+        <Section title="6. 注销后的删除与保留">
+          <p>
+            完成密码确认后，我们会立即吊销全部会话与权益，删除学习记录、笔记及附件、需求与社区内容、
+            设备 token、AI 对话和生成记录，并解除埋点与试听线索对账号的身份关联。
+          </p>
+          <p>
+            为处理退款、财务对账、优惠或积分核销、防欺诈及履行法定义务，订单、订阅、兑换和积分流水会在必要期限内
+            关联到一个无法登录且不含邮箱、手机号、昵称或密码的随机内部标识。保留期限届满后将按适用规则删除或进一步汇总匿名化。
+          </p>
+        </Section>
+
+        <Section title="7. 联系我们">
           <p>
             如需行使上述权利或对隐私有疑问，请发送邮件至 privacy@youdao.com。服务条款请参见
             <Link href="/terms" className="link-underline text-accent-700">《用户协议》</Link>。

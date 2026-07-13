@@ -74,10 +74,9 @@ beforeAll(async () => {
     SERVER_UP = false;
   }
   if (!SERVER_UP) {
-    // eslint-disable-next-line no-console
     console.warn(`[contract] 生产服务器不可达（${BASE}），契约测试整组跳过。`);
   }
-});
+}, 30_000);
 
 describe("契约 · 高危 DTO 形状", () => {
   it("DeskData: litToday/streak/recentNotes/myCourseCount/dueReviewCount", async ({ skip }) => {
@@ -138,8 +137,9 @@ describe("契约 · 高危 DTO 形状", () => {
     const courseId = courses?.courses?.[0]?.id;
     expect(courseId, "无可用 courseId").toBeTruthy();
     const detail = await getData(`/api/courses/${courseId}`);
-    const lessonId = detail?.course?.lessons?.[0]?.id;
+    const lessonId = detail?.lessons?.[0]?.id;
     expect(lessonId, "无可用 lessonId").toBeTruthy();
+    expect(detail.course, "course 不得嵌套原始 lessons 课件实体").not.toHaveProperty("lessons");
 
     const d = await getData(`/api/lessons/${lessonId}`);
     expectField(d, "access", "boolean");

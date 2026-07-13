@@ -69,8 +69,6 @@ function sceneWeight(scene: Scene): number {
   return w;
 }
 
-export const SIGNUP_BONUS = 100; // 注册赠送
-
 // —— 订阅月度积分：按档位差异化（v3.0 商业化）——
 // 设计意图：更长周期 / 更高价档位 → 月赠更多积分，强化「年卡更划算」的锚点。
 //   month(月卡)   → 300
@@ -130,20 +128,18 @@ export const getBalance = cache(async (userId: string): Promise<number> => {
   return acc?.balance ?? 0;
 });
 
-/** 确保账户存在（首次访问惰性创建 + 注册赠送）。返回账户。 */
+/**
+ * 确保账户存在（首次访问惰性创建）。返回账户。
+ *
+ * 未验证邮箱/手机号不得自动获得可交易积分：仅靠 IP 限流无法阻止分布式批量注册套利。
+ * 若未来恢复新客奖励，必须由“联系方式验证成功”事件显式调用 grantCredits，不能放回此通用入口。
+ */
 export async function ensureAccount(userId: string) {
   const existing = await prisma.creditAccount.findUnique({ where: { userId } });
   if (existing) return existing;
-  // 首建：送注册积分（记流水）
   try {
-    return await prisma.$transaction(async (tx) => {
-      const created = await tx.creditAccount.create({
-        data: { userId, balance: SIGNUP_BONUS, totalEarned: SIGNUP_BONUS },
-      });
-      await tx.creditLedger.create({
-        data: { userId, delta: SIGNUP_BONUS, type: "signup_bonus", balanceAfter: SIGNUP_BONUS, reason: "注册赠送" },
-      });
-      return created;
+    return await prisma.creditAccount.create({
+      data: { userId, balance: 0, totalEarned: 0 },
     });
   } catch (e) {
     // 并发首访：两请求同时建账，后到者撞 userId 唯一约束(P2002)——账户已被先到者建好，重读返回即可。

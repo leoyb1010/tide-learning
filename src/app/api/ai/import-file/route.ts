@@ -32,7 +32,7 @@ type PdfParseFn = (buf: Buffer, opts?: { max?: number }) => Promise<{ numpages: 
 let cachedPdfParse: PdfParseFn | null = null;
 function loadPdfParse(): PdfParseFn {
   if (cachedPdfParse) return cachedPdfParse;
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval, no-eval
+
   const nodeRequire = eval("require") as NodeRequire;
   cachedPdfParse = nodeRequire("pdf-parse/lib/pdf-parse.js") as PdfParseFn;
   return cachedPdfParse;

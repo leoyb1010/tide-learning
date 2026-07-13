@@ -157,6 +157,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
       }
     };
     document.addEventListener("keydown", onKey);
+    const returnFocus = hamburgerRef.current;
     // 焦点移入抽屉（关闭按钮为首个可聚焦项）。
     const raf = requestAnimationFrame(() =>
       drawerRef.current?.querySelector<HTMLElement>("button,a[href]")?.focus(),
@@ -166,7 +167,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
       document.removeEventListener("keydown", onKey);
       cancelAnimationFrame(raf);
       // 关闭后把焦点还给汉堡按钮（焦点不丢，WCAG 2.4.3）。
-      hamburgerRef.current?.focus?.();
+      returnFocus?.focus?.();
     };
   }, [drawerOpen]);
 

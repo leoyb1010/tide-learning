@@ -4,24 +4,20 @@ import { useEffect, useState } from "react";
 import { LoadingSkeleton, ErrorState, Badge } from "@/components/ui";
 import { useToast } from "@/components/Toast";
 import { DEMAND_STATUS } from "@/lib/format";
+import { DEMAND_TRANSITIONS } from "@/lib/demand-status";
 
 interface AdminDemand {
   id: string; title: string; description: string | null; category: string; status: string;
   riskLevel: string; officialReply: string | null; _count: { votes: number }; user: { nickname: string };
 }
 
-const NEXT_STATUS: Record<string, string[]> = {
-  pending_review: ["collecting", "rejected", "merged"],
-  collecting: ["evaluating", "rejected"],
-  evaluating: ["scheduled", "rejected"],
-  scheduled: ["producing"],
-  producing: ["launched"],
-};
+interface PublishedCourse { id: string; title: string; slug: string }
 
 export function AdminDemandManager() {
   const [demands, setDemands] = useState<AdminDemand[] | null>(null);
   const [error, setError] = useState(false);
   const [active, setActive] = useState<string | null>(null);
+  const [publishedCourses, setPublishedCourses] = useState<PublishedCourse[]>([]);
 
   async function load() {
     setError(false);
@@ -29,6 +25,7 @@ export function AdminDemandManager() {
       const json = await fetch("/api/admin/demands/pending").then((r) => r.json());
       if (!json.ok) throw new Error();
       setDemands(json.data.demands);
+      setPublishedCourses(json.data.publishedCourses ?? []);
     } catch { setError(true); }
   }
   useEffect(() => { load(); }, []);
@@ -52,14 +49,14 @@ export function AdminDemandManager() {
             </div>
             <button onClick={() => setActive(active === d.id ? null : d.id)} className="rounded-lg border border-ink-200 px-3 py-1.5 text-sm hover:border-accent-400">审核</button>
           </div>
-          {active === d.id && <DemandReviewPanel demand={d} allDemands={demands} onDone={() => { setActive(null); load(); }} />}
+          {active === d.id && <DemandReviewPanel demand={d} allDemands={demands} publishedCourses={publishedCourses} onDone={() => { setActive(null); load(); }} />}
         </div>
       ))}
     </div>
   );
 }
 
-function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand; allDemands: AdminDemand[]; onDone: () => void }) {
+function DemandReviewPanel({ demand, allDemands, publishedCourses, onDone }: { demand: AdminDemand; allDemands: AdminDemand[]; publishedCourses: PublishedCourse[]; onDone: () => void }) {
   const { toast } = useToast();
   const [status, setStatus] = useState(demand.status);
   const [reply, setReply] = useState(demand.officialReply ?? "");
@@ -68,7 +65,8 @@ function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand
   const [mergeTarget, setMergeTarget] = useState("");
   const [busy, setBusy] = useState(false);
   const [drafting, setDrafting] = useState(false);
-  const options = NEXT_STATUS[demand.status] ?? Object.keys(DEMAND_STATUS);
+  const [launchedCourseId, setLaunchedCourseId] = useState("");
+  const options = DEMAND_TRANSITIONS[demand.status] ?? [];
 
   // AI 起草官方回复：调 LLM 生成回复文案，覆盖填入 reply 输入框（运营可再改）。
   // AI 可能返回错误（402/503 等），一律 toast 提示、不崩溃。
@@ -93,11 +91,13 @@ function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand
   async function saveStatus() {
     if (status === "rejected" && !reason.trim()) { alert("未采纳必须填写原因"); return; }
     setBusy(true);
-    await fetch(`/api/admin/demands/${demand.id}/status`, {
+    const json = await fetch(`/api/admin/demands/${demand.id}/status`, {
       method: "PATCH", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ status, officialReply: reply, reason, riskLevel: risk }),
-    });
+      body: JSON.stringify({ status, officialReply: reply, reason, riskLevel: risk, launchedCourseId: status === "launched" ? launchedCourseId : undefined }),
+    }).then((r) => r.json()).catch(() => null);
     setBusy(false);
+    if (!json?.ok) { toast(json?.error ?? "保存失败", { tone: "warn" }); return; }
+    toast("需求状态已更新", { tone: "success" });
     onDone();
   }
   async function merge() {
@@ -134,7 +134,16 @@ function DemandReviewPanel({ demand, allDemands, onDone }: { demand: AdminDemand
       {status === "rejected" && (
         <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="未采纳原因（必填）" className="w-full rounded-lg border border-error/40 px-3 py-2 text-sm outline-none focus:border-error" />
       )}
-      <button disabled={busy} onClick={saveStatus} className="rounded-lg bg-accent-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-50">保存状态</button>
+      {status === "launched" && (
+        <label className="block text-sm">
+          <span className="text-ink-500">关联已发布课程（必选）</span>
+          <select value={launchedCourseId} onChange={(e) => setLaunchedCourseId(e.target.value)} className="mt-1 w-full rounded-lg border border-ink-200 px-3 py-2 text-sm" required>
+            <option value="">选择已发布课程</option>
+            {publishedCourses.map((course) => <option key={course.id} value={course.id}>{course.title}</option>)}
+          </select>
+        </label>
+      )}
+      <button disabled={busy || (status === "launched" && !launchedCourseId)} onClick={saveStatus} className="rounded-lg bg-accent-600 px-5 py-2 text-sm font-medium text-white disabled:opacity-50">保存状态</button>
 
       <div className="flex items-center gap-2 border-t border-ink-100 pt-3">
         <span className="text-sm text-ink-500">合并到：</span>

@@ -290,7 +290,7 @@ export default async function MarketProductPage({
             <span className="mono mb-3 block text-[11px] uppercase tracking-[0.1em] text-[var(--ink4)]">摊主 · 店铺</span>
             <div className="flex items-center gap-3">
               {stall.seller.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
+
                 <img
                   src={stall.seller.avatarUrl}
                   alt=""

@@ -56,6 +56,10 @@ final class AuthManager {
             KeychainStore.save(t)
         }
         user = u
+        // 登录成功是明确的用户动作：此时请求通知权限，并把 APNs token 经 AppDelegate 回传服务端。
+        #if os(iOS)
+        Task { await PushManager.shared.registerForPush() }
+        #endif
     }
 
     func logout() async {

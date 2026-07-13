@@ -74,16 +74,16 @@ const FAQ: { q: string; a: string }[] = [
     a: "订阅期内每月自动到账（月卡/连续包月 300、季卡 500、年卡 800）。积分用于 AI 造课、AI 笔记整理、模拟考试等能力，一门完整课程约消耗 40 积分。积分不随月清零，可累积使用。",
   },
   {
-    q: "支持开发票吗？",
-    a: "支持。付款后在「我的订阅 · 订单」里可申请电子普通发票，抬头与税号可自填，开具后发送到你的邮箱。",
+    q: "目前可以直接付款吗？",
+    a: "正式支付渠道仍在接入中。渠道开放前不会产生真实扣款；开放后，结算页会明确展示可用渠道、实付金额和服务周期。",
   },
   {
     q: "一个账号能几台设备用？",
-    a: "同一账号支持手机、平板、网页多端登录同步学习进度与笔记。为保护账号安全，异地异常登录会触发二次验证。",
+    a: "同一账号支持手机、平板、网页多端登录，并同步学习进度与笔记。请勿与他人共享账号或登录凭据。",
   },
   {
-    q: "学生有优惠吗？",
-    a: "有。完成学生认证后结算再享 8 折，可与部分优惠券叠加（以结算页最终折后价为准）。",
+    q: "优惠券什么时候生效？",
+    a: "只有结算页明确显示校验成功、优惠金额和最终实付价时才会生效；未显示的优惠不会在支付后补扣或追认。",
   },
 ];
 
@@ -91,10 +91,12 @@ export function PricingPlans({
   fullPlans,
   trackPlans,
   isLoggedIn,
+  redirectTo,
 }: {
   fullPlans: PlanData[];
   trackPlans: PlanData[];
   isLoggedIn: boolean;
+  redirectTo: string;
 }) {
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
@@ -233,6 +235,7 @@ export function PricingPlans({
                 couponCode={isHero ? appliedCode : undefined}
                 yearSaveCents={isHero ? yearSaveCents : 0}
                 yearPerDayCents={isHero ? yearPerDayCents : 0}
+                redirectTo={redirectTo}
               />
             </div>
           );
@@ -248,7 +251,7 @@ export function PricingPlans({
         <div className="stagger mx-auto grid max-w-[820px] items-stretch gap-5 sm:grid-cols-3">
           {trackPlans.map((p, i) => (
             <div key={p.id} style={{ "--i": i } as React.CSSProperties} className="flex">
-              <SubscriptionCard plan={p} isLoggedIn={isLoggedIn} redirectTo="/me/subscription" />
+              <SubscriptionCard plan={p} isLoggedIn={isLoggedIn} redirectTo={redirectTo} />
             </div>
           ))}
         </div>
@@ -311,6 +314,7 @@ function PlanCardShell({
   couponCode,
   yearSaveCents,
   yearPerDayCents,
+  redirectTo,
 }: {
   plan: PlanData;
   isHero: boolean;
@@ -319,6 +323,7 @@ function PlanCardShell({
   couponCode?: string;
   yearSaveCents: number;
   yearPerDayCents: number;
+  redirectTo: string;
 }) {
   return (
     <div className="relative flex w-full">
@@ -334,7 +339,7 @@ function PlanCardShell({
       <SubscriptionCard
         plan={plan}
         isLoggedIn={isLoggedIn}
-        redirectTo="/me/subscription"
+        redirectTo={redirectTo}
         couponCode={couponCode}
         variant={isHero ? "hero" : "plain"}
         perks={perks}

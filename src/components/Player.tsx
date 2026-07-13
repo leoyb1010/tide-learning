@@ -24,6 +24,7 @@ import { validateBlocks } from "@/lib/blocks";
 import { coursewareThemeAttr } from "@/lib/ai/themes";
 import { HtmlCourseware } from "./HtmlCourseware";
 import { trapFocus } from "./focus-trap";
+import { isPlayableVideoUrl } from "@/lib/media-url";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
 interface SubtitleCue { startSec: number; endSec: number; text: string }
@@ -87,7 +88,7 @@ export function Player({
   const nextHref = nextLessonId ? `/courses/${courseSlug}/learn/${nextLessonId}` : null;
   const nextLessonTitle = nextLessonId ? outline.find((o) => o.id === nextLessonId)?.title ?? null : null;
 
-  // §9 专注 2.0：入席仪式 + 番茄钟 + 会话记录 
+  // §9 专注 2.0：入席仪式 + 番茄钟 + 会话记录
   const [focusStage, setFocusStage] = useState<"idle" | "prep" | "active" | "review">("idle"); // 入席流程阶段
   const [focusGoal, setFocusGoal] = useState(""); // 本次目标
   const [pomodoroMin, setPomodoroMin] = useState(25); // 番茄钟时长（25/45/60）
@@ -105,9 +106,9 @@ export function Player({
   const slideNoteRef = useRef<NoteEditorHandle>(null); // 翻页课件全屏笔记浮层专用（独立于侧栏/Sheet 的 noteRef）
   // prep / review 全屏面板的边界：Tab focus trap 用（两者同一时刻至多挂一个）。
   const focusPanelRef = useRef<HTMLDivElement>(null);
-  // 仅当 videoUrl 指向真实媒体（.mp4/.m3u8/.webm）时用 <video>；
-  // MVP 的受控 mock 流（/api/stream 返回占位 JSON）继续走模拟播放器，保留品牌渐变画面，截帧走兜底帧。
-  const hasRealVideo = /\.(mp4|m3u8|webm)(\?|$)/i.test(lesson.videoUrl ?? "");
+  // 受控私有流没有文件扩展名，但仍是真实媒体；必须交给 <video> 才会发出 Range 请求。
+  // 非生产 mock asset 不匹配，继续走模拟播放器。
+  const hasRealVideo = isPlayableVideoUrl(lesson.videoUrl);
 
   // v3.1：块课的「视频课件」有独立时长（videoDurationSec），与图文阅读语义的 durationSec 隔离。
   // 播放机（模拟推进 / seek / 时间轴 / 进度）用「有效播放时长」：块课视频视图取 videoDurationSec，
@@ -817,7 +818,12 @@ export function Player({
       {!access ? (
         <div className="space-y-6">
           {VideoArea}
-          <Paywall remainingLessons={remainingLessons} courseTitle={courseTitle} isLoggedIn={isLoggedIn} />
+          <Paywall
+            remainingLessons={remainingLessons}
+            courseTitle={courseTitle}
+            isLoggedIn={isLoggedIn}
+            returnTo={`/courses/${courseSlug}/learn/${lesson.id}?t=${Math.floor(time)}`}
+          />
         </div>
       ) : (
         <div className={`grid min-w-0 gap-4 xl:gap-5 ${focus ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]"}`}>

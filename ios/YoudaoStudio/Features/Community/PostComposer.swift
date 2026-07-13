@@ -241,7 +241,7 @@ struct PostComposer: View {
             Button {
                 Haptics.light()
                 if reduceMotion { imageURLs.remove(at: index) }
-                else { withAnimation(StudioMotion.quick) { imageURLs.remove(at: index) } }
+                else { withAnimation(StudioMotion.quick) { _ = imageURLs.remove(at: index) } }
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 18))

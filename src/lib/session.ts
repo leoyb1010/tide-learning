@@ -72,6 +72,18 @@ export function validatePasswordStrength(pw: string): string | null {
   return null;
 }
 
+/** 登录/注册账号归一化：邮箱小写，手机号去空格/连字符，其余保留为预置用户名。 */
+export function normalizeAccountIdentifier(input: string):
+  | { kind: "email"; value: string }
+  | { kind: "phone"; value: string }
+  | { kind: "username"; value: string } {
+  const value = input.trim();
+  if (value.includes("@")) return { kind: "email", value: value.toLowerCase() };
+  const phone = value.replace(/[\s-]/g, "");
+  if (/^\+?\d{6,20}$/.test(phone)) return { kind: "phone", value: phone };
+  return { kind: "username", value };
+}
+
 /**
  * 常量假哈希（审计 2026-07-12 P2-9）：登录时账号不存在/已删时，对它跑一次等价的 verifyPassword，
  * 抹平「昂贵 scrypt 只在账号存在时才执行」造成的响应时序差，降低基于时序的用户枚举。

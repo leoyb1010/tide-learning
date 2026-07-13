@@ -1,7 +1,35 @@
 import SwiftUI
+import UIKit
+import UserNotifications
+
+@MainActor
+final class StudioAppDelegate: NSObject, UIApplicationDelegate {
+    func application(
+        _ application: UIApplication,
+        didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
+    ) -> Bool {
+        UNUserNotificationCenter.current().delegate = PushManager.shared
+        return true
+    }
+
+    func application(
+        _ application: UIApplication,
+        didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data
+    ) {
+        PushManager.shared.didRegister(deviceToken: deviceToken)
+    }
+
+    func application(
+        _ application: UIApplication,
+        didFailToRegisterForRemoteNotificationsWithError error: Error
+    ) {
+        PushManager.shared.didFailToRegister(error)
+    }
+}
 
 @main
 struct YoudaoStudioApp: App {
+    @UIApplicationDelegateAdaptor(StudioAppDelegate.self) private var appDelegate
     @State private var auth = AuthManager.shared
     // DEV：启动环境变量 DEV_TAB 指定初始 Tab（0书桌/1课程/2造课/3笔记/4我的），便于逐屏验证。
     @State private var router = TabRouter(

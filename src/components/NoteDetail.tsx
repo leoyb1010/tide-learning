@@ -188,7 +188,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
 
           {/* 截帧图（kind=capture） */}
           {note.kind === "capture" && note.captureUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={note.captureUrl}
               alt={title?.trim() || "笔记截帧"}

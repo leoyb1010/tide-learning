@@ -222,6 +222,7 @@ function Shell(props: {
       />
       {/* 潮汐波形：底部真实图形 */}
       <img
+        alt=""
         src={waveDataUri(size.w, p)}
         width={size.w}
         height={240}
@@ -232,7 +233,7 @@ function Shell(props: {
       <div style={{ display: "flex", alignItems: "center", gap: 12, zIndex: 1 }}>
         {emblemDataUri() ? (
           <div style={{ display: "flex", width: 34, height: 34, borderRadius: 10, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" }}>
-            <img src={emblemDataUri()!} width={28} height={28} style={{ width: 28, height: 28 }} />
+            <img src={emblemDataUri()!} alt="" width={28} height={28} style={{ width: 28, height: 28 }} />
           </div>
         ) : (
           <div style={{ display: "flex", width: 26, height: 26, borderRadius: 8, backgroundColor: p.red, alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: "#fff" }}>有</div>
@@ -255,7 +256,7 @@ function Shell(props: {
         {qr && (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <div style={{ display: "flex", padding: 8, borderRadius: 12, backgroundColor: "#ffffff" }}>
-              <img src={qr} width={76} height={76} style={{ width: 76, height: 76 }} />
+              <img src={qr} alt="扫码打开分享内容" width={76} height={76} style={{ width: 76, height: 76 }} />
             </div>
             <div style={{ display: "flex", fontSize: 14, color: p.ink3, fontFamily: MONO }}>扫码看看</div>
           </div>

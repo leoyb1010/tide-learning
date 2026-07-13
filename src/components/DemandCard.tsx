@@ -113,7 +113,7 @@ function SupporterStack({
             className="inline-flex h-6 w-6 items-center justify-center overflow-hidden rounded-full ring-2 ring-[var(--surface)]"
           >
             {u.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
+
               <img
                 src={u.avatarUrl}
                 alt=""

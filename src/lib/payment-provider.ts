@@ -2,7 +2,7 @@ import { createHmac, timingSafeEqual } from "crypto";
 
 /**
  * D1：支付渠道抽象。mock 为其中一个 provider（开发/演示用），
- * 真实微信 Native / 支付宝当面付 / Stripe 只需实现同一接口挂上。
+ * Stripe 已实现原生 Checkout/webhook；微信 Native / 支付宝当面付未实现前不注册 provider。
  * A1-1：所有渠道的 webhook 必须经 verifyWebhookSignature 校验后才处理。
  */
 
@@ -12,6 +12,7 @@ export interface CheckoutParams {
   amountCents: number;
   currency: string;
   subject: string;
+  billingPeriod: string;
 }
 
 export interface CheckoutTicket {
@@ -25,9 +26,19 @@ export interface CheckoutTicket {
 
 export interface PaymentProvider {
   channel: string;
+  signatureHeader: string;
   createCheckout(params: CheckoutParams): Promise<CheckoutTicket>;
   /** 校验 webhook 签名，返回是否可信。 */
   verifyWebhookSignature(rawBody: string, signature: string | null): boolean;
+  parseWebhook(rawBody: string): NormalizedPaymentWebhook | null;
+}
+
+export interface NormalizedPaymentWebhook {
+  eventType: "payment.succeeded" | "payment.refunded";
+  externalId: string;
+  externalOrderId: string;
+  amountCents: number;
+  currency: string;
 }
 
 /**
@@ -56,9 +67,10 @@ function safeEqualHex(a: string, b: string): boolean {
   return timingSafeEqual(ab, bb);
 }
 
-/** Mock provider：模拟微信/支付宝/Stripe，签名机制与真实渠道等价（HMAC）。 */
+/** Mock provider：仅供非生产演示业务状态机，不伪装任何真实商户渠道。 */
 class MockProvider implements PaymentProvider {
   constructor(public channel: string) {}
+  signatureHeader = "x-tide-signature";
 
   async createCheckout(params: CheckoutParams): Promise<CheckoutTicket> {
     return {
@@ -79,21 +91,113 @@ class MockProvider implements PaymentProvider {
       return false;
     }
   }
+
+  parseWebhook(rawBody: string): NormalizedPaymentWebhook | null {
+    try {
+      const body = JSON.parse(rawBody) as Partial<NormalizedPaymentWebhook>;
+      if (
+        (body.eventType !== "payment.succeeded" && body.eventType !== "payment.refunded") ||
+        !body.externalId || !body.externalOrderId || !Number.isSafeInteger(body.amountCents) ||
+        (body.amountCents ?? -1) < 0 || typeof body.currency !== "string"
+      ) return null;
+      return { ...body, currency: body.currency.toUpperCase() } as NormalizedPaymentWebhook;
+    } catch {
+      return null;
+    }
+  }
 }
 
-const PROVIDERS: Record<string, PaymentProvider> = {
-  mock: new MockProvider("mock"),
-  web_wechat: new MockProvider("web_wechat"),
-  web_alipay: new MockProvider("web_alipay"),
-  stripe: new MockProvider("stripe"),
-};
+function requiredEnv(name: string): string {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`支付配置缺失：${name}`);
+  return value;
+}
+
+class StripeProvider implements PaymentProvider {
+  channel = "stripe";
+  signatureHeader = "stripe-signature";
+
+  async createCheckout(params: CheckoutParams): Promise<CheckoutTicket> {
+    if (params.billingPeriod === "month_recurring") {
+      throw new Error("Stripe 自动续费仍需配置 Price/Subscription webhook；请先选择一次性套餐");
+    }
+    if (!Number.isSafeInteger(params.amountCents) || params.amountCents <= 0) {
+      throw new Error("Stripe 订单金额必须为正整数分");
+    }
+    const secretKey = requiredEnv("STRIPE_SECRET_KEY");
+    const site = new URL(requiredEnv("NEXT_PUBLIC_SITE_URL"));
+    if (site.protocol !== "https:" && site.hostname !== "localhost" && site.hostname !== "127.0.0.1") {
+      throw new Error("NEXT_PUBLIC_SITE_URL 必须为 HTTPS 站点");
+    }
+    const form = new URLSearchParams({
+      mode: "payment",
+      client_reference_id: params.externalOrderId,
+      success_url: new URL("/me/subscription?checkout=success", site).toString(),
+      cancel_url: new URL("/pricing?checkout=canceled", site).toString(),
+      "metadata[external_order_id]": params.externalOrderId,
+      "payment_intent_data[metadata][external_order_id]": params.externalOrderId,
+      "line_items[0][quantity]": "1",
+      "line_items[0][price_data][currency]": params.currency.toLowerCase(),
+      "line_items[0][price_data][unit_amount]": String(params.amountCents),
+      "line_items[0][price_data][product_data][name]": params.subject.slice(0, 120),
+    });
+    const response = await fetch("https://api.stripe.com/v1/checkout/sessions", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${secretKey}`,
+        "content-type": "application/x-www-form-urlencoded",
+        "idempotency-key": `tide-${params.orderId}`,
+      },
+      body: form,
+      signal: AbortSignal.timeout(15_000),
+    });
+    const json = await response.json().catch(() => ({})) as { id?: string; url?: string };
+    if (!response.ok || !json.id || !json.url) throw new Error(`Stripe 创建收银台失败（HTTP ${response.status}）`);
+    return { channel: this.channel, externalOrderId: params.externalOrderId, amountCents: params.amountCents, payUrl: json.url };
+  }
+
+  verifyWebhookSignature(rawBody: string, signature: string | null): boolean {
+    if (!signature) return false;
+    const parts = signature.split(",").map((x) => x.trim().split("=", 2));
+    const timestamp = Number(parts.find(([k]) => k === "t")?.[1]);
+    const candidates = parts.filter(([k]) => k === "v1").map(([, v]) => v);
+    if (!Number.isSafeInteger(timestamp) || Math.abs(Date.now() / 1000 - timestamp) > 300 || candidates.length === 0) return false;
+    try {
+      const expected = createHmac("sha256", requiredEnv("STRIPE_WEBHOOK_SECRET")).update(`${timestamp}.${rawBody}`).digest("hex");
+      return candidates.some((candidate) => safeEqualHex(expected, candidate));
+    } catch {
+      return false;
+    }
+  }
+
+  parseWebhook(rawBody: string): NormalizedPaymentWebhook | null {
+    try {
+      const event = JSON.parse(rawBody) as {
+        id?: string; type?: string;
+        data?: { object?: { payment_status?: string; refunded?: boolean; amount_total?: number; amount_refunded?: number; currency?: string; client_reference_id?: string; metadata?: Record<string, string> } };
+      };
+      const object = event.data?.object;
+      const externalOrderId = object?.metadata?.external_order_id || object?.client_reference_id;
+      if (!event.id || !externalOrderId || !object?.currency) return null;
+      if ((event.type === "checkout.session.completed" || event.type === "checkout.session.async_payment_succeeded") && object.payment_status === "paid" && Number.isSafeInteger(object.amount_total)) {
+        return { eventType: "payment.succeeded", externalId: event.id, externalOrderId, amountCents: object.amount_total!, currency: object.currency.toUpperCase() };
+      }
+      if (event.type === "charge.refunded" && object.refunded === true && Number.isSafeInteger(object.amount_refunded)) {
+        return { eventType: "payment.refunded", externalId: event.id, externalOrderId, amountCents: object.amount_refunded!, currency: object.currency.toUpperCase() };
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+}
+
+const MOCK_PROVIDER = new MockProvider("mock");
+const STRIPE_PROVIDER = new StripeProvider();
 
 /** 未知渠道返回 null —— webhook route 应据此返回 400，绝不回退到 mock provider。 */
 export function getProvider(channel: string): PaymentProvider | null {
-  // P0：mock 渠道生产门禁——生产默认不可用，仅当显式置 MOCK_PAY_ENABLED=1 时放行
-  // （与 mock-pay / recharge 路由同一闸门），防止生产环境经 mock 渠道伪造支付。
-  if (channel === "mock" && process.env.NODE_ENV === "production" && process.env.MOCK_PAY_ENABLED !== "1") {
-    return null;
-  }
-  return PROVIDERS[channel] ?? null;
+  if (channel === "stripe") return STRIPE_PROVIDER;
+  if (channel === "mock" && process.env.NODE_ENV !== "production") return MOCK_PROVIDER;
+  return null;
 }

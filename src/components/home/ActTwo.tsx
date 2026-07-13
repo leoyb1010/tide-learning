@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, useScroll, useTransform, AnimatePresence, type MotionValue } from "framer-motion";
 import {
   Books,
@@ -79,9 +80,8 @@ const DESKS: DeskSpec[] = [
 ];
 
 export function ActTwo({ tracks, totalCourses }: { tracks: TrackCardData[]; totalCourses: number }) {
-  const { immersive } = useStudyRoom();
-  if (!immersive) return <ActTwoStatic tracks={tracks} totalCourses={totalCourses} />;
-  return <ActTwoImmersive tracks={tracks} totalCourses={totalCourses} />;
+  // 固定使用稳定高度的三卡布局，避免 hydration 后在 190vh sticky 舞台与普通布局间切换造成 CLS。
+  return <ActTwoStatic tracks={tracks} totalCourses={totalCourses} />;
 }
 
 /** 桌面演示区：按桌位渲染对应的活演示。 */
@@ -326,13 +326,13 @@ function MiniShelf({ tracks, totalCourses }: { tracks: TrackCardData[]; totalCou
       >
         {/* 写实书脊排图：16:9 裁切成一条书架，hover 时整排轻微放大（像凑近看书架） */}
         <div className="relative aspect-[16/7] w-full overflow-hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src="/textures/book-spines-row.jpg"
             alt=""
             aria-hidden
-            loading="lazy"
-            decoding="async"
+            fill
+            sizes="(max-width: 639px) 320px, 420px"
+            quality={68}
             className="mini-shelf-img h-full w-full origin-bottom object-cover object-bottom transition-transform duration-500 ease-out will-change-transform group-hover/shelf:scale-[1.04]"
           />
           {/* 底部极淡渐隐，让书脊底与卡片背景软衔接（不压住书本） */}

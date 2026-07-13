@@ -186,7 +186,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
                 onClick={() => setAvatarUrl(src)}
                 label="选择头像"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
+                { }
                 <img src={src} alt="" className="h-full w-full rounded-full object-cover" />
               </AvatarChoice>
             ))}

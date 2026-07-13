@@ -2,6 +2,8 @@ import { PrismaClient } from "@prisma/client";
 import { randomBytes, scryptSync } from "crypto";
 // 复用 App 的块校验：种子里的 ai_block 内容也走同一道白名单，确保入库即合法（含 image src 白名单）。
 import { validateBlocks } from "../src/lib/blocks";
+import { installPrivateMediaFromPath } from "../src/lib/private-media";
+import path from "node:path";
 
 const prisma = new PrismaClient();
 
@@ -47,8 +49,8 @@ type LessonSeed = {
   isFree?: boolean; articleMd?: string; live?: boolean; seat?: number;
   // ai_block 课件：结构化块数组（JSON.stringify 后写入 blocksJson）。
   blocks?: unknown[];
-  // 视频课件通路（v3.1）：块课可另挂一版「视频课件」。填 videoUrl(站内 /videos/*.mp4) + videoGenStatus:"ready" 即可真播。
-  videoUrl?: string; videoGenStatus?: string; videoDurationSec?: number;
+  // 视频课件通路（v3.1）：真视频由下方 SEED_VIDEO_BY_LESSON 安装到私有目录。
+  videoGenStatus?: string; videoDurationSec?: number;
 };
 type CourseSeed = {
   slug: string; title: string; subtitle: string; description: string;
@@ -141,7 +143,7 @@ const courses: CourseSeed[] = [
       {
         title: "第 2 讲 · 给 AI 派活的四段式提示词", summary: "图文 + 视频双课件", contentType: "ai_block",
         durationSec: 540, blocks: aiOfficeBlocks,
-        videoUrl: "/videos/lessons/lesson-ai-office-005.mp4", videoGenStatus: "ready", videoDurationSec: 540,
+        videoGenStatus: "ready", videoDurationSec: 540,
       },
       { title: "第 3 讲 · 用 AI 写邮件", summary: "结构化提示词", durationSec: 720 },
       { title: "第 4 讲 · 会议纪要自动化", summary: "录音到纪要", durationSec: 810 },
@@ -346,14 +348,22 @@ async function main() {
   }
 
   // ---------- 课程 ----------
-  // 已就位的真实教学视频：文件名对应课程 slug，只有这 4 门有真片源。
-  // 给对应课程的「第 1 讲」（isFree 免费试学那节）填 videoUrl，让学习台能真播放。
-  const LESSON_VIDEO_BY_SLUG: Record<string, string> = {
-    "oral-smallclass-001": "/videos/lessons/lesson-oral-smallclass-001.mp4",
-    "ai-office-005": "/videos/lessons/lesson-ai-office-005.mp4",
-    "silver-oral-003": "/videos/lessons/lesson-silver-oral-003.mp4",
-    "anti-fraud-007": "/videos/lessons/lesson-anti-fraud-007.mp4",
+  // 真实教学片源不再放 public/：seed 将它们复制到 .data/media，每个章节使用独立 assetId。
+  // 即使两节课暂时共用同一源文件，鉴权也不会因「免费节 + 付费节共享 asset」而歧义。
+  const SEED_VIDEO_BY_LESSON: Record<string, { file: string; assetId: string }> = {
+    "oral-smallclass-001:0": { file: "lesson-oral-smallclass-001.mp4", assetId: "media_1e7a9d54-14cc-4ce9-88bd-3d50615ecfe1" },
+    "silver-oral-003:0": { file: "lesson-silver-oral-003.mp4", assetId: "media_29d71cfb-eb76-42c1-818e-f74d1d1026a5" },
+    "ai-office-005:0": { file: "lesson-ai-office-005.mp4", assetId: "media_39264f0d-d25c-49d9-a236-b25d76ec0aec" },
+    "ai-office-005:1": { file: "lesson-ai-office-005.mp4", assetId: "media_45cbed77-e265-44d6-b73d-a0063f6ec427" },
+    "anti-fraud-007:0": { file: "lesson-anti-fraud-007.mp4", assetId: "media_5e7cc35d-a461-426a-b293-4c5c36043194" },
   };
+  for (const seedVideo of Object.values(SEED_VIDEO_BY_LESSON)) {
+    await installPrivateMediaFromPath({
+      sourcePath: path.join(process.cwd(), "prisma", "seed-media", seedVideo.file),
+      assetId: seedVideo.assetId,
+      fileName: seedVideo.file,
+    });
+  }
   const videoFilledCourses: string[] = [];
   const courseIds: Record<string, string> = {};
   const lessonIdMap: Record<string, string[]> = {};
@@ -375,21 +385,19 @@ async function main() {
     for (let i = 0; i < c.lessons.length; i++) {
       const l = c.lessons[i];
       const type = l.live ? "live" : l.contentType ?? "video";
-      // 真实片源：仅第 1 讲（免费试学节）、且该课有对应视频文件时填直链，让学习台真播放。
-      const lessonZeroVideo = i === 0 && (l.isFree ?? false) ? LESSON_VIDEO_BY_SLUG[c.slug] ?? null : null;
+      const privateVideo = SEED_VIDEO_BY_LESSON[`${c.slug}:${i}`] ?? null;
       // ai_block 课件：校验块数组后 stringify 入库；非块课不写 blocksJson。
       const blocksJson =
         type === "ai_block" && Array.isArray(l.blocks)
           ? JSON.stringify({ version: 1, blocks: validateBlocks(l.blocks) })
           : null;
-      // 视频课件通路：块课可显式挂 videoUrl + videoGenStatus:"ready"（真播）。否则沿用第 1 讲兜底片源。
-      const realVideoUrl = l.videoUrl ?? lessonZeroVideo;
       const lesson = await prisma.lesson.create({
         data: {
           courseId: created.id, title: l.title, summary: l.summary, sortOrder: i,
           contentType: type,
-          videoAssetId: type === "video" || type === "live" ? `asset_${c.slug}_${i}` : null,
-          videoUrl: realVideoUrl,
+          // 只写真实安装到私有目录的资源；其余课程走图文/模拟展示，绝不落一个生产必 404 的假 assetId。
+          videoAssetId: privateVideo?.assetId ?? null,
+          videoUrl: null,
           blocksJson,
           videoGenStatus: l.videoGenStatus ?? null,
           videoDurationSec: l.videoDurationSec ?? null,
@@ -400,7 +408,7 @@ async function main() {
         },
       });
       lessonIdMap[c.slug].push(lesson.id);
-      if (realVideoUrl) videoFilledCourses.push(c.slug);
+      if (privateVideo) videoFilledCourses.push(c.slug);
     }
     for (const log of c.updateLogs) {
       await prisma.courseUpdateLog.create({
@@ -985,7 +993,7 @@ async function main() {
   console.log(`   字幕 ${subtitleCount} 条 · 笔记 ${noteCount} 条（截帧 ${captureSeq} 张真实截图）· 成就 ${achievementSeeds.length} 个（demo 解锁 ${demoUnlocked.length}）`);
   console.log(`   需求阶段 ${stageCount} 条 · 关注 ${followCount} 条 · 潮汐日历 ${streakDayCount} 天 · 优惠券 TIDE20`);
   console.log(`   广场帖子 ${postCount} 条（真实点赞 ${postLikeCount} · 评论 ${postCommentCount}，计数按真实行数重算）· 社区用户 ${communityUsers.length} 位（头像 avatar-4~12）`);
-  console.log(`   真实视频已填入 ${[...new Set(videoFilledCourses)].length} 门课首讲：${[...new Set(videoFilledCourses)].join(", ")}`);
+  console.log(`   私有真实视频已填入 ${videoFilledCourses.length} 个章节 / ${[...new Set(videoFilledCourses)].length} 门课：${[...new Set(videoFilledCourses)].join(", ")}`);
   console.log(`   课程 ${courses.length} 门（有道英语板块 + 潮汐 AI/生活）`);
   console.log(`   套餐：全站(月/季/年) + 单赛道(口语/银发/AI) · 线索 ${leadSeeds.length} 条`);
   // 生产下体验账号口令已随机化，不打印弱口令凭据（admin 密码策略见上方 SEED_ADMIN_PASSWORD 段）。

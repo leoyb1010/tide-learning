@@ -101,7 +101,7 @@ export function NoteTimeline({ notes, onToggleStar, onDelete }: TimelineProps) {
 
                         <div className="flex items-start gap-3">
                           {isCapture && n.captureUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
+
                             <img
                               src={n.captureUrl}
                               alt={n.title ?? "截帧"}

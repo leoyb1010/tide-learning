@@ -964,7 +964,7 @@ function useComposeOptions(open: boolean) {
  * 采集面板：四入口 [随手写][链接导入][图片][附件]。
  * - 随手写：POST /api/notes source=manual（v3.1 智能化：可选笔记本 / 标签多选 / 快捷关联课程）。
  * - 链接导入：POST /api/notes/import-url，服务端抓取正文落库。
- * - 图片 / 附件：POST /api/notes/attachments（multipart），存 public/uploads 并挂/建笔记。
+ * - 图片 / 附件：POST /api/notes/attachments（multipart），存私有目录并通过本人鉴权 API 读取。
  *
  * prefillNotebookId：笔记本详情页「在此笔记本记一条」预填该笔记本（弹窗仅走随手写，直接落入该本）。
  * 导出：供笔记本详情页的 client 包装组件（NotebookComposeButton）复用同一弹窗。
@@ -1548,7 +1548,7 @@ function UploadPanel({ kind, onCreated }: { kind: "image" | "attach"; onCreated:
         <div className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--card),var(--inner-hi)]">
           <div className="flex items-center gap-3">
             {isDoneImage ? (
-              // eslint-disable-next-line @next/next/no-img-element
+
               <img
                 src={done.attachment.path}
                 alt={done.attachment.fileName}

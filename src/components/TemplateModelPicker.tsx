@@ -32,6 +32,11 @@ interface LockedModelOpt {
   desc: string;
 }
 
+const TEMPLATE_THUMBNAILS: Record<string, string> = {
+  language_immersion: "/templates/template-story.jpg",
+  kids_bright: "/templates/template-workshop.jpg",
+};
+
 /**
  * 造课「课件模板 + 生成模型」选择器（造课 Tab 与导入 Tab 共用）。
  * 数据来自 GET /api/ai/models（按订阅态过滤模型；模板全员可选）。
@@ -85,7 +90,7 @@ export function TemplateModelPicker({
     return () => {
       alive = false;
     };
-  }, []);
+  }, [model, onAvailability, qualityTier, setModel, setQualityTier]);
 
   const showModelPicker = models.length > 1 || lockedModels.length > 0;
 
@@ -120,9 +125,9 @@ export function TemplateModelPicker({
                 )}
                 {/* 缩略图（生图资产）优先；加载失败回落图标 */}
                 {!thumbFail[t.key] ? (
-                  // eslint-disable-next-line @next/next/no-img-element
+
                   <img
-                    src={`/templates/template-${t.key}.jpg`}
+                    src={TEMPLATE_THUMBNAILS[t.key] ?? `/templates/template-${t.key}.jpg`}
                     alt=""
                     loading="lazy"
                     draggable={false}

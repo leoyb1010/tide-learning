@@ -241,7 +241,7 @@ export function MarketStallCard({
         {/* 摊主：头像 + 昵称 + 等级徽章（摊主立在卡上） */}
         <div className="mt-3 flex items-center gap-2 rounded-[12px] bg-[var(--surface-inset)] px-2.5 py-2 shadow-[var(--inner-hi)]">
           {stall.seller.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={stall.seller.avatarUrl}
               alt=""

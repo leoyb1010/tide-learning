@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: process.cwd(),
   // 三端复用预留：所有业务逻辑集中在 src/lib 与 API 层，
   // Web 视图层与后续 iOS/Android 客户端共享同一套服务端 entitlement。
 
@@ -27,13 +28,16 @@ const nextConfig: NextConfig = {
   },
 
   // 安全响应头 + 静态资源缓存。self-host next start 生效。
-  // CSP 仍需专项梳理 Next 内联脚本、课件 srcDoc iframe 与现有内联样式，避免直接强上导致功能损坏。
   async headers() {
     return [
       {
         // 全站安全头：禁点击劫持、禁 MIME 嗅探、收敛 Referer 泄露。
         source: "/:path*",
         headers: [
+          {
+            key: "Content-Security-Policy",
+            value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self'",
+          },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CheckCircle, Info, Warning, X } from "@phosphor-icons/react";
 import { SPRING_FIRM } from "./motion";
@@ -34,10 +34,10 @@ const TONE_CLS: Record<ToastTone, string> = {
 
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
-  let idSeq = 0;
+  const idSeq = useRef(0);
 
   const toast = useCallback<ToastApi["toast"]>((message, opts) => {
-    const id = Date.now() + idSeq++;
+    const id = Date.now() + idSeq.current++;
     const tone = opts?.tone ?? "success";
     setItems((xs) => [...xs.slice(-2), { id, message, tone, action: opts?.action }]); // 最多堆叠 3
     const dur = opts?.duration ?? 4000;

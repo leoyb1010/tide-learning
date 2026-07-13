@@ -430,10 +430,8 @@ export function DoorOpen({ children, className }: { children: ReactNode; classNa
   const reduce = useReducedMotion();
   return (
     <motion.div
-      className={`relative ${className ?? ""}`}
-      initial={reduce ? false : { opacity: 0, scale: 1.03 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={reduce ? { duration: 0 } : { duration: 1.0, ease: EASE }}
+      className={className}
+      initial={false}
     >
       {/* 开门光缝：一道从中缝向两侧推开的暖光，只在开场播一次（reduce 不渲染） */}
       {!reduce && (

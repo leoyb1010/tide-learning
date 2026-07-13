@@ -9,6 +9,7 @@ import { track } from "@/lib/analytics";
 import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { buildExcerpt } from "@/lib/format";
+import { PRIVATE_UPLOAD_DIR, attachmentDownloadPath } from "@/lib/private-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -27,10 +28,6 @@ const ALLOWED: Record<string, string> = {
   "text/plain": "txt",
   "text/markdown": "md",
 };
-
-// 磁盘写入根目录：env UPLOAD_DIR 可配（部署时指向持久卷，静态回源由 nginx 负责）；
-// 默认沿用 <cwd>/public/uploads。返回给客户端的 URL 路径固定为 /uploads/...，与磁盘位置解耦。
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), "public", "uploads");
 
 function safeExt(mime: string, fileName: string): string {
   if (ALLOWED[mime]) return ALLOWED[mime];
@@ -64,7 +61,7 @@ function matchesMagic(mime: string, bytes: Buffer): boolean {
  * 接受两种载荷：
  *   1) multipart/form-data：字段 file（必填）、noteId?（挂到已有笔记）、kind?（image|file）
  *   2) application/json：{ fileName, mimeType, dataBase64, noteId?, kind? }（base64 内联）
- * 存储：mock 落到 public/uploads/，path 记 /uploads/xxx。
+ * 存储：落到非 public 私有目录，读取必须经过本人鉴权下载路由。
  * 若未提供 noteId 则新建一条 kind="capture" 笔记挂该附件（图片可预览）。
  * 文本类（txt/md）抽取前 2k 字写入 NoteAttachment.summary。≤10MB。
  */
@@ -133,13 +130,14 @@ export async function POST(req: NextRequest) {
       summary = bytes.toString("utf-8").slice(0, TEXT_PREVIEW_LEN).trim() || null;
     }
 
-    // 落盘：mock 存储到 public/uploads/
+    // 落盘到非 public 目录；随机存储名不作为可直接访问 URL。
     const ext = safeExt(mimeType, fileName);
     const storedName = `${randomUUID()}.${ext}`;
-    const diskPath = path.join(UPLOAD_DIR, storedName);
-    await mkdir(UPLOAD_DIR, { recursive: true });
+    const attachmentId = randomUUID();
+    const diskPath = path.join(PRIVATE_UPLOAD_DIR, storedName);
+    const downloadPath = attachmentDownloadPath(attachmentId);
+    await mkdir(PRIVATE_UPLOAD_DIR, { recursive: true });
     await writeFile(diskPath, bytes);
-    const publicPath = `/uploads/${storedName}`;
 
     // 事务：（可选）新建挂载笔记 → 建附件。新建笔记时做免费额度校验。
     // 事务失败（如 402 配额超限）时清理已落盘文件，不留孤儿。
@@ -167,7 +165,7 @@ export async function POST(req: NextRequest) {
               excerpt: buildExcerpt(contentMd),
               source: "attachment",
               kind: isImage ? "capture" : "text",
-              captureUrl: isImage ? publicPath : null,
+              captureUrl: isImage ? downloadPath : null,
             },
             select: { id: true },
           });
@@ -177,11 +175,12 @@ export async function POST(req: NextRequest) {
 
         const attachment = await tx.noteAttachment.create({
           data: {
+            id: attachmentId,
             noteId: noteId!,
             fileName: fileName.slice(0, 255),
             mimeType,
             size: bytes.length,
-            path: publicPath,
+            path: storedName,
             summary,
           },
           select: { id: true, fileName: true, mimeType: true, size: true, path: true, summary: true },
@@ -202,7 +201,7 @@ export async function POST(req: NextRequest) {
     return ok({
       noteId,
       createdNote: createdNoteId != null,
-      attachment: result.attachment,
+      attachment: { ...result.attachment, path: downloadPath },
     });
   });
 }

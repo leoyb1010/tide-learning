@@ -12,13 +12,15 @@ export default async function AdminDashboard() {
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const premiumStatuses = ["active", "trial", "grace_period", "canceled_but_active"];
 
-  const [views, registers, trials, subs, playAgg, notes, demands, votesAgg, refunds, checkouts, leads, viewEvents, subsByScope, premiumCourses, premiumHits, deterministicHits, rejectGroups, recentRendered] = await Promise.all([
+  const [views, registers, trials, activeSubs, weeklyLearners, notes, demands, votesAgg, refunds, checkouts, leads, viewEvents, subsForScope, premiumCourses, premiumHits, deterministicHits, rejectGroups, recentRendered] = await Promise.all([
     prisma.analyticsEvent.count({ where: { eventName: "homepage_view" } }),
     prisma.user.count({ where: { role: "user" } }),
     prisma.analyticsEvent.count({ where: { eventName: "lesson_trial_start" } }),
-    prisma.subscription.count({ where: { status: { in: ["active", "trial", "grace_period", "canceled_but_active"] } } }),
-    prisma.learningProgress.aggregate({ _sum: { progressSec: true } }),
+    prisma.subscription.findMany({ where: { status: { in: premiumStatuses } }, distinct: ["userId"], select: { userId: true } }),
+    prisma.learningProgress.findMany({ where: { lastPlayedAt: { gte: weekAgo } }, distinct: ["userId"], select: { userId: true } }),
     prisma.note.count({ where: { deletedAt: null } }),
     prisma.demand.count(),
     prisma.demandVote.aggregate({ _sum: { voteCount: true } }),
@@ -26,7 +28,7 @@ export default async function AdminDashboard() {
     prisma.analyticsEvent.count({ where: { eventName: "checkout_start" } }),
     prisma.lead.findMany({ select: { source: true, status: true } }),
     prisma.analyticsEvent.findMany({ where: { eventName: "homepage_view" }, select: { propertiesJson: true } }),
-    prisma.subscription.groupBy({ by: ["scope"], where: { status: { in: ["active", "trial", "grace_period", "canceled_but_active"] } }, _count: true }),
+    prisma.subscription.findMany({ where: { status: { in: premiumStatuses } }, select: { userId: true, scope: true } }),
     prisma.course.count({ where: { qualityTier: "premium" } }),
     prisma.lesson.count({ where: { renderEngine: "llm" } }),
     prisma.lesson.count({ where: { renderEngine: "deterministic" } }),
@@ -48,18 +50,26 @@ export default async function AdminDashboard() {
     };
   }
   // 分赛道订阅分布（人群/赛道维度）
-  const scopeCounts = subsByScope.map((s) => ({ scope: s.scope, count: s._count as unknown as number }));
+  const scopeUsers = new Map<string, Set<string>>();
+  for (const sub of subsForScope) {
+    const users = scopeUsers.get(sub.scope) ?? new Set<string>();
+    users.add(sub.userId);
+    scopeUsers.set(sub.scope, users);
+  }
+  const scopeCounts = [...scopeUsers].map(([scope, users]) => ({ scope, count: users.size }));
 
+  const activeSubscriberIds = new Set(activeSubs.map((s) => s.userId));
+  const subs = activeSubscriberIds.size;
+  const weeklyActivePaidLearners = new Set(weeklyLearners.filter((p) => activeSubscriberIds.has(p.userId)).map((p) => p.userId)).size;
   const convRate = registers > 0 ? ((subs / registers) * 100).toFixed(1) : "0";
-  const playHours = ((playAgg._sum.progressSec ?? 0) / 3600).toFixed(1);
 
   const cards = [
     { label: "访问（首页曝光）", value: views },
     { label: "注册用户", value: registers },
     { label: "试学次数", value: trials },
-    { label: "订阅数", value: subs },
+    { label: "有效订阅用户", value: subs },
     { label: "注册→订阅转化", value: `${convRate}%` },
-    { label: "课程播放时长", value: `${playHours} h` },
+    { label: "近 7 天付费学习用户", value: weeklyActivePaidLearners },
     { label: "笔记创建", value: notes },
     { label: "需求提交", value: demands },
     { label: "投票数", value: votesAgg._sum.voteCount ?? 0 },
@@ -70,7 +80,7 @@ export default async function AdminDashboard() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-ink-950">数据看板</h1>
-        <p className="mt-1 text-sm text-ink-400">北极星指标：付费订阅用户的周学习时长 · 发起支付 {checkouts} 次</p>
+        <p className="mt-1 text-sm text-ink-400">北极星指标：近 7 天有真实进度写入的有效订阅用户 · 发起支付 {checkouts} 次</p>
       </div>
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {cards.map((c) => (

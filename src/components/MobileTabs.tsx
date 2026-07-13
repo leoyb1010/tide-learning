@@ -88,6 +88,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
       }
     };
     document.addEventListener("keydown", onKey);
+    const returnFocus = moreBtnRef.current;
     const raf = requestAnimationFrame(() =>
       sheetRef.current?.querySelector<HTMLElement>("a[href],button")?.focus(),
     );
@@ -95,7 +96,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
       document.body.style.overflow = prevOverflow;
       document.removeEventListener("keydown", onKey);
       cancelAnimationFrame(raf);
-      moreBtnRef.current?.focus?.();
+      returnFocus?.focus?.();
     };
   }, [moreOpen]);
 

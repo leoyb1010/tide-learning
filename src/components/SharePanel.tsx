@@ -400,7 +400,7 @@ function SharePanelModal({
                 </div>
               ) : (
                 // 预览图非交互装饰，动作按钮承载语义；这里用 alt 传达内容。
-                // eslint-disable-next-line @next/next/no-img-element
+
                 <img
                   src={imgSrc}
                   alt={`${title}预览图`}

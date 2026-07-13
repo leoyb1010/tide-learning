@@ -13,7 +13,6 @@ const EXAMPLE_PAY_SECRETS: Record<string, string> = {
   PAY_MOCK_SECRET: "dev-mock-secret",
   PAY_WEB_WECHAT_SECRET: "",
   PAY_WEB_ALIPAY_SECRET: "",
-  PAY_STRIPE_SECRET: "",
 };
 
 function validateProductionEnv(): void {
@@ -30,12 +29,21 @@ function validateProductionEnv(): void {
     }
   }
 
-  // (b) mock 渠道显式启用时，密钥不得为空或示例值——已知密钥可伪造 webhook（0 元开通权益）。
+  // (b) 生产永不允许 mock 渠道。演示支付必须使用独立的非生产部署。
   if (process.env.MOCK_PAY_ENABLED === "1") {
-    const mockSecret = process.env.PAY_MOCK_SECRET;
-    if (!mockSecret || mockSecret === EXAMPLE_PAY_SECRETS.PAY_MOCK_SECRET) {
-      errors.push("MOCK_PAY_ENABLED=1 时 PAY_MOCK_SECRET 不得为空或示例值 dev-mock-secret，请换强随机密钥");
-    }
+    errors.push("生产环境禁止 MOCK_PAY_ENABLED=1；请在独立非生产环境演示 mock 支付");
+  }
+
+  if (process.env.NEXT_PUBLIC_PAY_CHANNEL === "stripe") {
+    if (!process.env.STRIPE_SECRET_KEY) errors.push("NEXT_PUBLIC_PAY_CHANNEL=stripe 时必须配置 STRIPE_SECRET_KEY");
+    if (!process.env.STRIPE_WEBHOOK_SECRET) errors.push("NEXT_PUBLIC_PAY_CHANNEL=stripe 时必须配置 STRIPE_WEBHOOK_SECRET");
+  }
+
+  if (!process.env.STREAM_SIGNING_SECRET || process.env.STREAM_SIGNING_SECRET.length < 32) {
+    errors.push("STREAM_SIGNING_SECRET 未配置或少于 32 字符（私有视频短时 URL 签名必需）");
+  }
+  if (process.env.STORAGE_MODE !== "local") {
+    errors.push("生产环境必须配置 STORAGE_MODE=local（mock/留空都不得上线）");
   }
 
   // (c) 各支付渠道密钥：已设置的值不得等于 .env.example 的示例值（漏换示例值 = 密钥公开可查）。
@@ -58,14 +66,6 @@ export async function register() {
 
   if (process.env.NODE_ENV === "production") {
     validateProductionEnv();
-    // P1-2：生产环境显式启用 mock 支付渠道时高声告警（不阻断——staging/内部演示确有此需求）。
-    // 提醒运维：mock 是演示通道，真实收款须切到 web_wechat/web_alipay/stripe 的真实实现。
-    if (process.env.MOCK_PAY_ENABLED === "1") {
-      console.warn(
-        "[instrumentation] ⚠️ 生产环境启用了 MOCK_PAY_ENABLED=1（mock 演示支付通道）。" +
-          "确认这是 staging/演示环境；正式收款请接入真实支付渠道并关闭该开关。",
-      );
-    }
     // P2-2：公开站点基址若缺失或为 localhost，会被烤进 OG/分享卡链接，导致分享预览指向本地。
     // 不阻断（本地跑生产构建做验收时地址本就是 localhost），但高声告警提醒真实部署改真实域名。
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;

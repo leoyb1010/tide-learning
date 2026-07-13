@@ -13,13 +13,21 @@ struct MacLoginView: View {
     @State private var loading = false
     @State private var error: String?
     @State private var isSignup = false
+    @State private var consentAccepted = false
     @FocusState private var focus: Field?
 
     private enum Field { case identifier, password }
 
     // 与 iOS LoginView 相同的请求体（后端契约一致）。
     private struct LoginBody: Encodable { let identifier: String; let password: String }
-    private struct SignupBody: Encodable { let nickname: String; let identifier: String; let password: String }
+    private struct SignupBody: Encodable {
+        let nickname: String
+        let identifier: String
+        let password: String
+        let termsAccepted: Bool
+        let privacyAccepted: Bool
+        let consentVersion: String
+    }
 
     var body: some View {
         ZStack {
@@ -62,9 +70,16 @@ struct MacLoginView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
+                    if isSignup {
+                        Toggle("我已阅读并同意用户协议与隐私政策", isOn: $consentAccepted)
+                            .font(.studio(12))
+                            .foregroundStyle(Studio.ink3)
+                    }
+
                     StudioButton(title: isSignup ? "注册" : "登录", loading: loading) {
                         Task { await submit() }
                     }
+                    .disabled(isSignup && !consentAccepted)
 
                     Button(isSignup ? "已有账号？去登录" : "没有账号？去注册") {
                         withAnimation { isSignup.toggle(); error = nil }
@@ -93,13 +108,14 @@ struct MacLoginView: View {
         do {
             let u: AuthUser
             if isSignup {
+                guard consentAccepted else { error = "请先同意用户协议与隐私政策"; return }
                 // 昵称从邮箱本地部分推断（与 iOS 一致）。
                 let nickname = identifier.contains("@")
                     ? String(identifier.split(separator: "@").first ?? "同学")
                     : "同学"
                 u = try await API.shared.post(
                     "/api/auth/signup",
-                    body: SignupBody(nickname: nickname, identifier: identifier, password: password),
+                    body: SignupBody(nickname: nickname, identifier: identifier, password: password, termsAccepted: true, privacyAccepted: true, consentVersion: "2026-07-13"),
                     as: AuthUser.self
                 )
             } else {

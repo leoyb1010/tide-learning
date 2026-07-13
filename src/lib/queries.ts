@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { createStreamSignature } from "./private-media";
 import { resolveEntitlement, canAccessLesson, type EntitlementSnapshot } from "./entitlement";
 import { rankDemands } from "./demand-score";
 import { TRACK_MAP, trackLabel } from "./tracks";
@@ -10,6 +11,7 @@ import { LEDGER_TYPE } from "./credit-trade";
 // relativeTime / formatDuration 是零依赖纯日期函数，已迁至 @/lib/format（无 "use client"、
 // 不 import prisma）。此处 re-export 以兼容既有 server 侧引用（desk/me/demands 等）。
 import { relativeTime, formatDuration } from "./format";
+import { COURSE_PUBLIC_SELECT, LESSON_OUTLINE_SELECT } from "./course-public-select";
 
 // 赛道标签（融合有道内容板块）。保留 CATEGORY_LABELS 名以兼容旧引用。
 export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
@@ -126,9 +128,22 @@ export async function listCourses(opts?: { category?: string; sort?: string; q?:
 export async function getCourseDetail(idOrSlug: string, userId: string | null) {
   const course = await prisma.course.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    include: {
-      lessons: { orderBy: { sortOrder: "asc" } },
-      updateLogs: { orderBy: { publishedAt: "desc" } },
+    select: {
+      ...COURSE_PUBLIC_SELECT,
+      lessons: { orderBy: { sortOrder: "asc" }, select: LESSON_OUTLINE_SELECT },
+      updateLogs: {
+        orderBy: { publishedAt: "desc" },
+        select: {
+          id: true,
+          courseId: true,
+          lessonId: true,
+          updateType: true,
+          title: true,
+          description: true,
+          ownerId: true,
+          publishedAt: true,
+        },
+      },
     },
   });
   if (!course) return null;
@@ -137,14 +152,30 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
   const snapshot = await resolveEntitlement(userId);
   // 买断真值源：已购本课（CoursePurchase）则全部章节放行（不走赛道订阅门）。越权铁律：where userId=我。
   const owned = await hasPurchasedCourse(course.id, userId);
+  const progress = userId
+    ? await prisma.learningProgress.findMany({
+        where: { userId, courseId: course.id },
+        select: {
+          lessonId: true,
+          progressSec: true,
+          lastSlideIndex: true,
+          completedAt: true,
+          lastPlayedAt: true,
+        },
+        orderBy: { lastPlayedAt: "desc" },
+      })
+    : [];
 
+  const { lessons, updateLogs, ...courseMeta } = course;
   return {
-    course,
+    course: courseMeta,
     snapshot,
+    owned,
+    progress,
     categoryLabel: CATEGORY_LABELS[course.category],
     levelLabel: LEVEL_LABELS[course.level],
     durationText: formatDuration(course.totalDurationSec),
-    lessons: course.lessons.map((l) => ({
+    lessons: lessons.map((l) => ({
       id: l.id,
       title: l.title,
       summary: l.summary,
@@ -153,7 +184,7 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
       isFree: l.isFree,
       canAccess: canAccessLesson(course.category, l.isFree, snapshot, owned),
     })),
-    updateLogs: course.updateLogs.map((u) => ({
+    updateLogs: updateLogs.map((u) => ({
       ...u,
       relativeTime: relativeTime(u.publishedAt),
     })),
@@ -164,9 +195,32 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
 export async function getLessonForUser(lessonId: string, userId: string | null) {
   const lesson = await prisma.lesson.findUnique({
     where: { id: lessonId },
-    include: {
-      course: { include: { lessons: { orderBy: { sortOrder: "asc" } } } },
-      subtitles: { orderBy: { startSec: "asc" } },
+    select: {
+      id: true,
+      title: true,
+      summary: true,
+      contentType: true,
+      videoAssetId: true,
+      videoUrl: true,
+      articleMd: true,
+      blocksJson: true,
+      htmlJson: true,
+      videoGenStatus: true,
+      videoDurationSec: true,
+      durationSec: true,
+      isFree: true,
+      liveStartAt: true,
+      liveSeatLimit: true,
+      course: {
+        select: {
+          ...COURSE_PUBLIC_SELECT,
+          lessons: { orderBy: { sortOrder: "asc" }, select: LESSON_OUTLINE_SELECT },
+        },
+      },
+      subtitles: {
+        orderBy: { startSec: "asc" },
+        select: { startSec: true, endSec: true, text: true },
+      },
     },
   });
   if (!lesson) return null;
@@ -177,13 +231,13 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   const owned = await hasPurchasedCourse(lesson.course.id, userId);
   const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned);
 
-  const siblings = lesson.course.lessons;
+  const { lessons: siblings, ...courseMeta } = lesson.course;
   const idx = siblings.findIndex((l) => l.id === lesson.id);
 
   return {
     snapshot,
     access,
-    course: lesson.course,
+    course: courseMeta,
     track: lesson.course.category,
     lesson: {
       id: lesson.id,
@@ -195,9 +249,10 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       liveStartAt: lesson.liveStartAt ? lesson.liveStartAt.toISOString() : null,
       liveSeatLimit: lesson.liveSeatLimit,
       // 关键：付费章节且无权益时，videoUrl / articleMd / blocksJson 一律为 null。
-      // 有真实 demo 直链（lesson.videoUrl）时优先返回它（<video> 真播放）；否则回退 mock 受控流。
+      // 受控 asset 永远优先经过鉴权流接口；公开直链只允许免费章节使用。
+      // 付费章节即使历史数据遗留 videoUrl 也不返回，防止猜测 public 路径绕过权益门。
       videoUrl: access
-        ? lesson.videoUrl ?? (lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : null)
+        ? (lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : lesson.isFree ? lesson.videoUrl : null)
         : null,
       articleMd: access ? lesson.articleMd : null,
       // ai_block 类型的结构化课件（付费门控同 articleMd）
@@ -232,7 +287,8 @@ const STREAM_TTL_MS = 10 * 60 * 1000;
 function signedVideoUrl(assetId: string): string {
   // 取当前所在时间窗口的下一个边界作为过期戳 —— 稳定、可缓存、跨渲染一致。
   const exp = (Math.floor(Date.now() / STREAM_TTL_MS) + 1) * STREAM_TTL_MS;
-  return `/api/stream/${assetId}?exp=${exp}`;
+  const sig = createStreamSignature(assetId, exp);
+  return `/api/stream/${encodeURIComponent(assetId)}?exp=${exp}&sig=${sig}`;
 }
 
 /** 本周上新（§6.1 上新卡）。 */

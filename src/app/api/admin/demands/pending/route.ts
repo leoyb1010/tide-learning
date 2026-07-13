@@ -8,15 +8,22 @@ const RISK_RANK: Record<string, number> = { high: 2, medium: 1, low: 0 };
 export async function GET() {
   return handle(async () => {
     await requirePermission("demand:moderate");
-    const demands = await prisma.demand.findMany({
-      orderBy: { createdAt: "desc" },
-      include: { _count: { select: { votes: true } }, user: { select: { nickname: true } } },
-    });
+    const [demands, publishedCourses] = await Promise.all([
+      prisma.demand.findMany({
+        orderBy: { createdAt: "desc" },
+        include: { _count: { select: { votes: true } }, user: { select: { nickname: true } } },
+      }),
+      prisma.course.findMany({
+        where: { status: "published", visibility: { in: ["public", "unlisted"] } },
+        orderBy: { lastUpdatedAt: "desc" },
+        select: { id: true, title: true, slug: true },
+      }),
+    ]);
     demands.sort(
       (a, b) =>
         (RISK_RANK[b.riskLevel] ?? 0) - (RISK_RANK[a.riskLevel] ?? 0) ||
         b.createdAt.getTime() - a.createdAt.getTime(),
     );
-    return ok({ demands });
+    return ok({ demands, publishedCourses });
   });
 }

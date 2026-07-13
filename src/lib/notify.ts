@@ -14,6 +14,7 @@ export type NotifyType =
   | "post_like" // 你的帖子被赞
   | "course_update" // 你学的课更新了
   | "credit_grant" // 积分到账
+  | "demand_update" // 投票或关注的需求有进展
   | "system";
 
 export async function notify(params: {

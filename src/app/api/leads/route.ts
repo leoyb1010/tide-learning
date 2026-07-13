@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/session";
 import { track } from "@/lib/analytics";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
+import { audit } from "@/lib/audit";
+import { CONSENT_VERSION } from "@/lib/consent";
 
 /**
  * 手机号宽松校验：优先中国大陆手机号（1[3-9] 开头 11 位），
@@ -32,7 +34,11 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as {
       name?: string; phone?: string; courseId?: string; track?: string;
       source?: string; channelDetail?: string;
+      privacyAccepted?: boolean; consentVersion?: string;
     };
+    if (body.privacyAccepted !== true || body.consentVersion !== CONSENT_VERSION) {
+      return fail("请阅读并同意隐私政策后再提交");
+    }
     const phone = body.phone?.trim() || null;
     if (!phone && !user) return fail("请填写手机号以便安排试听");
     // 提供了手机号就必须合法（挡住垃圾/注入）；已登录用户可不填手机号（回退账户手机号）。
@@ -49,6 +55,13 @@ export async function POST(req: NextRequest) {
         channelDetail: body.channelDetail ?? null,
         status: "new",
       },
+    });
+    await audit({
+      operatorId: user?.id,
+      action: "consent.accepted",
+      targetType: "lead",
+      targetId: lead.id,
+      detail: `privacy=${CONSENT_VERSION};source=trial_booking`,
     });
     await track({
       eventName: "trial_booking",

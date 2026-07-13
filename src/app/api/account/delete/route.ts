@@ -3,7 +3,9 @@ import { prisma } from "@/lib/db";
 import { requireUser, verifyPassword, destroySession } from "@/lib/session";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
-import { track } from "@/lib/analytics";
+import { audit } from "@/lib/audit";
+import { unlink } from "node:fs/promises";
+import { attachmentDiskPath } from "@/lib/private-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -11,9 +13,8 @@ export const dynamic = "force-dynamic";
  * POST /api/account/delete — 注销账号（App Store 5.1.1(v) 要求可在 App 内删号）。
  * 入参：{ password }。
  * 校验：同源(CSRF) + 登录态 + 限流 + 当前密码正确。
- * 处理：软删 user（deletedAt=now）+ 吊销该用户全部会话（含当前 cookie 会话）。
- *   - 软删而非硬删：保留订单/审计等关联数据；getCurrentUser 已对 deletedAt!=null 返回 null，
- *     login 也拒绝 deletedAt 账号，故软删后即不可再登录。
+ * 处理：立即删除学习、社交、设备、AI 对话与附件数据；埋点和线索解除身份关联；
+ * 订单、订阅、优惠核销与积分流水因退款、对账和反欺诈需要保留，但账号主体会被不可逆匿名化并吊销权益。
  * 第三方登录账号（authProvider!=password 或无 passwordHash）无本地密码，走原渠道，此处拒绝。
  */
 export async function POST(req: NextRequest) {
@@ -33,18 +34,91 @@ export async function POST(req: NextRequest) {
       return fail("密码不正确");
     }
 
-    // 越权铁律：where userId
-    await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: user.id }, data: { deletedAt: new Date() } });
-      // 吊销全部会话，立即失效所有端登录态
-      await tx.session.deleteMany({ where: { userId: user.id } });
+    const attachments = await prisma.noteAttachment.findMany({
+      where: { note: { userId: user.id } },
+      select: { path: true },
     });
+
+    // 越权铁律：每张表都以当前 user.id 收敛；财务记录只保留到匿名账户壳。
+    await prisma.$transaction(async (tx) => {
+      await tx.session.deleteMany({ where: { userId: user.id } });
+      await tx.passwordReset.deleteMany({ where: { userId: user.id } });
+      await tx.device.deleteMany({ where: { userId: user.id } });
+      await tx.notification.deleteMany({ where: { userId: user.id } });
+
+      await tx.note.deleteMany({ where: { userId: user.id } });
+      await tx.noteTag.deleteMany({ where: { userId: user.id } });
+      await tx.learningProgress.deleteMany({ where: { userId: user.id } });
+      await tx.courseReview.deleteMany({ where: { userId: user.id } });
+      await tx.coursePurchase.deleteMany({ where: { userId: user.id } });
+      await tx.reviewCard.deleteMany({ where: { userId: user.id } });
+      await tx.notebook.deleteMany({ where: { userId: user.id } });
+      await tx.examMistake.deleteMany({ where: { userId: user.id } });
+      await tx.examAttempt.deleteMany({ where: { userId: user.id } });
+      await tx.exam.deleteMany({ where: { userId: user.id } });
+      await tx.focusSession.deleteMany({ where: { userId: user.id } });
+      await tx.streakDay.deleteMany({ where: { userId: user.id } });
+      await tx.streak.deleteMany({ where: { userId: user.id } });
+      await tx.userAchievement.deleteMany({ where: { userId: user.id } });
+
+      await tx.chatThread.deleteMany({ where: { userId: user.id } });
+      await tx.importedSource.deleteMany({ where: { userId: user.id } });
+      await tx.generationJob.deleteMany({ where: { userId: user.id } });
+      await tx.llmUsage.deleteMany({ where: { userId: user.id } });
+
+      await tx.postComment.deleteMany({ where: { userId: user.id } });
+      await tx.postLike.deleteMany({ where: { userId: user.id } });
+      await tx.post.deleteMany({ where: { userId: user.id } });
+      await tx.comment.deleteMany({ where: { userId: user.id } });
+      await tx.demandVote.deleteMany({ where: { userId: user.id } });
+      await tx.demandFollow.deleteMany({ where: { userId: user.id } });
+      await tx.demand.deleteMany({ where: { userId: user.id } });
+      await tx.courseAccessRequest.deleteMany({ where: { OR: [{ requesterId: user.id }, { ownerId: user.id }] } });
+      await tx.referral.deleteMany({ where: { OR: [{ inviterId: user.id }, { inviteeId: user.id }] } });
+      await tx.inviteCode.deleteMany({ where: { inviterId: user.id } });
+      await tx.course.deleteMany({ where: { authorUserId: user.id } });
+
+      await tx.analyticsEvent.updateMany({ where: { userId: user.id }, data: { userId: null, anonymousId: null } });
+      await tx.lead.updateMany({ where: { userId: user.id }, data: { userId: null, name: null, phone: null, followUpNote: null } });
+      await tx.redemptionCode.updateMany({ where: { createdById: user.id }, data: { createdById: null } });
+
+      const now = new Date();
+      await tx.subscription.updateMany({
+        where: { userId: user.id, status: { notIn: ["refunded", "revoked", "expired"] } },
+        data: { status: "revoked", cancelAtPeriodEnd: true, currentPeriodEnd: now },
+      });
+      await tx.entitlement.updateMany({ where: { userId: user.id }, data: { status: "revoked", validUntil: now } });
+      await tx.creditAccount.updateMany({
+        where: { userId: user.id },
+        data: { balance: 0, monthlyGrantKey: null },
+      });
+      await tx.userProfile.deleteMany({ where: { userId: user.id } });
+
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          email: null,
+          phone: null,
+          username: null,
+          nickname: "已注销用户",
+          avatarUrl: null,
+          passwordHash: null,
+          authProvider: "deleted",
+          deletedAt: now,
+        },
+      });
+    });
+
+    await Promise.all(attachments.map(({ path }) => {
+      const diskPath = attachmentDiskPath(path);
+      return diskPath ? unlink(diskPath).catch(() => {}) : Promise.resolve();
+    }));
 
     // 清理当前浏览器的 cookie 会话（Bearer 端无 cookie，无副作用）
     await destroySession();
 
-    await track({ eventName: "account_delete", userId: user.id });
+    await audit({ action: "account.erased", targetType: "pseudonymous_user", targetId: user.id, detail: "self-service deletion completed" });
 
-    return ok({ deleted: true });
+    return ok({ deleted: true, personalDataErased: true, financialRecordsAnonymized: true });
   });
 }

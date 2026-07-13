@@ -172,8 +172,8 @@ model Lesson {
   summary       String?
   sortOrder     Int       @default(0)
   contentType   String    @default("video") // video / article / mixed / live / ai_block / ai_html
-  videoAssetId  String? // 指向受控视频资源，非订阅用户拿不到直链
-  videoUrl      String? // demo 真实媒体直链（/videos/.../*.mp4）：有值且有权益时优先于 mock 受控流，供 <video> 真播放
+  videoAssetId  String?   @unique // 一个受控资产只绑一个章节，避免共享 asset 造成鉴权语义歧义
+  videoUrl      String? // 仅免费章节可用的公开媒体 URL；付费章节必须使用 videoAssetId
   articleMd     String?
   blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）；也是 ai_html 课的内容层真值源 + 兜底
   htmlJson      String? // ai_html 类型：AI 生成的自包含沙箱 HTML 课件渲染契约 {renderMode, contractVersion, html, hasScript, checksum}（见 src/lib/ai/courseware-html.ts）
@@ -202,7 +202,6 @@ model Lesson {
   subtitles Subtitle[]
 
   @@index([courseId, sortOrder])
-  @@index([videoAssetId])
 }
 
 // ---------- 字幕（C1：字幕划线捕捉）----------
@@ -995,7 +994,7 @@ model CreditLedger {
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   delta        Int      // 正=入账 负=消耗
-  type         String   // monthly_grant / recharge / share_reward / llm_spend / admin_adjust / signup_bonus
+  type         String   // monthly_grant / recharge / share_reward / llm_spend / admin_adjust；signup_bonus 仅为历史兼容
   refId        String?  // 关联 Order/LlmUsage/CourseAccessRequest id
   reason       String?  // 展示文案 / admin 调账备注
   balanceAfter Int      // 记账后余额快照（对账用）
@@ -1071,7 +1070,7 @@ model PostComment {
 
 // ==================== v2.3 §3 笔记采集（附件）====================
 
-/** 笔记附件：图片/PDF/文档，mock 存储于 public/uploads/，留对象存储接口。 */
+/** 笔记附件：图片/PDF/文档。path 是私有存储 key，下载必须经过笔记本人鉴权。 */
 model NoteAttachment {
   id        String   @id @default(cuid())
   noteId    String
@@ -1079,7 +1078,7 @@ model NoteAttachment {
   fileName  String
   mimeType  String
   size      Int
-  path      String   // /uploads/xxx 或对象存储 key
+  path      String   // 私有磁盘文件名或对象存储 key；历史行可能是 /uploads/xxx
   summary   String?  // 文本类附件的 AI 摘要
   createdAt DateTime @default(now())
 

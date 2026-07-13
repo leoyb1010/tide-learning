@@ -19,8 +19,10 @@ tsconfig.tsbuildinfo
 dev.db
 dev.db-journal
 
-# 采集面板 mock 上传目录（图片/附件落盘，不入库）
+# 私有笔记附件目录（必须经鉴权 API 读取，不入库）
 public/uploads/
+.data/
+backups/
 
 # 构建期版本溯源（scripts/gen-version.mjs 每次 build 生成，供 /api/version、/api/health）
 public/version.json

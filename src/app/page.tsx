@@ -29,12 +29,17 @@ export default async function HomePage() {
    未登录：三幕沉浸营销首页（server 取真实数据 → client 场景渲染）
    ============================================================ */
 async function MarketingHome() {
-  const [all, demandTeaserResult, plans] = await Promise.all([
+  const [all, demandTeaserResult, plans, activeLearners] = await Promise.all([
     listCourses({ sort: "recommended" }),
     // 首页第三幕只需「榜首一条 teaser + 征集总数」，用轻查询替代最重的
     // listRankedDemands（7 条聚合 + 社交 join），关键路径不再被社交聚合阻塞。
     getHomeDemandTeaser(["collecting", "evaluating", "scheduled", "producing"]),
     prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
+    prisma.learningProgress.findMany({
+      where: { lastPlayedAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
   ]);
   // 未登录分支：权益快照必为免费态，用于 VoteButton canVote 判定（保持签名一致）。
   const snapshot = await resolveEntitlement(null);
@@ -81,12 +86,8 @@ async function MarketingHome() {
     plans[0];
   const yearPriceText = yearPlan ? `¥${(yearPlan.priceCents / 100).toFixed(0)}/年` : null;
 
-  // 社会证明「此刻 N 位同学正在一起学」——当前在线数占位（去掉原「凌晨一点」压抑基调）：
-  // 无实时在线埋点，用「全站累计学习人数」派生一个稳定、合理的当前在线数
-  // （学习人数总和的一个小比例，落在 [120, 4800] 的可信区间；同一数据集稳定不乱跳）。
-  // 真实 DOM 数字，SSR 直出，利于 LCP/SEO。
-  const totalLearners = all.reduce((sum, c) => sum + (c.learnersCount ?? 0), 0);
-  const onlineCount = Math.max(120, Math.min(4800, Math.round(totalLearners * 0.008) || 137));
+  // “此刻在学”只统计最近 5 分钟真实写入学习进度的去重用户，不再从累计人数伪造。
+  const onlineCount = activeLearners.length;
 
   return (
     <>

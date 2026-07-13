@@ -8,14 +8,16 @@ export async function GET() {
     await requirePermission("dashboard:read");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const premiumStatuses = ["active", "trial", "grace_period", "canceled_but_active"];
 
     const [
       todayViews,
       registers,
       trials,
-      subscriptions,
+      activeSubscriptions,
       checkoutStarts,
-      playSeconds,
+      weeklyLearners,
       notesCount,
       demandsCount,
       votesCount,
@@ -24,16 +26,19 @@ export async function GET() {
       prisma.analyticsEvent.count({ where: { eventName: "homepage_view", createdAt: { gte: today } } }),
       prisma.user.count({ where: { role: "user" } }),
       prisma.analyticsEvent.count({ where: { eventName: "lesson_trial_start" } }),
-      prisma.subscription.count({ where: { status: { in: ["active", "trial", "grace_period", "canceled_but_active"] } } }),
+      prisma.subscription.findMany({ where: { status: { in: premiumStatuses } }, distinct: ["userId"], select: { userId: true } }),
       prisma.analyticsEvent.count({ where: { eventName: "checkout_start" } }),
-      prisma.learningProgress.aggregate({ _sum: { progressSec: true } }),
+      prisma.learningProgress.findMany({ where: { lastPlayedAt: { gte: weekAgo } }, distinct: ["userId"], select: { userId: true } }),
       prisma.note.count({ where: { deletedAt: null } }),
       prisma.demand.count(),
       prisma.demandVote.aggregate({ _sum: { voteCount: true } }),
       prisma.order.count({ where: { status: "refunded" } }),
     ]);
 
-    const subConversion = checkoutStarts > 0 ? Math.round((subscriptions / Math.max(registers, 1)) * 1000) / 10 : 0;
+    const activeSubscriberIds = new Set(activeSubscriptions.map((s) => s.userId));
+    const subscriptions = activeSubscriberIds.size;
+    const weeklyActivePaidLearners = new Set(weeklyLearners.filter((p) => activeSubscriberIds.has(p.userId)).map((p) => p.userId)).size;
+    const subConversion = Math.round((subscriptions / Math.max(registers, 1)) * 1000) / 10;
 
     return ok({
       metrics: {
@@ -42,7 +47,7 @@ export async function GET() {
         trials,
         subscriptions,
         subConversionRate: subConversion, // 注册→订阅 %
-        playHours: Math.round(((playSeconds._sum.progressSec ?? 0) / 3600) * 10) / 10,
+        weeklyActivePaidLearners,
         notesCount,
         demandsCount,
         votesCount: votesCount._sum.voteCount ?? 0,

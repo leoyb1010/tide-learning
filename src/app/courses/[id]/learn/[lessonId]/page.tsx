@@ -12,8 +12,15 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   return { title: lesson?.title ?? "学习" };
 }
 
-export default async function LearnPage({ params }: { params: Promise<{ id: string; lessonId: string }> }) {
+export default async function LearnPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string; lessonId: string }>;
+  searchParams: Promise<{ t?: string }>;
+}) {
   const { id, lessonId } = await params;
+  const { t } = await searchParams;
   const user = await getCurrentUser();
   const data = await getLessonForUser(lessonId, user?.id ?? null);
   if (!data) notFound();
@@ -52,6 +59,11 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
     ? await prisma.reviewCard.count({ where: { userId: user.id, dueAt: { lte: new Date() } } })
     : 0;
 
+  const requestedProgress = Number.parseInt(t ?? "", 10);
+  const returnProgress = Number.isFinite(requestedProgress)
+    ? Math.min(Math.max(requestedProgress, 0), lesson.durationSec)
+    : 0;
+
   return (
     <Player
       courseId={course.id}
@@ -65,7 +77,7 @@ export default async function LearnPage({ params }: { params: Promise<{ id: stri
       nextLessonId={nextLessonId}
       remainingLessons={lockedCount}
       isLoggedIn={!!user}
-      initialProgress={progress?.progressSec ?? 0}
+      initialProgress={progress?.progressSec ?? returnProgress}
       initialSlidePage={progress?.lastSlideIndex ?? 0}
       initialNotes={notes.map((n) => ({ ...n, updatedAt: n.updatedAt.toISOString() }))}
       posterSrc={trackStillSrc(course.category)}

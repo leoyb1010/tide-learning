@@ -426,7 +426,7 @@ export const NoteEditor = forwardRef<NoteEditorHandle, {
 
               {/* 截帧图 */}
               {n.kind === "capture" && n.captureUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
+
                 <img src={n.captureUrl} alt="课程截图" className="mb-2 w-full rounded-md border border-ink-100" loading="lazy" />
               )}
               {/* 剪藏原文 */}

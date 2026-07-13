@@ -186,7 +186,6 @@ const CLAIM_TTL_MS = 10 * 60_000;
  * 故改为剥离换行/控制字符——同样杜绝「字段里藏换行伪造 prompt 指令行」的注入面，不破坏语义。
  */
 function sanitizePromptField(s: string): string {
-  // eslint-disable-next-line no-control-regex
   return s.replace(/[\u0000-\u001f\u007f]+/g, " ").trim();
 }
 

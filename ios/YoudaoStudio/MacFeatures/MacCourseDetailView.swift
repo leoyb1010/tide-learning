@@ -15,7 +15,7 @@ import Observation
 /// GET /api/courses/[id] → { course, snapshot, categoryLabel, levelLabel, durationText, lessons, updateLogs }。
 struct MacCourseDetail: Decodable, Equatable {
     let course: MacCourseDetailCore
-    /// 展示用大纲（含 canAccess 访问判定），与 course.lessons 内嵌明细不同。
+    /// 展示用大纲（含 canAccess 访问判定）；course 本体不再嵌套章节，避免付费内容泄漏。
     let lessons: [MacCourseLesson]
     let categoryLabel: String?
     let levelLabel: String?

@@ -281,7 +281,7 @@ function ReviewItem({ review, index, reduce }: { review: ReviewView; index: numb
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
           {review.author.avatarUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+
             <img
               src={review.author.avatarUrl}
               alt=""

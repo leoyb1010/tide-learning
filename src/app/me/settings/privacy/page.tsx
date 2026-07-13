@@ -19,6 +19,8 @@ export default async function PrivacySettingsPage() {
         title="隐私与数据"
         desc="导出与账号注销"
       >
+        {/* API 下载需要浏览器文件响应，不能由 Next Link 客户端导航接管。 */}
+        {/* eslint-disable-next-line @next/next/no-html-link-for-pages */}
         <a
           href="/api/notes/export?format=md"
           className="studio-lift flex items-center justify-between rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5"

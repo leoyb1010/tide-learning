@@ -19,6 +19,8 @@ export async function POST(req: NextRequest) {
     // 限流：匿名亦可上报，按 IP 限每分钟 60 次，堵住无限写库
     assertRateLimit(req, "analytics", 60, 60_000);
     const user = await getCurrentUser();
+    const contentLength = Number(req.headers.get("content-length") ?? "0");
+    if (contentLength > 16_384) return ok({ tracked: false });
     const { eventName, properties, anonymousId, platform } = (await req.json()) as {
       eventName: string;
       properties?: Record<string, unknown>;
@@ -27,6 +29,14 @@ export async function POST(req: NextRequest) {
     };
     // 非法/缺失 eventName 一律静默忽略、不写库（返回 ok 不暴露校验细节）
     if (!eventName || typeof eventName !== "string" || !EVENT_NAME_RE.test(eventName)) {
+      return ok({ tracked: false });
+    }
+    if (anonymousId != null && (typeof anonymousId !== "string" || anonymousId.length > 128)) return ok({ tracked: false });
+    if (platform != null && (typeof platform !== "string" || platform.length > 32)) return ok({ tracked: false });
+    if (properties != null && (typeof properties !== "object" || Array.isArray(properties))) return ok({ tracked: false });
+    try {
+      if (JSON.stringify(properties ?? {}).length > 8192) return ok({ tracked: false });
+    } catch {
       return ok({ tracked: false });
     }
     await track({ eventName, userId: user?.id, anonymousId, properties, platform });

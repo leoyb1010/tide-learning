@@ -46,6 +46,21 @@ export function rollbackOnePeriod(billingPeriod: string, end: Date): Date {
   return d;
 }
 
+/** 回调只能结算同渠道、同金额、同币种的订单，防止小额回调开通高价权益。 */
+export function validateWebhookOrder(
+  channel: string,
+  payload: { amountCents: number; currency: string },
+  order: { channel: string; amountCents: number; currency: string },
+): void {
+  if (order.channel !== channel) throw new AppError("订单渠道不匹配");
+  if (!Number.isSafeInteger(payload.amountCents) || payload.amountCents < 0 || payload.amountCents !== order.amountCents) {
+    throw new AppError("支付金额与订单不匹配");
+  }
+  if (!payload.currency || payload.currency.toUpperCase() !== order.currency.toUpperCase()) {
+    throw new AppError("支付币种与订单不匹配");
+  }
+}
+
 /**
  * 订阅激活/续期的**共享核心**（v3.3）——把此前内联在 iap/verify 与 processWebhook 里的
  * 「已有有效订阅→续期(叠加时长)，否则新建」逻辑提炼为一处，供三方复用且行为一致：
@@ -250,6 +265,7 @@ export async function createCheckoutSession(
       amountCents: amount,
       currency: plan.currency,
       subject: plan.name,
+      billingPeriod: plan.billingPeriod,
     });
   } catch (e) {
     await prisma.order.update({ where: { id: order.id }, data: { status: "failed" } }).catch(() => {});
@@ -268,6 +284,8 @@ export async function processWebhook(channel: string, payload: {
   eventType: string;
   externalId: string; // 幂等键
   externalOrderId: string;
+  amountCents: number;
+  currency: string;
 }) {
   // 幂等：先原子占位（unique 约束保证并发下只有一个成功）
   try {
@@ -277,12 +295,17 @@ export async function processWebhook(channel: string, payload: {
         eventType: payload.eventType,
         externalId: payload.externalId,
         payloadJson: JSON.stringify(payload),
-        status: "received",
+        status: "processing",
       },
     });
   } catch {
-    // unique 冲突 → 重复回调
-    return { ok: true, duplicate: true };
+    const existing = await prisma.paymentWebhookLog.findUnique({ where: { channel_externalId: { channel, externalId: payload.externalId } } });
+    if (!existing || existing.status === "processed" || existing.status === "processing") return { ok: true, duplicate: true };
+    const claimed = await prisma.paymentWebhookLog.updateMany({
+      where: { id: existing.id, status: { in: ["error", "received"] } },
+      data: { status: "processing", errorMessage: null },
+    });
+    if (claimed.count === 0) return { ok: true, duplicate: true };
   }
 
   const logRef = await prisma.paymentWebhookLog.findUnique({
@@ -299,7 +322,7 @@ export async function processWebhook(channel: string, payload: {
       if (!order) throw new AppError("订单不存在");
       // 渠道匹配（防御纵深）：订单按 externalOrderId 全局查找，须校验回调渠道与下单渠道一致，
       // 否则持任一渠道密钥者可对其他渠道的订单发确认/退款回调。
-      if (order.channel !== channel) throw new AppError("订单渠道不匹配");
+      validateWebhookOrder(channel, payload, order);
 
       if (payload.eventType === "payment.succeeded") {
         if (order.status === "paid") return { ok: true, duplicate: true };

@@ -430,7 +430,7 @@ function Avatar({
   return (
     <Link href={`/u/${id}`} aria-label={`${nickname} 的主页`} className="shrink-0">
       {avatarUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
+
         <img src={avatarUrl} alt="" style={{ width: dim, height: dim }} className="rounded-full object-cover" />
       ) : (
         <span
@@ -474,7 +474,7 @@ function ImageGrid({ images }: { images: string[] }) {
               aria-label={`查看第 ${i + 1} 张图片`}
               className={`studio-press group relative aspect-square overflow-hidden rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] ${span}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+              { }
               <img
                 src={src}
                 alt=""

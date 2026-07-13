@@ -7,7 +7,7 @@ import Observation
 /// 详情接口是聚合结构：课程本体在 `course` 内，展示用大纲在顶层 `lessons`。
 struct CourseDetail: Decodable, Equatable {
     let course: CourseDetailCore
-    /// 展示用大纲（含 canAccess 访问判定），与 course.lessons 内嵌明细不同。
+    /// 展示用大纲（含 canAccess 访问判定）；course 本体不再嵌套章节，避免付费内容泄漏。
     let lessons: [CourseLesson]
     /// 后端已本地化的标签/时长文案。
     let categoryLabel: String?
