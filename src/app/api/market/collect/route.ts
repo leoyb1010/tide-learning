@@ -202,7 +202,8 @@ export async function DELETE(req: NextRequest) {
 
     return ok({
       status: "removed",
-      // 付费课保留所有权（仅隐藏），免费课连所有权一并移除。
+      // ownershipKept 表达「用户感知的所有权」而非内部凭证：付费课=仍拥有（仅隐藏）；
+      // 免费课 P1-1 后内部虽保留 CoursePurchase（防再拿走重复发激励），但用户侧语义仍是「移出书架、可零成本再拿走」，故回 isPaid。
       ownershipKept: isPaid,
       message: isPaid
         ? `已从书架移除《${course.title}》，你仍拥有这门课，随时可重新学习`

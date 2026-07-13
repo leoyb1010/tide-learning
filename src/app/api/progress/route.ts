@@ -76,7 +76,8 @@ export async function GET(req: NextRequest) {
     // videoScriptJson 完整课件正文）经进度列表整体下发——既是大 payload（重度用户巨响应），
     // 也可能让退订/无权益用户从进度列表拿到已学章节正文，绕过 getLessonForUser 的按权益置空。
     // 正文一律走 /api/lessons/[id] 的权益门；此列表只 select 课程标识与进度锚点，并分页（默认最近 100，上限 200）。
-    const take = Math.min(Number(new URL(req.url).searchParams.get("take")) || 100, 200);
+    // 夹上下界：负数/0 会被 Prisma 当「取末尾 N 条」透传，导致返回语义反常，故下界钳到 1。
+    const take = Math.min(Math.max(1, Number(new URL(req.url).searchParams.get("take")) || 100), 200);
     const progress = await prisma.learningProgress.findMany({
       where: { userId: user.id },
       select: {
