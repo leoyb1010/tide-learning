@@ -14,3 +14,11 @@ export class AppError extends Error {
     super(message);
   }
 }
+
+/** 写日志前移除常见凭据；不追求还原，只保证原始秘密不落盘。 */
+export function redactSensitiveText(value: unknown): string {
+  return String(value)
+    .replace(/\b(Bearer)\s+[A-Za-z0-9._~+\/-]+=*/gi, "$1 [REDACTED]")
+    .replace(/\b(sk|pk|whsec)_[A-Za-z0-9_-]{8,}\b/gi, "[REDACTED]")
+    .replace(/((?:password|passwd|token|secret|session|api[_-]?key)\s*[=:]\s*)[^\s,;\"'}]+/gi, "$1[REDACTED]");
+}

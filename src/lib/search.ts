@@ -112,9 +112,9 @@ async function searchCourses(term: string, viewerId: string | null, take: number
       ).map((p) => p.courseId)
     : [];
 
-  // 可见性 OR：官方 / 已分享集市 / 本人造课 / 已购买。
+  // 可见性 OR：public/unlisted / 已分享集市 / 本人造课 / 已购买。
   const visibility: Prisma.CourseWhereInput[] = [
-    { origin: "official" },
+    { visibility: { in: ["public", "unlisted"] } },
     { sharedStatus: "shared" },
   ];
   if (viewerId) visibility.push({ authorUserId: viewerId });

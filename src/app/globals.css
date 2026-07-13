@@ -381,6 +381,7 @@ body::before {
 .tabular { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
 .num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.lcp-system-font { font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
 
 /* 强调数字/标签的等宽感 */
 .overline {

@@ -17,15 +17,16 @@ const demoPassword = (devPassword: string): string =>
 
 function hashPassword(password: string): string {
   const salt = randomBytes(16).toString("hex");
-  const derived = scryptSync(password, salt, 64).toString("hex");
-  return `${salt}:${derived}`;
+  const N = 32768, r = 8, p = 1;
+  const derived = scryptSync(password, salt, 64, { N, r, p, maxmem: 256 * N * r * p + 1024 * 1024 }).toString("hex");
+  return `scrypt$${N}$${r}$${p}$${salt}$${derived}`;
 }
 
 const HEALTH_DISCLAIMER =
   "本内容仅用于健康信息素养学习，不构成诊断、治疗或用药建议。身体不适请及时咨询正规医疗机构。";
 
 const article = (t: string) =>
-  `## ${t}\n\n这是一节图文课件的示例正文。正式内容由内容团队按标准结构制作：定位、适合谁、要点、模板与更新日志。\n\n- 要点一：先理解概念，再动手实操。\n- 要点二：每节配套可复用模板。\n- 要点三：跟随更新日志掌握内容变化。\n`;
+  `## ${t}\n\n本节把「${t}」拆成可以立即练习的步骤。先阅读场景，再完成一次不看答案的输出，最后用检查表复盘。\n\n### 核心方法\n\n1. 明确这次练习的对象、目的和使用场景。\n2. 把任务拆成一个最小动作，先完成可用版本。\n3. 对照准确性、清晰度和可执行性逐项修改。\n\n### 立即练习\n\n用自己的真实情境写一个 3—5 句版本；第一次只求完整，第二次删去含糊表达，第三次补上具体对象、时间或结果。\n\n### 自查清单\n\n- 我能不用术语复述关键方法。\n- 我完成了一个与自己相关的例子。\n- 我知道下一次遇到同类问题时先做哪一步。\n`;
 
 // —— ai_block 演示课件（AI 办公）：结构化块，含两张真实课件图解（public/courseware/courseware-ai-*.png）。
 //   走 validateBlocks 校验后再 JSON.stringify 入库，确保种子数据本身也是合法块协议。
@@ -225,6 +226,10 @@ async function main() {
   if (isProd && process.env.SEED_FORCE !== "1") {
     throw new Error("生产环境禁止直接执行 seed（会清空全库重建）；确需执行请显式设置 SEED_FORCE=1");
   }
+  const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? (isProd ? "" : "admin123");
+  if (isProd && (adminPassword.length < 16 || /admin|password|123456/i.test(adminPassword))) {
+    throw new Error("生产 seed 必须显式配置至少 16 位强 SEED_ADMIN_PASSWORD；凭据不会生成或打印");
+  }
   console.log("🌊 清空并重建融合种子数据...");
   await prisma.analyticsEvent.deleteMany();
   await prisma.auditLog.deleteMany();
@@ -282,17 +287,8 @@ async function main() {
   // P0-4：管理员密码优先取 SEED_ADMIN_PASSWORD，避免弱密码 admin123 进生产。
   //   - 有 env：一律用它。
   //   - 无 env + 非生产：回退 admin123（本机 / 测试不受影响，与体验账号文档一致）。
-  //   - 无 env + 生产：生成强随机密码并 console.log 打印一次（仅此一次可见），杜绝默认弱口令上线。
+  //   - 无 env + 生产：启动前直接拒绝；不生成、更不向日志打印管理员凭据。
   // 注：dingyue / oral 等体验（demo）账号的弱口令仅限非生产；生产由 demoPassword() 换成随机值（见模块顶部）。
-  const adminPassword =
-    process.env.SEED_ADMIN_PASSWORD ??
-    (isProd
-      ? (() => {
-          const generated = randomBytes(18).toString("base64url");
-          console.log(`⚠️  未设置 SEED_ADMIN_PASSWORD，已为 admin 生成强随机密码（仅此一次打印）：${generated}`);
-          return generated;
-        })()
-      : "admin123");
   const admin = await prisma.user.create({
     data: { nickname: "平台管理员", username: "admin", email: "admin@tide.learning", phone: "13800000000", role: "admin", avatarUrl: "/avatars/avatar-2.png", passwordHash: hashPassword(adminPassword), profile: { create: { ageBand: "22-40" } } },
   });
@@ -354,7 +350,6 @@ async function main() {
     "oral-smallclass-001:0": { file: "lesson-oral-smallclass-001.mp4", assetId: "media_1e7a9d54-14cc-4ce9-88bd-3d50615ecfe1" },
     "silver-oral-003:0": { file: "lesson-silver-oral-003.mp4", assetId: "media_29d71cfb-eb76-42c1-818e-f74d1d1026a5" },
     "ai-office-005:0": { file: "lesson-ai-office-005.mp4", assetId: "media_39264f0d-d25c-49d9-a236-b25d76ec0aec" },
-    "ai-office-005:1": { file: "lesson-ai-office-005.mp4", assetId: "media_45cbed77-e265-44d6-b73d-a0063f6ec427" },
     "anti-fraud-007:0": { file: "lesson-anti-fraud-007.mp4", assetId: "media_5e7cc35d-a461-426a-b293-4c5c36043194" },
   };
   for (const seedVideo of Object.values(SEED_VIDEO_BY_LESSON)) {
@@ -384,8 +379,10 @@ async function main() {
     lessonIdMap[c.slug] = [];
     for (let i = 0; i < c.lessons.length; i++) {
       const l = c.lessons[i];
-      const type = l.live ? "live" : l.contentType ?? "video";
       const privateVideo = SEED_VIDEO_BY_LESSON[`${c.slug}:${i}`] ?? null;
+      const requestedType = l.live ? "live" : l.contentType ?? "video";
+      // 没有真实私有媒体的“视频课”改为完整图文课，绝不向用户展示必然无法播放的假视频。
+      const type = requestedType === "video" && !privateVideo ? "article" : requestedType;
       // ai_block 课件：校验块数组后 stringify 入库；非块课不写 blocksJson。
       const blocksJson =
         type === "ai_block" && Array.isArray(l.blocks)
@@ -399,9 +396,9 @@ async function main() {
           videoAssetId: privateVideo?.assetId ?? null,
           videoUrl: null,
           blocksJson,
-          videoGenStatus: l.videoGenStatus ?? null,
-          videoDurationSec: l.videoDurationSec ?? null,
-          articleMd: l.articleMd ?? null, durationSec: l.durationSec, isFree: l.isFree ?? false,
+          videoGenStatus: privateVideo ? (l.videoGenStatus ?? "ready") : null,
+          videoDurationSec: privateVideo ? (l.videoDurationSec ?? l.durationSec) : null,
+          articleMd: type === "article" ? (l.articleMd ?? article(l.title)) : null, durationSec: l.durationSec, isFree: l.isFree ?? false,
           liveStartAt: l.live ? new Date(Date.now() + 3 * 864e5) : null,
           liveSeatLimit: l.seat ?? null,
           status: "published", publishedAt: new Date(),

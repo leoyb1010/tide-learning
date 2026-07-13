@@ -9,7 +9,7 @@ import { track } from "@/lib/analytics";
 import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { buildExcerpt } from "@/lib/format";
-import { PRIVATE_UPLOAD_DIR, attachmentDownloadPath } from "@/lib/private-upload";
+import { PRIVATE_UPLOAD_DIR, attachmentDownloadPath, matchesAttachmentMagic } from "@/lib/private-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -39,23 +39,6 @@ function safeExt(mime: string, fileName: string): string {
  * 头部魔数校验：不只信客户端 MIME（参考 import-pdf 的 %PDF- 检查）。
  * 图片与 PDF 有稳定魔数逐一比对；docx/doc/txt/md 无稳定魔数，维持原有大小/类型限制。
  */
-function matchesMagic(mime: string, bytes: Buffer): boolean {
-  switch (mime) {
-    case "image/png":
-      return bytes.length >= 4 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
-    case "image/jpeg":
-      return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;
-    case "image/webp":
-      return bytes.length >= 12 && bytes.subarray(0, 4).toString("latin1") === "RIFF" && bytes.subarray(8, 12).toString("latin1") === "WEBP";
-    case "image/gif":
-      return bytes.length >= 4 && bytes.subarray(0, 4).toString("latin1") === "GIF8";
-    case "application/pdf":
-      return bytes.subarray(0, 5).toString("latin1") === "%PDF-";
-    default:
-      return true;
-  }
-}
-
 /**
  * POST /api/notes/attachments — 图片 / 附件入口。
  * 接受两种载荷：
@@ -109,7 +92,7 @@ export async function POST(req: NextRequest) {
     if (bytes.length === 0) return fail("文件内容为空");
     if (bytes.length > MAX_SIZE) return fail("文件不能超过 10MB");
     if (!ALLOWED[mimeType]) return fail("不支持的文件类型");
-    if (!matchesMagic(mimeType, bytes)) return fail("文件内容与声明类型不符");
+    if (!matchesAttachmentMagic(mimeType, bytes)) return fail("文件内容与声明类型不符");
 
     const isImage = mimeType.startsWith("image/");
 
@@ -136,8 +119,8 @@ export async function POST(req: NextRequest) {
     const attachmentId = randomUUID();
     const diskPath = path.join(PRIVATE_UPLOAD_DIR, storedName);
     const downloadPath = attachmentDownloadPath(attachmentId);
-    await mkdir(PRIVATE_UPLOAD_DIR, { recursive: true });
-    await writeFile(diskPath, bytes);
+    await mkdir(PRIVATE_UPLOAD_DIR, { recursive: true, mode: 0o700 });
+    await writeFile(diskPath, bytes, { mode: 0o600 });
 
     // 事务：（可选）新建挂载笔记 → 建附件。新建笔记时做免费额度校验。
     // 事务失败（如 402 配额超限）时清理已落盘文件，不留孤儿。

@@ -650,6 +650,7 @@ model PaymentWebhookLog {
   externalId   String
   payloadJson  String
   processedAt  DateTime?
+  processingStartedAt DateTime?
   status       String    @default("received") // received / processed / duplicate / error
   errorMessage String?
   createdAt    DateTime  @default(now())

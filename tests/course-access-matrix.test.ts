@@ -121,10 +121,26 @@ describe("付费课件身份矩阵", () => {
   it("他人的私有课程对匿名和其他用户都表现为不存在", async () => {
     mockPrisma.lesson.findUnique.mockResolvedValue({
       ...paidLesson,
-      course: { ...paidLesson.course, origin: "ai_generated", authorUserId: "owner", sharedStatus: "unshared" },
+      course: { ...paidLesson.course, origin: "ai_generated", visibility: "private", authorUserId: "owner", sharedStatus: "unshared" },
     });
     await expect(getLessonForUser("lesson-paid", null)).resolves.toBeNull();
     await expect(getLessonForUser("lesson-paid", "other-user")).resolves.toBeNull();
+  });
+
+  it("unlisted 可凭直链读取，但 private 仅作者、分享者或买家可读", async () => {
+    mockPrisma.lesson.findUnique.mockResolvedValue({
+      ...paidLesson,
+      course: { ...paidLesson.course, visibility: "unlisted", origin: "ai_generated" },
+    });
+    await expect(getLessonForUser("lesson-paid", null)).resolves.not.toBeNull();
+
+    mockPrisma.lesson.findUnique.mockResolvedValue({
+      ...paidLesson,
+      course: { ...paidLesson.course, visibility: "private", origin: "ai_generated", authorUserId: "owner", sharedStatus: "unshared" },
+    });
+    await expect(getLessonForUser("lesson-paid", "owner")).resolves.not.toBeNull();
+    mockPrisma.coursePurchase.findUnique.mockResolvedValue({ id: "purchase-private" });
+    await expect(getLessonForUser("lesson-paid", "buyer")).resolves.not.toBeNull();
   });
 
   it("课程详情的递归响应只含安全大纲，不含任何课件字段或秘密值", async () => {

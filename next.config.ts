@@ -34,10 +34,6 @@ const nextConfig: NextConfig = {
         // 全站安全头：禁点击劫持、禁 MIME 嗅探、收敛 Referer 泄露。
         source: "/:path*",
         headers: [
-          {
-            key: "Content-Security-Policy",
-            value: "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self'",
-          },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },

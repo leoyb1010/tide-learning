@@ -5,6 +5,7 @@ import { Button } from "@/components/ui";
 export default function NotFound() {
   return (
     <div className="flex flex-col items-center justify-center py-24">
+      <h1 className="mb-4 text-2xl font-bold text-ink-950">页面不存在</h1>
       <EmptyTide
         variant="notfound"
         description="你要找的内容不存在或已下架，回到首页继续探索每周上新的课程。"

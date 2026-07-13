@@ -43,9 +43,8 @@ function planPerks(plan: PlanData): { label: string; strong?: boolean }[] {
     return [
       ...base,
       { label: "本周上新第一时间可学" },
-      { label: "AI 笔记整理 + 模拟考试不限量" },
+      { label: "AI 笔记整理 + 模拟考试（按积分与频率规则使用）" },
       { label: "学习周报 + 分享卡 + 新功能抢先体验" },
-      { label: "专属优先客服通道" },
     ];
   }
   if (period === "quarter") {
@@ -64,7 +63,7 @@ function planPerks(plan: PlanData): { label: string; strong?: boolean }[] {
   ];
 }
 
-const FAQ: { q: string; a: string }[] = [
+function faq(payChannel: string): { q: string; a: string }[] { return [
   {
     q: "怎么退订？会立刻失效吗？",
     a: "随时可在「我的订阅」一键退订，无需联系客服。退订后权益保留到当前周期结束，之后课程锁定，但你的笔记与截帧永久保留、可继续查看导出。",
@@ -75,7 +74,9 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "目前可以直接付款吗？",
-    a: "正式支付渠道仍在接入中。渠道开放前不会产生真实扣款；开放后，结算页会明确展示可用渠道、实付金额和服务周期。",
+    a: payChannel === "stripe"
+      ? "可以。当前网页使用 Stripe 一次性付款，结算前会明确展示实付金额和服务周期；连续自动续费套餐尚未开放。"
+      : "当前仅为本地演示结算，不会产生真实扣款。正式环境必须切换到 Stripe 后才能付款。",
   },
   {
     q: "一个账号能几台设备用？",
@@ -85,18 +86,20 @@ const FAQ: { q: string; a: string }[] = [
     q: "优惠券什么时候生效？",
     a: "只有结算页明确显示校验成功、优惠金额和最终实付价时才会生效；未显示的优惠不会在支付后补扣或追认。",
   },
-];
+]; }
 
 export function PricingPlans({
   fullPlans,
   trackPlans,
   isLoggedIn,
   redirectTo,
+  payChannel,
 }: {
   fullPlans: PlanData[];
   trackPlans: PlanData[];
   isLoggedIn: boolean;
   redirectTo: string;
+  payChannel: string;
 }) {
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
@@ -261,7 +264,7 @@ export function PricingPlans({
       <div className="mx-auto max-w-[720px]">
         <h2 className="mb-4 text-center text-[18px] font-bold text-[var(--ink)]">常见问题</h2>
         <div className="overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card),var(--inner-hi)]">
-          {FAQ.map((item, i) => {
+          {faq(payChannel).map((item, i) => {
             const open = openFaq === i;
             return (
               <div key={item.q} className={i > 0 ? "border-t border-[var(--border)]" : ""}>

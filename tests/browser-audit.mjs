@@ -19,7 +19,8 @@ for (const viewport of [
   { name: "tablet", width: 768, height: 1024 },
   { name: "mobile", width: 375, height: 812 },
 ]) {
-  const context = await browser.newContext({ viewport });
+  // axe-core 由测试工具内联注入；绕过 CSP 只用于审计脚本，产品页面另有真实 CSP/交互探针。
+  const context = await browser.newContext({ viewport, bypassCSP: true });
   for (const route of pages) {
     const page = await context.newPage();
     const consoleErrors = [];
@@ -88,7 +89,7 @@ for (const viewport of [
 }
 
 // 登录后检查造课模板资源，不让匿名重定向掩盖 404。
-const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, bypassCSP: true });
 const page = await context.newPage();
 const failed = [];
 page.on("response", (res) => { if (res.status() >= 400) failed.push({ status: res.status(), url: res.url() }); });
@@ -142,7 +143,7 @@ if (mediaProbe) {
 }
 
 // 错误态与键盘提交：不填写凭据直接提交，错误信息必须可见且页面不能产生 5xx/控制台错误。
-const errorContext = await browser.newContext({ viewport: { width: 375, height: 812 } });
+const errorContext = await browser.newContext({ viewport: { width: 375, height: 812 }, bypassCSP: true });
 const errorPage = await errorContext.newPage();
 const errorConsole = [];
 const errorFailed = [];

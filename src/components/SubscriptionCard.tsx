@@ -96,6 +96,7 @@ export function SubscriptionCard({
           planId: plan.id,
           channel: process.env.NEXT_PUBLIC_PAY_CHANNEL || "mock",
           couponCode: couponCode || undefined,
+          returnTo: redirectTo ?? "/me/subscription",
         }),
       }).then((r) => r.json());
       if (!s.ok) throw new Error(s.error);
@@ -103,8 +104,8 @@ export function SubscriptionCard({
       // 跳转 mock 收银台页；真实环境这里应是渠道收银台链接
       setStep("redirecting");
       const payUrl: string = s.data.payUrl ?? `/checkout/mock?order=${encodeURIComponent(s.data.externalOrderId)}`;
-      const next = redirectTo ?? "/me/subscription";
-      router.push(`${payUrl}${payUrl.includes("?") ? "&" : "?"}next=${encodeURIComponent(next)}`);
+      if (/^https?:\/\//i.test(payUrl)) window.location.assign(payUrl);
+      else router.push(payUrl);
     } catch (e) {
       setStep("idle");
       const msg = (e as Error).message || "";

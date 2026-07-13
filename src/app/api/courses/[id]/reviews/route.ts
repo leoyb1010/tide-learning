@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { requireUser, getCurrentUser } from "@/lib/session";
-import { canViewCourse } from "@/lib/queries";
+import { canViewCourse, hasPurchasedCourse } from "@/lib/queries";
 import {
   getCourseRatingAggregate,
   listCourseReviews,
@@ -18,10 +18,11 @@ export const dynamic = "force-dynamic";
 async function resolveViewableCourse(idOrSlug: string, viewerId: string | null) {
   const course = await prisma.course.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, origin: true, authorUserId: true, sharedStatus: true, learnersCount: true },
+    select: { id: true, visibility: true, authorUserId: true, sharedStatus: true, learnersCount: true },
   });
   if (!course) return null;
-  if (!canViewCourse(course, viewerId)) return null;
+  const owned = await hasPurchasedCourse(course.id, viewerId);
+  if (!canViewCourse(course, viewerId, owned)) return null;
   return course;
 }
 

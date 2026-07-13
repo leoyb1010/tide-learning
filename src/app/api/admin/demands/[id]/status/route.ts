@@ -6,7 +6,6 @@ import { track } from "@/lib/analytics";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { generateCourseOutline, slugifyCourse } from "@/lib/course-gen";
 import { canTransitionDemand } from "@/lib/demand-status";
-import { notify } from "@/lib/notify";
 
 const VALID = ["pending_review", "collecting", "evaluating", "scheduled", "producing", "launched", "rejected"];
 
@@ -130,31 +129,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             reason: body.reason ?? body.officialReply,
           },
         });
-      }
-      return next;
-    });
-    await audit({ operatorId: admin.id, action: "demand.status", targetType: "demand", targetId: id, detail: `${demand.status}→${body.status}${previewCourseId ? ` (ai-preview:${previewCourseId})` : ""}` });
-    if (previewCourseId) {
-      await track({ eventName: "demand_ai_preview", userId: admin.id, properties: { demandId: id, courseId: previewCourseId } });
-    }
-    if (demand.status !== body.status) {
-      const [voters, followers] = await Promise.all([
-        prisma.demandVote.findMany({ where: { demandId: id }, distinct: ["userId"], select: { userId: true } }),
-        prisma.demandFollow.findMany({ where: { demandId: id }, select: { userId: true } }),
-      ]);
-      const recipientIds = new Set([demand.userId, ...voters.map((v) => v.userId), ...followers.map((f) => f.userId)]);
-      await Promise.all(
-        [...recipientIds].map((userId) =>
-          notify({
+        const [voters, followers] = await Promise.all([
+          tx.demandVote.findMany({ where: { demandId: id }, distinct: ["userId"], select: { userId: true } }),
+          tx.demandFollow.findMany({ where: { demandId: id }, select: { userId: true } }),
+        ]);
+        const recipientIds = new Set([demand.userId, ...voters.map((v) => v.userId), ...followers.map((f) => f.userId)]);
+        await tx.notification.createMany({
+          data: [...recipientIds].map((userId) => ({
             userId,
             type: "demand_update",
             title: body.status === "launched" ? "你关注的需求已上线" : "你关注的需求有新进展",
             body: body.status === "launched" ? `《${launchedCourse!.title}》现已可以学习` : `${demand.title}：${body.status}`,
             refType: "demand",
             refId: id,
-          }),
-        ),
-      );
+          })),
+        });
+      }
+      return next;
+    });
+    await audit({ operatorId: admin.id, action: "demand.status", targetType: "demand", targetId: id, detail: `${demand.status}→${body.status}${previewCourseId ? ` (ai-preview:${previewCourseId})` : ""}` });
+    if (previewCourseId) {
+      await track({ eventName: "demand_ai_preview", userId: admin.id, properties: { demandId: id, courseId: previewCourseId } });
     }
     return ok({ ...updated, previewCourseId });
   });

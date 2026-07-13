@@ -15,7 +15,10 @@ jobs:
       # 构建/运行时占位密钥（生产必须覆盖）。
       SESSION_SECRET: "ci-session-secret-not-for-production"
       PAY_MOCK_SECRET: "ci-mock-secret"
-      NEXT_PUBLIC_SITE_URL: "http://localhost:3000"
+      NEXT_PUBLIC_SITE_URL: "http://localhost:3100"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3100"
+      NEXT_PUBLIC_PAY_CHANNEL: "mock"
+      ALLOW_LOCAL_PRODUCTION: "1"
       STORAGE_MODE: "local"
       STREAM_SIGNING_SECRET: "ci-stream-signing-secret-at-least-32-characters"
 
@@ -45,6 +48,9 @@ jobs:
           npx prisma migrate status
           npm run db:seed
 
+      - name: Verify upgrade from audited legacy baseline
+        run: bash scripts/verify-legacy-migration.sh
+
       - name: Lint
         run: npm run lint
 
@@ -55,7 +61,7 @@ jobs:
         run: npm test
 
       - name: Dependency audit
-        run: npm audit --omit=dev --audit-level=moderate
+        run: npm audit --audit-level=moderate
 
       - name: Build
         run: npm run build
@@ -73,6 +79,7 @@ jobs:
           CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts
           RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
+          NODE_ENV=production BASE_URL=http://127.0.0.1:3100 node scripts/verify-browser-interactions.mjs
 
       - name: Backup and restore drill
         run: |
@@ -86,4 +93,7 @@ jobs:
           BACKUP_ENCRYPTION_PASSWORD_FILE="$RUNNER_TEMP/backup-password" ASSETS_DIR="$RUNNER_TEMP/restored-data" \
             bash scripts/restore-db.sh "$backup" "$RUNNER_TEMP/restored.db" "$archive" --force
           test "$(sqlite3 "$RUNNER_TEMP/restored.db" 'PRAGMA integrity_check;')" = "ok"
-          test "$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)" -ge 10
+          source_media_count="$(find "$GITHUB_WORKSPACE/.data/media" -type f | wc -l)"
+          restored_media_count="$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)"
+          test "$source_media_count" -ge 4
+          test "$restored_media_count" = "$source_media_count"

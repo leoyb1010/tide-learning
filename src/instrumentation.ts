@@ -15,8 +15,25 @@ const EXAMPLE_PAY_SECRETS: Record<string, string> = {
   PAY_WEB_ALIPAY_SECRET: "",
 };
 
-function validateProductionEnv(): void {
+function absolutePath(name: string, errors: string[]) {
+  const value = process.env[name]?.trim();
+  if (!value || !value.startsWith("/")) errors.push(`${name} 必须配置为绝对持久化路径`);
+}
+
+function httpsUrl(name: string, errors: string[]): URL | null {
+  try {
+    const value = new URL(process.env[name] || "");
+    if (value.protocol !== "https:") errors.push(`${name} 必须为公开 HTTPS 地址`);
+    return value;
+  } catch {
+    errors.push(`${name} 未配置或不是合法 URL`);
+    return null;
+  }
+}
+
+export function validateProductionEnv(): void {
   const errors: string[] = [];
+  const localPreview = process.env.ALLOW_LOCAL_PRODUCTION === "1";
 
   // (a) 数据库：必须配置；SQLite（file:）必须绝对路径——相对路径随进程工作目录漂移（见 .env.example）。
   const dbUrl = process.env.DATABASE_URL;
@@ -34,6 +51,9 @@ function validateProductionEnv(): void {
     errors.push("生产环境禁止 MOCK_PAY_ENABLED=1；请在独立非生产环境演示 mock 支付");
   }
 
+  if (!localPreview && process.env.NEXT_PUBLIC_PAY_CHANNEL !== "stripe") {
+    errors.push("真实生产环境必须配置 NEXT_PUBLIC_PAY_CHANNEL=stripe");
+  }
   if (process.env.NEXT_PUBLIC_PAY_CHANNEL === "stripe") {
     if (!process.env.STRIPE_SECRET_KEY) errors.push("NEXT_PUBLIC_PAY_CHANNEL=stripe 时必须配置 STRIPE_SECRET_KEY");
     if (!process.env.STRIPE_WEBHOOK_SECRET) errors.push("NEXT_PUBLIC_PAY_CHANNEL=stripe 时必须配置 STRIPE_WEBHOOK_SECRET");
@@ -44,6 +64,23 @@ function validateProductionEnv(): void {
   }
   if (process.env.STORAGE_MODE !== "local") {
     errors.push("生产环境必须配置 STORAGE_MODE=local（mock/留空都不得上线）");
+  }
+
+  const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? "1");
+  if (!Number.isSafeInteger(hops) || hops < 0 || hops > 5) errors.push("TRUSTED_PROXY_HOPS 必须为 0 到 5 的整数");
+
+  if (process.env.APPLE_IAP_ENABLED === "1") {
+    if (!process.env.APPLE_BUNDLE_ID) errors.push("启用 Apple IAP 时必须配置 APPLE_BUNDLE_ID");
+    if (!new Set(["Sandbox", "Production"]).has(process.env.APPLE_IAP_ENVIRONMENT || "")) {
+      errors.push("启用 Apple IAP 时 APPLE_IAP_ENVIRONMENT 必须为 Sandbox 或 Production");
+    }
+  }
+
+  if (!localPreview) {
+    const site = httpsUrl("NEXT_PUBLIC_SITE_URL", errors);
+    const app = httpsUrl("NEXT_PUBLIC_APP_URL", errors);
+    if (site && app && site.origin !== app.origin) errors.push("NEXT_PUBLIC_APP_URL 必须与 NEXT_PUBLIC_SITE_URL 同源");
+    for (const key of ["MEDIA_DIR", "UPLOAD_DIR", "RATE_LIMIT_DIR", "LOG_DIR"]) absolutePath(key, errors);
   }
 
   // (c) 各支付渠道密钥：已设置的值不得等于 .env.example 的示例值（漏换示例值 = 密钥公开可查）。
@@ -66,8 +103,7 @@ export async function register() {
 
   if (process.env.NODE_ENV === "production") {
     validateProductionEnv();
-    // P2-2：公开站点基址若缺失或为 localhost，会被烤进 OG/分享卡链接，导致分享预览指向本地。
-    // 不阻断（本地跑生产构建做验收时地址本就是 localhost），但高声告警提醒真实部署改真实域名。
+    // 本地生产构建预览必须显式 opt-in；真实部署的 HTTPS 地址已在上方 fail-fast。
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
     if (!siteUrl) {
       console.warn(

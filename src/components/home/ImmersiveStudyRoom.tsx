@@ -46,15 +46,12 @@ export function ImmersiveStudyRoom(data: ImmersiveData) {
   // 挂载后按真实环境校正。SSR 时 immersive=true → 输出的静态 HTML 含完整真实文案，
   // 沉浸增强在 hydration 后按能力接管。
   const [motionOk, setMotionOk] = useState(true);
-  const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
     const reduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const mobileMq = window.matchMedia("(max-width: 767px)");
     const apply = () => {
       setMotionOk(!reduceMq.matches);
-      setIsMobile(mobileMq.matches);
     };
     apply();
     const bind = (mq: MediaQueryList) => {
@@ -66,14 +63,14 @@ export function ImmersiveStudyRoom(data: ImmersiveData) {
       return () => mq.removeListener(apply);
     };
     const un1 = bind(reduceMq);
-    const un2 = bind(mobileMq);
     return () => {
       un1();
-      un2();
     };
   }, []);
 
-  const immersive = motionOk && !isMobile;
+  // 响应式布局全部由 CSS media query 处理，避免 hydration 后写 isMobile 导致首屏整树重绘。
+  const isMobile = false;
+  const immersive = motionOk;
 
   // 鼠标视差：仅沉浸态挂监听。归一化到 -1..1（视口中心为 0）。
   useEffect(() => {
