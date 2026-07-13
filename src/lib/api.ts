@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { AuthError } from "./session";
 import { RateLimitError } from "./rate-limit";
-import { AppError } from "./errors";
+import { AppError, redactSensitiveText } from "./errors";
 
 // AppError 抽到零依赖的 errors.ts（供 client 侧安全 import）；此处 re-export 保持既有引用兼容。
 export { AppError };
@@ -32,12 +32,13 @@ let lastLogSweepAt = 0; // 目录清理节流水位（模块级）
 async function persistInternalError(e: unknown): Promise<void> {
   try {
     // 动态 import，避免把 node:fs 拖进任何可能被 client 侧 import 的路径。
-    const { appendFile, mkdir, stat, rename, readdir, unlink } = await import("node:fs/promises");
+    const { appendFile, chmod, mkdir, stat, rename, readdir, unlink } = await import("node:fs/promises");
     const { join } = await import("node:path");
     const now = new Date();
     const day = now.toISOString().slice(0, 10); // YYYY-MM-DD（UTC；与 /admin/errors 同口径）
     const dir = getLogDir();
-    await mkdir(dir, { recursive: true });
+    await mkdir(dir, { recursive: true, mode: 0o700 });
+    await chmod(dir, 0o700).catch(() => {});
     const file = join(dir, `api-errors-${day}.jsonl`);
 
     // 轮转：当前文件超上限则滚存为 .1（覆盖旧滚存），随后当日从空文件重新累积。
@@ -52,10 +53,11 @@ async function persistInternalError(e: unknown): Promise<void> {
 
     const entry = {
       ts: now.toISOString(),
-      message: e instanceof Error ? e.message : String(e),
-      stack: e instanceof Error ? e.stack ?? null : null,
+      message: redactSensitiveText(e instanceof Error ? e.message : String(e)),
+      stack: e instanceof Error ? redactSensitiveText(e.stack ?? "") || null : null,
     };
-    await appendFile(file, JSON.stringify(entry) + "\n", "utf8");
+    await appendFile(file, JSON.stringify(entry) + "\n", { encoding: "utf8", mode: 0o600 });
+    await chmod(file, 0o600).catch(() => {});
 
     // 保留期清理（每小时至多一次）：删掉超过 LOG_RETAIN_DAYS 的 api-errors-*.jsonl。
     if (now.getTime() - lastLogSweepAt > 3_600_000) {
@@ -103,7 +105,7 @@ export async function handle(fn: () => Promise<NextResponse>): Promise<NextRespo
     // 畸形请求体（req.json() 解析失败抛 SyntaxError）：客户端错误，收敛为 400 而非 500
     if (e instanceof SyntaxError) return fail("请求体格式错误", 400);
     // 其余：记录服务端日志，返回通用文案，避免泄露数据结构 / 配置
-    console.error("[api:internal]", e instanceof Error ? e.stack ?? e.message : e);
+    console.error("[api:internal]", redactSensitiveText(e instanceof Error ? e.stack ?? e.message : e));
     // 结构化落盘（尽力而为，不 await —— 绝不阻塞/影响响应）。
     void persistInternalError(e);
     return fail("服务异常，请稍后再试", 500);

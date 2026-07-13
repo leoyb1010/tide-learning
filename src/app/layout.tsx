@@ -12,6 +12,7 @@ import { resolveEntitlement } from "@/lib/entitlement";
 import { prisma } from "@/lib/db";
 import { getBalance, ensureMonthlyGrant } from "@/lib/credits";
 import { shanghaiDayKey } from "@/lib/week";
+import { headers } from "next/headers";
 
 // STUDIO 字体系统：Plus Jakarta（UI/数字）+ 平台中文字体 + IBM Plex Mono（数据）。
 // 不在全站预加载 Noto Sans SC：它会按字形/字重拆成大量阻塞分片，移动慢网代价远高于系统中文字体的视觉差异。
@@ -68,6 +69,7 @@ function shortStudentId(userId: string): string {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   const user = await getCurrentUser();
 
   // P1-4：登录用户的适老/字号偏好从 UserProfile 读出，作为 ModeProvider 初值与 anti-FOUC 脚本兜底，
@@ -206,6 +208,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           tide_mode / tide_font_scale / tide_theme / studio_color_scheme。
         */}
         <script
+          nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             // P1-4：mode/font-scale 的 localStorage 兜底改为服务端注入的 profile 初值（${initialMode}/${initialFontScale}），
             // 无本机记录的银发用户在 paint 前即命中 elder，不再先闪 standard 再切。

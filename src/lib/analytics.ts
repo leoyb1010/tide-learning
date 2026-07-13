@@ -12,6 +12,7 @@ export const CORE_EVENTS = [
   "paywall_view",
   "checkout_start",
   "subscription_success",
+  "lesson_continue_after_pay",
   "lesson_progress",
   "lesson_complete",
   "note_create",

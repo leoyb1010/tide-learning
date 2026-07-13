@@ -93,6 +93,29 @@ describe("支付 webhook 事务状态机", () => {
     expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 
+  it("新鲜 processing 租约不被并发回调抢占", async () => {
+    prismaMock.paymentWebhookLog.create.mockRejectedValue({ code: "P2002" });
+    prismaMock.paymentWebhookLog.findUnique.mockResolvedValue({
+      id: "log-1", status: "processing", processingStartedAt: new Date(),
+    });
+    prismaMock.paymentWebhookLog.updateMany.mockResolvedValue({ count: 0 });
+    await expect(processWebhook("stripe", event())).resolves.toEqual({ ok: true, duplicate: true });
+    expect(prismaMock.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("超过五分钟的 processing 租约可被原子接管并继续履约", async () => {
+    prismaMock.paymentWebhookLog.create.mockRejectedValue({ code: "P2002" });
+    prismaMock.paymentWebhookLog.findUnique
+      .mockResolvedValueOnce({ id: "log-1", status: "processing", processingStartedAt: new Date(0) })
+      .mockResolvedValueOnce({ id: "log-1", status: "processing", processingStartedAt: new Date() });
+    prismaMock.paymentWebhookLog.updateMany.mockResolvedValue({ count: 1 });
+    await expect(processWebhook("stripe", event())).resolves.toMatchObject({ ok: true, subscriptionId: "sub-1" });
+    expect(prismaMock.paymentWebhookLog.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "log-1", status: "processing", OR: expect.any(Array) }),
+      data: expect.objectContaining({ status: "processing", processingStartedAt: expect.any(Date) }),
+    }));
+  });
+
   it("订单已退款后迟到的成功事件不会复活订阅，并留下乱序审计", async () => {
     prismaMock.order.findFirst.mockResolvedValue({ ...baseOrder, status: "refunded" });
     await expect(processWebhook("stripe", event())).resolves.toEqual({ ok: true, duplicate: true });

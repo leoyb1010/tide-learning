@@ -17,10 +17,10 @@ export default async function LearnPage({
   searchParams,
 }: {
   params: Promise<{ id: string; lessonId: string }>;
-  searchParams: Promise<{ t?: string }>;
+  searchParams: Promise<{ t?: string; checkout?: string }>;
 }) {
   const { id, lessonId } = await params;
-  const { t } = await searchParams;
+  const { t, checkout } = await searchParams;
   const user = await getCurrentUser();
   const data = await getLessonForUser(lessonId, user?.id ?? null);
   if (!data) notFound();
@@ -37,6 +37,9 @@ export default async function LearnPage({
       userId: user?.id,
       properties: { course_id: course.id, lesson_id: lessonId, trigger: "locked_lesson" },
     });
+  }
+  if (checkout === "success" && access && user) {
+    await track({ eventName: "lesson_continue_after_pay", userId: user.id, properties: { course_id: course.id, lesson_id: lessonId } });
   }
 
   // 恢复上次进度（§4.1：支付后回到原进度）

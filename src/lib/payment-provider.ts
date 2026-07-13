@@ -13,6 +13,8 @@ export interface CheckoutParams {
   currency: string;
   subject: string;
   billingPeriod: string;
+  /** 已在服务端校验为站内路径；真实渠道成功后必须回到用户原学习位置。 */
+  returnTo: string;
 }
 
 export interface CheckoutTicket {
@@ -77,7 +79,7 @@ class MockProvider implements PaymentProvider {
       channel: this.channel,
       externalOrderId: params.externalOrderId,
       amountCents: params.amountCents,
-      payUrl: `/checkout/mock?order=${encodeURIComponent(params.externalOrderId)}`,
+      payUrl: `/checkout/mock?order=${encodeURIComponent(params.externalOrderId)}&next=${encodeURIComponent(params.returnTo)}`,
       qrContent: `tide://pay/${params.externalOrderId}`,
     };
   }
@@ -129,11 +131,16 @@ class StripeProvider implements PaymentProvider {
     if (site.protocol !== "https:" && site.hostname !== "localhost" && site.hostname !== "127.0.0.1") {
       throw new Error("NEXT_PUBLIC_SITE_URL 必须为 HTTPS 站点");
     }
+    const success = new URL(params.returnTo, site);
+    success.searchParams.set("checkout", "success");
+    const cancel = new URL("/pricing", site);
+    cancel.searchParams.set("checkout", "canceled");
+    cancel.searchParams.set("next", params.returnTo);
     const form = new URLSearchParams({
       mode: "payment",
       client_reference_id: params.externalOrderId,
-      success_url: new URL("/me/subscription?checkout=success", site).toString(),
-      cancel_url: new URL("/pricing?checkout=canceled", site).toString(),
+      success_url: success.toString(),
+      cancel_url: cancel.toString(),
       "metadata[external_order_id]": params.externalOrderId,
       "payment_intent_data[metadata][external_order_id]": params.externalOrderId,
       "line_items[0][quantity]": "1",

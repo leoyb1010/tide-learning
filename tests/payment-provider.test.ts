@@ -93,6 +93,7 @@ describe("Stripe Checkout", () => {
       currency: "CNY",
       subject: "全站月卡",
       billingPeriod: "month",
+      returnTo: "/learn/course-1/lesson-2?t=93",
     });
     expect(ticket.payUrl).toContain("checkout.stripe.com");
     expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -107,11 +108,13 @@ describe("Stripe Checkout", () => {
     expect(form.get("line_items[0][price_data][currency]")).toBe("cny");
     expect(form.get("metadata[external_order_id]")).toBe("stripe_order_1");
     expect(form.get("payment_intent_data[metadata][external_order_id]")).toBe("stripe_order_1");
+    expect(form.get("success_url")).toBe("https://learning.example/learn/course-1/lesson-2?t=93&checkout=success");
+    expect(form.get("cancel_url")).toContain("next=%2Flearn%2Fcourse-1%2Flesson-2%3Ft%3D93");
   });
 
   it("未实现完整订阅生命周期前拒绝自动续费套餐", async () => {
     await expect(getProvider("stripe")!.createCheckout({
-      orderId: "o1", externalOrderId: "eo1", amountCents: 990, currency: "CNY", subject: "月卡", billingPeriod: "month_recurring",
+      orderId: "o1", externalOrderId: "eo1", amountCents: 990, currency: "CNY", subject: "月卡", billingPeriod: "month_recurring", returnTo: "/me/subscription",
     })).rejects.toThrow(/自动续费/);
   });
 });

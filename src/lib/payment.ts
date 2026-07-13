@@ -6,6 +6,7 @@ import { track } from "./analytics";
 import { AppError } from "./api";
 import { getProvider } from "./payment-provider";
 import { unlockAchievement } from "./gamification";
+import { safeInternalPath } from "./safe-redirect";
 
 /**
  * 支付与订阅 — 计划书 v0.3 §7.3 + D1 真实化。
@@ -182,6 +183,7 @@ export async function createCheckoutSession(
   planId: string,
   channel: string,
   couponCode?: string,
+  returnTo?: string,
 ) {
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan || !plan.isActive) throw new AppError("套餐不可用");
@@ -266,6 +268,7 @@ export async function createCheckoutSession(
       currency: plan.currency,
       subject: plan.name,
       billingPeriod: plan.billingPeriod,
+      returnTo: safeInternalPath(returnTo, "/me/subscription"),
     });
   } catch (e) {
     await prisma.order.update({ where: { id: order.id }, data: { status: "failed" } }).catch(() => {});
@@ -287,6 +290,8 @@ export async function processWebhook(channel: string, payload: {
   amountCents: number;
   currency: string;
 }) {
+  const processingStartedAt = new Date();
+  const staleBefore = new Date(processingStartedAt.getTime() - 5 * 60_000);
   // 幂等：先原子占位（unique 约束保证并发下只有一个成功）
   try {
     await prisma.paymentWebhookLog.create({
@@ -296,14 +301,18 @@ export async function processWebhook(channel: string, payload: {
         externalId: payload.externalId,
         payloadJson: JSON.stringify(payload),
         status: "processing",
+        processingStartedAt,
       },
     });
   } catch {
     const existing = await prisma.paymentWebhookLog.findUnique({ where: { channel_externalId: { channel, externalId: payload.externalId } } });
-    if (!existing || existing.status === "processed" || existing.status === "processing") return { ok: true, duplicate: true };
+    if (!existing || existing.status === "processed") return { ok: true, duplicate: true };
+    const reclaimable = existing.status === "processing"
+      ? { status: "processing", OR: [{ processingStartedAt: null }, { processingStartedAt: { lte: staleBefore } }] }
+      : { status: { in: ["error", "received"] } };
     const claimed = await prisma.paymentWebhookLog.updateMany({
-      where: { id: existing.id, status: { in: ["error", "received"] } },
-      data: { status: "processing", errorMessage: null },
+      where: { id: existing.id, ...reclaimable },
+      data: { status: "processing", processingStartedAt, payloadJson: JSON.stringify(payload), errorMessage: null },
     });
     if (claimed.count === 0) return { ok: true, duplicate: true };
   }
@@ -531,7 +540,10 @@ export async function processWebhook(channel: string, payload: {
         }
       }
       if (logRef) {
-        await prisma.paymentWebhookLog.update({ where: { id: logRef.id }, data: { status: "processed", processedAt: new Date() } });
+        await prisma.paymentWebhookLog.update({
+          where: { id: logRef.id },
+          data: { status: "processed", processedAt: new Date(), processingStartedAt: null },
+        });
       }
     } catch (tailErr) {
       // 事务已提交，收尾失败只记日志，不影响已履约的订单，也不进入删除补偿分支。

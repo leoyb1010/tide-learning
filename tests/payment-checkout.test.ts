@@ -91,12 +91,13 @@ describe("createCheckoutSession —— provider 先校验", () => {
     });
     prismaMock.order.create.mockResolvedValue({ id: "order_1" });
 
-    const res = await createCheckoutSession("u1", "plan_all", "web_wechat");
+    const res = await createCheckoutSession("u1", "plan_all", "web_wechat", undefined, "//evil.example");
     expect(prismaMock.order.create).toHaveBeenCalledTimes(1);
     expect(prismaMock.order.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: "pending", channel: "web_wechat" }) }),
     );
     expect(createCheckout).toHaveBeenCalledTimes(1);
+    expect(createCheckout).toHaveBeenCalledWith(expect.objectContaining({ returnTo: "/me/subscription" }));
     expect(res.orderId).toBe("order_1");
     expect(res.ticket).toBeDefined();
     // 成功路径不应触发 failed 补偿

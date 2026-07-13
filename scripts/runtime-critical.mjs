@@ -101,7 +101,7 @@ async function accountErasureFlow() {
     },
   });
 
-  const result = await api("/api/account/delete", { token, method: "POST", body: { password } });
+  const result = await api("/api/account/delete", { token, method: "POST", body: { password, confirmation: "DELETE_ACCOUNT" } });
   check(result.deleted && result.personalDataErased && result.financialRecordsAnonymized, "delete response contract failed");
 
   const erased = await prisma.user.findUnique({ where: { id: userId } });

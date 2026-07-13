@@ -12,7 +12,7 @@
     "start": "next start",
     "preview": "bash scripts/preview.sh",
     "lint": "eslint . --max-warnings=0",
-    "db:push": "prisma db push",
+    "db:push": "npm run db:deploy",
     "db:deploy": "bash scripts/migrate-deploy.sh",
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",

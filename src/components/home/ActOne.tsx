@@ -10,7 +10,6 @@ import {
   Sparkle,
   FileArrowUp,
 } from "@phosphor-icons/react/dist/ssr";
-import { DoorOpen } from "@/components/motion";
 import { useStudyRoom } from "./StudyRoomContext";
 import { HeroPromptInput } from "./HeroPromptInput";
 import { DeskDemo } from "./DeskDemo";
@@ -46,11 +45,9 @@ export function ActOne({
   onlineCount: number;
   totalCourses: number;
 }) {
-  const { px, py, motionOk, isMobile, immersive } = useStudyRoom();
+  const { px, py, motionOk, immersive } = useStudyRoom();
 
   // 鼠标视差 → 场景倾斜（克制 ±1.5°）。仅沉浸态活跃；降级时恒 0。
-  const rotY = useTransform(px, [-1, 1], immersive ? [1.5, -1.5] : [0, 0]);
-  const rotX = useTransform(py, [-1, 1], immersive ? [-1.2, 1.2] : [0, 0]);
   // 台灯光晕反向轻移，制造「光源在场景深处」的层次。
   const glowX = useTransform(px, [-1, 1], immersive ? [16, -16] : [0, 0]);
   const glowY = useTransform(py, [-1, 1], immersive ? [10, -10] : [0, 0]);
@@ -69,10 +66,9 @@ export function ActOne({
           低透明度 + 边缘渐隐 + 场景色蒙版压柔，营造「一屋子教室」的空间纵深；
           英文标注被蒙版弱化成氛围纹理，不与前景动画争视线。亮/暗两版随主题切换，
           随鼠标反向轻微视差（比前景慢，像更远的房间）。aria-hidden 纯装饰。 —— */}
-      {!isMobile && (
-        <motion.div
+      <motion.div
           aria-hidden
-          className="pointer-events-none absolute inset-0 overflow-hidden"
+          className="pointer-events-none absolute inset-0 hidden overflow-hidden sm:block"
           style={{ x: glowX, y: glowY }}
         >
           {/* 装饰性背景图：低优先级（fetchPriority=low）不与首屏 LCP 内容争带宽；
@@ -113,10 +109,9 @@ export function ActOne({
             }}
           />
         </motion.div>
-      )}
 
       {/* 推门进场：整场从暗到亮 + 光缝推开，一次性开场编排。reduce-motion 直接终态。 */}
-      <DoorOpen className="absolute inset-0 flex flex-col items-center justify-center">
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
         {/* —— 透视网格地板：CSS 3D，rotateX 铺向远方，径向遮罩渐隐（移动端保留，
             桌面已有教室背景图提供纵深，网格再淡一档避免与图打架）—— */}
         <motion.div
@@ -124,9 +119,9 @@ export function ActOne({
           className="pointer-events-none absolute inset-x-0 bottom-0 h-[62%]"
           style={{
             transformStyle: "preserve-3d",
-            transform: `perspective(680px) rotateX(${isMobile ? 66 : 60}deg)`,
+            transform: "perspective(680px) rotateX(60deg)",
             transformOrigin: "50% 100%",
-            opacity: isMobile ? 1 : 0.4,
+            opacity: 0.4,
             backgroundImage:
               "linear-gradient(var(--scene-grid) 1px, transparent 1px), linear-gradient(90deg, var(--scene-grid) 1px, transparent 1px)",
             backgroundSize: "56px 56px",
@@ -155,14 +150,8 @@ export function ActOne({
         />
 
         {/* —— 场景内容层：随鼠标整体倾斜（视差容器）。宽屏 max-w 阶梯放宽。 —— */}
-        <motion.div
+        <div
           className="relative z-[1] flex w-full max-w-[720px] flex-col items-center px-6 text-center lg:max-w-[1040px] lg:px-10 xl:max-w-[1200px] 2xl:max-w-[1360px]"
-          style={{
-            rotateX: rotX,
-            rotateY: rotY,
-            transformPerspective: 1200,
-            transformStyle: "preserve-3d",
-          }}
         >
           {/* 宽屏双列：左文案 + 右演示并排铺开；移动/窄屏单列纵向。 */}
           <div className="flex w-full flex-col items-center gap-10 lg:flex-row lg:items-center lg:gap-14 lg:text-left xl:gap-20">
@@ -180,34 +169,20 @@ export function ActOne({
 
               {/* 主文案：真实 DOM（SEO/LCP）。教室主轴——「想学的，这里都能开学」，
                   只保留一个红色专注词，字号收敛对齐设计系统 display 阶梯。 */}
-              <motion.h1
-                className="text-balance text-[32px] font-bold leading-[1.18] tracking-[-0.02em] text-[var(--scene-ink)] sm:text-[44px] lg:text-[52px] lg:leading-[1.1] xl:text-[60px]"
-                initial={false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.08 }}
+              <h1
+                className="lcp-system-font text-balance text-[32px] font-bold leading-[1.18] tracking-[-0.02em] text-[var(--scene-ink)] sm:text-[44px] lg:text-[52px] lg:leading-[1.1] xl:text-[60px]"
               >
                 想学的,
                 <br className="hidden sm:block" />
                 <span className="text-[var(--red)]">这里都能开学</span>
-              </motion.h1>
+              </h1>
 
               {/* 副文案：一句话点出「一间自习室，三种开学方式」，接社会证明。 */}
-              <motion.p
-                className="mt-5 max-w-[440px] text-[15px] leading-[1.8] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[500px] lg:text-[17px]"
-                initial={false}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: 0.16 }}
+              <p
+                className="lcp-system-font mt-5 max-w-[360px] text-[14px] leading-[1.7] text-[var(--scene-ink-2)] lg:mt-6 lg:max-w-[500px] lg:text-[17px]"
               >
-                三种开学方式:挑一门现成好课、一句话让 AI 造一门、
-                或把你的资料升维成课——都在你的自习室里完成。此刻{" "}
-                <span className="whitespace-nowrap font-semibold text-[var(--scene-ink)]">
-                  <span className="mono num-pop text-[var(--red)]">
-                    {onlineCount.toLocaleString()}
-                  </span>{" "}
-                  位同学
-                </span>{" "}
-                正一起学。
-              </motion.p>
+                选课、造课、学完，都在这里。
+              </p>
 
               {/* 三种开学方式入口 pill：直接回应「课程库 / AI 造课 / 自己课」三种内容。
                   真实链接、冷灰卡 + 小图标，SSR 直出可点。 */}
@@ -234,7 +209,7 @@ export function ActOne({
                 <p className="mono mt-4 text-[12px] text-[var(--scene-ink-3)] lg:text-[13px]">
                   已有{" "}
                   <span className="font-bold text-[var(--scene-ink-2)]">{totalCourses}</span>{" "}
-                  门课程在架 · 免费体验,无需登录
+                  门课程在架 · {onlineCount.toLocaleString()} 位同学在学 · 免费体验,无需登录
                 </p>
               </motion.div>
             </div>
@@ -252,7 +227,7 @@ export function ActOne({
               <DeskDemo />
             </motion.div>
           </div>
-        </motion.div>
+        </div>
 
         {/* —— 向下滚动提示：把用户引向第二幕「走近书桌」—— */}
         <motion.div
@@ -266,7 +241,7 @@ export function ActOne({
             <ArrowDown size={16} weight="bold" aria-hidden className={motionOk ? "scroll-hint" : ""} />
           </span>
         </motion.div>
-      </DoorOpen>
+      </div>
 
       {/* —— 邻座工位：房间四周浮着几张「别人正在学」的桌面小卡（仅宽屏沉浸态）。
           直挂 section（包含块=整幕），四角定位不受 DoorOpen 的居中布局影响；

@@ -25,7 +25,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       headers: {
         "content-type": attachment.mimeType,
         "content-length": String(bytes.length),
-        "content-disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(attachment.fileName)}`,
+        "content-disposition": `${attachment.mimeType.startsWith("image/") ? "inline" : "attachment"}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(attachment.fileName)}`,
         "cache-control": "private, no-store",
         "x-content-type-options": "nosniff",
       },

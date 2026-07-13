@@ -10,3 +10,9 @@ export const CREDITS_PER_COURSE = 40;
 export function coursesFromGrant(grant: number): number {
   return Math.max(1, Math.floor(grant / CREDITS_PER_COURSE));
 }
+
+/** 只展示当前支付渠道真正能完成结算的套餐，避免把不支持的自动续费卖给用户。 */
+export function isPlanSupportedByChannel(billingPeriod: string, channel: string): boolean {
+  if (channel === "stripe") return billingPeriod !== "month_recurring";
+  return billingPeriod !== "month";
+}

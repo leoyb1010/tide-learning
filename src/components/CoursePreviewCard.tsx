@@ -11,6 +11,7 @@ import { Spotlight } from "./motion";
 import { RatingStars } from "./RatingStars";
 import { deriveCourseRating } from "@/lib/course-rating";
 import { TRACK_MAP, trackGradientVar, resolveCoverSrc } from "@/lib/tracks";
+import { track } from "@/lib/analytics-client";
 
 /* ============================================================
    课程库 · 课程卡两段式预览（client）
@@ -33,7 +34,7 @@ export function CoursePreviewCard({ course }: { course: CourseCardData }) {
       <Spotlight className="h-full rounded-[var(--radius-card)]">
         <button
           type="button"
-          onClick={() => setOpen(true)}
+          onClick={() => { track("course_card_click", { course_id: course.id, course_slug: course.slug }); setOpen(true); }}
           aria-haspopup="dialog"
           aria-expanded={open}
           className="studio-lift group flex h-full w-full flex-col overflow-hidden rounded-[16px] border border-[var(--border)] bg-[var(--surface)] text-left shadow-[var(--card)]"

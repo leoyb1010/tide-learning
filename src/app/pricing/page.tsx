@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { PricingPlans } from "@/components/PricingPlans";
-import { coursesFromGrant } from "@/lib/pricing";
+import { coursesFromGrant, isPlanSupportedByChannel } from "@/lib/pricing";
 import { type PlanData } from "@/components/SubscriptionCard";
 import { monthlyGrantForPlan } from "@/lib/credits";
 import { TrackView } from "@/components/TrackView";
@@ -33,7 +33,7 @@ const RIGHTS = [
   { name: "学习周报", free: NO, premium: "是", expired: NO },
   { name: "分享卡（学习成果）", free: NO, premium: "是", expired: NO },
   { name: "需求投票权", free: NO, premium: "是", expired: NO },
-  { name: "优先客服 · 新功能抢先", free: NO, premium: "是", expired: NO },
+  { name: "新功能抢先体验", free: NO, premium: "是", expired: NO },
 ];
 
 /** 使用场景示例；不冒充真实用户证言。 */
@@ -69,19 +69,26 @@ export default async function PricingPage({
   const [rawPlans, courseCount, userCount, weekUpdates] = await Promise.all([
     prisma.plan.findMany({ where: { isActive: true }, orderBy: { priceCents: "asc" } }),
     prisma.course.count({ where: { status: "published", visibility: "public" } }),
-    prisma.user.count(),
+    prisma.learningProgress.findMany({
+      where: { user: { deletedAt: null, role: "user" } },
+      distinct: ["userId"],
+      select: { userId: true },
+    }),
     prisma.courseUpdateLog.count({ where: { publishedAt: { gte: weekAgo } } }),
   ]);
 
   // 只展示数据库真实值；禁止用营销下限伪造课程、用户或更新数量。
   const stats = {
     courses: courseCount,
-    learners: userCount,
+    learners: userCount.length,
     weekly: weekUpdates,
   };
 
   // 为每个 DB Plan 派生 monthlyGrant（前后端单一事实源：credits.ts）。
-  const plans: PlanData[] = rawPlans.map((p) => ({
+  const payChannel = process.env.NEXT_PUBLIC_PAY_CHANNEL || "mock";
+  const plans: PlanData[] = rawPlans
+    .filter((p) => isPlanSupportedByChannel(p.billingPeriod, payChannel))
+    .map((p) => ({
     id: p.id,
     name: p.name,
     billingPeriod: p.billingPeriod,
@@ -91,11 +98,10 @@ export default async function PricingPage({
     scope: p.scope,
     highlight: p.highlight,
     monthlyGrant: monthlyGrantForPlan({ billingPeriod: p.billingPeriod, scope: p.scope }),
-  }));
+    }));
 
-  // 全站会员：主推年卡/季卡/连续包月（排除弱锚点单月）；单月做弱锚点小字。
-  const fullPlans = plans.filter((p) => p.scope === "all" && p.billingPeriod !== "month");
-  const anchor = plans.find((p) => p.scope === "all" && p.billingPeriod === "month");
+  const fullPlans = plans.filter((p) => p.scope === "all");
+  const anchor = payChannel === "stripe" ? undefined : plans.find((p) => p.scope === "all" && p.billingPeriod === "month");
   const trackPlans = plans.filter((p) => p.scope !== "all");
 
   // 年卡月赠积分 → 「可造约 x 门课」，用于价值区数字与文案。
@@ -149,7 +155,7 @@ export default async function PricingPage({
             一次订阅解锁全部赛道，年卡每月赠 {yearGrant} 积分 · 可造约 {coursesFromGrant(yearGrant)} 门课
           </p>
         </div>
-        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} />
+        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} payChannel={payChannel} />
         {anchor && (
           <p className="mono mt-6 text-center text-[13px] text-[var(--ink4)]">
             也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首期优惠，月赠 {anchor.monthlyGrant} 积分）

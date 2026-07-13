@@ -27,6 +27,9 @@ const REVOKING_TYPES = new Set(["REFUND", "REVOKE"]);
 /** 解码一段 Apple JWS：已配置 Apple 时强制验签；未配置且非生产时按明文 JSON 测试载荷处理。 */
 function decodeAppleJws(jws: string): { ok: true; payload: Record<string, unknown> } | { ok: false; reason: string } {
   if (isAppleConfigured()) return verifySignedJws(jws);
+  if (process.env.NODE_ENV === "production") {
+    return { ok: false, reason: "生产环境未配置 Apple JWS 校验参数" };
+  }
   try {
     return { ok: true, payload: JSON.parse(jws) as Record<string, unknown> };
   } catch {

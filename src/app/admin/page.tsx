@@ -15,9 +15,9 @@ export default async function AdminDashboard() {
   const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const premiumStatuses = ["active", "trial", "grace_period", "canceled_but_active"];
 
-  const [views, registers, trials, activeSubs, weeklyLearners, notes, demands, votesAgg, refunds, checkouts, leads, viewEvents, subsForScope, premiumCourses, premiumHits, deterministicHits, rejectGroups, recentRendered] = await Promise.all([
+  const [views, registrationEvents, trials, activeSubs, weeklyLearners, notes, demands, votesAgg, refunds, checkouts, leads, viewEvents, subsForScope, premiumCourses, premiumHits, deterministicHits, rejectGroups, recentRendered, funnelGroups] = await Promise.all([
     prisma.analyticsEvent.count({ where: { eventName: "homepage_view" } }),
-    prisma.user.count({ where: { role: "user" } }),
+    prisma.analyticsEvent.findMany({ where: { eventName: "signup_success", userId: { not: null } }, distinct: ["userId"], select: { userId: true } }),
     prisma.analyticsEvent.count({ where: { eventName: "lesson_trial_start" } }),
     prisma.subscription.findMany({ where: { status: { in: premiumStatuses } }, distinct: ["userId"], select: { userId: true } }),
     prisma.learningProgress.findMany({ where: { lastPlayedAt: { gte: weekAgo } }, distinct: ["userId"], select: { userId: true } }),
@@ -34,6 +34,11 @@ export default async function AdminDashboard() {
     prisma.lesson.count({ where: { renderEngine: "deterministic" } }),
     prisma.lesson.groupBy({ by: ["renderRejectReason"], where: { renderRejectReason: { not: null } }, _count: true, orderBy: { _count: { renderRejectReason: "desc" } }, take: 5 }),
     prisma.lesson.findMany({ where: { renderEngine: { not: null } }, orderBy: { createdAt: "desc" }, take: 8, select: { id: true, title: true, renderEngine: true, renderRejectReason: true, renderDurationMs: true, course: { select: { title: true, template: true, qualityTier: true } } } }),
+    prisma.analyticsEvent.groupBy({
+      by: ["eventName"],
+      where: { eventName: { in: ["homepage_view", "course_card_click", "lesson_trial_start", "signup_success", "paywall_view", "checkout_start", "subscription_success", "lesson_continue_after_pay"] } },
+      _count: true,
+    }),
   ]);
 
   // 渠道漏斗：曝光(埋点 source) → 留资(lead) → 转化(lead converted)
@@ -60,15 +65,20 @@ export default async function AdminDashboard() {
 
   const activeSubscriberIds = new Set(activeSubs.map((s) => s.userId));
   const subs = activeSubscriberIds.size;
+  const registeredIds = new Set(registrationEvents.flatMap((e) => e.userId ? [e.userId] : []));
+  const registers = registeredIds.size;
+  const convertedRegistered = [...registeredIds].filter((id) => activeSubscriberIds.has(id)).length;
   const weeklyActivePaidLearners = new Set(weeklyLearners.filter((p) => activeSubscriberIds.has(p.userId)).map((p) => p.userId)).size;
-  const convRate = registers > 0 ? ((subs / registers) * 100).toFixed(1) : "0";
+  const convRate = registers > 0 ? ((convertedRegistered / registers) * 100).toFixed(1) : "0";
+  const funnelCounts = new Map(funnelGroups.map((g) => [g.eventName, g._count]));
+  const funnel = ["homepage_view", "course_card_click", "lesson_trial_start", "signup_success", "paywall_view", "checkout_start", "subscription_success", "lesson_continue_after_pay"];
 
   const cards = [
     { label: "访问（首页曝光）", value: views },
-    { label: "注册用户", value: registers },
+    { label: "完成注册（可识别用户）", value: registers },
     { label: "试学次数", value: trials },
     { label: "有效订阅用户", value: subs },
-    { label: "注册→订阅转化", value: `${convRate}%` },
+    { label: "注册同期群→当前有效订阅", value: `${convRate}%` },
     { label: "近 7 天付费学习用户", value: weeklyActivePaidLearners },
     { label: "笔记创建", value: notes },
     { label: "需求提交", value: demands },
@@ -93,10 +103,10 @@ export default async function AdminDashboard() {
 
       <div className="rounded-2xl border border-ink-100 bg-paper-raised p-5">
         <h2 className="mb-3 font-medium text-ink-950">P1 核心漏斗</h2>
-        <p className="text-sm text-ink-500">
-          homepage_view → course_card_click → lesson_trial_start → signup → paywall_view → checkout_start → subscription_success → lesson_continue_after_pay
-        </p>
-        <p className="mt-2 text-xs text-ink-400">埋点已全链路上报，事件明细见 analytics_events 表。</p>
+        <div className="flex flex-wrap gap-2 text-sm text-ink-500">
+          {funnel.map((name, index) => <span key={name}>{index > 0 && "→ "}{name} <strong className="tabular text-ink-950">{funnelCounts.get(name) ?? 0}</strong></span>)}
+        </div>
+        <p className="mt-2 text-xs text-ink-400">以上为 analytics_events 实际记录数；0 表示尚未观测到该事件，不代表链路已完成。</p>
       </div>
 
       <div className="rounded-2xl border border-ink-100 bg-paper-raised p-5">

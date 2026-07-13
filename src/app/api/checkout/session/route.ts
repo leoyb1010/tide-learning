@@ -12,13 +12,14 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
     assertRateLimit(req, "checkout", 20, 60_000); // 防刷单
     const user = await requireUser();
-    const { planId, channel, couponCode } = (await req.json()) as {
+    const { planId, channel, couponCode, returnTo } = (await req.json()) as {
       planId: string;
       channel?: string;
       couponCode?: string;
+      returnTo?: string;
     };
     if (!planId) return fail("请选择套餐");
-    const session = await createCheckoutSession(user.id, planId, channel ?? "mock", couponCode);
+    const session = await createCheckoutSession(user.id, planId, channel ?? "mock", couponCode, returnTo);
     // 前端应跳转 mock 收银台页（ticket.payUrl），由 /api/checkout/mock-pay 在服务端签名后回调 webhook。
     return ok({ ...session, payUrl: session.ticket.payUrl });
   });

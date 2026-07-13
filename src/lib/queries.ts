@@ -25,16 +25,17 @@ export { relativeTime, formatDuration };
 /**
  * 归属/可见性门（与订阅门 canAccessLesson 叠加，各管一件事）：
  * 判定「这门课该不该对当前访问者存在」。挡的是他人的私有课（AI 造课/导入课越权读取）。
- * - 官方课（origin === "official"）：始终公开可读。
- * - 非官方课：仅当「作者本人访问」或「已分享到集市（sharedStatus === "shared"）」才可读。
- *   游客（viewerUserId 为空）看不到任何非官方私有课，只能读 shared 或官方课。
+ * - public / unlisted：知道链接即可读取元数据；只有 public 进入课程库和 sitemap。
+ * - private：仅作者本人、已分享到集市或已购买者可读。
  * 不满足即视为不存在（调用方 return null → 页面 notFound / API 404）。
  */
 export function canViewCourse(
-  course: { origin: string; authorUserId: string | null; sharedStatus: string },
+  course: { visibility: string; authorUserId: string | null; sharedStatus: string },
   viewerUserId: string | null,
+  owned = false,
 ): boolean {
-  if (course.origin === "official") return true;
+  if (course.visibility === "public" || course.visibility === "unlisted") return true;
+  if (owned) return true;
   if (course.sharedStatus === "shared") return true;
   return !!viewerUserId && course.authorUserId === viewerUserId;
 }
@@ -147,11 +148,10 @@ export async function getCourseDetail(idOrSlug: string, userId: string | null) {
     },
   });
   if (!course) return null;
-  // 归属/可见性门：他人的私有课对当前访问者视为不存在（越权读取修复）。
-  if (!canViewCourse(course, userId)) return null;
-  const snapshot = await resolveEntitlement(userId);
   // 买断真值源：已购本课（CoursePurchase）则全部章节放行（不走赛道订阅门）。越权铁律：where userId=我。
   const owned = await hasPurchasedCourse(course.id, userId);
+  if (!canViewCourse(course, userId, owned)) return null;
+  const snapshot = await resolveEntitlement(userId);
   const progress = userId
     ? await prisma.learningProgress.findMany({
         where: { userId, courseId: course.id },
@@ -224,11 +224,10 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
     },
   });
   if (!lesson) return null;
-  // 归属/可见性门：他人的私有课的章节对当前访问者视为不存在（越权读取修复）。
-  if (!canViewCourse(lesson.course, userId)) return null;
-  const snapshot = await resolveEntitlement(userId);
   // 买断真值源：已购本课（CoursePurchase）则本节放行（不走赛道订阅门，修 P0 买断失能）。越权铁律：where userId=我。
   const owned = await hasPurchasedCourse(lesson.course.id, userId);
+  if (!canViewCourse(lesson.course, userId, owned)) return null;
+  const snapshot = await resolveEntitlement(userId);
   const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned);
 
   const { lessons: siblings, ...courseMeta } = lesson.course;

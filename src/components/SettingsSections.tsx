@@ -158,10 +158,37 @@ function ToggleRow({
   );
 }
 
-/** 注销账号（红色警示，二次确认）。保留原有「入口 + 确认」逻辑，暂无删除 API 时给出提示。 */
-export function DeleteAccountButton() {
+/** 注销账号（红色警示，显式确认；密码账号额外校验当前密码）。 */
+export function DeleteAccountButton({ requiresPassword }: { requiresPassword: boolean }) {
   const { toast } = useToast();
   const [confirming, setConfirming] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function erase() {
+    setError(null);
+    if (confirmation !== "注销账号") return setError("请输入“注销账号”以确认");
+    if (requiresPassword && !password) return setError("请输入当前密码");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/account/delete", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password, confirmation: "DELETE_ACCOUNT" }),
+      });
+      const json = await res.json().catch(() => ({ ok: false, error: "网络异常" }));
+      if (!json.ok) {
+        setError(json.error || "注销失败");
+        return;
+      }
+      toast("账号已注销，个人数据已清除", { tone: "success" });
+      window.location.assign("/login?deleted=1");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   if (!confirming) {
     return (
@@ -180,8 +207,19 @@ export function DeleteAccountButton() {
       <p className="mt-1.5 text-[12px] text-[var(--ink2)]">
         注销为不可逆操作，将清除你的学习记录与个人资料。建议先
         <span className="font-semibold text-[var(--ink)]"> 导出笔记 </span>
-        备份。如需继续，请联系客服 support@youdao.com 完成人工核验。
+        备份。继续操作需输入下方确认文字{requiresPassword ? "并验证当前密码" : ""}。
       </p>
+      <label className="mt-3 block text-[12px] font-medium text-[var(--ink2)]">
+        输入“注销账号”
+        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} className="mt-1.5 w-full rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]" />
+      </label>
+      {requiresPassword && (
+        <label className="mt-3 block text-[12px] font-medium text-[var(--ink2)]">
+          当前密码
+          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5 w-full rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]" />
+        </label>
+      )}
+      {error && <p className="mt-2 text-[12px] font-medium text-[var(--red)]">{error}</p>}
       <div className="mt-3 flex items-center gap-2.5">
         <button
           type="button"
@@ -192,13 +230,11 @@ export function DeleteAccountButton() {
         </button>
         <button
           type="button"
-          onClick={() => {
-            toast("注销申请需人工核验，请联系 support@youdao.com", { tone: "info" });
-            setConfirming(false);
-          }}
+          onClick={erase}
+          disabled={loading || confirmation !== "注销账号" || (requiresPassword && !password)}
           className="rounded-[10px] border border-[var(--red-soft-border)] px-4 py-2 text-[13px] font-semibold text-[var(--red)] transition-opacity hover:opacity-90"
         >
-          我已了解，申请注销
+          {loading ? "正在注销…" : "永久注销账号"}
         </button>
       </div>
     </div>

@@ -11,11 +11,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * POST /api/account/delete — 注销账号（App Store 5.1.1(v) 要求可在 App 内删号）。
- * 入参：{ password }。
- * 校验：同源(CSRF) + 登录态 + 限流 + 当前密码正确。
+ * 入参：密码账号 { password, confirmation }；第三方账号 { confirmation }。
+ * 校验：同源(CSRF) + 登录态 + 限流 + 明确确认；密码账号还须当前密码正确。
  * 处理：立即删除学习、社交、设备、AI 对话与附件数据；埋点和线索解除身份关联；
  * 订单、订阅、优惠核销与积分流水因退款、对账和反欺诈需要保留，但账号主体会被不可逆匿名化并吊销权益。
- * 第三方登录账号（authProvider!=password 或无 passwordHash）无本地密码，走原渠道，此处拒绝。
+ * 第三方账号没有本地密码，以当前已认证会话 + 同源保护 + 显式确认完成自助注销。
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -23,15 +23,13 @@ export async function POST(req: NextRequest) {
     const user = await requireUser();
     assertRateLimit(req, `account-delete:${user.id}`, 5, 60_000);
 
-    const body = (await req.json().catch(() => null)) as { password?: string } | null;
+    const body = (await req.json().catch(() => null)) as { password?: string; confirmation?: string } | null;
     const password = (body?.password ?? "").trim();
-    if (!password) return fail("请输入密码以确认注销");
+    if (body?.confirmation !== "DELETE_ACCOUNT") return fail("请输入“注销账号”以确认");
 
-    if (user.authProvider !== "password" || !user.passwordHash) {
-      return fail("第三方登录账号请通过原渠道注销");
-    }
-    if (!verifyPassword(password, user.passwordHash)) {
-      return fail("密码不正确");
+    if (user.authProvider === "password" && user.passwordHash) {
+      if (!password) return fail("请输入密码以确认注销");
+      if (!verifyPassword(password, user.passwordHash)) return fail("密码不正确");
     }
 
     const attachments = await prisma.noteAttachment.findMany({

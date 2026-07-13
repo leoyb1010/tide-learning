@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server";
 import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
 import { Agent } from "undici";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
@@ -12,6 +11,7 @@ import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { buildExcerpt } from "@/lib/format";
 import { htmlToStructuredMarkdown, paragraphizePlainText } from "@/lib/note-structure";
+import { isBlockedHostname, isBlockedIp } from "@/lib/network-address";
 
 export const dynamic = "force-dynamic";
 
@@ -24,44 +24,6 @@ const MAX_HTML_BYTES = 4_000_000; // 原始 HTML 硬上限 4MB，防超大页面
  * 拒绝：localhost、127./10./192.168./172.16-31./169.254.、::1、fc00::/7、fe80::、内网泄漏的 metadata IP。
  * 注意：需对 hostname 做 DNS 解析后再判定，防止「域名解析到内网」的绕过。
  */
-function isBlockedIp(ip: string): boolean {
-  const v = isIP(ip);
-  if (v === 4) {
-    const p = ip.split(".").map((n) => parseInt(n, 10));
-    if (p.length !== 4 || p.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return true;
-    const [a, b] = p;
-    if (a === 127) return true; // 环回
-    if (a === 10) return true; // 私有 A
-    if (a === 192 && b === 168) return true; // 私有 C
-    if (a === 172 && b >= 16 && b <= 31) return true; // 私有 B
-    if (a === 100 && b >= 64 && b <= 127) return true; // CGNAT 100.64.0.0/10（阿里云 metadata 100.100.100.200 属此段）
-    if (a === 169 && b === 254) return true; // 链路本地 / 云 metadata (169.254.169.254)
-    if (a === 0) return true; // 0.0.0.0/8
-    if (a >= 224) return true; // 组播 / 保留
-    return false;
-  }
-  if (v === 6) {
-    const low = ip.toLowerCase();
-    if (low === "::1" || low === "::") return true; // 环回 / 未指定
-    if (low.startsWith("fe80") || low.startsWith("fc") || low.startsWith("fd")) return true; // 链路本地 / ULA
-    // IPv4-mapped（::ffff:127.0.0.1 等）：抽出末段 IPv4 再判
-    const m = low.match(/::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (m) return isBlockedIp(m[1]);
-    return false;
-  }
-  return true; // 非法 IP 一律拒绝
-}
-
-function isBlockedHostname(hostname: string): boolean {
-  const h = hostname.toLowerCase().replace(/\.$/, ""); // 去尾点
-  if (!h) return true;
-  if (h === "localhost" || h.endsWith(".localhost")) return true;
-  if (h === "localhost.localdomain") return true;
-  // hostname 本身就是字面 IP：直接判
-  if (isIP(h)) return isBlockedIp(h);
-  return false;
-}
-
 /** 校验被拒绝时抛出的哨兵错误：hostname 命中黑名单 / 解析失败 / 解析出内网 IP。 */
 class BlockedTargetError extends Error {}
 

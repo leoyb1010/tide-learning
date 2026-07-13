@@ -43,7 +43,7 @@ export default async function PrivacySettingsPage() {
           <p className="mb-3 text-[12px] text-[var(--ink3)]">
             注销后数据不可恢复，请谨慎操作。
           </p>
-          <DeleteAccountButton />
+          <DeleteAccountButton requiresPassword={user.authProvider === "password" && !!user.passwordHash} />
         </div>
       </SectionCard>
     </div>
