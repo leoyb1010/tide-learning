@@ -470,13 +470,17 @@ export async function processWebhook(channel: string, payload: {
           }
         }
 
-        // 退款回退优惠券名额（不低于 0）+ 删核销记录：仅当本单确有核销记录时才回退，
-        // 避免「未核销订单退款也扣名额」把 redeemedCount 扣穿。deleteMany 命中数即本单是否核销过。
+        // 退款释放优惠券名额（不低于 0）：名额是「每用户一张」，核销行(@@unique[couponId,userId])的 orderId
+        // 会随该用户对该券的「最新一笔」订单移动（下单预留时的复用逻辑）。因此只有当核销行确实【指向本单】时
+        // 才释放——删行 + 减名额。此前按 (couponId,orderId) 删：同用户对同券多笔订单时，退「非当前持有单」会
+        // 命中 0（名额泄漏）、或对存量超发单误减（多释放）。改按持有关系判定即两者皆免。redeemedCount>0 兜底防扣穿。
         if (order.couponId) {
-          const removed = await tx.couponRedemption.deleteMany({
-            where: { couponId: order.couponId, orderId: order.id },
+          const redemption = await tx.couponRedemption.findUnique({
+            where: { couponId_userId: { couponId: order.couponId, userId: order.userId } },
+            select: { id: true, orderId: true },
           });
-          if (removed.count > 0) {
+          if (redemption && redemption.orderId === order.id) {
+            await tx.couponRedemption.delete({ where: { id: redemption.id } });
             await tx.coupon.updateMany({
               where: { id: order.couponId, redeemedCount: { gt: 0 } },
               data: { redeemedCount: { decrement: 1 } },
