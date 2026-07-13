@@ -230,6 +230,7 @@ struct ExamRunnerView: View {
             case .single: singleOptions(q)
             case .judge:  judgeOptions(q)
             case .short:  shortEditor(q)
+            case .unknown: shortEditor(q) // 未知题型降级为简答编辑器（P2-13 兜底）
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -67,15 +67,30 @@ export async function POST(req: NextRequest) {
   });
 }
 
-// GET /api/progress/me
-export async function GET() {
+// GET /api/progress — 当前用户的学习进度列表（Web 复合搜索选课范围等消费，只需课程标识）。
+export async function GET(req: NextRequest) {
   return handle(async () => {
     const user = await getCurrentUser();
     if (!user) return ok({ progress: [] });
+    // P1-2 修复：此前 include:{ lesson:true } 会把整行 lesson（含 blocksJson/htmlJson/articleMd/
+    // videoScriptJson 完整课件正文）经进度列表整体下发——既是大 payload（重度用户巨响应），
+    // 也可能让退订/无权益用户从进度列表拿到已学章节正文，绕过 getLessonForUser 的按权益置空。
+    // 正文一律走 /api/lessons/[id] 的权益门；此列表只 select 课程标识与进度锚点，并分页（默认最近 100，上限 200）。
+    const take = Math.min(Number(new URL(req.url).searchParams.get("take")) || 100, 200);
     const progress = await prisma.learningProgress.findMany({
       where: { userId: user.id },
-      include: { course: true, lesson: true },
+      select: {
+        id: true,
+        courseId: true,
+        lessonId: true,
+        progressSec: true,
+        lastSlideIndex: true,
+        completedAt: true,
+        lastPlayedAt: true,
+        course: { select: { id: true, title: true, slug: true, coverColor: true } },
+      },
       orderBy: { lastPlayedAt: "desc" },
+      take,
     });
     return ok({ progress });
   });

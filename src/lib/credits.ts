@@ -36,6 +36,25 @@ const SCENE_WEIGHT = {
 export type Scene = keyof typeof SCENE_WEIGHT;
 
 /**
+ * 各场景「一次调用的典型输出 token 量」——仅用于预检门槛(estimateCredits/assertCanSpend)的最坏成本估算。
+ * 修复(2026-07-12 P1-3)：此前预检写死 3000 token，严重低估逐节/HTML 精修的真实用量
+ * （逐节 maxTokens 8000、bespoke HTML 16000），使门槛远低于实扣、放行超额免单。
+ * 这里按各出口真实 maxTokens 量级取值，让门槛贴近真实成本；实际记账仍以真实 token 为准，此表不影响记账。
+ */
+const SCENE_TYPICAL_TOKENS: Record<Scene, number> = {
+  generate_course: 4000, // 大纲
+  generate_lesson: 8000, // 逐节块
+  generate_lesson_html: 16000, // bespoke HTML 精修
+  import_source: 6000,
+  generate_exam: 4000,
+  review_card: 3000,
+  note_transform: 3000,
+  note_summary: 3000,
+  companion: 2000,
+  search_expand: 1000,
+};
+
+/**
  * 取场景权重。缺键（理论上被 Scene 类型挡住，此处防御运行时脏数据 / 类型断言绕过）：
  * dev 环境显式 warn 暴露漏配，生产回落 1.0（按最贵计，宁多扣不漏扣）。
  */
@@ -95,9 +114,14 @@ export function tokensToCredits(usage: { totalTokens: number; model?: string }, 
   return Math.max(1, Math.ceil(raw));
 }
 
-/** 预估某场景一次调用的积分（UI 展示"本次约消耗 ~N 积分"，按典型 token 量估算）。可传 model 估高级模型成本。 */
-export function estimateCredits(scene: Scene, approxTokens = 3000, model?: string): number {
-  return tokensToCredits({ totalTokens: approxTokens, model }, scene);
+/**
+ * 预估某场景一次调用的积分（UI 展示"本次约消耗 ~N 积分" / 预检门槛）。
+ * approxTokens 缺省时用该场景的典型 token 量(SCENE_TYPICAL_TOKENS)，不再一律按 3000 估。
+ * 传 model 则叠乘该模型计费权重(高级模型更贵)，让门槛贴近真实最坏成本。
+ */
+export function estimateCredits(scene: Scene, approxTokens?: number, model?: string): number {
+  const tokens = approxTokens ?? SCENE_TYPICAL_TOKENS[scene] ?? 3000;
+  return tokensToCredits({ totalTokens: tokens, model }, scene);
 }
 
 /** 读余额（React cache 去重）。无账户视为 0。 */
@@ -156,14 +180,24 @@ export async function grantCredits(
 /**
  * 预检余额。默认要求 > 0（有余额即可开始）；传 scene 时用该场景的最坏估算成本设门槛，
  * 堵住「余额 1 分换任意大额生成」的超额免单缺口（HIGH-1）。余额可为负（欠账），负数必被拦。
+ * 传 model（P1-3 修复）则按所选模型的计费权重抬高门槛，避免高级模型下门槛仍按基准模型低估。
  */
-export async function assertCanSpend(userId: string, scene?: Scene): Promise<void> {
+export async function assertCanSpend(userId: string, scene?: Scene, model?: string): Promise<void> {
   const balance = await getBalance(userId);
-  // 场景已知则按最坏成本设门槛，否则最低 1 分
-  const threshold = scene ? estimateCredits(scene) : 1;
+  // 场景已知则按该场景典型 token × 所选模型权重估门槛，否则最低 1 分
+  const threshold = scene ? estimateCredits(scene, undefined, model) : 1;
   if (balance < threshold) {
     throw new AppError("积分不足，充值后可继续使用 AI 能力", 402);
   }
+}
+
+/**
+ * 读余额（不经 React cache，每次回源）。用于后台逐节生成循环等需要「实时余额」的场景——
+ * cache 版 getBalance 在同一请求作用域内会返回首次快照，循环内看不到中途扣费。
+ */
+export async function getBalanceFresh(userId: string): Promise<number> {
+  const acc = await prisma.creditAccount.findUnique({ where: { userId }, select: { balance: true } });
+  return acc?.balance ?? 0;
 }
 
 /**

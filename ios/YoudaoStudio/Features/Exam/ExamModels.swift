@@ -20,16 +20,25 @@ struct GenerateExamResponse: Decodable {
 // MARK: - 试卷（无 answer，防作弊）
 
 /// 题型。后端下发字符串 single/judge/short。
+/// 未知值兜底为 .unknown（审计 2026-07-12 P2-13）：与 NoteSource/NoteKind/NotifType 一致，
+/// 后端将来新增题型字符串时不致整卷解码抛错、整屏报错。
 enum ExamQuestionType: String, Decodable {
     case single   // 单选
     case judge    // 判断
     case short    // 简答
+    case unknown  // 未知题型兜底（前端按简答样式降级展示）
+
+    init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        self = ExamQuestionType(rawValue: raw) ?? .unknown
+    }
 
     var label: String {
         switch self {
         case .single: return "单选题"
         case .judge:  return "判断题"
         case .short:  return "简答题"
+        case .unknown: return "题目"
         }
     }
 }

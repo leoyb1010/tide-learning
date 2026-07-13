@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
-import { verifyPassword, createSession } from "@/lib/session";
+import { verifyPassword, createSession, DUMMY_PASSWORD_HASH } from "@/lib/session";
 import { ok, fail, handle } from "@/lib/api";
 import { assertKeyRateLimit, assertRateLimit } from "@/lib/rate-limit";
 
@@ -23,11 +23,16 @@ export async function POST(req: NextRequest) {
         ? { email: identifier }
         : { OR: [{ phone: identifier }, { username: identifier }] },
     });
-    if (!user || user.deletedAt || !verifyPassword(password, user.passwordHash)) {
+    // 恒定时间路径（P2-9）：无论账号是否存在都跑一次 verifyPassword——
+    // 账号缺失/已删时对常量假哈希派生，抹平「scrypt 只在账号存在时才执行」的时序差（防用户枚举）。
+    // 短路 `||` 会在 !user 时跳过昂贵 scrypt，故先无条件算出 passOk 再判定。
+    const active = user && !user.deletedAt ? user : null;
+    const passOk = verifyPassword(password, active ? active.passwordHash : DUMMY_PASSWORD_HASH);
+    if (!active || !passOk) {
       return fail("账号或密码不正确", 401);
     }
-    const sessionToken = await createSession(user.id);
+    const sessionToken = await createSession(active.id);
     // sessionToken 供原生 App 用 Authorization: Bearer 携带（Web 用 httpOnly cookie，不读此字段）。
-    return ok({ id: user.id, nickname: user.nickname, role: user.role, sessionToken });
+    return ok({ id: active.id, nickname: active.nickname, role: active.role, sessionToken });
   });
 }

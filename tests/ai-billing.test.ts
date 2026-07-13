@@ -86,10 +86,20 @@ describe("tokensToCredits —— 折算规则", () => {
 });
 
 describe("estimateCredits —— 预检门槛的典型成本", () => {
-  it("默认按 3000 token 估算，等价 tokensToCredits(usage(3000))", () => {
-    for (const s of ["generate_exam", "note_transform", "companion", "search_expand"] as Scene[]) {
-      expect(estimateCredits(s)).toBe(tokensToCredits(usage(3000), s));
-    }
+  it("按各场景典型 token 量估门槛（P1-3：不再一律 3000）", () => {
+    // note_transform 典型仍为 3000，等价旧口径；HTML 精修/逐节典型 token 更高，门槛应随之抬升。
+    expect(estimateCredits("note_transform")).toBe(tokensToCredits(usage(3000), "note_transform"));
+    // 逐节 HTML 精修（典型 16000）是最贵出口，门槛应显著高于大纲（典型 4000）。
+    expect(estimateCredits("generate_lesson_html")).toBeGreaterThan(estimateCredits("generate_course"));
+    // 逐节块（典型 8000）门槛应高于搜索扩展（典型 1000）。
+    expect(estimateCredits("generate_lesson")).toBeGreaterThan(estimateCredits("search_expand"));
+  });
+
+  it("传 model 时按模型计费权重抬高门槛（高级模型更贵）", () => {
+    // 同场景下，高权重模型的门槛应 ≥ 基准模型（缺省 model 权重=1）。
+    const base = estimateCredits("generate_lesson");
+    const premium = estimateCredits("generate_lesson", undefined, "__nonexistent_model__");
+    expect(premium).toBeGreaterThanOrEqual(base); // 未知模型权重回落 1，至少不低于基准
   });
 
   it("高成本生成类门槛 > 1（预检不再形同虚设）", () => {

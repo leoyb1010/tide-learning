@@ -72,6 +72,13 @@ export function validatePasswordStrength(pw: string): string | null {
   return null;
 }
 
+/**
+ * 常量假哈希（审计 2026-07-12 P2-9）：登录时账号不存在/已删时，对它跑一次等价的 verifyPassword，
+ * 抹平「昂贵 scrypt 只在账号存在时才执行」造成的响应时序差，降低基于时序的用户枚举。
+ * 用新格式(scrypt$N=32768)，与新注册哈希同成本路径；模块加载时计算一次。
+ */
+export const DUMMY_PASSWORD_HASH = hashPassword("tide::login::timing::equalizer::v1");
+
 export function sha256(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
@@ -86,27 +93,31 @@ export function anonId(seed?: string): string {
 // ---------- Session ----------
 export async function createSession(userId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 864e5);
-  // 会话令牌显式用 256 位 CSPRNG（cuid 可预测性偏高，不适合做 bearer token）。
-  // String 主键可存任意串，旧 cuid 会话不受影响，到期自然淘汰。
-  const session = await prisma.session.create({
-    data: { id: randomBytes(32).toString("hex"), userId, expiresAt },
+  // 会话令牌：256 位 CSPRNG 明文 token 只交给客户端（cookie / Bearer）；DB 只存其 sha256 作查找键。
+  // P2-10 修复：此前把明文 token 直接作 Session.id 落库——只读级 DB 泄露（注入取数 / 备份外泄）即可
+  // 拿到所有在线会话 token 直接重放，与已哈希的重置 token 处理不一致。现改为存 sha256，原文不落库。
+  // 旧明文会话由 getCurrentUser / destroySession 双读兼容，至自然过期（≤30 天）后全量收敛。
+  const token = randomBytes(32).toString("hex");
+  await prisma.session.create({
+    data: { id: sha256(token), userId, expiresAt },
   });
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE, session.id, {
+  cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
     sameSite: "strict", // A2：从 lax 收紧到 strict，堵住 CSRF
     path: "/",
     expires: expiresAt,
     secure: process.env.NODE_ENV === "production",
   });
-  return session.id;
+  return token;
 }
 
 export async function destroySession(): Promise<void> {
   const cookieStore = await cookies();
   const sid = cookieStore.get(SESSION_COOKIE)?.value;
   if (sid) {
-    await prisma.session.deleteMany({ where: { id: sid } });
+    // 删新格式(sha256)与旧格式(明文)两种主键，兼容 P2-10 前创建的会话。
+    await prisma.session.deleteMany({ where: { id: { in: [sha256(sid), sid] } } });
     cookieStore.delete(SESSION_COOKIE);
   }
 }
@@ -134,10 +145,17 @@ async function currentSessionId(): Promise<string | null> {
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const sid = await currentSessionId();
   if (!sid) return null;
-  const session = await prisma.session.findUnique({
-    where: { id: sid },
+  // 先按 sha256(sid) 查（P2-10 新格式）；查不到再按明文 id 查（修复前创建的旧会话，兼容至过期）。
+  let session = await prisma.session.findUnique({
+    where: { id: sha256(sid) },
     include: { user: true },
   });
+  if (!session) {
+    session = await prisma.session.findUnique({
+      where: { id: sid },
+      include: { user: true },
+    });
+  }
   if (!session || session.expiresAt < new Date()) return null;
   if (session.user.deletedAt) return null;
   return session.user;

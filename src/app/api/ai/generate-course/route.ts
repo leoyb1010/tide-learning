@@ -50,10 +50,6 @@ export async function POST(req: NextRequest) {
       // 高成本 AI：按用户限流，每天 5 门
       assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
 
-      // 积分预检：余额不足抛 402。造课高成本（generate_course 权重 1.0），按该场景最坏成本
-      // 设门槛，堵住「余额仅够 1 分却发起满额造课」的超额免单缺口。
-      await assertCanSpend(user.id, "generate_course");
-
       const body = (await req.json().catch(() => null)) as {
         prompt?: string;
         category?: string;
@@ -87,6 +83,11 @@ export async function POST(req: NextRequest) {
       if (qualityTier === "premium" && !snapshot.isSubscriber) {
         return fail("精修排版为会员专享，请升级订阅或使用标准排版", 402);
       }
+
+      // 积分预检（P1-3 修复）：按所选模型的真实计费权重设门槛（高级模型门槛更高），
+      // 堵住「余额仅够基准模型 1 门却用高级模型发起满额造课」的超额免单缺口。
+      // 逐节生成的整课扇出成本另由 runCourseGenBackground 内的「逐节预检」按累计预估兜住。
+      await assertCanSpend(user.id, "generate_course", modelKey);
 
       // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 模板结构 + 合规底线。
       // 输出契约不变：{title, subtitle, intro, outline:[{title, objective, difficulty}]}。

@@ -228,6 +228,10 @@ model CourseUpdateLog {
   description String?
   ownerId     String?
   publishedAt DateTime @default(now())
+
+  // 课程详情页 include updateLogs（WHERE courseId ORDER BY publishedAt）+ 全局更新流 orderBy publishedAt。
+  // SQLite 不为外键自动建索引，热点路径此前全表扫 + 排序。（审计 2026-07-12 P2-5）
+  @@index([courseId, publishedAt])
 }
 
 // ---------- §9.3 学习进度 ----------
@@ -296,9 +300,12 @@ model Note {
   // courseId/lessonId 可空：v2.2 起支持「独立笔记」(source=manual) 与 AI 整理产物(source=ai_transform)，
   // 它们不绑定任何课程/章节；课程内记的笔记(source=lesson)继续填这两个字段。
   courseId     String?
-  course       Course?   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  // onDelete: SetNull（审计 2026-07-12 P2-8）：此前为 Cascade——一旦将来加课程/章节硬删路径
+  // （或有人用 Studio/脚本删课），会连带删掉所有学习者挂该课/节的笔记（用户数据丢失）。
+  // 字段本就可空且支持独立笔记，删课时把笔记转为独立笔记（courseId/lessonId 置空）更安全。
+  course       Course?   @relation(fields: [courseId], references: [id], onDelete: SetNull)
   lessonId     String?
-  lesson       Lesson?   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  lesson       Lesson?   @relation(fields: [lessonId], references: [id], onDelete: SetNull)
   timestampSec Int?
   anchorRef    String? // 块课件锚点 "block:<id>" / "chapter:<n>"（视频课继续用 timestampSec）
   title        String?
@@ -450,6 +457,8 @@ model DemandStatusLog {
   operatorId String?
   reason     String?
   createdAt  DateTime @default(now())
+
+  @@index([demandId]) // 需求详情页 include statusLogs（审计 2026-07-12 P2-7）
 }
 
 // ---------- §9.6 订阅与订单 ----------
@@ -497,6 +506,8 @@ model CouponRedemption {
   createdAt DateTime @default(now())
 
   @@unique([couponId, orderId])
+  // 每人限用一次（审计 2026-07-12 P2-1）：下单时以此约束原子预留、防同一用户反复用同券薅折扣。
+  @@unique([couponId, userId])
   @@index([userId])
 }
 
@@ -696,6 +707,10 @@ model ContentCalendar {
   status             String   @default("planned") // planned / recording / editing / review / scheduled / published / delayed
   riskLevel          String   @default("low")
   delayReason        String?
+
+  // 排期看板按课程/计划发布日筛选与排序（审计 2026-07-12 P2-7）
+  @@index([courseId])
+  @@index([plannedPublishDate])
 }
 
 // ---------- 预约试听 / 建联线索（融合有道 0转正 + 电联建联漏斗）----------
@@ -713,6 +728,11 @@ model Lead {
   followUpNote  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  // 建联队列按状态/跟进人筛选、按时间排序，随投放增长（审计 2026-07-12 P2-7）
+  @@index([status])
+  @@index([assigneeId])
+  @@index([createdAt])
 }
 
 // ---------- 后台审计日志 (§19 技术验收: audit log) ----------
@@ -724,6 +744,10 @@ model AuditLog {
   targetId   String?
   detail     String?
   createdAt  DateTime @default(now())
+
+  // 审计日志无限增长；/admin 按时间倒序翻页 + 按操作人过滤（审计 2026-07-12 P2-7）
+  @@index([createdAt])
+  @@index([operatorId])
 }
 
 // ---------- 学习激励（C3：连续学习 + 潮汐日历）----------
@@ -978,7 +1002,9 @@ model CreditLedger {
   createdAt    DateTime @default(now())
 
   @@index([userId, createdAt])
-  @@index([type]) // admin/credits 按流水类型统计（monthly_grant / llm_spend …），避免全表扫
+  // 复合索引：既服务 admin/credits 按 type 统计（type 前缀），又服务 IAP 退款按 (type, refId) 精确查
+  // recharge 行（此前只有 [type]，退款 clawback 需扫全部 recharge 行）。（审计 2026-07-12 P2-7）
+  @@index([type, refId])
 }
 
 /** LLM Token 用量原始记录（积分折算依据）。 */

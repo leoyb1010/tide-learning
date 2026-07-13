@@ -37,7 +37,8 @@ function periodEnd(billingPeriod: string, from = new Date()): Date {
  * periodEnd 的逆：从到期时间回退「一个计费周期」的时长。
  * 退款时用来精确扣掉「本笔订单贡献的那一段」，而不清零其他订单续期已付的周期。
  */
-function rollbackOnePeriod(billingPeriod: string, end: Date): Date {
+// 导出供 IAP 退款通知复用（审计 2026-07-12 P2-2）：精确回退一个计费周期，不清零同订阅其它已付周期。
+export function rollbackOnePeriod(billingPeriod: string, end: Date): Date {
   const d = new Date(end);
   if (billingPeriod === "year") addMonthsClamped(d, -12);
   else if (billingPeriod === "quarter") addMonthsClamped(d, -3);
@@ -146,9 +147,9 @@ export async function resolveGrantPlan(preferredPlanId?: string | null) {
   return plan;
 }
 
-/** 校验并结算优惠券，返回折扣分与券 id。 */
+/** 校验并结算优惠券，返回折扣分、券 id 与名额上限（maxRedeem 供下单时原子预留用，P2-1）。 */
 async function applyCoupon(code: string | undefined, planId: string, baseCents: number) {
-  if (!code) return { discountCents: 0, couponId: null as string | null };
+  if (!code) return { discountCents: 0, couponId: null as string | null, couponMaxRedeem: 0 };
   const coupon = await prisma.coupon.findUnique({ where: { code } });
   if (!coupon || !coupon.isActive) throw new AppError("优惠券无效");
   if (coupon.expiresAt && coupon.expiresAt < new Date()) throw new AppError("优惠券已过期");
@@ -157,7 +158,7 @@ async function applyCoupon(code: string | undefined, planId: string, baseCents: 
   const discount = coupon.kind === "percent"
     ? Math.round((baseCents * Math.min(100, coupon.value)) / 100)
     : Math.min(baseCents, coupon.value);
-  return { discountCents: discount, couponId: coupon.id };
+  return { discountCents: discount, couponId: coupon.id, couponMaxRedeem: coupon.maxRedeem };
 }
 
 /** 发起支付：创建 pending 订单，返回渠道收银台票据。 */
@@ -185,7 +186,7 @@ export async function createCheckoutSession(
   });
   const isFirstEver = priorConsuming === 0;
   const base = isFirstEver && plan.firstPriceCents != null ? plan.firstPriceCents : plan.priceCents;
-  const { discountCents, couponId } = await applyCoupon(couponCode, planId, base);
+  const { discountCents, couponId, couponMaxRedeem } = await applyCoupon(couponCode, planId, base);
   const amount = Math.max(0, base - discountCents);
 
   // P0-2：先校验渠道 provider，再落订单。不支持渠道 / 生产禁用 mock 时直接拒绝，
@@ -194,16 +195,49 @@ export async function createCheckoutSession(
   if (!provider) throw new AppError("不支持的支付渠道");
 
   const externalOrderId = channel + "_" + randomBytes(10).toString("hex");
-  const order = await prisma.order.create({
-    data: {
-      userId, planId, channel,
-      amountCents: amount,
-      currency: plan.currency,
-      status: "pending",
-      externalOrderId,
-      couponId,
-      discountCents,
-    },
+  // 事务：创建订单 + 在**下单时**原子预留优惠券名额（审计 2026-07-12 P2-1）。
+  // 此前折扣在下单时就计入金额，但 redeemedCount 直到支付回调才自增——N 个用户在任何人支付前并发下单
+  // 都读到未满、全部拿折扣（并发超发），且无每人上限（同一用户可反复用同券），构成营销预算泄漏。
+  // 现在下单即：① 全局名额 maxRedeem>0 时条件自增，抢不到→拒单；② 以 @@unique([couponId,userId]) 保证
+  // 每人限一次（未支付的旧订单允许复用同一名额重试，已支付则拒绝）。webhook 因唯一约束天然幂等（不再重复自增），
+  // 退款路径按 (couponId,orderId) 释放名额。
+  const order = await prisma.$transaction(async (tx) => {
+    const o = await tx.order.create({
+      data: {
+        userId, planId, channel,
+        amountCents: amount,
+        currency: plan.currency,
+        status: "pending",
+        externalOrderId,
+        couponId,
+        discountCents,
+      },
+    });
+    if (couponId) {
+      const existing = await tx.couponRedemption.findUnique({
+        where: { couponId_userId: { couponId, userId } },
+        select: { id: true, orderId: true },
+      });
+      if (existing) {
+        // 该用户已对此券占过名额：仅当旧订单已支付才是「真的用过」→ 拒绝；
+        // 旧订单仍 pending/failed（放弃后重试）→ 复用名额、改指向新订单，不重复自增全局名额。
+        const prev = await tx.order.findUnique({ where: { id: existing.orderId }, select: { status: true } });
+        if (prev && prev.status === "paid") throw new AppError("该优惠券每人限用一次");
+        await tx.couponRedemption.update({ where: { id: existing.id }, data: { orderId: o.id } });
+      } else {
+        if (couponMaxRedeem > 0) {
+          const claimed = await tx.coupon.updateMany({
+            where: { id: couponId, redeemedCount: { lt: couponMaxRedeem } },
+            data: { redeemedCount: { increment: 1 } },
+          });
+          if (claimed.count === 0) throw new AppError("优惠券已被领完");
+        } else {
+          await tx.coupon.update({ where: { id: couponId }, data: { redeemedCount: { increment: 1 } } });
+        }
+        await tx.couponRedemption.create({ data: { couponId, userId, orderId: o.id } });
+      }
+    }
+    return o;
   });
 
   // P0-2：收银台票据创建失败（真实渠道网络/配置异常）时补偿——把刚建的订单标记为 failed（可追踪、
@@ -288,9 +322,9 @@ export async function processWebhook(channel: string, payload: {
           return { ok: true, duplicate: true };
         }
 
-        // 优惠券核销闭环（流3-U4b）：先建核销记录占位，(couponId,orderId) 唯一约束保证
-        // 同一订单在 webhook 重放/并发下只有一次核销通过；再在事务内条件自增 redeemedCount，
-        // updateMany + count<maxRedeem 二次核验保证并发下不超发（A1-14）。
+        // 优惠券核销闭环（流3-U4b）：P2-1 起名额已在**下单时**原子预留（createCheckoutSession），
+        // 该订单的 CouponRedemption 行通常已存在——此处 create 撞唯一约束(P2002)即 alreadyRedeemed=true、
+        // 跳过自增，天然幂等、不重复计数。仅对 P2-1 之前创建的**存量订单**（无预留行）走 create+自增的旧路径。
         if (order.couponId && order.coupon) {
           // 钱已收 → 订单必须激活：优惠券核销只做「记录」，任何营销名额/幂等冲突都不得回滚已付款事务。
           let alreadyRedeemed = false;

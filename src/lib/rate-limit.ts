@@ -47,11 +47,20 @@ export function rateLimit(key: string, limit: number, windowMs: number): RateLim
  * 优先信任平台注入的不可伪造 header（x-real-ip 由反代设置）。
  */
 const TRUSTED_PROXY_HOPS = Number(process.env.TRUSTED_PROXY_HOPS ?? "1");
+// 是否信任入站 x-real-ip（审计 2026-07-12 P2-11）。默认 false：
+// x-real-ip 是客户端可任意伪造的普通请求头，只有当反代**强制覆盖**它时才可信。
+// 此前无条件优先信任 x-real-ip，盖过了下方已加固的 XFF「取倒数第 N 跳」逻辑——
+// 反代若未覆盖 x-real-ip，攻击者每请求换值即得全新限流桶，正是 XFF 想堵的洞。
+// 确有可信反代设置 x-real-ip 的部署，显式置 TRUST_PROXY_REAL_IP=1 开启。
+const TRUST_PROXY_REAL_IP = process.env.TRUST_PROXY_REAL_IP === "1";
 
 // 共享取 IP 逻辑：NextRequest.headers 与 next/headers 的 ReadonlyHeaders 都实现 get(name)。
 function pickClientIp(get: (name: string) => string | null): string {
-  const realIp = get("x-real-ip");
-  if (realIp) return realIp.trim();
+  // 仅在显式声明可信反代会覆盖 x-real-ip 时才信任它；否则一律走已加固的 XFF「倒数第 N 跳」。
+  if (TRUST_PROXY_REAL_IP) {
+    const realIp = get("x-real-ip");
+    if (realIp) return realIp.trim();
+  }
   const xff = get("x-forwarded-for");
   if (xff) {
     const parts = xff.split(",").map((s) => s.trim()).filter(Boolean);

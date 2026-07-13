@@ -120,7 +120,17 @@ export async function collectFreeCourse(args: {
         where: { userId_courseId: { userId: collectorId, courseId } },
         select: { id: true },
       });
-      if (owned) return { status: "already_owned" };
+      if (owned) {
+        // 已拥有（此前拿走过、或被移出书架但按 P1-1 修复保留了所有权凭证）：把起始记录重新落回书架，
+        // 让「免费课零成本再拿走」仍可用；但绝不再发作者激励——激励只在 CoursePurchase 首次创建成功时发一次，
+        // 这里靠唯一约束命中确认「非首次」，故 re-collect 循环无法再刷分（P1-1 铸造漏洞根治）。
+        await prisma.learningProgress.upsert({
+          where: { userId_lessonId: { userId: collectorId, lessonId: firstLessonId } },
+          update: {},
+          create: { userId: collectorId, courseId, lessonId: firstLessonId, progressSec: 0 },
+        });
+        return { status: "already_owned" };
+      }
     }
     throw e;
   }

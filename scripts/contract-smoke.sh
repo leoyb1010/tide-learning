@@ -325,8 +325,15 @@ assert_dto "ShelfCourse" "/api/shelf" '{
 assert_dto "DeskData" "/api/desk" '{
   "root":"data",
   "fields":{
+    "greeting":"str","nickname":"str","advice":"str",
     "litToday":"bool","streak":"int",
-    "recentNotes":"list","myCourseCount":"int","dueReviewCount":"int"
+    "resumeList":"list",
+    "resumeList[0].courseSlug":"str","resumeList[0].courseTitle":"str",
+    "resumeList[0].lessonId":"str","resumeList[0].lessonTitle":"str",
+    "resumeList[0].progressPct":"int","resumeList[0].remainText":"str",
+    "recentNotes":"list",
+    "recentNotes[0].id":"str","recentNotes[0].title":"str","recentNotes[0].relativeTime":"str",
+    "myCourseCount":"int","dueReviewCount":"int"
   }
 }'
 
@@ -383,9 +390,30 @@ assert_dto "me/overview" "/api/me/overview" '{
     "totalStudySec":"int","completedCount":"int","notesCount":"int","notebookCount":"int",
     "purchasedCount":"int","dueReviewCount":"int","currentStreak":"int","longestStreak":"int",
     "achievementsCount":"int","creditBalance":"int","isSubscriber":"bool","statusLabel":"str",
+    "subscriptionStatus":"str",
     "creator":"dict","creator.totalIncome":"int","creator.totalSales":"int","creator.stallCount":"int"
   },
   "dates":["validUntil"]
+}'
+
+# me/gamification（成长档案：连续天数/日历/成就，iOS ProfileView 强解码；P2-12 补覆盖）
+assert_dto "me/gamification" "/api/me/gamification" '{
+  "root":"data",
+  "fields":{
+    "currentStreak":"int","longestStreak":"int",
+    "calendar":"list","calendar[0].day":"str","calendar[0].minutes":"int",
+    "achievements":"list","achievements[0].key":"str","achievements[0].name":"str"
+  }
+}'
+
+# notifications（通知列表：iOS NotificationsView 强解码；P2-12 补覆盖）
+assert_dto "notifications" "/api/notifications" '{
+  "root":"data",
+  "fields":{
+    "unread":"int","items":"list",
+    "items[0].id":"str","items[0].type":"str","items[0].title":"str","items[0].read":"bool"
+  },
+  "dates":["items[0].createdAt"]
 }'
 
 # subscription/me

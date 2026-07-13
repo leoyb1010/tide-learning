@@ -11,11 +11,18 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
  * 只测 createCheckoutSession 分支，故 mock 掉带副作用的依赖，用 prisma stub 断言「是否落单」。
  */
 
-const prismaMock = vi.hoisted(() => ({
-  plan: { findUnique: vi.fn() },
-  order: { count: vi.fn(), create: vi.fn(), update: vi.fn() },
-  coupon: { findUnique: vi.fn() },
-}));
+const prismaMock = vi.hoisted(() => {
+  const base = {
+    plan: { findUnique: vi.fn() },
+    order: { count: vi.fn(), create: vi.fn(), update: vi.fn(), findUnique: vi.fn() },
+    coupon: { findUnique: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    couponRedemption: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+    // P2-1：订单创建 + 优惠券预留在 $transaction 内完成；测试里直接以 mock 自身作 tx 执行回调。
+    $transaction: vi.fn(),
+  };
+  base.$transaction.mockImplementation(async (fn: (tx: typeof base) => unknown) => fn(base));
+  return base;
+});
 const providerMock = vi.hoisted(() => ({ getProvider: vi.fn() }));
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));

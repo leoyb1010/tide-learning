@@ -4,6 +4,7 @@ import { ok, fail, handle } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { isAppleConfigured, verifySignedJws, appleEnvironment } from "@/lib/apple-iap";
+import { rollbackOnePeriod } from "@/lib/payment";
 
 export const dynamic = "force-dynamic";
 
@@ -101,20 +102,30 @@ export async function POST(req: NextRequest) {
       return ok({ received: true, duplicate: true });
     }
 
-    const candidateOrderIds = [txId && `iap_${txId}`, originalTxId && `iap_${originalTxId}`].filter(Boolean) as string[];
     const affectedUserIds = new Set<string>();
 
     const result = await prisma.$transaction(async (tx) => {
       let revokedSub = false;
       let clawedCredits = 0;
 
-      // 订阅类：撤销订单激活的订阅（退款/撤销即时失效）。
-      for (const eoid of candidateOrderIds) {
-        const order = await tx.order.findUnique({
-          where: { externalOrderId: eoid },
-          select: { id: true, userId: true, status: true, subscriptionId: true },
+      // 订阅类（审计 2026-07-12 P2-2 修复：过度回收）：
+      // 一次 REFUND 只针对「具体退款的那笔交易(txId)」，故只精确回退该笔订单激活的订阅的**一个计费周期**，
+      // 与 payment.processWebhook 退款对齐（rollbackOnePeriod），不再遍历 candidateOrderIds 把 original
+      // 也一并 currentPeriodEnd=now 清零——那会误伤同订阅上 Web/其它续期已付的未退款周期。
+      // 优先具体退款交易 txId 的订单，缺失才回退到 originalTxId。
+      const refundEoid = txId ? `iap_${txId}` : `iap_${originalTxId}`;
+      const fallbackEoid = originalTxId && `iap_${originalTxId}` !== refundEoid ? `iap_${originalTxId}` : null;
+      let order = await tx.order.findUnique({
+        where: { externalOrderId: refundEoid },
+        select: { id: true, userId: true, status: true, subscriptionId: true, plan: { select: { billingPeriod: true } } },
+      });
+      if (!order && fallbackEoid) {
+        order = await tx.order.findUnique({
+          where: { externalOrderId: fallbackEoid },
+          select: { id: true, userId: true, status: true, subscriptionId: true, plan: { select: { billingPeriod: true } } },
         });
-        if (!order) continue;
+      }
+      if (order) {
         affectedUserIds.add(order.userId);
         if (order.status !== "refunded") {
           await tx.order.update({ where: { id: order.id }, data: { status: "refunded" } });
@@ -122,10 +133,18 @@ export async function POST(req: NextRequest) {
         if (order.subscriptionId) {
           const sub = await tx.subscription.findUnique({ where: { id: order.subscriptionId } });
           if (sub && sub.status !== "refunded" && sub.status !== "expired") {
-            await tx.subscription.update({
-              where: { id: sub.id },
-              data: { status: "refunded", currentPeriodEnd: new Date() },
-            });
+            const now = new Date();
+            const rolledBack = rollbackOnePeriod(order.plan.billingPeriod, sub.currentPeriodEnd);
+            if (rolledBack > now) {
+              // 回退一个周期后仍在未来（有其它续期已付撑着）→ 仅缩短有效期，状态不改、不误伤未退款周期。
+              await tx.subscription.update({ where: { id: sub.id }, data: { currentPeriodEnd: rolledBack } });
+            } else {
+              // 回退后已到期 → 本笔是唯一/最后支撑，置退款即时失效。
+              await tx.subscription.update({
+                where: { id: sub.id },
+                data: { status: "refunded", currentPeriodEnd: now },
+              });
+            }
             revokedSub = true;
           }
         }

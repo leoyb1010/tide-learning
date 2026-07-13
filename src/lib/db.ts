@@ -2,10 +2,27 @@ import { PrismaClient } from "@prisma/client";
 
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
+/**
+ * SQLite 连接串归一（审计 2026-07-12 P2-4）：为 file: 库强制 connection_limit=1。
+ * 根因：PRAGMA busy_timeout 是「每连接」易失属性，只对承接该 PRAGMA 的那一条池化连接生效；
+ * Prisma 默认连接池可 >1 条，其余连接 timeout=0，并发写下会立刻抛 SQLITE_BUSY 而非等待 5s。
+ * SQLite 本就应串行化写，把连接池钉成 1 条 → busy_timeout 必然覆盖所有查询，消除偶发 "database is locked" 500。
+ * 已显式配置 connection_limit 或非 sqlite 时不干预（尊重部署方设置）。
+ */
+function pinnedSqliteUrl(): string | undefined {
+  const url = process.env.DATABASE_URL;
+  if (!url || !url.startsWith("file:")) return undefined;
+  if (url.includes("connection_limit=")) return undefined;
+  return url + (url.includes("?") ? "&" : "?") + "connection_limit=1";
+}
+
+const pinnedUrl = pinnedSqliteUrl();
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    ...(pinnedUrl ? { datasources: { db: { url: pinnedUrl } } } : {}),
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

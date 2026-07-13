@@ -30,14 +30,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
-    await assertCanSpend(user.id, "generate_course");
 
     const course = await prisma.course.findUnique({
       where: { id },
-      select: { id: true, authorUserId: true, genStatus: true },
+      select: { id: true, authorUserId: true, genStatus: true, modelUsed: true },
     });
     if (!course) return fail("课程不存在", 404);
     if (course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
+
+    // 余额预检按该课所用模型设门槛（P1-3：与首次造课一致），置于归属校验之后（不对非作者做扣费预检）。
+    // 整课扇出成本仍由 runCourseGenBackground 的逐节积分门按累计预估兜住。
+    await assertCanSpend(user.id, "generate_course", course.modelUsed ?? undefined);
 
     // 只有 generating / failed 的课可续造（ready 无需续、其它态非造课课程）
     if (course.genStatus !== "generating" && course.genStatus !== "failed") {

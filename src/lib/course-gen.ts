@@ -1,6 +1,6 @@
 import { chatJson } from "./llm";
 import { prisma } from "./db";
-import { creditingOnUsage } from "./credits";
+import { creditingOnUsage, estimateCredits, getBalanceFresh } from "./credits";
 import { track } from "./analytics";
 import { validateBlocks, type Block } from "./blocks";
 import { simpleOutlinePrompt, lessonVoiceLine, lessonRecipeBlock, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
@@ -799,16 +799,30 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
     const budget = createCoursewareBudget();
     let premiumRenderCount = 0;
     let deterministicRenderCount = 0;
+    // —— premium HTML 精修的逐节积分门（P1-3 修复）——
+    // bespoke HTML 单节 maxTokens 16000，是最贵的出口。此前整课的多节精修不校验余额，
+    // 可把余额刷成大额负数。这里按累计预估投影余额：预算不足时对剩余节「降级为免费确定性渲染」
+    // （enhance=false，仍产出多样化 HTML，只是不走 LLM 精修），而非无脑继续烧钱。
+    const htmlPerLessonCost = premium
+      ? estimateCredits("generate_lesson_html", undefined, course.modelUsed ?? undefined)
+      : 0;
+    let htmlProjectedBalance = premium && course.authorUserId ? await getBalanceFresh(course.authorUserId) : 0;
     for (const l of lessons) {
+      // 仅 premium 且投影余额足够才走 LLM 精修；否则降级为免费确定性渲染。
+      const enhanceThis = premium && htmlProjectedBalance >= htmlPerLessonCost;
       try {
         const result = await renderAndStoreLessonHtml(courseId, l, design, mode, {
-          enhance: premium,
+          enhance: enhanceThis,
           userId: course.authorUserId,
           model: course.modelUsed,
           budget,
         });
-        if (result.engine === "llm") premiumRenderCount += 1;
-        else if (result.engine === "deterministic") deterministicRenderCount += 1;
+        if (result.engine === "llm") {
+          premiumRenderCount += 1;
+          htmlProjectedBalance -= htmlPerLessonCost; // 精修成功才计入预估扣减
+        } else if (result.engine === "deterministic") {
+          deterministicRenderCount += 1;
+        }
       } catch (e) {
         console.error("[course-gen] html render failed for lesson", l.id, e);
       }
@@ -842,11 +856,34 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     const start = await readGenProgress(courseId);
     let failed = start.failed;
 
+    // —— 逐节积分门（P1-3 修复）——
+    // 此前整课扇出只在入口预检一次(3分)，随后全部空节逐个扣费但不再校验余额，
+    // 使余额仅剩个位数的订阅用户可发起 premium 造课把余额刷成大额负数。
+    // 这里按「所选模型 × 逐节典型 token」估单节成本，用累计预估兜底：
+    // 逐节扣费经 creditingOnUsage→after() 延迟落账、循环内读余额会滞后，故不依赖实时余额，
+    // 而是从起始余额减去每节预估成本；投影余额低于单节门槛即停止后续节
+    // （剩余空节留空→收尾判为 failed，前端显示「继续生成」，充值后可续）。
+    const genCourse = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { modelUsed: true },
+    });
+    const genModel = genCourse?.modelUsed ?? undefined;
+    const perLessonCost = estimateCredits("generate_lesson", undefined, genModel);
+    let projectedBalance = await getBalanceFresh(userId);
+    let stoppedForCredits = false;
+
     for (const { id: lessonId } of pending) {
+      // 投影余额不足以覆盖下一节的预估成本 → 停止扇出，避免一次授权把余额刷成大额负数。
+      if (projectedBalance < perLessonCost) {
+        stoppedForCredits = true;
+        console.warn(`[course-gen] 逐节积分门：余额不足（投影 ${projectedBalance} < 单节门槛 ${perLessonCost}），停止后续节`, courseId);
+        break;
+      }
       await updateGenJob(courseId, { currentLessonId: lessonId });
       try {
         const r = await generateLessonCore(lessonId, userId);
         if (r.failed) failed += 1;
+        else projectedBalance -= perLessonCost; // 成功生成才计入预估扣减
       } catch (e) {
         // 越权 / 章节不存在 / 未知异常：标记失败继续，绝不中断整条后台流水
         console.error("[course-gen] lesson failed in background:", lessonId, e);
@@ -874,6 +911,10 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       // 若这里继续保持 running，前端会永久转圈且 resume-gen 会被“正在跑”挡住。
       // 先收敛为 failed，前端可立即显示“继续生成”；若另一流水随后真的补齐最后一节，
       // generateLessonCore 的 allReady 收尾仍会把课程改回 ready。
+      // stoppedForCredits：本轮是被逐节积分门主动截停（非生成失败），充值后走 resume-gen 可续造。
+      if (stoppedForCredits) {
+        console.warn(`[course-gen] 造课因积分不足截停，剩余 ${remaining} 节待续（充值后可继续生成）`, courseId);
+      }
       await prisma.course.update({ where: { id: courseId }, data: { genStatus: "failed" } });
       await finalizeGenJob(courseId, "failed");
     }

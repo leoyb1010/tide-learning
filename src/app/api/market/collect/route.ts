@@ -138,12 +138,12 @@ export async function POST(req: NextRequest) {
  * 起始记录（collect/purchase 时 upsert 落地的 fork 起始记录）——learning/collected/completed 三层
  * 都据 LearningProgress 派生。故「移出书架」= 删掉该课名下我的 LearningProgress 行。
  *
- * 分支（按 CoursePurchase.priceCredits 快照——「我当时实付了多少」，比现价更可靠）：
- *   - 免费课（priceCredits===0）：真·逆操作——删 LearningProgress + 删免费 CoursePurchase。
- *     免费课随时可零成本再拿走（re-collect 走免费分支重建所有权与书架），删所有权凭证无损失。
- *   - 付费课（priceCredits>0）：**只从书架隐藏，保留所有权凭证 CoursePurchase**——只删 LearningProgress，
- *     绝不删 CoursePurchase（付费买断权益永久，删了=白扣钱）。用户仍拥有该课，重新学习任一节即可
- *     再落 LearningProgress 回到书架，全程不重复扣款（re-collect 撞 CoursePurchase 唯一约束→already_owned）。
+ * 统一行为（免费/付费一致，P1-1 修复后）：**只从书架移出，永久保留所有权凭证 CoursePurchase**——
+ *   只删该课名下我的 LearningProgress，绝不删 CoursePurchase。
+ *   - 付费课：所有权=付费买断，删了=白扣钱；重新学习任一节即回书架，re-collect 撞唯一约束→already_owned。
+ *   - 免费课：此前会删 CoursePurchase 做「真逆操作」，但因作者激励幂等绑定 CoursePurchase 首次创建，
+ *     删后再拿走会重复发激励（刷分铸造）。现改为保留凭证；再拿走走 collectFreeCourse 的 already_owned
+ *     分支重加书架、不再发激励，「零成本再拿走」体验不变但杜绝刷分。
  *
  * 幂等：deleteMany 天然幂等（无行不抛错）；未拿走过（无 CoursePurchase 且无 LearningProgress）返回 not_on_shelf。
  * 越权铁律：所有 where 带 userId=当前用户，只能移除自己书架里的课。
@@ -177,18 +177,16 @@ export async function DELETE(req: NextRequest) {
 
     const isPaid = (purchase?.priceCredits ?? 0) > 0;
 
-    // 单事务原子移出：删该课名下我的全部 LearningProgress（=移出书架）；免费课再删所有权凭证。
+    // 移出书架 = 删该课名下我的全部 LearningProgress。所有权凭证 CoursePurchase 一律保留。
+    // P1-1 修复：此前免费课会在此删掉 CoursePurchase，而作者创作激励的幂等依赖「CoursePurchase 首次创建」——
+    // 删掉后再「拿走」即重新创建成功、再次给作者发激励，构成「拿走↔移除」循环刷分的积分铸造漏洞。
+    // 改为与付费课一致：uncollect 只移出书架、永久保留所有权凭证；再拿走走 collectFreeCourse 的
+    // already_owned 分支重加书架、不再发激励。免费课「可零成本再拿走」的体验不变。
     const result = await prisma.$transaction(async (tx) => {
       const removed = await tx.learningProgress.deleteMany({
         where: { userId: user.id, courseId },
       });
-      // 付费课保留 CoursePurchase（买断权益永久）；仅免费课删所有权凭证做真逆操作。
-      let purchaseDeleted = false;
-      if (purchase && !isPaid) {
-        await tx.coursePurchase.delete({ where: { id: purchase.id } });
-        purchaseDeleted = true;
-      }
-      return { removedProgress: removed.count, purchaseDeleted };
+      return { removedProgress: removed.count };
     });
 
     // 既无所有权凭证、也没删到任何进度 → 本就不在书架，幂等返回。

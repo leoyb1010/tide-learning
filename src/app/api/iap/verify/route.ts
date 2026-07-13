@@ -118,7 +118,9 @@ export async function POST(req: NextRequest) {
     const idempotencyTxId = (typeof verified.transactionId === "string" && verified.transactionId) || transactionId;
 
     // —— 积分类充值 ——
-    if (productId in CREDIT_PRODUCTS) {
+    // 用 Object.hasOwn 而非 `in`（审计 2026-07-12 P2-3）：`in` 会命中 Object.prototype 继承键，
+    // productId="constructor"/"toString" 会误判为真、取到函数值致 500 或建出异常订阅（非生产 mock 路径可触发）。
+    if (Object.hasOwn(CREDIT_PRODUCTS, productId)) {
       const amount = CREDIT_PRODUCTS[productId];
 
       // 幂等：以 (type=recharge, refId=idempotencyTxId) 作**全局**幂等键。
@@ -156,7 +158,9 @@ export async function POST(req: NextRequest) {
     }
 
     // —— 订阅类 ——
-    if (productId in SUBSCRIPTION_PRODUCTS) {
+    // 同 P2-3：用 Object.hasOwn 避免 `in` 的原型链穿透（productId="constructor" 会使 cfg=函数、
+    // billingPeriod=undefined 让 plan.findFirst 退化为不过滤而随便建订阅）。
+    if (Object.hasOwn(SUBSCRIPTION_PRODUCTS, productId)) {
       const cfg = SUBSCRIPTION_PRODUCTS[productId];
       const externalOrderId = `iap_${idempotencyTxId}`;
 
