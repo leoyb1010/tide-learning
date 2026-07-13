@@ -93,4 +93,7 @@ jobs:
           BACKUP_ENCRYPTION_PASSWORD_FILE="$RUNNER_TEMP/backup-password" ASSETS_DIR="$RUNNER_TEMP/restored-data" \
             bash scripts/restore-db.sh "$backup" "$RUNNER_TEMP/restored.db" "$archive" --force
           test "$(sqlite3 "$RUNNER_TEMP/restored.db" 'PRAGMA integrity_check;')" = "ok"
-          test "$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)" -ge 10
+          source_media_count="$(find "$GITHUB_WORKSPACE/.data/media" -type f | wc -l)"
+          restored_media_count="$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)"
+          test "$source_media_count" -ge 4
+          test "$restored_media_count" = "$source_media_count"
