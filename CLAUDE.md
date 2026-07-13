@@ -30,7 +30,7 @@
 - AI 自习室架构（三引擎+中枢）见 docs/AI自习室架构.md
 - 主分支：master（唯一主线；STUDIO 重构 + AI 自习室已全部并入。原 feat/studio-v2-redesign、feat/v1.0-upgrade 已合并并删除）
 - 体验账号（支持 用户名/手机号/邮箱 登录）：dingyue/demo123(全站订阅, 或 demo@tide.learning)、admin/admin123(后台, 或 admin@tide.learning)。username 为体验账号预置，普通注册不设。
-- LLM key 在 .env 的 DEEPSEEK_API_KEY（已 gitignore）；DeepSeek 账户余额为 0，AI 实际生成需充值
+- LLM key 在 .env 的 DEEPSEEK_API_KEY（已 gitignore）。**公网 DeepSeek 官方 API（api.deepseek.com）余额充足、可真实生成**（2026-07 实测余额 ¥90+，deepseek-chat/deepseek-reasoner 均可用）。做本机真实生成时用**公网 DeepSeek**，不要用内网 NewAPI 网关（newapi.inner.youdao.com，本机不可达/403）。模型注册表默认走 NewAPI 内网 env，本机真实生成需临时把模型条目指向公网 DeepSeek（DEEPSEEK_API_KEY + DEEPSEEK_BASE_URL=https://api.deepseek.com）。
 
 ## 验证铁律
 - **契约冒烟必须全绿**：改动任何 API route / DTO 后，跑 `bash scripts/contract-smoke.sh`，必须输出「契约冒烟 N/N 通过」并 exit 0。
