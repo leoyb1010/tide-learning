@@ -20,10 +20,10 @@ jobs:
       STREAM_SIGNING_SECRET: "ci-stream-signing-secret-at-least-32-characters"
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: 20
           cache: npm
