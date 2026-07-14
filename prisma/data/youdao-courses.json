@@ -1,0 +1,5034 @@
+[
+ {
+  "key": "silver",
+  "subtitle": "只学能立刻开口的短句，慢讲多练，50+ 长辈也能轻松说英语",
+  "intro": "《银发口语》是专为 50+ 长辈设计的实用英语课。我们把日常零散的英语需求系统化，全覆盖见面寒暄、超市购物、餐厅点单、外出问路、看病买药等高频生活场景。课程摒弃晦涩语法和复杂长句，只教当下就能开口的短句口语；授课节奏放慢，重点句反复练，一句一句慢慢来。跟着有道银发英语教研组，学完每节立刻就能用，让你在真实场景里轻松开口说英语。",
+  "level": "L1",
+  "instructorName": "有道银发英语教研组",
+  "lessons": [
+   {
+    "title": "见面就能说：打招呼与寒暄",
+    "summary": "从 Hello 到 See you，学会见面寒暄的整套短句，敢开口是第一步。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "遇到外国邻居，你只是笑笑点头？",
+      "markdown": "周末在小区花园，你碰到隔壁楼的外国邻居。他对你笑着说 'Good morning!'，你想回应，却只能点点头、摆摆手。\n\n其实这一刻你需要的，不是背单词、也不是学语法，而是**一两句能立刻说出口的短句**。这一节，我们就从最简单的见面问候开始——慢慢讲，反复练，学完你就敢开口。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "记住 4 句见面必用短句：Hello / Good morning / How are you? / Nice to meet you.",
+       "听懂别人问 \"How are you?\"，并自然回答一句 I'm fine, thank you.",
+       "学会 2 句礼貌告别：See you. / Take care.",
+       "掌握「慢讲跟读」的练习方法：一句读三遍"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "见面第一句：能张口就是胜利",
+      "markdown": "见面问候，**越短越自然**。记住下面这几句，一句就够用：\n\n- **Hello.** 你好。（万能，任何时候都能用）\n- **Hi.** 嗨。（更随意，熟人之间）\n- **Good morning.** 早上好。\n\n发音慢慢来，跟着念三遍：\n\n- Hello ≈ 哈-喽\n- Good morning ≈ 古得-摸宁\n\n先不用记多，把这三句念顺口，见面就能用。"
+     },
+     {
+      "type": "example",
+      "markdown": "英语问候会**分时段**，记住三段就行：\n\n- **Good morning!** 早上好！（起床到中午 12 点前）\n- **Good afternoon!** 下午好！（中午到傍晚）\n- **Good evening!** 晚上好！（天黑以后）\n\n小提醒：**Good night** 不是「晚上好」，而是**睡前道晚安**，别用错啦。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "邻居 Tom",
+        "text": "Good morning! How are you?",
+        "note": "早上好！你好吗？ ≈ 古得摸宁，好阿油"
+       },
+       {
+        "speaker": "你",
+        "text": "Good morning. I'm fine, thank you.",
+        "note": "早上好。我很好，谢谢。（这句是万能回答，背下来）"
+       },
+       {
+        "speaker": "邻居 Tom",
+        "text": "Nice to meet you.",
+        "note": "很高兴认识你。"
+       },
+       {
+        "speaker": "你",
+        "text": "Nice to meet you, too.",
+        "note": "我也很高兴认识你。句末加一个 too 就行"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "\"How are you?\" 的标准回答：**I'm fine, thank you.**（我很好，谢谢）",
+       "别人说 Nice to meet you，你回 **Nice to meet you, too.**",
+       "一句读三遍：第一遍看着读，第二遍跟着读，第三遍不看读",
+       "说不利索没关系，**先敢开口，再求标准**"
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "别把中文直接翻成英文",
+      "left": {
+       "heading": "❌ 中式误区",
+       "items": [
+        "把「你吃了吗？」当问候直译成 Have you eaten?（外国人会以为你要请客）",
+        "见面就问 How old are you?（问年龄不礼貌）",
+        "回答 How are you 时憋很久，想凑一个长句子"
+       ]
+      },
+      "right": {
+       "heading": "✅ 地道短句",
+       "items": [
+        "见面直接说 Hello / Good morning 就好",
+        "想关心对方，说 How are you? 就够",
+        "一句 I'm fine, thank you. 脱口而出，最自然"
+       ]
+      }
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "I have to go now. See you!",
+        "note": "我得走了。回头见！"
+       },
+       {
+        "speaker": "邻居 Tom",
+        "text": "See you. Take care!",
+        "note": "回头见。保重！"
+       },
+       {
+        "speaker": "你",
+        "text": "Take care. Bye!",
+        "note": "保重。再见！"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "邻居早上对你说 'How are you?'，最自然的回答是哪一句？",
+      "options": [
+       "How old are you?",
+       "I'm fine, thank you.",
+       "Good night.",
+       "Thank you eat."
+      ],
+      "answerIndex": 1,
+      "explain": "'I'm fine, thank you.'（我很好，谢谢）是回答 How are you 的万能句，背下来脱口而出。How old are you 是问年龄，Good night 是睡前道晚安，都不合适。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你学会了见面的整套短句：**Hello / Good morning** 打招呼，**How are you? — I'm fine, thank you.** 一问一答，**Nice to meet you** 认识新朋友，**See you / Take care** 礼貌告别。记住：慢慢念，一句读三遍，见面就敢开口。",
+      "next": "下一节我们走进超市——「这个多少钱？」「能刷卡吗？」这些购物必备短句，学完你自己就能逛超市结账。"
+     }
+    ]
+   },
+   {
+    "title": "逛超市：问价格与结账",
+    "summary": "掌握超市购物三句核心：问位置、问价格、能否刷卡，自己也能逛超市结账。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "想问价格，话到嘴边却卡住了",
+      "markdown": "你在超市想买瓶东西，找了半天没找到；好不容易看到一样商品，又不知道多少钱。想问店员，话到嘴边却卡住了。\n\n别担心，超市购物其实来来回回就那几句话：**问在哪、问多少钱、怎么付钱**。这一节我们把它们一句句拆开，慢慢练熟。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "学会问商品位置：Excuse me, where is the milk?",
+       "学会问价格：How much is this?",
+       "学会结账付款：Can I pay by card?",
+       "听懂店员常说的 \"Anything else?\" 并回答"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "购物万能三句",
+      "markdown": "逛超市，记住这**三句核心**，走遍超市都不怕：\n\n- **Excuse me, where is the ...?** 请问……在哪里？\n- **How much is this?** 这个多少钱？\n- **Can I pay by card?** 能刷卡吗？\n\n开头的 **Excuse me**（≈ 意克斯-Q斯-米）是「打扰一下」，问人前先说它，最礼貌。把 the 后面换成你要找的东西就行。"
+     },
+     {
+      "type": "example",
+      "markdown": "把 **where is the ...** 后面换个词，就能问各种东西：\n\n- Where is the **milk**? 牛奶在哪？\n- Where is the **bread**? 面包在哪？\n- Where is the **checkout**? 收银台在哪？\n\n问价格也一样，指着东西说：\n\n- **How much is this?** 这个多少钱？（单个）\n- **How much are these?** 这些多少钱？（多个用 these）"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Excuse me, where is the milk?",
+        "note": "打扰一下，牛奶在哪里？"
+       },
+       {
+        "speaker": "店员",
+        "text": "It's over there, aisle three.",
+        "note": "在那边，三号货架。aisle ≈ 阿油，「货架/通道」"
+       },
+       {
+        "speaker": "你",
+        "text": "Thank you. How much is this?",
+        "note": "谢谢。这个多少钱？"
+       },
+       {
+        "speaker": "店员",
+        "text": "It's five dollars.",
+        "note": "五美元。（听懂数字就行）"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "问人前先说 **Excuse me**（打扰一下），最礼貌",
+       "找东西：**Where is the + 东西?**，指着说更清楚",
+       "问价格：单个用 **How much is this?**，多个用 How much are these?",
+       "没听清价格，说一句 **Sorry?**（≈ 搔瑞）请对方再说一遍"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "收银员",
+        "text": "That's twenty dollars. Anything else?",
+        "note": "一共二十美元。还要别的吗？"
+       },
+       {
+        "speaker": "你",
+        "text": "No, thank you. Can I pay by card?",
+        "note": "不用了，谢谢。能刷卡吗？"
+       },
+       {
+        "speaker": "收银员",
+        "text": "Sure. A bag?",
+        "note": "当然。需要袋子吗？"
+       },
+       {
+        "speaker": "你",
+        "text": "Yes, please.",
+        "note": "好的，麻烦了。（要就说 Yes, please；不要说 No, thank you）"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "在超市想问「这个多少钱？」，应该说哪句？",
+      "options": [
+       "Where is the milk?",
+       "How much is this?",
+       "Can I pay by card?",
+       "Anything else?"
+      ],
+      "answerIndex": 1,
+      "explain": "'How much is this?' 就是「这个多少钱？」。Where is the milk 是问位置，Can I pay by card 是问能否刷卡，Anything else 是店员问你还要别的吗。"
+     },
+     {
+      "type": "flashcard",
+      "front": "Can I pay by card?",
+      "back": "能刷卡吗？—— 付款前问这一句。想付现金说 I'll pay in cash（我付现金）。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节的三句核心一定要记牢：**Where is the ...?**（在哪）、**How much is this?**（多少钱）、**Can I pay by card?**（能刷卡吗）。再配上 Excuse me 开头、Yes, please / No, thank you 回答，一趟超市就能自己搞定。",
+      "next": "买完东西饿了吧？下一节我们进餐厅——点餐、要咖啡、结账，「The bill, please」这些短句学完，你也能自己下馆子。"
+     }
+    ]
+   },
+   {
+    "title": "下馆子：点餐与买单",
+    "summary": "用 I'd like 点餐、说忌口、结账，一套流程学下来，自己也能从容下馆子。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "想点杯不加糖的咖啡，却只能比划",
+      "markdown": "和家人出门旅游，走进一家咖啡店，你想点杯热咖啡、不要糖，却不知道怎么说，只能指着别人的杯子比划。\n\n点餐其实有固定套路：**要位子、点东西、说要求、结账**。这一节我们一句句练熟，让你自己也能从容点单。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "学会进店要位子：A table for two, please.",
+       "学会点餐点饮料：I'd like a coffee.",
+       "学会说要求/忌口：No sugar, please.",
+       "学会结账：The bill, please."
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "点餐万能句：I'd like ...",
+      "markdown": "点任何东西，都用这一句开头：\n\n- **I'd like a coffee.** 我想要一杯咖啡。\n- **I'd like a tea.** 我想要一杯茶。\n- **I'd like this one.** 我要这个。（指着菜单说，最省事）\n\n**I'd like**（≈ 爱得-赖克）就是「我想要」，比 I want 更礼貌。不会说菜名？指着菜单说 **I'd like this one** 就行。"
+     },
+     {
+      "type": "example",
+      "markdown": "点完东西，加一句说清你的**要求**：\n\n- **No sugar, please.** 不要糖，谢谢。\n- **No ice, please.** 不要冰。\n- **A small one, please.** 要小杯的。\n\n结尾都加一个 **please**（请/谢谢），一下就礼貌了。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "服务员",
+        "text": "Hi, a table for how many?",
+        "note": "你好，几位？"
+       },
+       {
+        "speaker": "你",
+        "text": "A table for two, please.",
+        "note": "两位，谢谢。（换个数字：for three 三位）"
+       },
+       {
+        "speaker": "服务员",
+        "text": "What would you like?",
+        "note": "您想点什么？"
+       },
+       {
+        "speaker": "你",
+        "text": "I'd like a coffee. No sugar, please.",
+        "note": "我要一杯咖啡，不要糖，谢谢。"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "点东西万能句：**I'd like ...**（我想要……），比 I want 礼貌",
+       "不会说菜名，指着菜单说 **I'd like this one**",
+       "说忌口用 **No + 东西 + please**：No sugar / No ice",
+       "每句结尾加 **please**，礼貌又自然"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Excuse me, the bill, please.",
+        "note": "打扰一下，请结账。bill ≈ 比欧，「账单」"
+       },
+       {
+        "speaker": "服务员",
+        "text": "Sure. Here you are.",
+        "note": "好的，给您。"
+       },
+       {
+        "speaker": "你",
+        "text": "Can I pay by card?",
+        "note": "能刷卡吗？（和超市那句一样，通用！）"
+       },
+       {
+        "speaker": "服务员",
+        "text": "Of course. Thank you!",
+        "note": "当然可以。谢谢！"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "点咖啡时想说「不要糖」，应该加哪一句？",
+      "options": [
+       "A table for two.",
+       "No sugar, please.",
+       "The bill, please.",
+       "How are you?"
+      ],
+      "answerIndex": 1,
+      "explain": "'No sugar, please.' 就是「不要糖，谢谢」。A table for two 是要两个人的位子，The bill please 是结账，都用错场合了。"
+     },
+     {
+      "type": "flashcard",
+      "front": "The bill, please.",
+      "back": "请结账／买单。—— 吃完想付钱，说这一句。bill 就是账单。"
+     },
+     {
+      "type": "summary",
+      "markdown": "点餐四步走：**A table for ...**（要位子）→ **I'd like ...**（点东西）→ **No sugar, please**（说忌口）→ **The bill, please**（结账）。注意到没有？**Can I pay by card?** 上一节超市学过，这里又能用——短句就是这样，学一句用多处。",
+      "next": "吃饱喝足，该出门逛逛了。下一节学「问路」——迷路了怎么办？「How do I get to ...?」一句话帮你找到目的地。"
+     }
+    ]
+   },
+   {
+    "title": "别迷路：问路与方向",
+    "summary": "两句问路开头加三个方向词，迷路也能自己找回目的地。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "眼前有人能问，你却开不了口",
+      "markdown": "出门在外，最怕迷路。手机没电、地图看不懂，眼前明明有人可以问，你却开不了口。\n\n问路其实只要三样：**问在哪、听方向、道声谢**。方向词就那么几个——左、右、直走。这一节练熟，迷路也不慌。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "学会开口问路：Excuse me, where is the restroom?",
+       "学会问怎么走：How do I get to the station?",
+       "听懂方向词：left / right / straight",
+       "学会确认远近：Is it far?"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "问路两句头：先问「在哪」再问「怎么走」",
+      "markdown": "问路记住这两句开头：\n\n- **Excuse me, where is the ...?** 请问……在哪里？（问位置）\n- **How do I get to the ...?** 我怎么去……？（问路线）\n\n最常找的地方：\n\n- **restroom** 洗手间（≈ 瑞斯特-入姆）\n- **station** 车站\n- **hospital** 医院\n\n找洗手间就说：Excuse me, where is the restroom?"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Excuse me, how do I get to the station?",
+        "note": "打扰一下，我怎么去车站？"
+       },
+       {
+        "speaker": "路人",
+        "text": "Go straight, then turn left.",
+        "note": "直走，然后左转。"
+       },
+       {
+        "speaker": "你",
+        "text": "Turn left. Is it far?",
+        "note": "左转。远吗？（重复对方的话，帮自己记住）"
+       },
+       {
+        "speaker": "路人",
+        "text": "No, just five minutes.",
+        "note": "不远，就五分钟。"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "方向词就这几个，反复念熟：\n\n- **Go straight.** 直走。（≈ 高-斯吹特）\n- **Turn left.** 左转。\n- **Turn right.** 右转。\n- **It's over there.** 就在那边。\n\n听懂这四句，别人指的方向你就能跟上。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "问位置：**Where is the ...?**；问路线：**How do I get to the ...?**",
+       "三个方向词记牢：**straight**（直）/ **left**（左）/ **right**（右）",
+       "听不懂就说 **Sorry?** 或 **Again, please.**（请再说一遍）",
+       "把对方的话**重复一遍**，既确认又练口语"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Sorry, again please?",
+        "note": "抱歉，请再说一遍？（没听清就大方地问）"
+       },
+       {
+        "speaker": "路人",
+        "text": "Turn right at the corner.",
+        "note": "在路口右转。corner ≈ 阔那，「拐角/路口」"
+       },
+       {
+        "speaker": "你",
+        "text": "Turn right. Thank you for your help!",
+        "note": "右转。谢谢你的帮忙！"
+       },
+       {
+        "speaker": "路人",
+        "text": "No problem. Good luck!",
+        "note": "不客气。祝你好运！"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "你想问「我怎么去车站？」，正确说法是？",
+      "options": [
+       "Where are you from?",
+       "How do I get to the station?",
+       "How much is this?",
+       "Turn left, please."
+      ],
+      "answerIndex": 1,
+      "explain": "'How do I get to the station?' 就是「我怎么去车站？」。Where are you from 是问你从哪来，How much is this 是问价格，都不对。"
+     },
+     {
+      "type": "flashcard",
+      "front": "Go straight / Turn left / Turn right",
+      "back": "直走 / 左转 / 右转 —— 三个方向词，问路必备，反复念熟就够用。"
+     },
+     {
+      "type": "summary",
+      "markdown": "问路不难：两句开头 **Where is the ...?** 和 **How do I get to ...?**，配上三个方向词 **straight / left / right**，再加一句 **Thank you for your help!**，迷路也能自己找回来。别忘了：没听清就说 Sorry, again please，一点都不丢人。",
+      "next": "在外走多了难免有个头疼脑热。下一节我们去药店和诊所——「I have a headache」「Do you have medicine for a cold?」，身体不舒服也能说清楚。"
+     }
+    ]
+   },
+   {
+    "title": "身体不适：药店与看病",
+    "summary": "用 I have a 说症状、Do you have medicine 买药，身体不适也能说清楚。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "想买点药，却说不清哪里不舒服",
+      "markdown": "出门在外突然头疼、感冒，想去药店买点药，却不知道怎么描述哪里不舒服。比划半天，店员一脸茫然。\n\n身体不适的表达，其实有个万能句型：**I have a ...**（我有……）。这一节我们把常见症状一句句学会，关键时刻能说清楚、买对药。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "学会说不舒服：I don't feel well.",
+       "学会描述症状：I have a headache / a cough / a fever.",
+       "学会买药：Do you have medicine for a cold?",
+       "听懂用法说明：How many times a day? / After meals."
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "说症状万能句：I have a ...",
+      "markdown": "哪里不舒服，都用这一句：\n\n- **I have a headache.** 我头疼。（headache ≈ 嗨得-克）\n- **I have a cough.** 我咳嗽。（cough ≈ 靠夫）\n- **I have a fever.** 我发烧。（fever ≈ 飞-握）\n\n还有一句先垫场：**I don't feel well.**（我感觉不舒服）。先说这句，再说具体哪里疼。"
+     },
+     {
+      "type": "example",
+      "markdown": "常见症状词，认一认、念一念：\n\n- **headache** 头疼\n- **stomachache** 肚子疼\n- **cough** 咳嗽\n- **fever** 发烧\n- **cold** 感冒\n\n套进 **I have a ...** 就能用：I have a stomachache.（我肚子疼。）"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Hi, I don't feel well. I have a cold.",
+        "note": "你好，我不太舒服。我感冒了。"
+       },
+       {
+        "speaker": "药剂师",
+        "text": "Do you have a cough?",
+        "note": "你咳嗽吗？"
+       },
+       {
+        "speaker": "你",
+        "text": "Yes. Do you have medicine for a cold?",
+        "note": "咳嗽。你们有感冒药吗？medicine ≈ 麦德森，「药」"
+       },
+       {
+        "speaker": "药剂师",
+        "text": "Yes, here you are.",
+        "note": "有的，给你。"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "万能句型 **I have a + 症状**：headache / cough / fever",
+       "买药：**Do you have medicine for + 病?**（有治……的药吗）",
+       "先垫一句 **I don't feel well.**（我不舒服），再说细节",
+       "疼得厉害说 **It hurts here.**（这里疼），指着说更清楚"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "How many times a day?",
+        "note": "一天吃几次？"
+       },
+       {
+        "speaker": "药剂师",
+        "text": "Three times a day, after meals.",
+        "note": "一天三次，饭后吃。after meals ≈ 阿夫特-米欧斯，「饭后」"
+       },
+       {
+        "speaker": "你",
+        "text": "After meals. Thank you!",
+        "note": "饭后。谢谢！（重复一遍，记得更牢）"
+       },
+       {
+        "speaker": "药剂师",
+        "text": "Get well soon!",
+        "note": "早日康复！"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "在药店想说「我头疼」，应该说哪一句？",
+      "options": [
+       "I have a headache.",
+       "How much is this?",
+       "Turn left, please.",
+       "Nice to meet you."
+      ],
+      "answerIndex": 0,
+      "explain": "'I have a headache.' 就是「我头疼」。用万能句型 I have a + 症状，把 headache 换成 cough、fever 就能说别的症状。"
+     },
+     {
+      "type": "flashcard",
+      "front": "Do you have medicine for a cold?",
+      "back": "有感冒药吗？—— 买药万能句。把 a cold 换成 a cough、a headache，就能买别的药。"
+     },
+     {
+      "type": "summary",
+      "markdown": "身体不适三件套：先说 **I don't feel well.**，再用 **I have a + 症状** 说清哪儿疼，最后 **Do you have medicine for ...?** 买药。买到药别忘问 **How many times a day?**（一天几次）。学完这一节，你已经能应对生活里最常见的英语场景了！",
+      "next": "五个高频场景——寒暄、购物、点餐、问路、看病——你都能开口了。接下来把这些短句在生活里多念多用，记住我们的方法：慢慢讲，一句读三遍，敢开口就是进步。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "ct1v4",
+  "subtitle": "跟着有道中教,4 大高频场景 + 发音细拆,零基础也敢开口",
+  "intro": "《中教口语小班 1v4》自学版,把有道中教 1v4 小班(2–4 人)的开口教学法搬进课程库。中教教研组精选生活与职场高频场景——自我介绍、日常寒暄、咖啡点单、职场会议,配真实英文对话与句型框架,并细拆中国人最容易读错的发音与连读。跟着「听—拆—仿—练」四步开口法,同伴对练降低开口压力,零基础也敢张口,循序渐进夯实口语基础。",
+  "level": "L1",
+  "instructorName": "有道中教教研组",
+  "lessons": [
+   {
+    "title": "第 1 节 · 小班开口法：破冰与自我介绍",
+    "summary": "小班开口法 + 破冰自我介绍，用万能框架 30 秒介绍自己。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "第一次开口，你也卡壳过吗？",
+      "markdown": "脑子里明明有话，一到嘴边就成了一片空白——很多人不是不会英语，是**不敢开口**。有道中教 1v4 小班(2–4 人)之所以有效，就是因为人少、压力小，同伴一起练，你说错也没人笑。这一节我们把小班里的开口法搬到自学版：先教你一套「越用越顺」的开口方法，再用它完成第一件事——**大方地介绍自己**。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解「小班开口法」为什么能降低开口压力",
+       "掌握「听—拆—仿—练」四步开口循环",
+       "用万能框架完成一段 30 秒英文自我介绍",
+       "避开自我介绍最常见的 3 个中式表达"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "什么是「小班开口法」",
+      "markdown": "有道中教 1v4 小班的核心不是「老师讲、你听」，而是**中教细拆 + 同伴对练**：中教把发音和语法拆到你能听懂，再让 2–4 人互相对练，在互相带动中把话说出来。\n\n自学版里我们保留它的精髓：每个场景都给你**真实句型框架**和**可对练的对话**。你可以对着手机自问自答，也可以拉一个同伴一起念——**先开口，再求好**，这是提升口语最关键的一步。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "① 听懂 Listen",
+        "detail": "先把对话听明白：谁在说、说的是什么场景。听懂是模仿的前提。"
+       },
+       {
+        "title": "② 拆解 Break down",
+        "detail": "跟着中教注释，把句子拆成「框架 + 可替换词」，看清哪里是骨架、哪里能换。"
+       },
+       {
+        "title": "③ 模仿 Shadow",
+        "detail": "跟读，模仿语音语调，先慢后快，重点句读 3–5 遍。"
+       },
+       {
+        "title": "④ 对练 Pair practice",
+        "detail": "找同伴或自问自答，把句子真正「说出去」——这一步不做，等于没学。"
+       }
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "中教",
+        "text": "Let's start with a quick warm-up. Tell us your name, your job, and one thing you love.",
+        "note": "开口框架：名字 + 职业 + 一个爱好，思路清晰不慌张"
+       },
+       {
+        "speaker": "Amy(同学)",
+        "text": "Hi everyone, I'm Amy. I work as an accountant, and I love hiking on weekends.",
+        "note": "work as + 职业；love + doing（hiking）"
+       },
+       {
+        "speaker": "Ben(同学)",
+        "text": "Hi, I'm Ben. I'm a college student, and I'm really into basketball.",
+        "note": "be into sth = 很喜欢某事，比 like 更自然"
+       },
+       {
+        "speaker": "中教",
+        "text": "Great! Ben, say it again, a bit slower — 'I'm really into basketball.' Feel the linking: really-into.",
+        "note": "中教细拆：放慢 + 连读，把节奏带出来"
+       },
+       {
+        "speaker": "Cathy(同学)",
+        "text": "Hello, my name is Cathy. Nice to meet you all.",
+        "note": "简短也完全 OK——先敢开口，最重要"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "开场：Hi everyone, I'm ___. ",
+       "职业：I work as a ___. / I'm a ___.",
+       "爱好：I love ___ing. / I'm into ___.",
+       "收尾：Nice to meet you all."
+      ]
+     },
+     {
+      "type": "flashcard",
+      "front": "I'm into ___.",
+      "back": "我很喜欢___（口语常用，比 like 更自然）。例：I'm into photography. 我很喜欢摄影。"
+     },
+     {
+      "type": "compare",
+      "title": "自我介绍：中式表达 vs 地道说法",
+      "left": {
+       "heading": "常见中式表达（要避开）",
+       "items": [
+        "My English is poor.（一开口就道歉）",
+        "I am a office worker.（a/an 冠词用错）",
+        "I very like basketball.（very like 是典型错误）"
+       ]
+      },
+      "right": {
+       "heading": "地道说法",
+       "items": [
+        "I'm still learning, but I'll try.",
+        "I work in an office. / I'm an office worker.",
+        "I really like basketball. / I'm into basketball."
+       ]
+      }
+     },
+     {
+      "type": "quiz",
+      "question": "想表达「我是一名护士，喜欢做饭」，下面哪句最地道？",
+      "options": [
+       "I am nurse, I very like cooking.",
+       "I'm a nurse, and I love cooking.",
+       "I do nurse job, I like cook.",
+       "My job is nurse, I very like to cooking."
+      ],
+      "answerIndex": 1,
+      "explain": "a nurse 需要冠词 a；「喜欢做饭」用 love/like + doing(cooking)；very like 是典型中式错误，要说 really like 或 love。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你收获了两样东西：一套可复用的**「听—拆—仿—练」开口法**，和一段**万能自我介绍框架**（名字 + 职业 + 爱好 + 收尾）。别只在心里默念——现在就大声念 3 遍，最好拉个同伴互相介绍一次。",
+      "next": "下一节走进「日常寒暄」：学会用天气、周末话题自然聊起来，再也不用尬站着只憋出一句 How are you。"
+     }
+    ]
+   },
+   {
+    "title": "第 2 节 · 日常寒暄：不再冷场的闲聊术",
+    "summary": "3 个零风险话题 + 回答反问技巧，日常寒暄不再冷场。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "电梯里的 10 秒沉默",
+      "markdown": "你和外国同事一起等电梯，想聊两句缓解尴尬，脑子里却只蹦出一句 How are you，对方答完就没下文了——**空气突然安静**。其实老外之间也天天在做这种「无意义闲聊」(small talk)，它不是浪费时间，而是关系的**润滑剂**。这一节，中教教你用几个安全话题和一个小技巧，让闲聊自然地接下去。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握 3 个「零风险」寒暄话题，开口不冷场",
+       "学会 How are you? 的多种地道回答",
+       "用「回答 + 反问」技巧把对话接下去",
+       "积累 8 句可直接套用的闲聊句"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "闲聊聊什么最安全",
+      "markdown": "small talk 的黄金原则是**选安全话题、别太深入**。\n\n✅ 安全话题：天气 (weather)、周末/计划 (weekend / plans)、食物 (food)。\n\n❌ 尽量避开：年龄、收入、婚否、体重——在英语文化里这些偏隐私，不适合闲聊。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "Morning! How's it going?",
+        "note": "How's it going 比 How are you 更轻松随意"
+       },
+       {
+        "speaker": "B",
+        "text": "Pretty good, thanks. How about you?",
+        "note": "回答 + 反问，对话不掉线"
+       },
+       {
+        "speaker": "A",
+        "text": "Not bad. Did you do anything fun this weekend?",
+        "note": "周末是万能话题"
+       },
+       {
+        "speaker": "B",
+        "text": "I just stayed home and watched a movie. What about you?",
+        "note": "stay home 在家待着；继续反问"
+       },
+       {
+        "speaker": "A",
+        "text": "I went hiking. The weather was perfect.",
+        "note": "用天气自然收尾"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "How's it going? / How's your day?",
+       "Any plans for the weekend?",
+       "The weather's really nice today.",
+       "How about you? / What about you?（万能反问）"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**How are you? 别永远只会 I'm fine, thank you, and you?** 换着说更自然：\n\n- Pretty good, thanks. — 挺好的\n- Not bad. — 还行\n- Can't complain. — 还不错（字面：没啥可抱怨的）\n- A little tired, but okay. — 有点累，不过还行"
+     },
+     {
+      "type": "compare",
+      "title": "冷场回答 vs 接得住的回答",
+      "left": {
+       "heading": "对话终结者",
+       "items": [
+        "Fine.（然后就没了）",
+        "Yes. / No.（只回一个词）",
+        "I don't know.（把话堵死）"
+       ]
+      },
+      "right": {
+       "heading": "能把话接下去",
+       "items": [
+        "Pretty good — how about you?（回答 + 反问）",
+        "Yeah, I did! I went to the park.（回答 + 一个细节）",
+        "Not really, maybe just rest. You?（诚实 + 反问）"
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "Can't complain.",
+      "back": "还不错、没啥可抱怨的。回答 How are you 时的地道口语，显得轻松随和。"
+     },
+     {
+      "type": "quiz",
+      "question": "同事问 Any plans for the weekend?，最能把对话接下去的回答是？",
+      "options": [
+       "No.",
+       "Not really — maybe just rest. How about you?",
+       "I don't know.",
+       "Weekend."
+      ],
+      "answerIndex": 1,
+      "explain": "「回答 + 反问」是让闲聊延续的核心技巧；只回 No / I don't know 会让对话立刻终结。"
+     },
+     {
+      "type": "summary",
+      "markdown": "闲聊的秘诀就两点：**选安全话题**（天气/周末/食物）+ **回答后加一句反问或细节**。把本节 8 句寒暄语挑 3 句读熟，明天在电梯里就能用上。",
+      "next": "下一节切换到生活场景——咖啡店点单，学会一次说清楚「要什么、冷还是热、堂食还是外带」。"
+     }
+    ]
+   },
+   {
+    "title": "第 3 节 · 生活场景：咖啡店从容点单",
+    "summary": "点单三步法，咖啡店从容点单、听懂店员追问。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "排到你了，店员一连串发问",
+      "markdown": "队伍排到你，店员笑着连珠炮：「Hi, what can I get you? Hot or iced? For here or to go?」一紧张，准备好的词全忘了。其实咖啡店点单是**高度可预测**的场景——店员就问那几句。这一节用「点单三步法」，把整个流程拆开、练熟，下次你就能从容点完一杯咖啡。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用「点单三步法」从容完成一次英文点单",
+       "听懂店员最常见的 4 个追问",
+       "掌握 size / hot / iced / to go 等关键词",
+       "用 Could I get... 礼貌下单"
+      ]
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "① 回应招呼",
+        "detail": "别急着报单，先笑着回一句 Hi, how are you? 放松一下。"
+       },
+       {
+        "title": "② 说清要什么",
+        "detail": "用 Could I get a ___? 或 I'd like a ___，比 I want 礼貌得多。"
+       },
+       {
+        "title": "③ 应对追问",
+        "detail": "提前想好三件事：多大杯 (size)、冷还是热 (hot/iced)、堂食还是外带 (for here / to go)。"
+       }
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "店员",
+        "text": "Hi there! What can I get you?",
+        "note": "点单万能开场白"
+       },
+       {
+        "speaker": "你",
+        "text": "Hi, could I get a medium latte, please?",
+        "note": "Could I get 最地道礼貌；medium 中杯"
+       },
+       {
+        "speaker": "店员",
+        "text": "Hot or iced?",
+        "note": "热的还是冰的"
+       },
+       {
+        "speaker": "你",
+        "text": "Hot, please.",
+        "note": "简短直接回答即可"
+       },
+       {
+        "speaker": "店员",
+        "text": "For here or to go?",
+        "note": "堂食还是外带"
+       },
+       {
+        "speaker": "你",
+        "text": "To go, thanks.",
+        "note": "to go = 外带；for here = 堂食"
+       },
+       {
+        "speaker": "店员",
+        "text": "That'll be five dollars.",
+        "note": "That'll be... = 一共…（报价格）"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "Could I get a ___, please?（最礼貌的点单句）",
+       "I'd like a ___.（我想要…）",
+       "For here. / To go.（堂食 / 外带）",
+       "Can I have oat milk instead?（能换成燕麦奶吗）"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**店员最常见的 4 个追问，提前备好答案：**\n\n- What size? → Small / medium / large, please.\n- Hot or iced? → Iced, please.\n- Anything else? → That's all, thanks. / No, that's it.\n- For here or to go? → To go."
+     },
+     {
+      "type": "compare",
+      "title": "生硬 vs 礼貌地道",
+      "left": {
+       "heading": "偏生硬 / 易错",
+       "items": [
+        "I want a coffee.（I want 略显生硬）",
+        "Give me a latte.（像命令）",
+        "Big one.（太含糊）"
+       ]
+      },
+      "right": {
+       "heading": "礼貌地道",
+       "items": [
+        "Could I get a coffee, please?",
+        "I'd like a latte.",
+        "A large one, please."
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "For here or to go?",
+      "back": "堂食还是外带？答：For here.（堂食）/ To go.（外带）。to go 也可以说 takeaway（英式）。"
+     },
+     {
+      "type": "quiz",
+      "question": "店员问 Anything else?，你已经点好了，怎么回答最地道？",
+      "options": [
+       "No thing.",
+       "That's all, thanks.",
+       "Finish.",
+       "I want nothing."
+      ],
+      "answerIndex": 1,
+      "explain": "That's all, thanks. 或 No, that's it. 是地道说法；No thing / Finish 都不是自然英语。"
+     },
+     {
+      "type": "summary",
+      "markdown": "点单其实是「有剧本」的：**回应招呼 → 说清要什么 → 应对 4 个固定追问**。把本节对话跟读到能脱口而出，下次进咖啡店就当练习场，真点一杯。",
+      "next": "下一节进入职场——用一句话在会议上做自我介绍、得体地表达观点、礼貌地提出请求。"
+     }
+    ]
+   },
+   {
+    "title": "第 4 节 · 职场高频：会议上从容开口",
+    "summary": "会议自我介绍、表达观点、礼貌请求，职场开口得体不慌。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "轮到你介绍，大脑空白",
+      "markdown": "视频会议里，老板说：「Let's go around and introduce ourselves.」镜头一个个转过来，快到你了，心跳加速——该说什么、怎么说才不失礼？职场英语看着复杂，其实高频动作就三件：**介绍自己、表达观点、提请求**。这一节把这三件事的句型框架给你，临场照着套，稳住不慌。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用一句话完成职场自我介绍（名字 + 岗位 + 负责什么）",
+       "掌握表达观点的「缓冲句」，不显生硬",
+       "学会职场里的礼貌请求与委婉不同意",
+       "积累 6 个会议高频句型"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "职场开口就三件事",
+      "markdown": "别被「商务英语」四个字吓到。日常职场沟通里，高频开口就集中在三类：\n\n1. **介绍自己** — 我是谁、做什么的\n2. **表达观点** — 我怎么看、建议怎么做\n3. **提请求 / 回应** — 请对方帮忙、委婉表达不同意见\n\n每类记住一个框架，临场就能拼出得体的话。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "老板",
+        "text": "Let's go around and introduce ourselves.",
+        "note": "go around = 挨个来"
+       },
+       {
+        "speaker": "你",
+        "text": "Sure. Hi, I'm Leo from the marketing team. I handle social media.",
+        "note": "框架：I'm ___ from the ___ team. I handle ___."
+       },
+       {
+        "speaker": "同事",
+        "text": "I think we should launch next week.",
+        "note": "I think we should… 提出建议"
+       },
+       {
+        "speaker": "你",
+        "text": "That's a good point. But could we double-check the budget first?",
+        "note": "先肯定、再提问，非常得体"
+       },
+       {
+        "speaker": "老板",
+        "text": "Good idea. Let's do that.",
+        "note": ""
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "自我介绍：I'm ___ from the ___ team. I handle ___.",
+       "表达观点：In my opinion, ___. / I think we should ___.",
+       "缓冲同意：That's a good point, but ___.",
+       "礼貌请求：Could we ___? / Would it be possible to ___?"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**同意 / 不同意 / 补充，各备一句：**\n\n- 同意：I totally agree. / Exactly.\n- 委婉不同意：I see your point, but I'm not sure.（别直接说 You're wrong）\n- 补充观点：Can I add something? / Just to add on…"
+     },
+     {
+      "type": "compare",
+      "title": "太直接 vs 职场得体",
+      "left": {
+       "heading": "太直接（显得冲）",
+       "items": [
+        "You're wrong.",
+        "No, I don't like it.",
+        "Give me the report."
+       ]
+      },
+      "right": {
+       "heading": "职场得体",
+       "items": [
+        "I see it a bit differently.",
+        "I'm not sure that'll work — could we try…?",
+        "Could you send me the report when you get a chance?"
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "That's a good point, but…",
+      "back": "先肯定对方、再提出不同看法的缓冲句。职场沟通里显得成熟得体，比直接反对更容易被接受。"
+     },
+     {
+      "type": "quiz",
+      "question": "同事的方案你不太认同，下面哪句最得体？",
+      "options": [
+       "You're wrong.",
+       "That's a good point, but I'm not sure about the timeline.",
+       "No. Bad idea.",
+       "I don't like."
+      ],
+      "answerIndex": 1,
+      "explain": "职场沟通讲究「先肯定、再质疑」。直接说 You're wrong 会显得冒犯；而且 I don't like 语法也不完整（缺宾语）。"
+     },
+     {
+      "type": "summary",
+      "markdown": "职场开口抓住三个框架就够用：**介绍自己**（I'm ___ from ___, I handle ___）、**表达观点**（In my opinion… / 缓冲句 That's a good point, but…）、**礼貌请求**（Could we…?）。把这三句改成你自己的岗位版本，念熟备用。",
+      "next": "最后一节是中教招牌——细拆中国人最容易读错的发音，教你连读弱读，让口语听起来更顺、更地道。"
+     }
+    ]
+   },
+   {
+    "title": "第 5 节 · 中教发音细拆：纠音与连读",
+    "summary": "中教细拆 th / v / 词尾发音 + 连读弱读，让口语更顺更地道。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "每个词都对，老外却听不懂",
+      "markdown": "你说「I want to book a room」，一个单词一个单词都没错，前台却皱起眉——问题往往不在词汇，而在**发音清晰度**和**连读节奏**。这正是有道中教最招牌的一环：**细拆发音**，不堆一堆音标，只抓最影响「被听懂」的几个点，逐个拆、慢讲、多练。这一节，我们攻克中国人最容易卡住的发音，再学会连读，让口语真正「顺」起来。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "攻克中国人最易错的 3 类发音：th、v/w、词尾辅音",
+       "掌握「辅音 + 元音」连读，让语流更顺",
+       "学会弱读，把句子说出英文的节奏",
+       "用中教纠音法自己练、自己改"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "中教纠音法：只抓关键几点",
+      "markdown": "中教细拆发音，不搞玄乎的音标轰炸，只盯住最影响听懂的几处：\n\n- **th** 要咬舌（舌尖轻触上齿）\n- **v** 要上齿轻咬下唇，别读成 w\n- **词尾辅音**别吞掉（and 的 -d、word 的 -d）\n- 句子里要有**连读**和**弱读**，不能逐词硬蹦\n\n方法就八个字：**逐个拆、慢讲、多练**。"
+     },
+     {
+      "type": "compare",
+      "title": "三类高频发音误区 vs 正确",
+      "left": {
+       "heading": "误区（听不懂的根源）",
+       "items": [
+        "think 读成 sink（th → s）",
+        "very 读成 wery（v → w）",
+        "and 读成 an、word 吞掉词尾 -d"
+       ]
+      },
+      "right": {
+       "heading": "正确做法",
+       "items": [
+        "think：舌尖轻触上齿，送气 /θ/",
+        "very：上齿轻咬下唇发 /v/",
+        "and / word：词尾 d 要发出来，别吞"
+       ]
+      }
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "① 辅音 + 元音连读",
+        "detail": "前词的词尾辅音，和后词的词首元音连起来读：an apple → a-napple。"
+       },
+       {
+        "title": "② 相同音吞一个",
+        "detail": "两个相同/相近的音相遇，只发一个：good day → goo(d) day。"
+       },
+       {
+        "title": "③ 弱读虚词",
+        "detail": "to / and / of / for 这类虚词读轻读快：want to → 口语里的 wanna 就是这么来的。"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**连读示例（先慢速拆解，再正常速度模仿）：**\n\n- Can I have a cup of coffee? → Ca-nI have a cup-of…（Can I 连读）\n- I want to go. → I wanna go.（want to 弱读连读）\n- Nice to meet you. → Nice to mee-chu.（meet you 连读成 /tʃ/）"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "中教",
+        "text": "Say after me: 'think.' Put your tongue between your teeth.",
+        "note": "舌尖放上下齿之间，别读成 sink"
+       },
+       {
+        "speaker": "同学",
+        "text": "Think.",
+        "note": "先把单音读准"
+       },
+       {
+        "speaker": "中教",
+        "text": "Good. Now link it: 'I think it's okay' → 'I-thin-kits-okay.'",
+        "note": "中教带你把整句连起来读"
+       },
+       {
+        "speaker": "同学",
+        "text": "I think it's okay.",
+        "note": ""
+       },
+       {
+        "speaker": "中教",
+        "text": "Slower first, then speed up. Practice makes it natural.",
+        "note": "慢讲、多练——中教纠音的核心"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "练法：慢速拆解 → 正常速度模仿 → 录音回听对比",
+       "每个难音每天读 10 遍，形成肌肉记忆",
+       "整句练连读，不要逐词硬蹦",
+       "找同伴互听互纠（这正是小班对练的价值）"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "在自然口语里，want to go 常常连读弱读成？",
+      "options": [
+       "want to go（逐词重读）",
+       "wanna go",
+       "want go",
+       "wan to go"
+      ],
+      "answerIndex": 1,
+      "explain": "want to 在口语中弱读、连读为 wanna，这是英语节奏的自然结果。能听懂、也能说出来，会让你的口语更地道、更省力。"
+     },
+     {
+      "type": "summary",
+      "markdown": "恭喜你走完全部 5 节！这一节你拿到了中教招牌的**纠音清单**（th / v / 词尾辅音）和**连读三招**。发音靠一次次录音回听慢慢磨——今天先挑 think、very 两个词各读 10 遍。\n\n别忘了：这是自学版，真正的飞跃来自**开口对练**。把这五个场景找个同伴（或回到有道中教 1v4 小班）一句句说出来，你会发现——原来自己早就能开口了。",
+      "next": "回到场景反复练：自我介绍 → 日常寒暄 → 咖啡点单 → 职场会议，配上今天的发音与连读，把它们真正「说」出来。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "oral_class",
+  "subtitle": "8大主题·16课时,把碎片化口语系统化,练成张口就来的地道表达",
+  "intro": "《口语小班课》为有基础的英语学习者与爱好者打造,把散落在生活、职场和网络里的地道表达,系统化成一套能迁移、能开口的口语能力。课程共8大主题、16课时,覆盖个人成长、职场沟通、日常交流与当下新潮热点四大场景,用高频句型、真实对话和\"中式英语 vs 地道说法\"对照,帮你走出\"背了却不会用\"的困境。每节先给场景钩子,再拆句型、练对话、做测验,把碎片化积累变成张口就来的表达肌肉。由有道口语教研组研发。",
+  "level": "L2",
+  "instructorName": "有道口语教研组",
+  "lessons": [
+   {
+    "title": "个人成长 · 聊聊你最近在忙什么、想成为谁",
+    "summary": "从'最近在忙啥'开始,学会用地道句型谈目标与自我提升,告别 I'm busy 和 improve myself 的 Chinglish。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "被问'最近在忙啥',你却只憋得出 I'm busy",
+      "markdown": "老同学重逢、面试破冰、和外国同事寒暄,对方笑着问一句 **\"What have you been up to?\"**,你脑子一片空白,只能挤出 \"I'm busy\" 或 \"nothing special\",气氛瞬间冷场。\n\n其实这类问题不是考英语,而是给你**一个介绍自己成长的机会**。这一节,我们就把'我在努力做什么、想变成什么样'说得自然又有料。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用 3 个万能句型自然回答'最近在忙什么、在努力什么'",
+       "掌握'提升自己'的地道说法,告别中式的 improve myself",
+       "学会用成长型心态的表达谈论目标和进步,不再只会说 good"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "三个万能句型,说清'我在做什么'",
+      "markdown": "**1. I'm working on...** 我在(为…)下功夫 / 我在弄…\n> I'm working on my public speaking. 我在练当众表达。\n\n**2. I've been trying to...** 我一直在尝试…(强调坚持了一阵)\n> I've been trying to read one book a month. 我一直在坚持每月读一本书。\n\n**3. I'm getting into...** 我最近迷上 / 开始接触…\n> I'm really getting into cooking these days. 我最近挺迷做饭的。\n\n三句都能接在 \"What have you been up to?\" 后面,比 \"I'm busy\" 信息量高得多。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Emma",
+        "text": "Hey, long time no see! What have you been up to?",
+        "note": "What have you been up to? = 最近在忙啥,比 How are you 更自然的寒暄"
+       },
+       {
+        "speaker": "Leo",
+        "text": "Oh, you know, the usual. But I've actually been working on my public speaking lately.",
+        "note": "the usual 老样子;work on sth 在…上下功夫"
+       },
+       {
+        "speaker": "Emma",
+        "text": "Nice! What got you into that?",
+        "note": "What got you into that? 你怎么开始搞这个的 / 怎么入坑的"
+       },
+       {
+        "speaker": "Leo",
+        "text": "I kept freezing up in meetings, so I figured I'd better do something about it.",
+        "note": "freeze up 卡壳/僵住;figured I'd better… 想着还是…比较好"
+       },
+       {
+        "speaker": "Emma",
+        "text": "Good for you. Baby steps, right?",
+        "note": "Good for you 真替你高兴;Baby steps 一步一步来"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "中式直译 vs 母语者常说",
+      "left": {
+       "heading": "中式直译(听着别扭)",
+       "items": [
+        "I want to improve myself. (太笼统,不知道改什么)",
+        "My English is poor.",
+        "I want to make myself better."
+       ]
+      },
+      "right": {
+       "heading": "地道表达(母语者常说)",
+       "items": [
+        "I want to work on myself. / I'm trying to level up. 我想提升自己",
+        "My English is a bit rusty. 我英语有点生疏了",
+        "I want to grow / better myself. 我想成长 / 让自己更好"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "**谈'还在进步中'的成长型表达(藏拙又显真诚):**\n\n- \"I'm not there yet, but I'm getting better.\" 我还没到那一步,但在进步。\n- \"It's a work in progress.\" 还在进行中,慢慢来。\n- \"I'll take it as a learning curve.\" 就当是一段学习过程。\n\n这些句子在说'我做得还不够好'时,既坦诚又不显丧,面试和日常都好用。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "'最近在忙啥'首选 What have you been up to?,别只回 I'm busy",
+       "work on sth 是'提升自己'的黄金动词,替代生硬的 improve",
+       "用 I've been + doing 强调'一直在坚持',显得真实有过程",
+       "卡壳别硬扛,用 It's a work in progress 自然带过"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "朋友问 \"What got you into photography?\",最贴切自然的回答是?",
+      "options": [
+       "Because I am busy with photography.",
+       "I kept seeing great shots online, so I figured I'd give it a try.",
+       "Photography is my improve myself.",
+       "I very like photography."
+      ],
+      "answerIndex": 1,
+      "explain": "What got you into X 问的是'你怎么入坑的',要讲契机和原因。B 用 figured I'd give it a try(想着试试看)自然又地道。A 答非所问,C、D 是典型中式英语(improve myself 不能这么用,very like 搭配错误)。"
+     },
+     {
+      "type": "summary",
+      "markdown": "**本节收获:** 用 working on / been trying to / getting into 三句,把'最近在忙什么'讲成一次得体的自我介绍;并学会 work on myself、a work in progress 等地道成长表达,替代 improve myself 的中式说法。",
+      "next": "会介绍完自己,下一步就是走进会议室——下节《职场沟通》教你在会上得体地表达不同意见,既亮明观点又不伤和气。"
+     }
+    ]
+   },
+   {
+    "title": "职场沟通 · 开会时,如何得体地表达不同意见",
+    "summary": "掌握同意、补充、委婉反对的职场句型,用缓冲语让异议不伤和气,自然插话接话。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "视频会议里,你想反对却怕显得冲",
+      "markdown": "会议上同事抛出一个方案,你心里并不认同,可一句 \"No, I don't agree\" 说出口,气氛立刻紧绷。憋着不说,又错过了表达机会。\n\n职场英语的关键不在于'敢不敢反对',而在于**怎么反对得体**——先接住对方,再委婉给出理由。这一节我们就练这套'外柔内刚'的表达。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握委婉表达同意、补充、反对的三组职场句型",
+       "学会用缓冲语(softening)让异议不伤和气",
+       "能在会议里自然地插话、接话、推进讨论"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "职场三连:同意 / 补充 / 委婉反对",
+      "markdown": "**同意并推进:**\n> That makes sense. / I'm on the same page. 有道理 / 我跟你想的一样。\n\n**补充观点(不抢话):**\n> Building on that, ... 顺着这个思路…\n> I'd like to add one thing. 我想补充一点。\n\n**委婉反对(先认同再转折):**\n> I see your point, but... 我明白你的意思,不过…\n> I'm not sure I fully agree — here's why. 我不太确定完全同意,原因是…"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Manager",
+        "text": "So the plan is to launch next week. Thoughts?",
+        "note": "Thoughts? 大家怎么看?会议征询意见的高频短句"
+       },
+       {
+        "speaker": "Amy",
+        "text": "That makes sense to me, but I'm a little concerned about the timeline.",
+        "note": "先肯定 that makes sense,再用 I'm a little concerned about… 委婉提出担忧"
+       },
+       {
+        "speaker": "Ben",
+        "text": "Building on Amy's point, could we push it back a few days?",
+        "note": "Building on…'s point 顺着…的观点补充;push it back 往后推"
+       },
+       {
+        "speaker": "Manager",
+        "text": "Fair enough. Let's aim for the following Monday then.",
+        "note": "Fair enough 有道理 / 可以接受;aim for 争取在…"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "太直接 vs 得体",
+      "left": {
+       "heading": "太直接(显得冲)",
+       "items": [
+        "No, that's wrong.",
+        "I don't agree.",
+        "That won't work."
+       ]
+      },
+      "right": {
+       "heading": "得体(职场友好)",
+       "items": [
+        "I see it a bit differently. 我看法稍有不同",
+        "I'm not sure I fully agree — here's why. 我不太确定完全认同,理由是…",
+        "That might be tricky. Could we try…? 那可能有点难办,能不能试试…?"
+       ]
+      }
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "反对前先 acknowledge:I see your point / I hear you",
+       "but 前面加缓冲,but 后面给理由,别光说 No",
+       "Thoughts? 和 Fair enough 是英美会议的高频短句",
+       "补充观点用 Building on that,显专业又不抢话"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**再进阶:三句缓冲语让反对更柔和**\n\n- \"Correct me if I'm wrong, but...\" 我可能说错,但…\n- \"Just to play devil's advocate...\" 我唱个反调 / 换个角度想…\n- \"Maybe we could consider...\" 也许我们可以考虑…\n\n共同点:把强硬的'我反对'包装成'我抛个想法',对方更容易接受。"
+     },
+     {
+      "type": "quiz",
+      "question": "同事的方案你担心时间太赶,最得体的表达是?",
+      "options": [
+       "No, the timeline is impossible.",
+       "I'm a little concerned about the timeline — could we build in some buffer?",
+       "Your plan is wrong.",
+       "I don't like it."
+      ],
+      "answerIndex": 1,
+      "explain": "职场沟通讲究'先认同再提问题'。B 用 I'm a little concerned(委婉表达担忧)加建设性建议 build in some buffer(留点缓冲),既亮明异议又不伤和气。其余三项都过于生硬,容易让对方下不来台。"
+     },
+     {
+      "type": "summary",
+      "markdown": "**本节收获:** 用 that makes sense / building on that / I'm not sure I fully agree 三组句型,把'同意—补充—反对'说得专业又得体;并掌握 I'm a little concerned、correct me if I'm wrong 等缓冲语,让职场异议外柔内刚。",
+      "next": "会开会,也得会寒暄。下节《日常交流》带你走进茶水间和饭局,学会自然的 small talk 和'约饭不尴尬'的邀约句型。"
+     }
+    ]
+   },
+   {
+    "title": "日常交流 · 寒暄不冷场,约饭张得开口",
+    "summary": "学会自然的 small talk 开场和地道的邀约句型,礼貌地接受或婉拒,让社交不再尴尬。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "茶水间遇到外国同事,想聊两句却没词",
+      "markdown": "在茶水间碰到外国同事,你笑着点头,然后……陷入沉默,只能默默等咖啡好;想约朋友吃个饭,一句 \"Let us eat dinner together\" 又生硬得像翻译腔。\n\n日常英语拼的不是词汇量,而是**几句随口就来的寒暄和邀约**。这一节,我们把 small talk 和约饭说得自然又轻松。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "学会 3 个自然的 small talk 开场,告别冷场",
+       "掌握'约饭 / 约见面'的地道邀约句型",
+       "会用地道公式礼貌地接受或婉拒邀约"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "开场白 + 约见面:随口就来的句型",
+      "markdown": "**寒暄开场(万能三句):**\n> Any plans for the weekend? 周末有安排吗?\n> How was your weekend? 周末过得怎样?\n> Crazy weather today, huh? 今天天气够可以的哈?\n\n**发出邀约(轻松不刻意):**\n> Do you want to grab lunch sometime? 找时间一起吃个午饭?\n> We should catch up soon. 咱们该聚聚了。\n> Are you free this Friday? 这周五有空吗?\n\n关键词 **grab**(随手弄点)让邀约显得随意不有压力。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "Morning! How was your weekend?",
+        "note": "周一万能寒暄"
+       },
+       {
+        "speaker": "B",
+        "text": "Pretty chill, just caught up on some sleep. You?",
+        "note": "chill 轻松;catch up on sleep 补觉;结尾反问 You? 把球踢回去"
+       },
+       {
+        "speaker": "A",
+        "text": "Same here. Hey, do you want to grab coffee later?",
+        "note": "Same here 我也一样;grab coffee 随口约喝咖啡"
+       },
+       {
+        "speaker": "B",
+        "text": "Sure, sounds good. Around three?",
+        "note": "sounds good 好呀;Around three? 三点左右?"
+       },
+       {
+        "speaker": "A",
+        "text": "Works for me. See you then.",
+        "note": "Works for me 我可以 / 没问题"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "教科书腔 vs 自然口语",
+      "left": {
+       "heading": "生硬 / 教科书",
+       "items": [
+        "Let us eat dinner together.",
+        "I am fine, thank you, and you?",
+        "Do you have free time?"
+       ]
+      },
+      "right": {
+       "heading": "自然口语",
+       "items": [
+        "Do you want to grab dinner sometime? 找时间吃个饭?",
+        "Pretty good, you? / Not bad, you? 还不错,你呢?",
+        "Are you free later? / Are you around this week? 待会有空吗 / 这周在吗?"
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "grab a bite",
+      "back": "随便吃点东西(口语约饭超高频)。例:\"Wanna grab a bite after work?\" 下班后随便吃点?—— wanna = want to,口语缩读。"
+     },
+     {
+      "type": "example",
+      "markdown": "**接受 / 婉拒,各一个地道公式:**\n\n- 接受:\"Sounds great, count me in!\" 听着不错,算我一个!\n- 婉拒:\"I'd love to, but I'm swamped this week. Rain check?\" 我很想去,但这周忙翻了,改天?\n\n> swamped 忙得不可开交;rain check 改约(源自看球下雨改期的票根)。"
+     },
+     {
+      "type": "quiz",
+      "question": "同事约你下班吃饭,但你实在没空,最自然的婉拒是?",
+      "options": [
+       "No, I have no time.",
+       "I'd love to, but I'm swamped tonight — rain check?",
+       "I cannot because I am very busy.",
+       "Maybe. I don't know."
+      ],
+      "answerIndex": 1,
+      "explain": "地道婉拒公式 = 先表达意愿(I'd love to)+ 给理由(I'm swamped)+ 提议改天(rain check)。既不失礼又留余地。A、C 生硬,D 含糊敷衍,都会让对方尴尬。"
+     },
+     {
+      "type": "summary",
+      "markdown": "**本节收获:** 用 How was your weekend / Any plans 打开话匣子,用 grab lunch、grab a bite 轻松约人,再用 'I'd love to, but… rain check?' 优雅婉拒。社交从此不冷场、不尴尬。",
+      "next": "日常聊天绕不开热点。下节《当下新潮热点》带你聊 AI 和短视频,顺便解锁 FOMO、ghosting 等 8 个网络流行语。"
+     }
+    ]
+   },
+   {
+    "title": "当下新潮热点 · 聊AI、短视频和网络流行语",
+    "summary": "用地道句型表达对科技热点的看法,解锁 FOMO、ghosting 等 8 个高频网络流行语,自然参与潮流闲聊。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "朋友聊 AI 和短视频,你只会说 'yes, it's good'",
+      "markdown": "饭桌上朋友聊得火热:ChatGPT 好不好用、短视频刷到停不下来、谁又'突然消失'不回消息……你想插话,却只憋得出 \"yes, it's good\",聊天戛然而止。\n\n聊热点是当代社交货币。这一节,我们学会**对新潮事物表态**的地道句型,并解锁一批高频网络流行语,让你接得上梗、聊得进去。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用地道句型表达对科技和热点的看法,不再只会说 good / bad",
+       "掌握 8 个高频网络流行语(FOMO、ghosting、doomscrolling 等)",
+       "能自然参与关于 AI 和社交媒体的闲聊"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "表态四句型:从'好'到'我拿不准'",
+      "markdown": "> I'm kind of obsessed with... 我最近超迷…\n> It's a bit of a game changer. 挺颠覆的 / 改变游戏规则。\n> Honestly, it's overhyped. 说实话,有点被吹过头了。\n> I'm on the fence about it. 我还拿不定主意。\n\n四句覆盖'喜欢—颠覆—泼冷水—中立'的完整光谱,比一句 good 丰富太多。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "Have you tried using AI to plan your trips? It's a game changer.",
+        "note": "game changer 颠覆性 / 改变格局的东西"
+       },
+       {
+        "speaker": "B",
+        "text": "Honestly, I'm on the fence. It's handy, but sometimes it just makes stuff up.",
+        "note": "on the fence 犹豫 / 中立;makes stuff up 瞎编,聊 AI 幻觉的地道说法"
+       },
+       {
+        "speaker": "A",
+        "text": "True. But for boring tasks? Total time-saver.",
+        "note": "time-saver 省时神器;total 加强语气'绝对是'"
+       },
+       {
+        "speaker": "B",
+        "text": "Fair. I'll give it another shot.",
+        "note": "Fair 有道理;give it another shot 再试一次"
+       }
+      ]
+     },
+     {
+      "type": "flashcard",
+      "front": "FOMO",
+      "back": "fear of missing out,害怕错过(怕自己没跟上别人)。例:\"I bought the tickets out of pure FOMO.\" 纯粹因为怕错过才买的票。"
+     },
+     {
+      "type": "example",
+      "markdown": "**8 个高频网络流行语(点到为止,看场合用):**\n\n- **ghosting** 突然玩消失,不回消息\n- **doomscrolling** 刷负面新闻停不下来\n- **FOMO** 害怕错过\n- **flex** 炫耀 —— \"Stop flexing your new phone.\" 别晒你的新手机了\n- **lowkey / highkey** 有点 / 超级 —— \"I'm lowkey tired.\" 我有点累\n- **it's giving...** 有种…的感觉 —— \"It's giving summer vibes.\" 很有夏天那味儿\n- **vibe check** 氛围 / 状态确认\n- **touch grass** 别老上网,出去走走(调侃)"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "表态别只说 good/bad,用 game changer / overhyped / on the fence",
+       "makes stuff up 是吐槽 AI '一本正经胡说'的地道说法",
+       "流行语点到为止、看场合;正式会议里慎用",
+       "give it a shot / another shot = 试试看 / 再试一次"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "想说'这个功能有点被过度吹捧了',最地道的说法是?",
+      "options": [
+       "This function is too much praised.",
+       "Honestly, it's a bit overhyped.",
+       "People speak it too good.",
+       "It is very hype."
+      ],
+      "answerIndex": 1,
+      "explain": "overhyped = 被过度炒作 / 吹过头,是母语者评价热点产品的高频词,常配 a bit / kind of 软化语气。A、C、D 均为中式表达,搭配和语法都不对。"
+     },
+     {
+      "type": "summary",
+      "markdown": "**本节收获:** 用 game changer / overhyped / on the fence 对热点表态,用 makes stuff up 吐槽 AI,并解锁 FOMO、ghosting、doomscrolling 等 8 个流行语,聊科技和潮流不再插不上话。",
+      "next": "词句都会了,可一开口还是断断续续?最后一节《方法篇》教你系统化积累 + 用 filler 争取思考时间,把碎片表达练成'张口就来'。"
+     }
+    ]
+   },
+   {
+    "title": "方法篇 · 把碎片化表达练成'张口就来'",
+    "summary": "掌握'场景库+句型卡+影子跟读'的系统化积累法,用 filler 和连接词自然争取思考时间,让口语连贯起来。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "词也认识、句型也背过,一开口还是卡",
+      "markdown": "单词认识、句型也背过,可真到开口那一刻,还是断断续续、卡在半句,越急越说不利索。\n\n问题往往不在'背得不够',而在**积累太碎、调用没练**。这一节,我们把前四节学到的表达系统化,并教你像母语者一样用停顿词从容争取思考时间。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握'场景库 + 句型卡 + 影子跟读'的系统化积累法",
+       "学会用 filler(停顿词)和连接词自然争取思考时间",
+       "把零散的表达连成流畅、有逻辑的口语"
+      ]
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "建'场景表达库'",
+        "detail": "按吃饭、开会、闲聊、聊热点等场景,把地道句型分类收进笔记,而不是孤立地背单词。用时按场景整块调取,前四节的表达正好归类归档。"
+       },
+       {
+        "title": "做'句型卡'",
+        "detail": "每个场景提炼 3-5 个万能句型(如 Do you want to grab…? / I'm a little concerned about…),正面写中文情境、背面写英文,像闪卡一样反复调用到脱口而出。"
+       },
+       {
+        "title": "影子跟读(shadowing)",
+        "detail": "跟着音频延迟半句同步复述,模仿语音、语调和节奏,让句型从'认识'变成'肌肉记忆'。每天 10 分钟,坚持比时长更重要。"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "用 filler 从容争取思考时间",
+      "markdown": "母语者也需要时间组织语言,他们靠的不是沉默,而是自然的过渡词:\n\n> Let me think... 让我想想\n> That's a good question. 这问题问得好(先接住,再想)\n> Well, you know... 嗯,你懂的\n> How do I put this... 我该怎么说呢…\n\n关键:别用中式的 \"uh… uh… how to say\",换成这些顺滑的 filler,既争取时间又显从容。"
+     },
+     {
+      "type": "compare",
+      "title": "卡壳沉默 vs 自然过渡",
+      "left": {
+       "heading": "卡住时(暴露紧张)",
+       "items": [
+        "……(长时间沉默)",
+        "Uh... uh... how to say...",
+        "How to say(中式错误,母语者不这么说)"
+       ]
+      },
+      "right": {
+       "heading": "自然过渡(显从容)",
+       "items": [
+        "Hmm, let me put it this way... 嗯,这么说吧…",
+        "What I mean is... 我的意思是…",
+        "The word I'm looking for is... 我想找的那个词是…"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "**连接词,是流利感的关键:**\n\n- \"First off, ... and on top of that, ...\" 首先…而且…\n- \"The thing is, ...\" 问题在于 / 其实是…\n- \"At the end of the day, ...\" 说到底 / 归根结底…\n\n把零散的句子用连接词串起来,听感立刻从'蹦单词'变成'成段表达'。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "系统化 = 场景库 + 句型卡 + 影子跟读,别再孤立背单词",
+       "filler 不是缺点,是母语者争取思考时间的自然手段",
+       "永远别说 how to say,改用 how do I put this",
+       "the thing is / at the end of the day 等连接词,是流利感的关键"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "一时想不起词、想争取几秒思考,最地道的过渡是?",
+      "options": [
+       "How to say... how to say...",
+       "Hmm, how do I put this...",
+       "Wait wait, then silence.",
+       "I don't know the word, sorry."
+      ],
+      "answerIndex": 1,
+      "explain": "how do I put this 是母语者边想边说的自然过渡,既争取时间又显从容。how to say 是典型中式错误(语法也不对);长时间沉默或直接道歉都会打断交流、暴露紧张。"
+     },
+     {
+      "type": "summary",
+      "markdown": "**本节收获:** 用'场景库 + 句型卡 + 影子跟读'把碎片表达系统化,用 how do I put this、the thing is 等 filler 与连接词让口语从容连贯。前五节的句型,从此能真正'张口就来'。",
+      "next": "这五节是《口语小班课》的缩影。完整 8 大主题、16 课时还会带你走进出行旅游、情绪表达、面试谈薪等更多高频场景,把地道表达一路积累成综合口语实力。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "wj1v1",
+  "subtitle": "外教 1v1 地道表达精华·5 大实景主题自学版",
+  "intro": "《外教口语 1v1》是有道面向成人日常职场口语、学生口语应试、有基础想进阶三类人群的真人 1v1 课程，共 12 主题、5000 话题，外教沉浸式陪练、实时纠音、灵活约课。本课程为其地道表达与实景对话的精华自学版：精选破冰寒暄、职场会议、餐厅社交、出行问路、面试自我介绍五大高频场景，用真实英文对话、母语者常用短句与「Chinglish vs 地道」对照，配同步纠音要点，带你从「背句子」走向「真实反应」，学完可无缝衔接真人 1v1。",
+  "level": "L2",
+  "instructorName": "有道外教团队",
+  "lessons": [
+   {
+    "title": "破冰寒暄:让「你好吗」不再尬聊",
+    "summary": "从「Fine, thank you」到真实接话反应,掌握母语者高频寒暄与万能回应。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "还在「Fine, thank you. And you?」吗?",
+      "markdown": "电梯里遇到外国同事,对方随口一句 **\"How's it going?\"**,你条件反射地背出 \"Fine, thank you, and you?\"——对方愣了半秒,礼貌笑笑就没了下文。\n\n这就是课本英语和真实英语的鸿沟:你答得没错,但没人这么说。外教 1v1 的第一课,不是教你更多单词,而是把你从**「背问答」**带进**「真实反应」**——听到什么,自然接什么。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握 3 种母语者高频寒暄开场,告别「How are you—Fine」套路",
+       "学会用地道短句自然回应,让对话继续下去而不是卡住",
+       "纠正中国学习者最常见的一个寒暄发音错误(comfortable)"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "地道英语 = 场景 + 反应,不是翻译",
+      "markdown": "外教 1v1 的方法有三层:**实景模拟**(把你放进真实场景)+**地道表达**(只教母语者真的会说的)+**实时纠音**(开口就改)。\n\n寒暄的本质不是「考试问答」,而是「**接话**」。母语者不追求答得完整,而是把话头递回去,让对话滚动下去。记住:寒暄卡壳比语法出错尴尬十倍。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "同事",
+        "text": "Hey, how's it going?",
+        "note": "比 How are you 更随意、更高频;现代口语几乎不说 How do you do"
+       },
+       {
+        "speaker": "你",
+        "text": "Not bad, just getting my coffee. You?",
+        "note": "Not bad = 还行;后面主动加一句正在做什么,给对方话头"
+       },
+       {
+        "speaker": "同事",
+        "text": "Same here. Long morning already.",
+        "note": "Same here = 我也是,比 Me too 更口语"
+       },
+       {
+        "speaker": "你",
+        "text": "Tell me about it.",
+        "note": "表示「可不是嘛/深有同感」,不是真让对方讲"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "寒暄回应:课本 vs 地道",
+      "left": {
+       "heading": "课本直译(尬)",
+       "items": [
+        "Fine, thank you. And you?",
+        "I am very good.",
+        "How do you do?(现代口语几乎不用)"
+       ]
+      },
+      "right": {
+       "heading": "母语者会说",
+       "items": [
+        "Pretty good, thanks — you?",
+        "Can't complain.",
+        "Doing alright, a bit tired though."
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "**一组万能寒暄反应**\n\n开场:\"How's it going?\" / \"How are you doing?\"\n\n回应可选:\n- **\"Pretty good, thanks.\"** 挺好的\n- **\"Can't complain.\"** 还不错(直译「没什么好抱怨的」)\n- **\"Getting there.\"** 还在努力/凑合(尤其忙、累时)\n\n收尾再反问一句 **\"How about you?\"** 或简短一个 **\"You?\"**,把球踢回去。"
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**【实时纠音·高频错音】** \"comfortable\" 很多同学读成 com-for-TA-ble,重音全乱。母语者读 **/ˈkʌmftəbəl/**——其实是三个音节,KUMF-tuh-bul,中间那个 or 几乎被吞掉。寒暄常说 \"I'm comfortable with that\",一读错就露怯。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "同事",
+        "text": "Any plans for the weekend?",
+        "note": "周五高频寒暄,别只答 yes/no"
+       },
+       {
+        "speaker": "你",
+        "text": "Nothing crazy — just catching up on sleep. You?",
+        "note": "Nothing crazy = 没啥特别的;catching up on sleep = 补觉"
+       },
+       {
+        "speaker": "同事",
+        "text": "Might go hiking if the weather holds.",
+        "note": "if the weather holds = 如果天气给力、不变天"
+       },
+       {
+        "speaker": "你",
+        "text": "Nice, sounds relaxing.",
+        "note": "用 Nice / Sounds + 形容词 自然收尾"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "寒暄目标不是「答对」,而是「接话」:答完主动加半句 + 反问",
+       "记 3 张万能回应卡:Pretty good / Can't complain / Getting there",
+       "一个词「You?」就能礼貌反问,不必每次都说完整句",
+       "语气 > 语法:寒暄错点语法没人在意,卡住不说才真尴尬"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "同事说 \"How's it going?\",下面哪个回答最自然、最能让对话继续?",
+      "options": [
+       "Fine, thank you. And you?",
+       "Pretty good — just grabbing coffee. You?",
+       "I am very good, thank you very much.",
+       "How do you do?"
+      ],
+      "answerIndex": 1,
+      "explain": "地道寒暄要「接话」:先随意回应(Pretty good),再加半句正在做的事(grabbing coffee)给对方话头,最后一个 \"You?\" 把球踢回。课本式 \"Fine, thank you\" 太生硬,容易冷场。"
+     },
+     {
+      "type": "summary",
+      "markdown": "本节你把「背问答」换成了「接话反应」:学会 Pretty good / Can't complain / Getting there 三张万能卡,掌握「回应 + 半句 + 反问」的接话公式,还纠正了 comfortable 的重音。",
+      "next": "下一节进职场——会议一开口就冷场?教你母语者的开场白,以及「不得罪人地表达不同意见」。"
+     }
+    ]
+   },
+   {
+    "title": "职场会议:开场与「不得罪人」地表达观点",
+    "summary": "职场会议开场与「不得罪人」的委婉异议表达。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "会议一开口就冷场",
+      "markdown": "跨国会议里,你想插一句不同看法,一句 **\"I think you are wrong\"** 出口,全场空气瞬间凝固。\n\n职场英语的坎,往往不是词汇量,而是**「分寸」**。同样是表达异议,母语者能说得既清楚又不伤和气。外教 1v1 的职场主题,练的正是这种「有话直说,但说得让人接受」。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "学会 3 句母语者会议开场白,自然接管发言权",
+       "掌握「委婉表达不同意见」的地道句式,既表态又不得罪人",
+       "纠正 important / opinion 等职场高频词的发音"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "职场地道 = 清楚 + 留有余地",
+      "markdown": "英语职场里,直接否定 (\"You're wrong\") 被视为无礼;母语者用 **softening(软化)** 达到同样目的——先认可,再用 but 引出保留意见。\n\n这不是虚伪,而是协作文化:你表了态,又给了对方台阶,方案才更容易推进。掌握这套「缓冲句式」,比多背几十个单词更能改变别人对你的印象。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "主持人",
+        "text": "Let's get started. Sam, want to kick us off?",
+        "note": "kick off = 开场/开始;want to...? 是柔和的邀请"
+       },
+       {
+        "speaker": "Sam",
+        "text": "Sure. So just to give you some context, ...",
+        "note": "to give you some context = 先交代背景,母语者开场高频"
+       },
+       {
+        "speaker": "你",
+        "text": "Can I jump in here?",
+        "note": "礼貌打断、插一句,比直接开口好"
+       },
+       {
+        "speaker": "Sam",
+        "text": "Go ahead.",
+        "note": "请讲"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "\"Let me kick things off.\" 我先开个头",
+       "\"Just to give you some context, ...\" 先交代下背景",
+       "\"Can I jump in here?\" 我插一句可以吗(礼貌打断)",
+       "\"Let's circle back to that.\" 这点我们待会再说"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**委婉表达不同意见(disagree politely)**\n\n- **\"I see your point, but I'd look at it differently.\"** 我懂你意思,但我看法不太一样\n- **\"That's fair, though I'm not sure it'll scale.\"** 有道理,不过我担心难以规模化\n- **\"Could we maybe consider ...?\"** 我们能不能考虑…?(用问句软化)\n\n避免:\"You're wrong.\" / \"No, that's bad.\"——太冲,容易让对话变对抗。"
+     },
+     {
+      "type": "compare",
+      "title": "表达不同意见",
+      "left": {
+       "heading": "生硬(易得罪人)",
+       "items": [
+        "You're wrong.",
+        "No, that's a bad idea.",
+        "I don't agree."
+       ]
+      },
+      "right": {
+       "heading": "地道(表态又得体)",
+       "items": [
+        "I see where you're coming from, but...",
+        "That could work, though I'd be a bit careful about...",
+        "I'm not totally sold on that — can we look at the numbers?"
+       ]
+      }
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**【实时纠音】** \"important\" 别把结尾 t 读太重成 im-POR-tANT;母语者读 **/ɪmˈpɔːrtnt/**,结尾是轻轻的 \"-tnt\",几乎听不到元音。\"opinion\" 重音在中间 **/əˈpɪnjən/**——o-PIN-yun,不是 O-pinion。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "经理",
+        "text": "What do you think of the new timeline?",
+        "note": "直接征询意见"
+       },
+       {
+        "speaker": "你",
+        "text": "Honestly, I'm a bit concerned we're cutting it close.",
+        "note": "Honestly 开头显真诚;cutting it close = 时间太紧"
+       },
+       {
+        "speaker": "经理",
+        "text": "Fair enough. What would you suggest?",
+        "note": "Fair enough = 有道理/可以理解"
+       },
+       {
+        "speaker": "你",
+        "text": "Maybe we push the launch by a week to be safe.",
+        "note": "Maybe...to be safe:提议 + 留余地,不把话说死"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "会议上你不同意同事的方案,最得体的说法是?",
+      "options": [
+       "No, you're wrong.",
+       "I see where you're coming from, but I'd be careful about the timeline.",
+       "That's a bad idea.",
+       "I don't agree at all."
+      ],
+      "answerIndex": 1,
+      "explain": "英语职场重「分寸」。先认可对方 (I see where you're coming from),再用 but 引出保留意见,既表态又不伤和气。直接说 wrong / bad idea 会显得咄咄逼人。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你学会了 kick off / jump in / give some context 的开场,以及「先认可再 but」的委婉异议公式,还纠正了 important、opinion 的发音——这些正是让同事觉得你「专业又好共事」的细节。",
+      "next": "下一节走出办公室——餐厅一句 \"I want a coffee\" 就露馅?教你像本地人一样自然点单和社交。"
+     }
+    ]
+   },
+   {
+    "title": "餐厅社交:告别「I want」式点单",
+    "summary": "餐厅点餐、买单、社交的地道说法,告别「I want」式 Chinglish。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "「I want a coffee」一出口就露馅",
+      "markdown": "在国外咖啡馆,你说 **\"I want a coffee\"**,店员愣了下才反应过来——语法完全没错,但母语者几乎不这么点单,听起来像在下命令。\n\n地道口语的差距,常常就藏在这些**「小词」**里。这一节把点餐、买单、社交的高频表达一次讲透,让你开口就像本地人。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用 I'll have / Could I get 替代生硬的 I want,自然点单",
+       "掌握加料、买单、打包、社交寒暄的高频短句",
+       "纠正 water / dessert 等点餐高频词的发音与重音"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "点餐地道公式:I'll have / Could I get",
+      "markdown": "\"I want...\" 直白得像命令,母语者极少用来点单。地道说法是:\n\n- **\"I'll have ...\"**(我要…)——陈述式,点单标准句\n- **\"Could I get ...?\"**(能给我…吗)——问句式,更礼貌\n\n核心是两点:**加 please**、**多用问句**。这两样是英语礼貌的骨架,几乎适用于所有服务场景。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "服务员",
+        "text": "Hi, what can I get you?",
+        "note": "点餐开场白,不是 What do you want"
+       },
+       {
+        "speaker": "你",
+        "text": "I'll have the grilled chicken, please.",
+        "note": "I'll have = 点餐标准说法"
+       },
+       {
+        "speaker": "服务员",
+        "text": "Sure. Anything to drink?",
+        "note": "问饮料"
+       },
+       {
+        "speaker": "你",
+        "text": "Could I get a sparkling water?",
+        "note": "Could I get...? 礼貌要东西;sparkling water = 气泡水"
+       },
+       {
+        "speaker": "服务员",
+        "text": "Of course. For here or to go?",
+        "note": "堂食还是外带"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**点餐 & 买单万能句**\n\n- **\"I'll have the ..., please.\"** 我要…\n- **\"Could I get ... on the side?\"** …单独放旁边(如酱料)\n- **\"Can we get the check, please?\"** 买单(美式 check,英式 bill)\n- **\"Keep the change.\"** 不用找了\n\n避免:I want... / Give me...——语法对,但生硬甚至显得没礼貌。"
+     },
+     {
+      "type": "compare",
+      "title": "点餐说法",
+      "left": {
+       "heading": "生硬(Chinglish)",
+       "items": [
+        "I want a coffee.",
+        "Give me the menu.",
+        "Bring me water."
+       ]
+      },
+      "right": {
+       "heading": "地道",
+       "items": [
+        "I'll have a coffee, please.",
+        "Could I see the menu?",
+        "Could we get some water when you have a sec?"
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "「买单」怎么说?(美式)",
+      "back": "Can we get the check, please? —— 美式用 check,英式用 bill。别用中式直译 \"Give me the bill\"。"
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**【实时纠音】** \"water\" 美音里 t 常浊化成 d 音,读作 **\"WAH-der\"**;英音则是清楚的 /ˈwɔːtə/。\"dessert\"(甜点) 重音在后 **/dɪˈzɜːrt/**——di-ZERT,别和 \"desert\"(沙漠,DEZ-ert 重音在前) 搞混,点错就尴尬了。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "点单开口先 I'll have / Could I get,几乎不用 I want",
+       "加 please、用问句,是英语礼貌的核心",
+       "check(美)/ bill(英) 别混;\"Keep the change\" 一句显自然",
+       "dessert 重音在后,别读成 desert(沙漠)"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "在餐厅想点一份烤三文鱼,最地道的说法是?",
+      "options": [
+       "I want the grilled salmon.",
+       "Give me the grilled salmon.",
+       "I'll have the grilled salmon, please.",
+       "The grilled salmon for me now."
+      ],
+      "answerIndex": 2,
+      "explain": "\"I'll have ..., please\" 是母语者点单标准句式,礼貌又自然。\"I want / Give me\" 语法虽对,但听起来像命令,容易显得没礼貌。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你把 \"I want\" 升级成 \"I'll have / Could I get\",掌握了买单、打包、加料的地道短句,还分清了 dessert 和 desert 的重音——下次进餐厅,一开口就是本地味儿。",
+      "next": "下一节出发去旅行——机场值机、酒店入住、街头问路,一整套实景对话带你从容不慌。"
+     }
+    ]
+   },
+   {
+    "title": "出行实景:机场·酒店·问路",
+    "summary": "机场、酒店、问路全流程实景对话,听懂固定问句不慌张。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "机场一句没听懂,行程全乱",
+      "markdown": "值机台问你 **\"Aisle or window?\"**,你没反应过来是什么意思;酒店前台说 **\"You're all set\"**,你不确定这是好消息还是坏消息。\n\n旅行英语的坑,大多不在生词,而在这些**「每个词都认识、连起来却抓不住意思」**的瞬间。这一节用实景对话,把机场、酒店、问路的固定问句一次拆清。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "听懂并回应机场值机、安检的高频问句",
+       "掌握酒店入住、退房、问路的地道短句",
+       "纠正 aisle / receipt 等旅行高频词的「哑音」"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "旅行英语:听懂「固定问句」比背单词更重要",
+      "markdown": "机场、酒店的对话高度**模式化**——来来回回就那几十句。你不需要词汇量爆表,只要提前认得这些固定问句,听到就能条件反射地应答。\n\n所以这一节的重点是「**听得懂 + 答得出**」:先记住对方大概率会问什么,再准备好你的标准回应。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "地勤",
+        "text": "May I see your passport, please?",
+        "note": "出示护照"
+       },
+       {
+        "speaker": "你",
+        "text": "Here you go.",
+        "note": "递东西时说,比 give you 自然地道"
+       },
+       {
+        "speaker": "地勤",
+        "text": "Aisle or window?",
+        "note": "过道座还是靠窗座"
+       },
+       {
+        "speaker": "你",
+        "text": "Window, please.",
+        "note": "靠窗,谢谢"
+       },
+       {
+        "speaker": "地勤",
+        "text": "You're all set. Gate 22, boarding at 3.",
+        "note": "You're all set = 都办好了/搞定了(好消息)"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**旅行万能句**\n\n- **\"Here you go.\"** 给你(递东西时)\n- **\"You're all set.\"** 都办好了(前台/值机常说,是好消息)\n- **\"I have a reservation under Li.\"** 我有预订,名字是 Li\n- **\"What time is check-out?\"** 几点退房"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "客人",
+        "text": "Hi, I have a reservation under Chen.",
+        "note": "under + 姓 = 用…名字预订的"
+       },
+       {
+        "speaker": "前台",
+        "text": "Let me check... yes, a king room for two nights.",
+        "note": "Let me check = 稍等我查一下"
+       },
+       {
+        "speaker": "客人",
+        "text": "Great. Also, how do I get to the subway from here?",
+        "note": "How do I get to...? 问路标准句"
+       },
+       {
+        "speaker": "前台",
+        "text": "Go straight, then take a left. It's a five-minute walk.",
+        "note": "take a left = 左转;a five-minute walk = 步行五分钟"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "问路 & 应答",
+      "left": {
+       "heading": "生硬/不自然",
+       "items": [
+        "Where is subway?",
+        "I want check out time.",
+        "Give me my passport back."
+       ]
+      },
+      "right": {
+       "heading": "地道",
+       "items": [
+        "How do I get to the subway?",
+        "What time is check-out?",
+        "Could I have my passport back, please?"
+       ]
+      }
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**【实时纠音·哑音】** \"aisle\"(过道) 里的 s 不发音,读 **/aɪl/**,跟 \"I'll\" 同音,别读成 \"ai-so\"。\"receipt\"(收据) 的 p 是哑音,读 **/rɪˈsiːt/**——ri-SEET;问 \"Could I get a receipt?\" 时最容易读错。"
+     },
+     {
+      "type": "quiz",
+      "question": "酒店前台对你说 \"You're all set.\",意思最接近?",
+      "options": [
+       "你还需要再交点钱。",
+       "都给你办好了,没别的事了。",
+       "你订错房间了。",
+       "你得重新排队。"
+      ],
+      "answerIndex": 1,
+      "explain": "\"You're all set\" 是服务场景高频语,意思是「你都搞定了/没别的事了」,是好消息。机场、酒店、餐厅都常听到,听懂它能少很多慌张。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你听懂了 Aisle or window、You're all set 等旅行固定问句,掌握了预订、退房、问路的地道说法,还搞定了 aisle、receipt 的哑音——出行路上再不慌。",
+      "next": "最后一节回到「高压时刻」——面试与自我介绍,教你既真诚又有分量地介绍自己。"
+     }
+    ]
+   },
+   {
+    "title": "面试自我介绍:讲一个让人记住的重点",
+    "summary": "用「现在-过去-未来」公式做有重点的自我介绍,应对面试。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "「Tell me about yourself」一开口就背简历",
+      "markdown": "面试官一句 **\"Tell me about yourself\"**,你把简历从头到尾复述了一遍,对方礼貌点头,眼神却渐渐飘走。\n\n地道的自我介绍,从来不是**复述经历**,而是**讲一个让人记住的重点**。这一节给你一套母语者常用的结构和句式,让你在最紧张的场合也能说得清楚、有分量。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用「现在-过去-未来」结构自然回答 Tell me about yourself",
+       "掌握描述能力与成绩的地道动词短语,避免空话套话",
+       "纠正 interview / experience 等面试高频词的重音"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "自我介绍公式:Present → Past → Future",
+      "markdown": "母语者回答 \"Tell me about yourself\" 常用**三段式**:\n\n1. **Present** 现在做什么(点明现状)\n2. **Past** 过去的关键经历(一两个亮点,不是流水账)\n3. **Future** 为什么想要这个机会(动机 + 期待)\n\n简洁、有重点、有逻辑,比把简历背一遍强太多。面试官记住的,永远是那个「重点」,不是那串经历。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "面试官",
+        "text": "So, tell me a little about yourself.",
+        "note": "面试开场经典问题"
+       },
+       {
+        "speaker": "你",
+        "text": "Sure. Right now I'm a marketing specialist at a fintech startup, where I run our social campaigns.",
+        "note": "Right now 点明现在;where 引出你具体做什么"
+       },
+       {
+        "speaker": "你",
+        "text": "Before that, I spent two years in content, which is where I really got into data-driven marketing.",
+        "note": "Before that 过渡到过去;got into = 开始热衷于"
+       },
+       {
+        "speaker": "你",
+        "text": "I'm looking to take on a bigger role, and that's what drew me to this position.",
+        "note": "what drew me to = 吸引我来的原因,收在未来/动机"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "\"I led / I ran ...\" 我带领/负责了…(比 I did 有力)",
+       "\"I'm responsible for ...\" 我负责…",
+       "\"I helped grow ... by 30%.\" 我帮助…增长了 30%(带数字更可信)",
+       "\"That's what drew me to ...\" …正是吸引我的地方"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**描述成绩,别用空话**\n\n- 空:\"I'm a hard worker and a team player.\"(人人都这么说,记不住)\n- 实:\"I led a team of four and grew our followers by 40% in six months.\"(有角色、有数字、有结果)\n\n母语者更信**具体事实**,不信形容词堆砌。一个数字,胜过十个 hardworking。"
+     },
+     {
+      "type": "compare",
+      "title": "自我介绍",
+      "left": {
+       "heading": "空泛(记不住)",
+       "items": [
+        "I'm hardworking and responsible.",
+        "I did many things in my last job.",
+        "I want a good job."
+       ]
+      },
+      "right": {
+       "heading": "有重点(记得住)",
+       "items": [
+        "I led a small team and doubled our output.",
+        "In my last role, I ran our email campaigns.",
+        "I'm looking to grow into a leadership role."
+       ]
+      }
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**【实时纠音】** \"interview\" 重音在最前 **/ˈɪntərvjuː/**——IN-ter-view,别读成 in-ter-VIEW。\"experience\" 重音在第二音节 **/ɪkˈspɪəriəns/**——ik-SPEER-ee-uns,很多同学会漏掉中间音节读成 \"expi-rience\"。"
+     },
+     {
+      "type": "quiz",
+      "question": "面试官问 \"Tell me about yourself\",最好的开场是?",
+      "options": [
+       "从出生地开始,把整份简历完整背一遍",
+       "Right now I'm a marketing specialist, where I run our social campaigns...(现在→过去→未来)",
+       "I'm hardworking, responsible, and a team player.",
+       "I don't know where to start."
+      ],
+      "answerIndex": 1,
+      "explain": "地道回答用「现在→过去→未来」三段式,先点明现状,再讲关键经历和动机,简洁有重点。堆形容词(hardworking / team player)或复述整份简历,都很难让人记住。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你掌握了 Present→Past→Future 自我介绍公式,用 led / ran / grew by X% 这样有分量的短语替代空话,还纠正了 interview、experience 的重音。五节精华到此结束——而这只是 12 主题里的一瞥。",
+      "next": "想真正开口练、被外教实时纠音、按自己节奏灵活约课?欢迎进入《外教口语 1v1》真人课,5000 话题任你选,把「敢说、地道」练成本能。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "chaopin",
+  "subtitle": "躺学三步法 · 24周从0到开口:单词—听说—语境沉浸式精进英语",
+  "intro": "「超频语境」以「躺学」为核心理念,用轻松、高频的沉浸式语言环境,带0基础学员在无压力浸泡中自然掌握英语。课程依托躺学「单词—听说—语境」三步教学法,循序渐进覆盖音标与语法基础,配套超频语料与短剧语境课。24周分为基础级(万能词汇入门、掌握日常对话)与飞跃级(真实语境训练、夯实听说读写、掌握高级词汇与地道口语),由梁焕臻主讲,帮你实现英语0→1入门并同步精进听说读写。",
+  "level": "L1",
+  "instructorName": "梁焕臻",
+  "lessons": [
+   {
+    "title": "开学第一课:「躺学」三步法 + 音标躺着入门",
+    "summary": "认识超频语境的躺学理念与「单词—听说—语境」三步法,并躺着入门最实用的英语音标。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "背了就忘、开口就怕?问题不在你",
+      "markdown": "很多人学英语的经历是:单词书背到 abandon 就放弃,好不容易记住的词,过两天又忘了;真要开口,脑子一片空白。\n\n不是你不够努力,而是方法太累——**孤立地背、用力地记、没有语境**。超频语境换一种活法:躺着学。把自己泡进高频、真实的英语环境里,让语言像背景音乐一样一遍遍流过你,记忆在无压力中自然发生。这一节,我们先认识这套「躺学」方法,再躺着拿下英语发音的地基——音标。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解「躺学」理念:为什么高频沉浸比死记硬背更省力",
+       "掌握躺学「单词—听说—语境」三步学习法的运作方式",
+       "读懂英语音标,能准确发出 /iː/ /ɪ/ /æ/ 等高频音",
+       "用音标拼读并记住 3 个日常高频词"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "「躺学」不是偷懒,是顺应大脑",
+      "markdown": "「躺学」的核心是**高频 + 沉浸 + 无压力**。\n\n- **高频**:同一批高频词、高频句,在不同场景里反复出现。英语中最高频的约 1000 个词,覆盖了日常对话的 85% 以上——把它们泡熟,就能听懂、说出大部分日常内容。\n- **沉浸**:不靠意志力硬背,而是让语料反复流过耳朵和眼睛,像小孩学母语一样自然吸收。\n- **无压力**:不追求一次记牢,允许「见了忘、忘了又见」,在重复中沉淀。\n\n这就是为什么可以「躺着学」:你要做的不是用力,而是**保持在场**——每天让英语环境包围你。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第一步 · 单词:先把高频词泡熟",
+        "detail": "每周聚焦少量万能高频词,配合发音、图文、例句多通道输入,先建立「音—形—义」的联结,不求量大,只求扎实。"
+       },
+       {
+        "title": "第二步 · 听说:在句子里听懂、开口",
+        "detail": "把单词放回真实句子,先大量听、磨耳朵;再跟读、模仿语调,把「认识」变成「能说」。"
+       },
+       {
+        "title": "第三步 · 语境:在短剧语境里活用",
+        "detail": "通过超频语料和短剧语境课,把词和句放进有情节的真实场景,理解它「什么时候用、怎么用」,完成从记住到会用的飞跃。"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "音标:英语发音的「拼音」",
+      "markdown": "0 基础最该先啃下的地基,是**国际音标(IPA)**——它就像英语的拼音,见到音标就能读出词。英语有 48 个音标(20 元音 + 28 辅音),我们先拿下几个最高频、最容易读错的元音:\n\n- **/iː/** 长音「衣——」,嘴角向两边咧开、拉长:see, tea\n- **/ɪ/** 短音「衣」,又短又松,别拉长:sit, big\n- **/æ/** 「爱」的口型,嘴张大,像牙医让你说「啊」:cat, bad\n- **/ə/** 最轻最懒的「schwa」音,轻轻带过:about 的第一个音\n\n**关键区别**:/iː/ 和 /ɪ/ 长短不同——sheep(绵羊 /iː/)和 ship(船 /ɪ/)就靠这个区分。"
+     },
+     {
+      "type": "example",
+      "markdown": "对比着听,感受长短音的差别:\n\n- **seat** /siːt/ 座位 vs **sit** /sɪt/ 坐 —— 前长后短\n- **feet** /fiːt/ 脚(复数) vs **fit** /fɪt/ 合身\n- **bad** /bæd/ 坏的 —— 嘴张大,别读成「拜德」\n\n试着跟读一句:*I sit on the seat.*(我坐在座位上。)注意 sit 短、seat 长,一句话里就能练到长短音对比。"
+     },
+     {
+      "type": "flashcard",
+      "front": "see /siː/",
+      "back": "看见 —— 长音 /iː/,嘴角咧开拉长「衣——」。例:I see a bird. 我看见一只鸟。"
+     },
+     {
+      "type": "flashcard",
+      "front": "cat /kæt/",
+      "back": "猫 —— /æ/ 把嘴张大。例:The cat is fat. 这只猫很胖。(fat 也读 /æ/)"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "高频约 1000 词覆盖日常对话 85%+,先泡熟高频词最划算",
+       "三步法顺序:单词打底 → 听说磨耳开口 → 语境活用",
+       "/iː/ 长、/ɪ/ 短,sheep 与 ship 就靠长短音区分",
+       "/æ/ 要把嘴张大,别用中文「爱」草草带过",
+       "躺学不追求一次记牢,靠高频重复自然沉淀"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "下面哪一组词的元音都是短音 /ɪ/?",
+      "options": [
+       "see, tea",
+       "sit, big",
+       "cat, bad",
+       "seat, feet"
+      ],
+      "answerIndex": 1,
+      "explain": "sit /sɪt/、big /bɪɡ/ 都是又短又松的 /ɪ/。see/tea/seat/feet 是长音 /iː/,cat/bad 是 /æ/。记住:/ɪ/ 短促不拉长,/iː/ 才是拉长的「衣——」。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你认识了「躺学」的高频沉浸理念和「单词—听说—语境」三步法,并拿下了 /iː/ /ɪ/ /æ/ /ə/ 四个高频元音,能拼读 see、big、cat 等词。发音地基一旦打好,后面记词、开口都会顺很多。",
+      "next": "下一节进入基础级核心——「万能词汇」:少量高频词怎样一词多用,躺着也能记牢。"
+     }
+    ]
+   },
+   {
+    "title": "万能词汇入门:少记多用,高频词躺着记牢",
+    "summary": "聚焦最高频的「万能动词」,学会一词多用,用超频语料在重复中把词记牢。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "记 100 个生词,不如吃透 10 个高频词",
+      "markdown": "你背了 obtain、acquire、receive 三个「获得」,老外一个 **get** 就全搞定了。\n\n母语者日常最爱用的,恰恰是 get / have / take / make 这类**万能高频词**——它们出现频率极高、一词多用,是「四两拨千斤」的杠杆。躺学不让你去啃冷僻长难词,而是先把这几个万能词泡到滚瓜烂熟,让它们在超频语料里一遍遍找上门。这一节,我们就从三个万能动词开始。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解「万能高频词」的杠杆:少量词覆盖大量表达",
+       "掌握 get / have / take 三个万能动词的常用义与搭配",
+       "用高频搭配说出 10 句以上日常表达",
+       "学会用「音—形—义—例句」四通道躺学记词"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "超频语料:让高频词一遍遍找上门",
+      "markdown": "「超频语料」的原理很简单:同一个高频词,在不同语料、不同场景里**反复出现**。你不用刻意去背,见得多了自然就熟——这正是躺学「无压力」的底气。\n\n以 **get** 为例,它的核心义是「获得 / 变得 / 到达 / 理解」,具体是哪个意思,由后面的搭配决定。掌握一个 get,你就同时握住了十几种表达。记词的关键不是「记住中文」,而是**记住它和谁一起出现**。"
+     },
+     {
+      "type": "example",
+      "markdown": "**get 一词多用**,同一个词、四种意思:\n\n- **get** a gift 收到礼物(获得)\n- **get** tired 变累了(变得)\n- **get** home 到家(到达)\n- I **get** it. 我懂了(理解)\n- **get** up 起床(固定词组)\n\n看,五句话都靠一个 get,意思却全不同——搭配才是解锁词义的钥匙。"
+     },
+     {
+      "type": "flashcard",
+      "front": "have",
+      "back": "拥有 / 吃喝 / 进行某动作。搭配记:have a car(有辆车)、have breakfast(吃早饭)、have a look(看一下)、have a good time(玩得开心)。"
+     },
+     {
+      "type": "flashcard",
+      "front": "take",
+      "back": "乘坐 / 拿取 / 花费(时间)/ 服(药)。搭配记:take a bus(坐公交)、take a photo(拍照)、take medicine(吃药)、It takes time(需要时间)。"
+     },
+     {
+      "type": "compare",
+      "title": "两种记词方式,省力天差地别",
+      "left": {
+       "heading": "死记硬背(累)",
+       "items": [
+        "一个中文对一个英文,背了就忘",
+        "孤立记单词,不知道怎么用",
+        "追求数量,背到 abandon 就放弃"
+       ]
+      },
+      "right": {
+       "heading": "躺学高频记忆(省力)",
+       "items": [
+        "高频词反复出现,见多自然熟",
+        "连搭配和例句一起记,拿来就用",
+        "少量万能词,覆盖大量日常表达"
+       ]
+      }
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "get:获得 / 变得 / 到达 / 理解,靠搭配区分词义",
+       "have:拥有 / 吃喝 / 进行某动作(have a look)",
+       "take:乘坐 / 拿取 / 花费时间 / 服药",
+       "记词连例句一起记,别只记孤立的中文对应"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "「我拍了一张照片」用哪个万能动词最地道?",
+      "options": [
+       "I make a photo.",
+       "I take a photo.",
+       "I have a photo.",
+       "I get a photo."
+      ],
+      "answerIndex": 1,
+      "explain": "「拍照」的固定搭配是 take a photo(或 take a picture)。make 是「制作」、have 是「拥有」、get 是「获得」,都不能表示「拍」这个动作。搭配要整块记,不能逐字直译。"
+     },
+     {
+      "type": "summary",
+      "markdown": "掌握 get / have / take 三个万能动词,你已经能拼出几十句日常表达。记住躺学记词的秘诀:不是记得多,而是记得活——把搭配和例句整块吃进去。",
+      "next": "有了词,下一节进入「听说」——带你听懂、开口说出咖啡店点单、问路、寒暄的第一段真实对话。"
+     }
+    ]
+   },
+   {
+    "title": "掌握日常对话:开口说出第一句英语",
+    "summary": "用万能句型和真实对话,躺着磨耳朵、开口说,搞定点单、问路、寒暄等日常场景。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "听得懂、说得出,才算真的会",
+      "markdown": "很多人单词认识一堆,一到真人面前就卡壳——这不是词汇问题,是**没练过听和说**。\n\n躺学听说篇的路径很清晰:**先大量听、磨耳朵,再跟读模仿、开口**。你不必一开始就听懂每个词,先抓住整体意思,让真实对话一遍遍流过耳朵。这一节,我们把上一节学的万能词放进三段最常见的日常对话里,让你真正开口。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "听懂并开口说出点单、问路、寒暄三类日常对话",
+       "掌握 Can I…? / Where is…? / How are…? 三个万能句型",
+       "通过跟读模仿,练出自然的语调而非逐字硬读"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "听说躺学法:先泡耳朵,再开口",
+      "markdown": "开口前,先让耳朵「泡熟」。躺学听说的三个动作:\n\n1. **磨耳朵**:反复听同一段对话,先抓整体、别纠结生词;\n2. **跟读模仿**:跟着音频读,重点模仿**语调和节奏**,而不是逐字对拼;\n3. **影子跟读(shadowing)**:音频响起后半句、你跟读半句,像影子一样贴着说。\n\n听得越熟,开口越顺——这就是「先泡耳朵再开口」。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Server",
+        "text": "Hi, what can I get you?",
+        "note": "服务员常用语:您要点什么?(注意又见 get!)"
+       },
+       {
+        "speaker": "You",
+        "text": "Can I have a latte, please?",
+        "note": "Can I have…? 我可以要…吗?—— 点单万能句"
+       },
+       {
+        "speaker": "Server",
+        "text": "Sure. For here or to go?",
+        "note": "在这儿喝还是带走?"
+       },
+       {
+        "speaker": "You",
+        "text": "To go, thanks.",
+        "note": "带走,谢谢。"
+       }
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "You",
+        "text": "Excuse me, where is the subway station?",
+        "note": "Excuse me 先礼貌打断;Where is…? 问「…在哪」"
+       },
+       {
+        "speaker": "Local",
+        "text": "Go straight and turn left.",
+        "note": "直走,然后左转"
+       },
+       {
+        "speaker": "You",
+        "text": "How long does it take?",
+        "note": "又见 take!要花多久?"
+       },
+       {
+        "speaker": "Local",
+        "text": "About five minutes.",
+        "note": "大约五分钟"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "三个万能句型,套进任何场景",
+      "markdown": "把上面对话拆成可复用的「句型 + 空格」,换个词就是新场景:\n\n- **Can I have / get ___, please?** 请求要东西(填饮品、食物、物品)\n- **Where is the ___?** 问位置(填 station、restroom、exit…)\n- **How are you? / How's it going?** 寒暄开场\n\n句型是骨架,空格随便换——这就是「少学多用」。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "点单:Can I have a ___, please?(填饮品/食物)",
+       "问路:Where is the ___? + Go straight / turn left / turn right",
+       "寒暄:How are you? → I'm good, thanks. And you?",
+       "先听整体再抠细节,跟读时模仿语调而非逐字硬拼"
+      ]
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**开口小贴士**:听不懂时,一句 *Sorry, could you say that again?*(能再说一遍吗?)就能救场。听不懂太正常了——会「请求重复」比假装听懂重要得多。"
+     },
+     {
+      "type": "quiz",
+      "question": "在咖啡店想点一杯美式咖啡,最自然的说法是?",
+      "options": [
+       "Where is an Americano?",
+       "Can I have an Americano, please?",
+       "How are you, Americano?",
+       "I take an Americano now."
+      ],
+      "answerIndex": 1,
+      "explain": "点单万能句是 Can I have… please。Where is 用来问位置、How are you 是寒暄,都不用于点单;take 虽是万能词,但「点单」固定用 have 或 get。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你已经能应对点单、问路、寒暄三类高频场景,基础级到此打通了「词 → 句 → 对话」的完整链条。会说的关键不在词多,而在把万能句型练熟、敢开口。",
+      "next": "基础级收官。下一节升入「飞跃级」——走进短剧语境课,在真实剧情里让英语真正活起来。"
+     }
+    ]
+   },
+   {
+    "title": "短剧语境课:在真实剧情里让英语「活」起来",
+    "summary": "进入飞跃级,用短剧语境课在有情节的真实场景中猜词、活用,把英语从「学会」变成「用得出」。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "同一个词,换个场景意思全变",
+      "markdown": "朋友对你说 *You killed it!*——字面是「你杀了它」,可在语境里,它的意思是「你太棒了!」。\n\n脱离场景背单词,永远学不会这种「活」的英语。躺学第三步「语境」,正是为此而设:通过**短剧语境课**,把词和句放回有情节、有人物、有冲突的真实场景里,让你看懂它「什么时候用、带什么情绪」。这一节,我们走进一段职场短剧。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解「语境学习」:为什么脱离场景背词效率低",
+       "读懂一段职场短剧,抓住剧情与人物关系",
+       "学会「从语境猜词义」,不查词典也能大致读懂",
+       "掌握 3 个高频职场口语表达"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "语境:词义的开关",
+      "markdown": "同一个词,语境一变,意思全变。以高频词 **run** 为例:\n\n- **run** a business 经营公司\n- **run** late 迟到、比预计晚\n- **run** out 用完、耗尽\n\n单看 run 你无从下手,但放进句子,语境就替你「拨」出了正确的那个意思。短剧语境课的作用,就是把词嵌进剧情——你记住的不是孤立释义,而是「这个场景该用哪个词」。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Amy",
+        "text": "Hey Ben, how's the report going?",
+        "note": "报告进展如何?(going 表「进展」)"
+       },
+       {
+        "speaker": "Ben",
+        "text": "Almost done. I'm just wrapping it up.",
+        "note": "wrap up 收尾、搞定,职场口语高频"
+       },
+       {
+        "speaker": "Amy",
+        "text": "Great. The deadline is tomorrow, so let's not drop the ball.",
+        "note": "drop the ball 掉链子、出岔子(俚语)"
+       },
+       {
+        "speaker": "Ben",
+        "text": "Don't worry, I've got this.",
+        "note": "I've got this 交给我、没问题(又见 get 的完成时)"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "从语境猜词义:三条线索",
+      "markdown": "遇到生词先别急着查,用三条线索「猜」:\n\n1. **看上下文**:deadline is tomorrow → drop the ball 大概是件不好的事;\n2. **看人物反应**:Ben 回 Don't worry → 印证它是「别搞砸」;\n3. **看熟词旧义**:wrap 是「包裹」,wrap up 自然引申为「收尾、打包完成」。\n\n先猜、再验证,查词典是最后一步——这才是母语者读生词的方式。"
+     },
+     {
+      "type": "example",
+      "markdown": "用线索猜一句:*The meeting ran over, so we had to reschedule the call.*\n\n- **ran over**:会议「超时了」(run over = 超过预定时间);\n- 由「超时」推出 **reschedule** = 重新安排(re- 重新 + schedule 日程)。\n\n整句意思:会议超时了,所以我们只好把通话重新安排。全程没查词典,靠语境就懂了。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "run 一词多义:run a business 经营 / run late 迟到 / run out 用完",
+       "wrap up = 收尾;drop the ball = 掉链子;I've got this = 交给我",
+       "猜词三线索:上下文、人物反应、熟词旧义(词根词缀)",
+       "短剧语境课用法:先看懂剧情,再回收其中的生词短语"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "同事说 *Let's not drop the ball on this project.* 他的意思最接近?",
+      "options": [
+       "我们别在项目上扔球玩",
+       "这个项目我们别掉链子、别搞砸",
+       "我们把项目这个球传出去",
+       "这个项目该结束了"
+      ],
+      "answerIndex": 1,
+      "explain": "drop the ball 是英语俚语,字面「掉了球」,引申为「掉链子、把事情搞砸」。结合语境(deadline、let's not…)就能推出:他在提醒大家别出岔子。这正是「从语境猜词义」的实战。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你学会了在真实剧情里猜词、活用,掌握了 wrap up / drop the ball / I've got this 三个职场高频表达。语境是让英语「活」起来的关键一步——词不再是孤立的,而是长在场景里的。",
+      "next": "最后一节,冲刺飞跃级高阶目标——高级词汇与地道口语,把「中式英语」升级成 native 表达。"
+     }
+    ]
+   },
+   {
+    "title": "高级词汇与地道口语:从「能说」到「说地道」",
+    "summary": "飞跃级冲刺,用地道搭配和高级词汇替换中式表达,夯实听说读写,把英语说得更像 native。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "说得对,不等于说得地道",
+      "markdown": "*How to say this word?* ——语法好像没错,母语者却一听就知道你是初学者。地道的说法是 *How do you say this word?*\n\n到了飞跃级,目标不再是「说对」,而是「说地道」。地道英语的秘密,往往不在难词,而在**搭配**:native 说 heavy rain(大雨)而不是 big rain,说 make a decision 而不是 do a decision。这一节,我们把常见的中式表达一个个升级。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "识别并纠正常见中式英语(Chinglish)表达",
+       "掌握 native 高频地道搭配与高级替换词",
+       "在真实对话中自然使用地道口语,提升口语档次"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "地道 = 用对搭配,而非用难词",
+      "markdown": "英语里哪些词该「凑一对」,是约定俗成的,叫**搭配(collocation)**。地道不地道,常常就差在这:\n\n- 做决定 → make a decision(不是 do a decision)\n- 大雨 → heavy rain(不是 big rain)\n- 开灯 → turn on the light(不是 open the light)\n\n升级口语的捷径,不是背更难的词,而是把这些**高频搭配整块记、整块用**。"
+     },
+     {
+      "type": "compare",
+      "title": "中式表达 vs 地道表达",
+      "left": {
+       "heading": "Chinglish(逐字直译)",
+       "items": [
+        "How to say this word?",
+        "I very like it.",
+        "Open the light.",
+        "big rain / people mountain people sea"
+       ]
+      },
+      "right": {
+       "heading": "Native(地道)",
+       "items": [
+        "How do you say this word?",
+        "I really like it. / I like it a lot.",
+        "Turn on the light.",
+        "heavy rain / a huge crowd"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "**高级词汇升级**,把大白话换成更有力的表达:\n\n- very good → **excellent / fantastic / brilliant**\n- I think → **In my opinion / I'd say**\n- very tired → **exhausted / worn out**\n\n例:*I'm exhausted after the trip.*(旅行之后我累坏了。)——exhausted 一个词,比 very tired 更地道、更有画面。"
+     },
+     {
+      "type": "flashcard",
+      "front": "make a decision",
+      "back": "做决定(不是 do a decision)。例:It's time to make a decision. 该做决定了。—— 记住 make 这个地道动词搭配。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "Any plans for the weekend?",
+        "note": "周末有安排吗?—— 比 Do you have plans 更口语"
+       },
+       {
+        "speaker": "B",
+        "text": "Not really. I might just chill at home.",
+        "note": "chill 放松、躺平,超口语;might 表不确定"
+       },
+       {
+        "speaker": "A",
+        "text": "Sounds good. Let's catch up sometime.",
+        "note": "catch up 叙旧、聚聚;Sounds good 听起来不错"
+       },
+       {
+        "speaker": "B",
+        "text": "For sure! I'll text you.",
+        "note": "For sure 当然;text 作动词 = 发短信"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "地道靠搭配:make a decision / heavy rain / turn on the light",
+       "升级词:excellent、exhausted、in my opinion 替换 very good/tired、I think",
+       "口语连接词:Not really / Sounds good / For sure / catch up",
+       "夯实听说读写:多听地道语料,把搭配整块记、整块用"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "下面哪一句是地道英语,而不是中式直译?",
+      "options": [
+       "The rain is very big today.",
+       "We had heavy rain today.",
+       "Today open the light please.",
+       "I very like this weather."
+      ],
+      "answerIndex": 1,
+      "explain": "英语用 heavy rain 形容大雨,不说 big rain;「开灯」是 turn on the light;「我很喜欢」是 I really like / like it a lot,不用 very like。地道的关键,是记住搭配而非逐字直译。"
+     },
+     {
+      "type": "summary",
+      "markdown": "你走完了「单词—听说—语境」三步:从音标、万能词、日常对话,到短剧语境、地道口语。躺学的秘诀始终如一——保持高频沉浸,把英语泡进生活,自然而然从「能说」走到「说地道」。",
+      "next": "接下来,回基础级复训巩固,或加练超频语料与短剧语境课,让开口越来越自然——躺着,继续学下去。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "taiji",
+  "subtitle": "祁连山太极阴阳学习法:句法为阴、词汇为阳,从底层逻辑重建你的英语体系",
+  "intro": "《太极英语》由祁连山老师主讲,以独创的「太极阴阳学习法」为底层逻辑:句法为「阴」是内在逻辑,词汇为「阳」是外在表达,二者相辅相成、融会贯通,构成完整英语体系。课程共24周,基础段12周夯实英语语法、句子结构与单词法,高级段12周通过八大生活场景实战攻克长难句。特色教学法——用中文思维学语法、英语拼音法、九宫格记忆法,辅以漫画万词趣味专项,帮0基础、备考与职场人群从底层真正理解英语。",
+  "level": "L2",
+  "instructorName": "祁连山",
+  "lessons": [
+   {
+    "title": "第1节 太极阴阳:英语的底层逻辑",
+    "summary": "看懂太极阴阳:句法为阴、词汇为阳,搭起英语底层逻辑",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "背了三千单词,为什么还是开不了口?",
+      "markdown": "你可能背过一整本单词书,考试也能蒙对几道题,可真到要说、要写一个完整句子时,脑子里的词却拼不成一句像样的英语。问题不在于你不够努力,而在于——你只学了「阳」(单词),却漏掉了「阴」(句法逻辑)。\n\n太极英语的第一课,祁连山老师要带你看清英语的底层结构:单词是外在的表达,句法是内在的逻辑,二者像太极的阴阳,缺一不可。看懂这一层,后面24周才真正学得进去。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解「太极阴阳学习法」:句法为阴(内在逻辑)、词汇为阳(外在表达)",
+       "看清传统「只背单词」学法为什么低效",
+       "掌握「用中文思维理解英语」的入门视角",
+       "了解24周(基础12周+高级12周)的完整学习路线"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "太极阴阳:句法为「阴」,词汇为「阳」",
+      "markdown": "中国人学英语,常常把单词和语法割裂开:背单词是一回事,学语法又是一回事。太极学习法的核心,是把它们看成一个整体的两面。\n\n**阳——词汇**:外在的、看得见的表达。就像太极的阳面,是一个个具体的单词:`apple`、`run`、`beautiful`。\n\n**阴——句法**:内在的、看不见的逻辑。它决定这些单词按什么顺序、什么关系组合成句子。\n\n一句 `I love you`,三个词是「阳」,而「谁 + 做什么 + 对谁」这个主谓宾骨架,就是「阴」。词汇再多,没有句法这根「阴」的骨架,也只是一堆散落的珠子,串不成项链。"
+     },
+     {
+      "type": "compare",
+      "title": "传统学法 vs 太极学法",
+      "left": {
+       "heading": "传统学法(只顾「阳」)",
+       "items": [
+        "单词书从 A 背到 Z,背了就忘",
+        "语法当公式死记,不懂为什么",
+        "会认单词,却拼不出完整句子",
+        "一开口就卡壳,只能蹦词"
+       ]
+      },
+      "right": {
+       "heading": "太极学法(阴阳合一)",
+       "items": [
+        "单词放进句子里学,记得牢",
+        "用中文思维理解语法逻辑",
+        "先搭句子主干,再填词汇血肉",
+        "有骨架就能开口成句"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "看这句话怎么「阴阳合一」:\n\n> **The girl reads books.**(这个女孩读书。)\n\n- 「阳」(词汇):`girl` 女孩、`read` 读、`book` 书——外在的砖块。\n- 「阴」(句法):`主语(谁) + 谓语(做什么) + 宾语(对什么)` 这个看不见的骨架。\n\n把骨架抽出来,就是 `主语 + 谓语 + 宾语`。以后无论换成 `The teacher writes letters.`(老师写信)还是 `Children eat apples.`(孩子吃苹果),骨架不变,只是往「阴」里换不同的「阳」。**学会骨架,你就能造出成千上万句子。**"
+     },
+     {
+      "type": "concept",
+      "title": "用中文思维学语法:先讲通「为什么」",
+      "markdown": "很多人怕语法,是因为教材直接甩术语:「现在完成时」「非谓语动词」……记住了名字,却不知道它在说什么事。\n\n太极英语反过来:先用你熟悉的中文逻辑把道理讲通,再对应到英语形式。\n\n比如英语的语序,用中文思维一句话就懂:**英语最爱「先说核心、再说细节」**。中文说「在桌上的那本书」,英语偏偏说 `the book on the table`(书 + 在桌上)——先亮出核心 `book`,再补细节 `on the table`。抓住这个中文思维差异,你就不会再写出 `on the table book` 这种中式英语。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "太极阴阳:句法为阴(内在逻辑)、词汇为阳(外在表达),相辅相成",
+       "学英语不是「背更多单词」,而是「阴阳合一」搭起完整体系",
+       "基础段12周:英语语法 + 句子结构 + 单词法,夯实底层",
+       "高级段12周:八大生活场景实战,攻克长难句",
+       "配套特色法:中文思维学语法、英语拼音法、九宫格记忆法、漫画万词"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "按「太极阴阳学习法」,下面哪一项属于「阴」?",
+      "options": [
+       "单词 beautiful 的拼写",
+       "「主语 + 谓语 + 宾语」的句子骨架逻辑",
+       "apple 这个词的发音",
+       "背下来的一整页词汇表"
+      ],
+      "answerIndex": 1,
+      "explain": "「阴」指看不见的内在句法逻辑,句子骨架(主谓宾)正是典型的「阴」;而单词的拼写、发音、词汇表都是看得见的外在表达,属于「阳」。记住:词汇为阳、句法为阴。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你建立了太极英语最重要的地基:**句法为阴、词汇为阳,二者合一才是完整的英语**。也看清了传统「只背单词」为什么走不远。",
+      "next": "下一节进入「阴」的核心——用中文思维搭起英语句子的三大主干结构,让你从此看得懂长句、写得出整句。"
+     }
+    ]
+   },
+   {
+    "title": "第2节 句法为阴:中文思维搭句子主干",
+    "summary": "三大主干结构 + 拆句四步法,用中文思维搭起英语句子骨架",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "为什么一到长句子就「每个词都认识,连起来却看不懂」?",
+      "markdown": "读英语时,你有没有这种感觉:单词一个个都认识,可它们排成一长串,意思就糊了。写作时更惨,想表达一个稍复杂的意思,句子就散架。\n\n根源是——你没抓住句子的「主干」。英语再长的句子,都是一根主干加上层层修饰。这一节,祁连山老师用中文思维,带你把英语句子的「阴」(句法骨架)彻底理清。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握英语句子的三大主干结构:主谓、主谓宾、主系表",
+       "学会用中文思维快速定位句子主干",
+       "分清「主干」与「修饰成分」,不再被长句吓住",
+       "理解语序差异,写出地道英语而非中式英语"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "英语句子的三大主干结构",
+      "markdown": "英语句子千变万化,主干却只有三种,像太极的三个基本式:\n\n**① 主 + 谓(S + V)**:谁 + 做了什么动作。\n`Birds fly.`(鸟飞。)`She smiled.`(她笑了。)\n\n**② 主 + 谓 + 宾(S + V + O)**:谁 + 对什么 + 做了什么。\n`I love English.`(我爱英语。)`He reads books.`(他读书。)\n\n**③ 主 + 系 + 表(S + link + P)**:谁 + 是/处于 + 什么状态。系动词(be/look/smell…)本身没实义,只连接主语和它的状态。\n`She is happy.`(她很开心。)`The soup smells good.`(汤闻起来很香。)\n\n**任何英语句子,主干都逃不出这三种。** 认出主干,长句就破了一半。"
+     },
+     {
+      "type": "example",
+      "markdown": "分别用中文对照,感受三种主干:\n\n> ① `The baby is crying.` 主谓 —— 宝宝 + 在哭。(is crying 是一个谓语动作)\n> ② `Tom bought a car.` 主谓宾 —— 汤姆 + 买了 + 一辆车。\n> ③ `Your idea sounds great.` 主系表 —— 你的主意 + 听起来 + 很棒。(sounds 是系动词,great 是表语)\n\n注意 ③:`sound / look / feel / smell / taste` 这类词,后面常跟形容词而不是名词,因为它们是系动词,连接的是「状态」不是「动作对象」。所以说 `sounds great`(听起来很棒),不说 `sounds greatly`。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第一步:找动词",
+        "detail": "先在句子里锁定那个表示动作或状态的词(谓语),它是句子的心脏。如 read / is / bought。"
+       },
+       {
+        "title": "第二步:动词前面找主语",
+        "detail": "问自己「谁在做这个动作?」动词前的核心名词就是主语。"
+       },
+       {
+        "title": "第三步:动词后面判断结构",
+        "detail": "后面跟动作对象→主谓宾;跟形容词/状态→主系表;什么都不跟→主谓。"
+       },
+       {
+        "title": "第四步:剩下的都是修饰",
+        "detail": "定语、状语、补语等一律先划掉,只留「主干三件套」,句子意思立刻清晰。"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "中式直译 vs 英语地道语序",
+      "left": {
+       "heading": "中式英语(照中文顺序硬翻)",
+       "items": [
+        "`I very like you.`(我很喜欢你)",
+        "`He yesterday came.`(他昨天来了)",
+        "`on the table the book`(桌上的书)",
+        "`I with my friend go.`(我和朋友去)"
+       ]
+      },
+      "right": {
+       "heading": "地道英语(先主干后修饰)",
+       "items": [
+        "`I like you very much.` 程度词 very much 放句末",
+        "`He came yesterday.` 时间状语常放句末",
+        "`the book on the table` 核心词在前、细节在后",
+        "`I go with my friend.` 先说完主干再补 with…"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "主干搭好后,往「阴」上挂「阳」,句子就丰满起来——这就是阴阳结合:\n\n> 主干:`The girl reads books.`(女孩读书)\n> 加定语:`The **little** girl reads **English** books.`(小女孩读英语书)\n> 加状语:`The little girl reads English books **in the library every morning**.`(小女孩每天早上在图书馆读英语书)\n\n看:主干 `The girl reads books` 始终没变,只是不断往上添修饰。**读长句时反过来,先把修饰划掉,露出主干,再回头看细节——长句就不可怕了。**"
+     },
+     {
+      "type": "quiz",
+      "question": "句子 `The coffee tastes bitter.` 属于哪种主干结构?",
+      "options": [
+       "主谓(S+V)",
+       "主谓宾(S+V+O)",
+       "主系表(S+link+P)",
+       "以上都不是"
+      ],
+      "answerIndex": 2,
+      "explain": "`taste`(尝起来)是系动词,后面跟形容词 `bitter`(苦的)描述主语 coffee 的状态,所以是「主系表」结构。判断窍门:动词后跟形容词、描述状态而非动作对象的,基本都是主系表。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "英语句子主干只有三种:主谓、主谓宾、主系表",
+       "拆句四步:找动词 → 找主语 → 判结构 → 划修饰",
+       "系动词(be/look/sound/smell/taste…)后跟形容词,不跟副词",
+       "英语语序:先亮核心主干,再补定语状语等细节",
+       "读长句先划修饰、露主干;写句子先立主干、再挂修饰"
+      ]
+     },
+     {
+      "type": "summary",
+      "markdown": "你已经掌握了「阴」的核心——三大主干结构和拆句四步法。从今往后,再长的英语句子,你都能先抓住那根「主干」。",
+      "next": "有了句法的「阴」,下一节补上词汇的「阳」:祁连山老师的三大记词绝招——英语拼音法、九宫格记忆法、漫画万词,让单词记得快、忘得慢。"
+     }
+    ]
+   },
+   {
+    "title": "第3节 词汇为阳:拼音法 + 九宫格 + 漫画万词",
+    "summary": "拼音法、九宫格、漫画万词——三招把单词记得快、忘得慢",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "单词记了就忘、忘了再记,死循环怎么破?",
+      "markdown": "「昨天背的今天全忘」几乎是每个学英语人的痛。你以为是记性差,其实是方法错——一个字母一个字母地硬背,大脑当然记不住。\n\n英语其实是「拼音文字」,见词能读、按音记形;再配上九宫格的成组记忆和漫画的画面联想,单词就从「死记」变成「好玩又牢固」。这一节,把词汇这个「阳」面练扎实。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用「英语拼音法」按音节拼读单词,见词能读、听音能写",
+       "用「九宫格记忆法」把单词成组记忆,一次记牢一片",
+       "用「漫画万词」的画面联想,把抽象词变成好记的画面",
+       "掌握词根拆词,举一反三扩大词汇量"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "英语拼音法:英语是「拼音文字」,见词能读",
+      "markdown": "中文是象形字,得一个个记;英语是**拼音文字**,字母就是发音符号,天生「见词能读」。可惜很多人从没被教过拼读规则,只能死记字母顺序,自然记不住。\n\n拼音法的核心:**把长单词拆成音节,一个音节一个音节地读**。比如:\n\n- `international` → `in-ter-na-tion-al`(五个音节,读顺了自然会拼)\n- `important` → `im-por-tant`\n- `computer` → `com-pu-ter`\n\n会拆音节,你就不再是「背」一长串字母,而是「拼」出一个词——记忆量瞬间减少大半,而且**听到一个新词,也能大致拼写出来**。"
+     },
+     {
+      "type": "example",
+      "markdown": "用拼音法拆几个「看着吓人」的长词,你会发现它们其实很简单:\n\n> `beautiful` → `beau-ti-ful`(美丽的)\n> `information` → `in-for-ma-tion`(信息)\n> `comfortable` → `com-for-table`(舒适的)\n> `responsibility` → `re-spon-si-bil-i-ty`(责任)\n\n把每个音节读准、连起来,单词就「读会」了。**读得出,才记得住**——这是拼音法的第一性原理。反过来,老师慢读一个词,你也能按音节把它写个八九不离十。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第一步:定主题,画九宫格",
+        "detail": "取一个场景主题(如「厨房」),画一个 3×3 的九宫格,中心格写主题词 kitchen。"
+       },
+       {
+        "title": "第二步:八格填相关词",
+        "detail": "周围八格填与主题强相关的词:knife(刀)、spoon(勺)、bowl(碗)、pan(锅)、stove(灶)、fridge(冰箱)、plate(盘)、cup(杯)。"
+       },
+       {
+        "title": "第三步:成组记忆",
+        "detail": "一次记的不是孤立单词,而是一整张「厨房图」。词与词靠场景互相勾连,忘了一个,靠旁边的能想起来。"
+       },
+       {
+        "title": "第四步:复述整格",
+        "detail": "合上书,凭记忆把九宫格默写一遍。能默出整格,这 9 个词就成片地进了长期记忆。"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "漫画万词:把抽象单词变成一幅画",
+      "markdown": "大脑记画面,远比记抽象符号牢。漫画万词就是给难记的词配一个**画面 / 联想**,让它「一看就忘不掉」。\n\n举例:\n\n- `ambulance`(救护车):谐音联想「俺不能死」——脑补一个人躺在车上喊「俺不能死」,画面感一出来就记住了。\n- `bookworm`(书虫/书呆子):`book`(书)+ `worm`(虫)→ 一条虫钻在书里,活脱脱「书虫」。\n- `sunflower`(向日葵):`sun`(太阳)+ `flower`(花)→ 朝着太阳的花。\n\n把单词画成漫画,记忆就从「痛苦硬背」变成「看图讲故事」。"
+     },
+     {
+      "type": "flashcard",
+      "front": "拼音法拆词:`comfortable` 怎么读、什么意思?",
+      "back": "拆成 `com-for-table` 三个音节读顺即可。意思:舒适的、舒服的。例:`This chair is very comfortable.`(这把椅子很舒服。)"
+     },
+     {
+      "type": "flashcard",
+      "front": "词根 `port = 拿、运`,能带出哪些词?",
+      "back": "im**port** 进口(往里拿) / ex**port** 出口(往外拿) / trans**port** 运输(运过去) / **port**able 便携的(能拿着走)。记一个词根,一串词全会。"
+     },
+     {
+      "type": "flashcard",
+      "front": "漫画联想:`ambition` 是什么意思?怎么记?",
+      "back": "意思:雄心、野心。记法:`amb`(到处走)→ 为目标到处奔走的人 = 有雄心。例:`She has a big ambition to start her own company.`(她有开公司的大志向。)"
+     },
+     {
+      "type": "quiz",
+      "question": "关于「英语拼音法」,下列说法正确的是?",
+      "options": [
+       "英语是象形文字,只能一个字母一个字母硬背",
+       "把单词拆成音节拼读,见词能读、听音能写",
+       "拼音法只对短单词有用,长单词没办法",
+       "拼音法就是用汉语拼音去标英文"
+      ],
+      "answerIndex": 1,
+      "explain": "英语是拼音文字,拼音法的核心正是把单词(尤其是长单词)拆成音节来拼读,做到见词能读、听音能写。它恰恰最擅长「化长为短」处理长单词,也不是用汉语拼音硬标。"
+     },
+     {
+      "type": "summary",
+      "markdown": "词汇这个「阳」面,你已握有三把钥匙:**拼音法**(见词能读)、**九宫格**(成组记牢)、**漫画万词**(画面联想),再加词根拆词举一反三。配合上一节的句法「阴」,阴阳齐备。",
+      "next": "基础段学完,进入高级实战:下一节用「八大生活场景」里的真实长难句,检验你的阴阳功力——再长的句子也能一刀破开。"
+     }
+    ]
+   },
+   {
+    "title": "第4节 高级实战:八大生活场景攻克长难句",
+    "summary": "八大生活场景实战,用阴阳还原法一刀破开长难句",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "真实世界的英语,句子长得像一列火车",
+      "markdown": "教材里的短句你搞定了,可真实的英语——合同、邮件、新闻、机场广播——句子往往又长又绕,从句套从句。这正是《太极英语》高级段12周要练的:在**八大生活场景**里,用阴阳还原法把长难句一刀破开。\n\n别怕。你已经学过主干(阴)和词汇(阳),这一节只是把它们用在真刀真枪的长句上。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解长难句 = 主干 + 层层修饰的本质",
+       "掌握「拆长难句四步法」,再长也能定位主干",
+       "在旅行、职场等真实场景中读懂长句",
+       "摆脱逐词翻译,学会「抓主干」式高效阅读"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "长难句的真相:一根主干 + 层层修饰",
+      "markdown": "长难句之所以「难」,不是因为它复杂,而是因为它**在主干上挂了很多修饰**(定语从句、状语、介词短语……)。它的「阴」(主干)其实还是那三种结构。\n\n破解思路很简单:**先把所有修饰成分「拨开」,露出主干,读懂主干,再逐层看修饰。** 就像太极里以柔克刚——不硬拼,先卸掉外围的「阳」,直取核心的「阴」。"
+     },
+     {
+      "type": "example",
+      "markdown": "**场景①:旅行 / 机场**\n\n> The passenger **who checked in late** missed the flight **that was scheduled to depart at noon.**\n\n看着吓人,拆开就简单:\n\n- 划掉修饰:`who checked in late`(修饰 passenger)、`that was scheduled to depart at noon`(修饰 flight)。\n- 露出主干:**The passenger missed the flight.**(乘客错过了航班。)——就是个「主谓宾」!\n- 再补细节:哪个乘客?办登机手续晚了的。哪个航班?本该中午起飞的。\n\n全句意思:那位办登机晚了的乘客,错过了本该中午起飞的航班。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第一步:找出主句的动词",
+        "detail": "先锁定整句的核心谓语动词(不是从句里的),它牵着主干。上例中是 missed。"
+       },
+       {
+        "title": "第二步:定位主干三件套",
+        "detail": "围绕这个动词找出主语、宾语/表语,得到主谓宾/主系表的骨架:The passenger missed the flight。"
+       },
+       {
+        "title": "第三步:识别并「暂时忽略」修饰",
+        "detail": "who… / that… / 介词短语等,先用括号括起来放一边,不让它们干扰你抓主意。"
+       },
+       {
+        "title": "第四步:回填修饰,补全细节",
+        "detail": "主干读懂后,再把括号里的修饰一层层贴回去,看它们分别修饰谁,句子全貌就清晰了。"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "八大生活场景:在真实语境里练兵",
+      "markdown": "高级段不做无意义的题海,而是围绕**八大高频生活场景**练长难句阅读与表达,让学到的英语能直接用:\n\n**① 旅行出行　② 职场办公　③ 餐饮就餐　④ 购物消费　⑤ 就医健康　⑥ 社交寒暄　⑦ 银行办事　⑧ 校园学习**\n\n每个场景都配真实语料:机场广播、工作邮件、菜单说明、就诊对话……你练的不是「考试句」,而是**明天出门就能碰到的英语**。阴阳功夫,最终要落到能用。"
+     },
+     {
+      "type": "example",
+      "markdown": "**场景②:职场 / 办公**\n\n> The manager told the new employees **that the meeting would be postponed until Friday.**\n\n拆解:\n\n- 主句动词:`told`。\n- 主干:**The manager told the new employees (something).**(经理告诉新员工一件事)\n- 修饰/内容:`that the meeting would be postponed until Friday`(会议将推迟到周五)是 told 的内容(宾语从句)。\n\n全句:经理告诉新员工,会议将推迟到周五。**抓住 `told` 这个主干动词,整句瞬间清晰。**"
+     },
+     {
+      "type": "compare",
+      "title": "逐词翻译 vs 抓主干阅读",
+      "left": {
+       "heading": "逐词翻译(越读越晕)",
+       "items": [
+        "从第一个词啃到最后一个,记不住前面",
+        "被 who / that / which 这些从句词卡死",
+        "每个修饰都想翻,信息过载",
+        "读完一遍不知道句子到底在说谁"
+       ]
+      },
+      "right": {
+       "heading": "抓主干阅读(又快又准)",
+       "items": [
+        "先找主句动词,一步锁定核心",
+        "从句先括起来,不干扰主意",
+        "先懂「谁做了什么」,再看细节",
+        "主干 + 回填,长句一遍读通"
+       ]
+      }
+     },
+     {
+      "type": "quiz",
+      "question": "读长难句 `The book that I bought yesterday is really interesting.`,它的主干是?",
+      "options": [
+       "I bought the book",
+       "The book is interesting",
+       "yesterday is interesting",
+       "that I bought yesterday"
+      ],
+      "answerIndex": 1,
+      "explain": "`that I bought yesterday` 是修饰 book 的定语从句,先划掉;剩下的主干是 `The book is interesting`(主系表)。记住:主句的核心动词是 is,不是从句里的 bought。抓主句动词,主干立现。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "长难句 = 主干(阴) + 层层修饰(定语从句/状语/介词短语)",
+       "拆句四步:找主句动词 → 定主干 → 括住修饰 → 回填细节",
+       "认准「主句动词」,别被从句里的动词带偏",
+       "八大场景:旅行/职场/餐饮/购物/就医/社交/办事/校园",
+       "阅读求「先抓主意,再看细节」,不做逐词翻译"
+      ]
+     },
+     {
+      "type": "summary",
+      "markdown": "你已经能用阴阳还原法,把真实场景里的长难句一刀破开——先抓主干,再回填修饰。这正是高级段实战的核心功夫。",
+      "next": "读得懂,更要说得出。最后一节回到「开口」:把主干和场景变成脱口而出的地道口语,让24周所学真正落到嘴上。"
+     }
+    ]
+   },
+   {
+    "title": "第5节 场景开口:把阴阳变成能说的话",
+    "summary": "5组万能开口句型 + 真实场景对话,把所学变成脱口而出的口语",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "会读会写,一开口却还是「哑巴英语」?",
+      "markdown": "很多人语法过关、单词也认识,可一到真人面前就张不开嘴。原因是:开口靠的不是「想」,而是「现成的句子骨架」脱口而出。\n\n这一节,祁连山老师带你把前面学的主干(阴)和词汇(阳),浓缩成几组**万能开口句型**,再放进真实场景对话里练——练到不用想就能说。这是24周太极功夫的收官一击。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "把「句子主干」转化为能脱口而出的开口句型",
+       "在餐厅、机场等真实场景中自如应对",
+       "掌握 5 组高频「万能句型」,现学现用",
+       "用主干 + 替换词的方法,快速造出成百上千句口语"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "从「句子主干」到「开口表达」",
+      "markdown": "开口的秘诀,是手里备好几个**固定骨架**,说的时候只需往里换词。这正是阴阳法的实战:骨架是「阴」,替换的词是「阳」。\n\n比如骨架 `I'd like + 名词`(我想要……):\n\n- `I'd like a coffee.`(我想要杯咖啡。)\n- `I'd like the window seat.`(我想要靠窗的座位。)\n- `I'd like some water.`(我想要点水。)\n\n骨架不变,换个词就是一句新话。**背 10 个骨架,胜过背 1000 个孤立句子。**"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "服务员",
+        "text": "Hi, are you ready to order?",
+        "note": "点餐场景开场白:您准备好点餐了吗?"
+       },
+       {
+        "speaker": "你",
+        "text": "Yes. I'd like a burger and a coke, please.",
+        "note": "用万能骨架 I'd like + 名词:我要一个汉堡和一杯可乐。please 让语气更礼貌"
+       },
+       {
+        "speaker": "服务员",
+        "text": "For here or to go?",
+        "note": "堂食还是外带?——高频问句,记住整句"
+       },
+       {
+        "speaker": "你",
+        "text": "To go, thanks. How much is it?",
+        "note": "外带,谢谢。多少钱?How much is it 万能问价句"
+       },
+       {
+        "speaker": "服务员",
+        "text": "That's nine dollars.",
+        "note": "一共九美元"
+       }
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "地勤",
+        "text": "Good morning. May I see your passport?",
+        "note": "机场值机:早上好,可以看下您的护照吗?"
+       },
+       {
+        "speaker": "你",
+        "text": "Sure, here you are.",
+        "note": "当然,给您。Here you are 递东西时的万能句"
+       },
+       {
+        "speaker": "地勤",
+        "text": "Would you like a window or an aisle seat?",
+        "note": "您要靠窗还是靠过道的座位?window 窗 / aisle 过道"
+       },
+       {
+        "speaker": "你",
+        "text": "I'd like a window seat, please.",
+        "note": "又是 I'd like + 名词骨架:我想要靠窗的座位"
+       },
+       {
+        "speaker": "地勤",
+        "text": "Here's your boarding pass. Gate 12.",
+        "note": "这是您的登机牌,12号登机口。boarding pass 登机牌"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "`I'd like + 名词` —— 我想要……(点餐/购物/订座万能句)",
+       "`How much is it?` —— 多少钱?(问价必备)",
+       "`Could you + 动词原形?` —— 你能……吗?(礼貌请求,如 Could you help me?)",
+       "`Where is + 地点?` —— ……在哪儿?(问路必备)",
+       "`Here you are. / Here you go.` —— 给您(递东西时脱口而出)"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "用「主干 + 替换词」现场造句,你会发现开口其实很省力:\n\n> 骨架:`Could you + 动词原形?`(你能……吗?)\n> - `Could you help me?`(你能帮我吗?)\n> - `Could you speak slowly?`(你能说慢点吗?)\n> - `Could you take a photo for me?`(你能帮我拍张照吗?)\n\n> 骨架:`Where is + 地点?`(……在哪儿?)\n> - `Where is the restroom?`(洗手间在哪儿?)\n> - `Where is the gate?`(登机口在哪儿?)\n\n**记住骨架,换词即用**——这就是把阴阳变成「能说出口的话」。"
+     },
+     {
+      "type": "quiz",
+      "question": "在餐厅想点一杯茶,用学过的「万能骨架」,最地道的说法是?",
+      "options": [
+       "`I want tea!`",
+       "`Give me tea.`",
+       "`I'd like a cup of tea, please.`",
+       "`Tea, tea, tea.`"
+      ],
+      "answerIndex": 2,
+      "explain": "`I'd like + 名词, please` 是最礼貌自然的点单骨架。`I want` / `Give me` 直白甚至略显生硬,不够礼貌;加上 a cup of 和 please,既地道又得体。骨架记牢,换个名词就能点任何东西。"
+     },
+     {
+      "type": "callout",
+      "tone": "info",
+      "markdown": "**慢讲多练,开口不怕错。** 口语的进步不靠「想得完美」,而靠「多说几遍」。把这一节的 5 组骨架每天大声念 10 遍,一周后你会发现:遇到场景,句子会自己「跳」出来。太极讲究以慢练快——慢慢练熟,用时才快。"
+     },
+     {
+      "type": "summary",
+      "markdown": "恭喜你走完这门课的核心旅程:从**太极阴阳**的底层逻辑,到句法「阴」的三大主干、词汇「阳」的三大记词法,再到高级段八大场景攻长难句,最后落到能脱口而出的开口句型。**句法与词汇,阴阳合一,你的英语体系已经搭起来了。**",
+      "next": "把这 5 组骨架用进你明天的真实生活;之后进入完整的24周训练,基础12周夯实、高级12周实战,让太极英语的功夫真正长在你身上。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "sanheyi",
+  "subtitle": "实用英语 + 动词短语 + 地道习语,三合一练成开口就地道的日常英语",
+  "intro": "这门课围绕《三合一全能英语》的核心主线展开:实用英语打底、动词短语增地道、地道习语帮你听懂本土口语。我们不讲课本语法理论,而是聚焦点餐、问路、购物、闲聊等真实生活场景,把老外真正在说的整句、短语和习语一次讲透,专治哑巴英语、听不懂本土口语。全程避开死记硬背,靠场景优先、整块记忆、开口复述的方法,让你从卡壳到从容开口,切实提升日常流利沟通。适合所有想把英语用出去的爱好者。",
+  "level": "L2",
+  "instructorName": "有道全能英语教研组",
+  "lessons": [
+   {
+    "title": "三合一学习法 · 告别哑巴英语,从咖啡店开口",
+    "summary": "认识实用英语+动词短语+习语的学习主线与场景优先、整块记忆、开口复述的三合一学习法,用咖啡店场景说出第一批地道点单句。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "站在咖啡店,脑子一片空白",
+      "markdown": "你排到柜台,脑子里正逐字翻译“我要一杯中杯热拿铁,不要糖”——还没组织好,店员已经问了第二遍 “For here or to go?”,你只憋出一个“...latte”。学了十几年英语、背了不少单词,可真到开口还是卡壳。这不是你词汇量不够,而是你学的是“课本英语”,没练过“能用出口的英语”。这门课,就从这里开始。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "看懂《三合一全能英语》的学习主线:实用英语 + 动词短语 + 地道习语",
+       "掌握三合一学习法的三个动作:场景优先、整块记忆、开口复述",
+       "用咖啡店场景,说出 3-5 句立刻能用的地道点单表达"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "什么是“三合一”",
+      "markdown": "这门课不按语法书章节走,而是围绕真实沟通所需的三层能力:\n\n**① 实用英语**——生活高频场景里“整句就能用”的地道表达,是打底。\n**② 动词短语(phrasal verbs)**——像 `pick up`、`check out` 这类小词组合,本土人天天挂嘴边,用上它英语立刻不“塑料”。\n**③ 地道习语(idioms)**——像 `a piece of cake` 这种不能按字面翻译的说法,是听懂本土口语的钥匙。\n\n三者叠加,才是老外真实在说的日常英语。我们避开死记硬背,只练“能开口、听得懂”的部分。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "① 场景优先,不背孤立单词",
+        "detail": "先锁定一个真实场景(点单、问路、闲聊),只学这个场景要用的话。用得上,才记得住。"
+       },
+       {
+        "title": "② 整块记忆,句子不拆开",
+        "detail": "把 Can I get a latte, please 当成一个整体记,而不是逐词翻译再拼装——这样开口才快。"
+       },
+       {
+        "title": "③ 开口复述,练到脱口而出",
+        "detail": "每句话大声跟读 3 遍,再合上文字复述一遍。哑巴英语的解药只有一个:让嘴巴动起来。"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "咖啡店点单,4 句就够用:\n\n- **Can I get a medium latte, please?** 我要一杯中杯拿铁,谢谢。(`Can I get...` 是最地道的点单开头,比 I want 客气自然)\n- **For here, please. / To go, please.** 堂食 / 带走。(店员必问,先备好答案)\n- **No sugar, thanks.** 不要糖,谢谢。\n- **Keep the change.** 不用找了。(小费文化里超实用)"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Barista",
+        "text": "Hi! What can I get for you?",
+        "note": "点单最常见的开场,就是问“要点什么”"
+       },
+       {
+        "speaker": "You",
+        "text": "Can I get a medium latte, please?",
+        "note": "medium=中杯(小/中/大:small / medium / large)"
+       },
+       {
+        "speaker": "Barista",
+        "text": "Sure. For here or to go?",
+        "note": "堂食还是带走"
+       },
+       {
+        "speaker": "You",
+        "text": "To go, please. And no sugar.",
+        "note": "带走,不要糖"
+       },
+       {
+        "speaker": "Barista",
+        "text": "That'll be 4.50.",
+        "note": "一共 4.5(美元)。That'll be... 是报价的固定说法"
+       },
+       {
+        "speaker": "You",
+        "text": "Here you go. Keep the change.",
+        "note": "“给你” + “不用找了”"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "三合一 = 实用英语(打底)+ 动词短语(增地道)+ 习语(听懂本土口语)",
+       "Can I get...? 是点单、要东西的万能开头,比 I want 自然得多",
+       "整句记忆 + 大声复述,是治哑巴英语的核心动作",
+       "先学“这个场景用得上的话”,而不是“这本书的第 3 课”"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "在咖啡店想点一杯带走的中杯拿铁,最地道的说法是?",
+      "options": [
+       "I want one middle latte, take away.",
+       "Can I get a medium latte to go, please?",
+       "Give me a middle size latte, I go.",
+       "Please, latte, medium, outside."
+      ],
+      "answerIndex": 1,
+      "explain": "Can I get... please 是地道点单开头;中杯是 medium(不是 middle);带走用 to go。其他选项都是逐字翻译的中式英语,老外能猜懂但一听就“不本土”。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你拿到了整门课的地图:三合一(实用英语+动词短语+习语)与三合一学习法(场景优先、整块记忆、开口复述),还用咖啡店场景开了口。记住:能用出去的,才算你的英语。",
+      "next": "下一节进入【实用英语】板块:餐厅点餐、问路、购物三大高频场景,教你把“中式直译”换成老外真正在说的地道整句。"
+     }
+    ]
+   },
+   {
+    "title": "实用英语 · 高频生活场景,把中式英语换成地道整句",
+    "summary": "跳出逐字翻译陷阱,掌握餐厅、问路、购物三大场景的地道核心整句,并在点餐对话里自然提要求、买单。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "菜单看得懂,话却说不出",
+      "markdown": "在餐厅,你想说“这个可以不放辣吗”,脑子里逐字翻译成 This can not put spicy,说出口自己都心虚。问题不在词汇,而在于你把中文一个字一个字搬进了英文。**实用英语的关键,是记老外这个场景会怎么说的整句,而不是翻译你的中文。** 这一节我们攻克三个最高频的生活场景。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解“实用英语=场景整句”,跳出逐字翻译的中式英语陷阱",
+       "掌握餐厅、问路、购物三大场景各 2-3 句地道核心表达",
+       "能在点餐对话里自然提出要求(加/减、买单)"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "别翻译中文,记场景整句",
+      "markdown": "中文说“开灯”,英文不是 open the light,而是 `turn on the light`——动词根本不对应。这类“想当然”的直译,就是中式英语的来源。\n\n实用英语的做法是:**把每个场景里老外的固定说法整块背下来。** 你不需要懂每个词为什么这么搭,只要在对的场景说对的整句。用得多了,语感自然就有了。下面这张对照表,先感受一下差距。"
+     },
+     {
+      "type": "compare",
+      "title": "逐字翻译 vs 地道说法",
+      "left": {
+       "heading": "中式直译(听着别扭)",
+       "items": [
+        "Open the light.(开灯)",
+        "I very like this dish.",
+        "Give you.(把东西递给对方)",
+        "How to go to the station?"
+       ]
+      },
+      "right": {
+       "heading": "老外真正说的",
+       "items": [
+        "Turn on the light.",
+        "I really like this dish.",
+        "Here you go.",
+        "How do I get to the station?"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "三大场景各记两句,立刻能用:\n\n**餐厅**\n- **Could we get the menu, please?** 能给我们看下菜单吗?\n- **Can I have this without onions?** 这个能不放洋葱吗?(不放某样东西:`without + 食材`)\n\n**问路**\n- **Excuse me, how do I get to the subway?** 请问地铁怎么走?(`how do I get to...` 是问路万能句)\n- **Is it within walking distance?** 走得到吗?\n\n**购物**\n- **I'm just looking, thanks.** 我随便看看,谢谢。(不想被店员跟着时的救命句)\n- **Do you have this in a smaller size?** 这个有小一号的吗?"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Server",
+        "text": "Are you ready to order?",
+        "note": "可以点单了吗"
+       },
+       {
+        "speaker": "You",
+        "text": "Yes. Can I have the burger without onions?",
+        "note": "without + 食材 = 不放某样;地道又礼貌"
+       },
+       {
+        "speaker": "Server",
+        "text": "Sure. Anything to drink?",
+        "note": "要喝点什么吗"
+       },
+       {
+        "speaker": "You",
+        "text": "Just water, thanks.",
+        "note": "“就要水”——just 让语气很自然"
+       },
+       {
+        "speaker": "Server",
+        "text": "Great. I'll be right back with that.",
+        "note": "马上给您上"
+       },
+       {
+        "speaker": "You",
+        "text": "Thanks. And could we get the check when you have a chance?",
+        "note": "顺便买单;the check=账单(英式常用 the bill)"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "实用英语记的是场景整句,不是逐字翻译的中文",
+       "how do I get to...? 问路、Can I have... without... 减料、I'm just looking 挡推销——都是高频救命句",
+       "买单说 Can we get the check?(美) / the bill(英)",
+       "语气软化词 just / please / could 让你听起来礼貌又本土"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "点餐时想让厨房不要放香菜,下面哪句最地道?",
+      "options": [
+       "Please don't put coriander inside.",
+       "Can I have it without coriander?",
+       "I don't want you add coriander.",
+       "No coriander to me."
+      ],
+      "answerIndex": 1,
+      "explain": "Can I have it without + 食材 是不放某样东西的地道固定句式,礼貌又自然。其他几句都是从中文逐字搬过来的,语法或搭配都别扭。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你把三个最高频的生活场景(餐厅/问路/购物)的地道整句收进了口袋,也看清了中式英语的病根:逐字翻译。以后开口前,先问自己老外这句会怎么说,而不是我的中文怎么翻。",
+      "next": "下一节进入【动词短语】板块:pick up、check out、run out of……这些本土人天天用的小词组合,是让你的英语从教科书腔变地道的开关。"
+     }
+    ]
+   },
+   {
+    "title": "动词短语 · 让英语瞬间地道的高频 phrasal verbs",
+    "summary": "理解动词短语要整块记,拿下 pick up、figure out、run out of、hang out、check out 五个高频短语,用它们替换生硬书面动词。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "每个词都认识,连起来就懵",
+      "markdown": "老外说 I'll pick you up at seven,你每个词都认识,却愣了一下——“捡起你?” 又比如 We ran out of coffee,跟“跑”根本没关系。这些由“动词+小词”组成的**动词短语(phrasal verbs)**,是本土口语的主力。不掌握它们,你既听不懂、也说不地道。好消息是:高频的就那几十个,这一节先拿下最常用的一批。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解动词短语的特点:意思不能靠字面词猜,要整体记",
+       "掌握 5 个超高频动词短语的核心用法与例句",
+       "能用动词短语替换生硬的书面动词,让表达更口语"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "动词短语:整体记,别拆着猜",
+      "markdown": "动词短语 = 动词 + 介词/副词(如 up / out / off),组合后的意思往往和字面无关:\n\n- `pick up` 字面“捡起”,实际常指**开车去接人 / 顺便学会**\n- `check out` 字面“检查出去”,实际是**看一看 / 退房结账**\n\n所以别一个词一个词翻译,**把整个短语当一个单词来记**。而且它们比对应的正式动词更口语——老外聊天几乎不说 investigate,都说 `look into`。"
+     },
+     {
+      "type": "example",
+      "markdown": "5 个高频动词短语,配真实例句:\n\n- **pick up**:I'll `pick` you `up` at the airport. 我去机场接你。/ I `picked up` some Italian in Rome. 我在罗马学了点意大利语。\n- **figure out**:I can't `figure out` how this app works. 我搞不懂这 app 怎么用。\n- **run out of**:We've `run out of` milk. 我们牛奶用完了。\n- **hang out**:Let's `hang out` this weekend. 这周末一起玩吧。\n- **check out**:You should `check out` that new ramen place. 你该去试试那家新拉面店。/ We need to `check out` by 11. 我们得 11 点前退房。"
+     },
+     {
+      "type": "flashcard",
+      "front": "pick up(三个高频意思)",
+      "back": "① 开车接人:I'll pick you up at 7.(我 7 点来接你)\n② 顺便学会:She picked up French quickly.(她很快学会了法语)\n③ 拿起/取:Can you pick up the phone?(接下电话好吗)"
+     },
+     {
+      "type": "flashcard",
+      "front": "figure out",
+      "back": "弄明白、想出办法。\nI finally figured out the answer.(我终于想明白答案了)\n比 understand 更口语,强调动脑搞清楚。"
+     },
+     {
+      "type": "flashcard",
+      "front": "run out of",
+      "back": "把…用完、耗尽。\nWe ran out of gas on the highway.(我们在高速上没油了)\n注意:后面接被用完的东西——run out of + 名词。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "动词短语意思不能靠字面猜,要整块当一个单词记",
+       "口语里动词短语常替代正式动词:look into > investigate,put off > postpone",
+       "pick up 至少三义:接人 / 学会 / 拿起——听语境判断",
+       "run out of 后面接被用完的东西,不是人"
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "书面正式动词 vs 口语动词短语",
+      "left": {
+       "heading": "正式/书面(考试作文爱用)",
+       "items": [
+        "tolerate(容忍)",
+        "investigate(调查)",
+        "postpone(推迟)",
+        "discover(发现)"
+       ]
+      },
+      "right": {
+       "heading": "口语更地道(老外常说)",
+       "items": [
+        "put up with",
+        "look into",
+        "put off",
+        "come across / find out"
+       ]
+      }
+     },
+     {
+      "type": "quiz",
+      "question": "We've run out of coffee. 这句话是什么意思?",
+      "options": [
+       "我们跑出去买咖啡了。",
+       "我们的咖啡用完了。",
+       "我们不喝咖啡了。",
+       "我们把咖啡跑洒了。"
+      ],
+      "answerIndex": 1,
+      "explain": "run out of + 某物 = 把某物用完/耗尽,和跑没关系。这正是动词短语的特点:必须整体理解,不能拆开按字面翻。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你拿下了 pick up、figure out、run out of、hang out、check out 五个高频动词短语,也明白了它们要整块记忆。多用它们替换生硬的书面动词,你的英语立刻不教科书了。",
+      "next": "下一节进入【地道习语】板块:a piece of cake、under the weather、hit the road……这些字面翻译会闹笑话的说法,是你听懂本土口语的最后一块拼图。"
+     }
+    ]
+   },
+   {
+    "title": "地道习语 · 听懂本土口语的最后一块拼图",
+    "summary": "理解习语约定俗成、不能字面翻,掌握 a piece of cake、under the weather、hit the road 等高频习语,并避开硬翻与用错场合的坑。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "小菜一碟跟蛋糕有什么关系?",
+      "markdown": "朋友说 Don't worry, it's a piece of cake,你四处找蛋糕;同事说 I'm feeling under the weather,你抬头看天。**习语(idioms)**就是这样:字面意思和真实意思完全两回事,硬翻必闹笑话。它们是本土口语里的调味料,出现频率极高。听不懂习语,你就会觉得“每个词都会,整句却不懂”。这一节,我们把最常用的一批一次讲透。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解习语的本质:约定俗成、不能字面直译",
+       "掌握 4-5 个超高频地道习语的意思与使用场景",
+       "在对话里听懂并自然用出至少 2 个习语"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "习语:约定俗成,别按字面翻",
+      "markdown": "习语是一门语言里约定俗成的固定说法,意思是整体文化沉淀下来的,和字面无关:\n\n- `a piece of cake` ≠ 一块蛋糕,而是**小菜一碟、很简单**\n- `under the weather` ≠ 在天气下面,而是**身体不舒服**\n\n学习要点有两个:**一是整体记意思,二是记住用的场合**。习语偏口语、偏随意,和朋友聊天用很地道,但正式书面场合要慎用。"
+     },
+     {
+      "type": "flashcard",
+      "front": "a piece of cake",
+      "back": "小菜一碟、非常简单。\nThe exam was a piece of cake.(那考试太简单了)\n近义:easy peasy(更随意口语)"
+     },
+     {
+      "type": "flashcard",
+      "front": "under the weather",
+      "back": "身体不适、不舒服。\nI'm feeling a bit under the weather today.(我今天有点不舒服)\n比 I'm sick 更委婉,常用于请假、婉拒。"
+     },
+     {
+      "type": "flashcard",
+      "front": "hit the road",
+      "back": "出发、上路、该走了。\nIt's getting late, let's hit the road.(不早了,我们出发吧)\n和打路无关,是启程的地道说法。"
+     },
+     {
+      "type": "flashcard",
+      "front": "cost an arm and a leg",
+      "back": "非常昂贵、贵得离谱。\nThat bag cost an arm and a leg.(那包贵得要命)\n夸张说法,不是真的少胳膊少腿。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Mike",
+        "text": "You look tired. You okay?",
+        "note": "你看着挺累,还好吗"
+       },
+       {
+        "speaker": "Anna",
+        "text": "Yeah, just a bit under the weather.",
+        "note": "嗯,就是有点不舒服(委婉说身体不适)"
+       },
+       {
+        "speaker": "Mike",
+        "text": "Take it easy. Was the presentation hard?",
+        "note": "别太拼;take it easy=放轻松,也是习语"
+       },
+       {
+        "speaker": "Anna",
+        "text": "Not at all — it was a piece of cake.",
+        "note": "一点也不,小菜一碟"
+       },
+       {
+        "speaker": "Mike",
+        "text": "Nice. Well, it's late, I should hit the road.",
+        "note": "该走了 / 出发了"
+       },
+       {
+        "speaker": "Anna",
+        "text": "Sure, drive safe!",
+        "note": "路上小心"
+       }
+      ]
+     },
+     {
+      "type": "callout",
+      "tone": "warn",
+      "markdown": "**避坑:** ① 习语别硬翻中文,更别自己造——good good study, day day up 老外听不懂。② 习语偏随意口语,求职信、正式报告里少用。③ 拿不准场合时,先听老外在什么情境用,再模仿。"
+     },
+     {
+      "type": "quiz",
+      "question": "同事说 I'm feeling under the weather today,他最可能想表达?",
+      "options": [
+       "他今天心情随天气变化。",
+       "他今天身体不太舒服。",
+       "他被雨淋了。",
+       "他觉得今天天气不好。"
+      ],
+      "answerIndex": 1,
+      "explain": "under the weather 是固定习语,意思是身体不适、不舒服,和天气无关,常用来委婉地说自己状态不好或请假。字面翻译会完全理解错。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这一节你掌握了 a piece of cake、under the weather、hit the road、cost an arm and a leg 等高频习语,也学会了避坑:整体记意思、注意使用场合、绝不硬翻。听懂本土口语的拼图,补上了。",
+      "next": "最后一节【三合一实战】:把实用英语、动词短语、习语放进同一段真实对话,带你完整演练一次,把三层能力真正串成开口就地道。"
+     }
+    ]
+   },
+   {
+    "title": "三合一实战 · 一段真实对话,串起三层能力",
+    "summary": "在一段综合闲聊里识别实用英语、动词短语、习语三种元素,用跟读→拆解→复述三步法内化,独立复述整段对话。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "把学过的,一次用出来",
+      "markdown": "前四节,你分别练了实用英语、动词短语和习语。但真实沟通里,它们从不分开出现——一句话里可能同时有场景整句、动词短语和习语。这一节我们不学新概念,而是把三者放进**同一段真实对话**,拆解、复述、内化,让你看清地道的日常英语到底长什么样,并练到能自己说出来。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "在一段综合对话里,识别出实用英语、动词短语、习语三种元素",
+       "掌握跟读→拆解→复述的实战内化三步法",
+       "独立复述整段对话,把三合一能力串成开口表达"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "Sam",
+        "text": "Hey! Long time no see. Wanna grab a coffee?",
+        "note": "实用英语:grab a coffee=去喝杯咖啡,超地道的邀约"
+       },
+       {
+        "speaker": "Lee",
+        "text": "Sure! I could really use a break.",
+        "note": "习语感表达:could use a break=正需要休息一下"
+       },
+       {
+        "speaker": "Sam",
+        "text": "Cool. Let's check out that new place downtown.",
+        "note": "动词短语:check out=去看看 / 试试"
+       },
+       {
+        "speaker": "Lee",
+        "text": "Sounds good. Is it far? Can we walk?",
+        "note": "实用英语:问距离 / 问路"
+       },
+       {
+        "speaker": "Sam",
+        "text": "It's a piece of cake — five minutes on foot.",
+        "note": "习语:a piece of cake,这里指太容易了 / 没问题"
+       },
+       {
+        "speaker": "Lee",
+        "text": "Perfect. Oh, I ran out of cash though. Do they take cards?",
+        "note": "动词短语:ran out of=用完了(现金);Do they take cards=能刷卡吗"
+       },
+       {
+        "speaker": "Sam",
+        "text": "Yeah, they do. Let's hit the road!",
+        "note": "习语:hit the road=出发"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "把上面这段对话按三合一拆开看,你就懂了地道英语的配方:\n\n**① 实用英语(场景整句)**:Wanna grab a coffee?、Can we walk?、Do they take cards?\n**② 动词短语**:`check out`(去看看)、`run out of`(用完)\n**③ 地道习语**:`a piece of cake`(轻松)、`hit the road`(出发)、`could use a break`(正需要休息)\n\n看,老外一段普通闲聊,三层能力全在里面。这就是这门课要你练成的样子。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "① 跟读:先模仿语音语调",
+        "detail": "把整段对话大声跟读 2-3 遍,先不管拆解,重在模仿节奏和语气。"
+       },
+       {
+        "title": "② 拆解:标出三合一元素",
+        "detail": "像上面那样,把每句归类到实用英语 / 动词短语 / 习语,理解它为什么地道。"
+       },
+       {
+        "title": "③ 复述:合上文字自己说",
+        "detail": "盖住原文,试着把这段对话用自己的话复述一遍,卡住的地方就是你要重点练的。"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "学完前后,同一个意思你会怎么说",
+      "left": {
+       "heading": "以前(教科书腔)",
+       "items": [
+        "Do you want to drink coffee?",
+        "I want to see that new shop.",
+        "We have no cash.",
+        "Let's go now."
+       ]
+      },
+      "right": {
+       "heading": "现在(三合一 · 地道)",
+       "items": [
+        "Wanna grab a coffee?",
+        "Let's check out that new place.",
+        "I ran out of cash.",
+        "Let's hit the road!"
+       ]
+      }
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "真实对话里,实用英语 + 动词短语 + 习语是混在一起出现的",
+       "内化三步法:跟读(模仿)→ 拆解(归类理解)→ 复述(合上文字说)",
+       "grab a coffee / check out / hit the road 都比教科书说法更地道自然",
+       "卡壳的地方就是你的练习重点,反复开口是唯一解药"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "下面哪一句同时用到了动词短语和习语的地道说法?",
+      "options": [
+       "I want to drink coffee and then go home.",
+       "Let's check out that café — it's a piece of cake to find.",
+       "This coffee is very delicious and cheap.",
+       "Please give me a cup of coffee now."
+      ],
+      "answerIndex": 1,
+      "explain": "check out 是动词短语(去看看),a piece of cake 是习语(这里指很好找)。一句话里两种地道元素叠加,正是三合一追求的自然口语效果。其余选项都是正确但偏教科书的直白表达。"
+     },
+     {
+      "type": "summary",
+      "markdown": "恭喜你走完《三合一全能英语》的核心主线:实用英语打底、动词短语增地道、习语听懂本土口语,并在真实对话里把三者串了起来。语言的进步只发生在开口的那一刻——把这门课的句子反复说出来,让它们真正变成你的。",
+      "next": "接下来,带着场景优先、整块记忆、开口复述的方法,去更多真实生活场景里持续输入和开口。你已经有了三合一的地图,剩下的,就是每天开口一点点。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "ct1v1",
+  "subtitle": "有道中教带你从\"不敢说\"到\"张口就来\":发音、语法、场景一次夯实",
+  "intro": "《中教口语·自学精华》由有道中教教研组打造,面向想开口的每一个人。中教老师熟悉国内学习者的英语痛点,用通俗易懂的中文思维讲解:先帮你破除开口畏惧,再细致纠正发音与语法误区,系统梳理生活、职场、自我提升等高频场景表达。五节课循序渐进,让你从\"背了十年却开不了口\",稳步走到\"轻松敢说、流利用好\"。",
+  "level": "L1",
+  "instructorName": "有道中教教研组",
+  "lessons": [
+   {
+    "title": "开口第一课·先敢说,再把话说好",
+    "summary": "破除开口畏惧,掌握「先流利后准确」的开口逻辑与 5 句万能开口句",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "背了十年单词,为什么还是开不了口?",
+      "markdown": "你能看懂英文邮件、能做完形填空,可外国同事一句 **\"How's it going?\"** 就让你大脑空白、脸红心跳。\n\n这不是你笨,而是我们从小「为考试学英语」,练的是「认」,不是「说」。有道中教最懂这种痛——今天这节课,我们不背新单词,只做一件事:把你心里那道「怕说错」的坎迈过去。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "理解「先流利、后准确」的开口逻辑,不再因怕错而沉默",
+       "掌握 5 句能立刻用起来的「万能开口句」",
+       "学会用「短句 + 重复替换」策略,把想说的话拆成能说出口的小块"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "开不了口的真相:你在用「考试脑」做「交流事」",
+      "markdown": "很多人一开口就先在脑子里「翻译 + 查语法」,一句话没说完就卡住了。\n\n中教教研组的建议很简单:交流的第一目标是**让对方听懂**,不是**零错误**。母语者聊天时也常说不完整的句子。请记住这句心法:\n\n> **Communication first, perfection later.(先沟通,再完美。)**\n\n说错了,只要对方能懂,你就赢了。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "敢说 > 说对:开口的 60 分,胜过沉默的 0 分",
+       "用短句:一句话说不清,就拆成三句短的",
+       "重复与替换:不会说 exhausted,就说 very, very tired——换简单词也能表达",
+       "允许卡壳:用 \"Let me think…\" / \"How do I say…\" 争取时间,而不是闭嘴"
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**5 句万能开口句(今天就能用):**\n\n- **\"Sorry, could you say that again?\"**(不好意思,能再说一遍吗?)——听不懂时的救命句,别只会说生硬的 \"What?\"\n- **\"How's it going?\"**(最近怎么样?)——万能寒暄,比 \"How are you? / Fine, thank you\" 自然十倍\n- **\"I'm not sure how to say this, but…\"**(我不太确定怎么说,不过……)——给自己缓冲,母语者也常用\n- **\"You know what I mean?\"**(你懂我意思吧?)——说不清时把话头递回去\n- **\"Let me think for a second.\"**(让我想一下)——卡壳时的体面停顿,好过尴尬沉默"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "外国同事",
+        "text": "Morning! How's it going?",
+        "note": "= 早上好,最近怎么样?比 How are you 更口语"
+       },
+       {
+        "speaker": "你",
+        "text": "Pretty good, thanks. A bit busy this week.",
+        "note": "不用完整长句,short and true(简短又真实)就够了"
+       },
+       {
+        "speaker": "外国同事",
+        "text": "Yeah? What are you working on?",
+        "note": "What are you working on = 你在忙什么"
+       },
+       {
+        "speaker": "你",
+        "text": "A new report. It's… kind of a lot.",
+        "note": "kind of a lot = 有点多;卡住时 \"kind of\" 是很好用的缓冲词"
+       },
+       {
+        "speaker": "外国同事",
+        "text": "Ha, I feel you. Good luck!",
+        "note": "I feel you = 我懂你(共情口语)"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "同样一句话,别再说得像课本",
+      "left": {
+       "heading": "❌ 教科书 / 中式",
+       "items": [
+        "How are you? — Fine, thank you, and you?(机械背诵感)",
+        "I very like it.(very 不能直接修饰动词)",
+        "Please wait me.(缺介词)"
+       ]
+      },
+      "right": {
+       "heading": "✅ 自然口语",
+       "items": [
+        "How's it going? — Pretty good, you?",
+        "I really like it. / I like it a lot.",
+        "Please wait for me."
+       ]
+      }
+     },
+     {
+      "type": "quiz",
+      "question": "外国同事说 \"How's it going?\",最自然的回应是?",
+      "options": [
+       "Fine, thank you, and you?",
+       "Pretty good, thanks. You?",
+       "I'm going to the office.",
+       "Sorry, I can't speak English."
+      ],
+      "answerIndex": 1,
+      "explain": "\"How's it going?\" 是寒暄,不是问「你去哪」。回一句轻松真实的 \"Pretty good, thanks. You?\" 最自然;\"Fine, thank you, and you?\" 语法没错但太课本、太生硬。"
+     },
+     {
+      "type": "summary",
+      "markdown": "这节课的核心只有一句:**先敢说,再说好。** 把「怕错」换成「先让对方听懂」,你就已经跨过了最难的一关。今天的 5 句万能句,建议今天就找机会用出去。",
+      "next": "下节课进入中教最拿手的「纠音」——为什么你的 \"three\" 会被听成 \"sree\"?我们从舌位、口型手把手拆给你看。"
+     }
+    ]
+   },
+   {
+    "title": "发音纠错·中国人最容易读错的那几个音",
+    "summary": "手把手纠正 th、/v/-/w/、词尾辅音等中国学习者最高频的发音失分点",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "\"three coffees\" 说出口,店员却听成了 \"sree\"",
+      "markdown": "点单、报数、说名字……一个音读不准,对方反复问 \"Sorry?\",开口的信心瞬间崩塌。\n\n中国学习者的发音问题高度集中,就那么几个「钉子户」。有道中教纠音,从来不让你死记音标,而是告诉你**舌头放哪、嘴型怎么摆**。这节课,我们把最容易露怯的几个音,一次拔掉。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "读准 /θ/ 和 /ð/(th 音),摆脱 \"three → sree\" 的尴尬",
+       "分清 /v/-/w/、/l/-/r/ 两组易混音",
+       "学会不吞词尾辅音,让 like / desk / and 清晰完整"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "中教纠音法:先定位,再模仿",
+      "markdown": "发音发不准,90% 不是听力问题,而是「口腔动作」没做对。\n\n中教教研组的纠音三件套:**看舌位 → 慢速夸张模仿 → 放进句子里练**。别怕一开始读得夸张,肌肉记住动作后,自然就顺了。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第一步:舌尖轻抵上齿",
+        "detail": "把舌尖轻轻放在上门牙后缘或上下齿之间,别用力咬"
+       },
+       {
+        "title": "第二步:送气出声",
+        "detail": "/θ/ 不振动声带(think、three);/ð/ 振动声带(this、that)。手放喉咙能感到区别"
+       },
+       {
+        "title": "第三步:慢速带词练",
+        "detail": "th-ink → think,th-ree → three;先拆音节再连起来,每个词读 5 遍"
+       }
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "两组「一读就露馅」的音",
+      "left": {
+       "heading": "❌ 常被读错",
+       "items": [
+        "very 读成 \"wery\"(/v/ 读成 /w/)",
+        "rice 读成 \"lice\"(/r/ 读成 /l/)",
+        "thank 读成 \"sank\"(/θ/ 读成 /s/)"
+       ]
+      },
+      "right": {
+       "heading": "✅ 正确口型",
+       "items": [
+        "/v/:上齿轻咬下唇再送气;/w/:双唇撅圆",
+        "/r/:舌头后缩、不碰上颚;/l/:舌尖顶上齿龈",
+        "/θ/:舌尖出齿缝送气,别缩回嘴里"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "**词尾辅音别「吞」掉:**\n\n- **\"like\"** /laɪk/ ——结尾的 /k/ 要送出,别读成 \"lie\"\n- **\"desk\"** /desk/ ——/sk/ 两个辅音都要,别读成 \"des\"\n- **\"black and white\"** ——and 连读可弱读成 /ən/,听感像 \"black-en-white\",但 /d/ 别整个吞掉\n\n中文说明:中文几乎没有词尾辅音,所以我们习惯性「吞尾」。有意识地把结尾辅音「轻轻送出」,清晰度立刻提升一半。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "纠音不靠背音标,靠「口型动作」的肌肉记忆",
+       "/θ/ 舌尖一定要露出齿缝,宁可夸张",
+       "/v/ 咬唇、/w/ 撅唇,一咬一撅别搞混",
+       "词尾辅音「轻送不吞」,单词立刻清楚一半"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Hi, can I get three lattes, please?",
+        "note": "three 的 /θr/ 舌尖出齿缝,别读成 \"sree\""
+       },
+       {
+        "speaker": "店员",
+        "text": "Sure, that's three lattes. For here or to go?",
+        "note": "to go = 外带;for here = 堂食"
+       },
+       {
+        "speaker": "你",
+        "text": "To go, thanks. And a glass of water.",
+        "note": "water 的 /t/ 美音常弱化成「闪音」,读 \"wah-der\" 也可"
+       },
+       {
+        "speaker": "店员",
+        "text": "No problem. Anything else?",
+        "note": "Anything else = 还要别的吗"
+       },
+       {
+        "speaker": "你",
+        "text": "That's all, thank you very much.",
+        "note": "very 咬唇 /v/,别读成 \"wery\""
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "单词 \"three\" 里的 th,正确的发音动作是?",
+      "options": [
+       "舌尖顶住下齿",
+       "舌尖轻放在上下齿之间/上齿后缘并送气",
+       "双唇撅圆",
+       "舌头后缩不动"
+      ],
+      "answerIndex": 1,
+      "explain": "th(/θ/)的关键是舌尖放到上下齿之间或上齿后缘、轻轻送气。舌尖若缩在嘴里,就会读成 /s/,three 也就成了 \"sree\"。"
+     },
+     {
+      "type": "summary",
+      "markdown": "发音不是天赋,而是「口腔动作」的准确复制。今天的 th、/v/-/w/、词尾辅音,是中国学习者最高频的三个失分点。每天对着这几个词慢读、夸张练 3 分钟,两周后你会明显听到自己更「清楚」了。",
+      "next": "音发对了,句子却总说错时态、丢冠词?下节课中教用「中文思维」带你绕开最坑的几个语法点。"
+     }
+    ]
+   },
+   {
+    "title": "语法开口·用中文思维绕开最坑的语法点",
+    "summary": "用中文思维绕开时态、三单、冠词三大语法坑,张口时能「反应过来」",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "\"I go there yesterday\" —— 一句话暴露时态硬伤",
+      "markdown": "开口时最常见的不是不会,而是「来不及想」:昨天的事用了现在时,第三人称忘了加 s,冠词 a/the 全凭感觉。\n\n中教教研组的做法不是甩给你一堆语法术语,而是用**中文里能对上的逻辑**,让你说的时候能「反应过来」。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用「时间线」直觉,张口就用对过去 / 现在 / 将来时",
+       "记住第三人称单数动词加 -s 的开口反射",
+       "分清 a / the / 零冠词的基本判断"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "中教心法:英语的「时间」长在动词上",
+      "markdown": "中文靠「昨天、已经、正在」这些词表示时间,动词本身不变;英语正相反——**时间信息藏在动词的变化里**。\n\n所以说过去的事,先在脑子里按下「动词变过去式」这个开关:go → went,eat → ate,is → was。养成这个反射,时态错误能少一大半。"
+     },
+     {
+      "type": "compare",
+      "title": "\"我在吃饭\"到底用哪个?",
+      "left": {
+       "heading": "❌ 常见错误",
+       "items": [
+        "I go there yesterday.(过去的事用了原形)",
+        "He like coffee.(三单漏了 s)",
+        "I am agree with you.(agree 是动词,前面不加 am)"
+       ]
+      },
+      "right": {
+       "heading": "✅ 正确说法",
+       "items": [
+        "I went there yesterday.",
+        "He likes coffee.",
+        "I agree with you."
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "**冠词 a / the 的开口判断:**\n\n- 第一次提到、泛指一个 → **a / an**:\"I saw **a** dog.\"(我看到一只狗,听者不知道哪只)\n- 再次提到、双方都知道的特指 → **the**:\"**The** dog was so cute.\"(就是刚说的那只)\n- 泛指一类、抽象或不可数常零冠词:\"I like **music**.\" / \"She speaks **English**.\"\n\n中文说明:中文没有冠词,这正是我们最容易漏的。开口时抓一个简单原则——**「随便一个」用 a,「就是那个」用 the**。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第一步:先定时间",
+        "detail": "开口前 0.5 秒,判断这件事是过去、现在,还是将来"
+       },
+       {
+        "title": "第二步:动词跟着变",
+        "detail": "过去 → went / was;将来 → will go / be going to;现在习惯 → 原形(三单加 s)"
+       },
+       {
+        "title": "第三步:说完扫一眼主语",
+        "detail": "主语是 he/she/it 且是现在时,检查动词有没有加 -s"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "说过去的事,先按下「动词变过去式」开关",
+       "he / she / it + 现在时,动词记得加 -s",
+       "「随便一个」用 a,「就是那个」用 the",
+       "agree、like、want 本身就是动词,前面不要再加 be 动词"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "下面哪句是正确的?",
+      "options": [
+       "I go to Beijing last week.",
+       "I went to Beijing last week.",
+       "I am go to Beijing last week.",
+       "I going to Beijing last week."
+      ],
+      "answerIndex": 1,
+      "explain": "last week 是过去时间,动词要用过去式 went。go 是原形不能表示过去;\"am go\" / \"going\"(缺助动词)都不成立。"
+     },
+     {
+      "type": "summary",
+      "markdown": "语法不是开口的敌人,而是让别人「秒懂你」的工具。今天三个高频点——时态开关、三单加 s、a/the——不用背规则,张口时能「反应过来」就够了。多说、被纠、再说,肌肉记忆比死记规则牢得多。",
+      "next": "基础打牢,该上「实战」了。下节课带你走进生活场景:点餐、购物、问路,一整套能直接抄作业的对话。"
+     }
+    ]
+   },
+   {
+    "title": "生活场景·点餐购物问路,照着说就行",
+    "summary": "点餐、购物、问路三大生活场景,给你可直接套用的固定句式与真实对话",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "出国旅行,最先卡住的永远是「吃住行」",
+      "markdown": "菜单看不懂、退货说不清、问路听不明白——生活场景的口语,不需要高级词,只需要几套「照着说就行」的固定句式。\n\n有道中教把最高频的生活场景拆成一段段真实对话,今天先拿下点餐、购物、问路三件事。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用固定句式完成餐厅点餐、加单与结账",
+       "学会购物中问码、试穿、退换的高频表达",
+       "掌握问路与听懂方向指示的关键词"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "服务员",
+        "text": "Hi, are you ready to order?",
+        "note": "ready to order = 可以点餐了吗"
+       },
+       {
+        "speaker": "你",
+        "text": "Yes. I'll have the beef noodles, please.",
+        "note": "\"I'll have…\" 是点餐最地道的开头,别用生硬的 \"I want\""
+       },
+       {
+        "speaker": "服务员",
+        "text": "Sure. Anything to drink?",
+        "note": "Anything to drink = 需要喝的吗"
+       },
+       {
+        "speaker": "你",
+        "text": "Just water, thanks. And could I get the check when you have a moment?",
+        "note": "the check = 账单(美);英式常说 the bill"
+       },
+       {
+        "speaker": "服务员",
+        "text": "Of course, I'll bring it right over.",
+        "note": "right over = 马上就来"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**点餐万能句:**\n\n- **\"I'll have…\"** / **\"Can I get…?\"** ——点菜开头,比 \"I want\" 礼貌自然\n- **\"What do you recommend?\"** ——不知道点啥,让店员推荐\n- **\"Could I have this without onions?\"** ——去掉某样配料(onions 可换成任意食材)\n- **\"Can we split the bill?\"** ——AA 分账"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "你",
+        "text": "Excuse me, do you have this in a medium?",
+        "note": "in a medium = 中码;small / large 同理"
+       },
+       {
+        "speaker": "店员",
+        "text": "Let me check… Yes, here you go. The fitting room is over there.",
+        "note": "fitting room = 试衣间"
+       },
+       {
+        "speaker": "你",
+        "text": "Thanks. Also, can I return this if it doesn't fit?",
+        "note": "return = 退货;doesn't fit = 不合身"
+       },
+       {
+        "speaker": "店员",
+        "text": "Sure, within 30 days with the receipt.",
+        "note": "with the receipt = 凭小票"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "点餐开头永远用 \"I'll have…\" 或 \"Can I get…?\"",
+       "问价:\"How much is this?\" / \"How much does it cost?\"",
+       "问路:\"Excuse me, how do I get to…?\" 比 \"Where is…?\" 更礼貌好用",
+       "听方向抓关键词:go straight(直走)、turn left/right(左/右转)、next to(挨着)、across from(在……对面)"
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "这些话,换个说法更顺耳",
+      "left": {
+       "heading": "❌ 生硬 / 中式",
+       "items": [
+        "I want beef noodles.(像命令)",
+        "Where is the toilet?(直白略突兀)",
+        "Give me the bill."
+       ]
+      },
+      "right": {
+       "heading": "✅ 更得体",
+       "items": [
+        "I'll have the beef noodles, please.",
+        "Excuse me, where's the restroom?",
+        "Could I get the check, please?"
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "问路:「请问怎么去地铁站?」用英语怎么说更自然?",
+      "back": "Excuse me, how do I get to the subway station?（比 \"Where is the subway station?\" 更礼貌、更常用）"
+     },
+     {
+      "type": "quiz",
+      "question": "在餐厅点餐,最地道礼貌的开头是?",
+      "options": [
+       "I want the steak.",
+       "Give me the steak.",
+       "I'll have the steak, please.",
+       "The steak is mine."
+      ],
+      "answerIndex": 2,
+      "explain": "\"I'll have… , please\" 是英语点餐的标准礼貌说法。\"I want\" 和 \"Give me\" 语气偏生硬、像命令,母语者点餐时几乎不这么说。"
+     },
+     {
+      "type": "summary",
+      "markdown": "生活口语的秘诀不是词汇量,而是几套能「直接抄」的固定句式。今天的点餐、购物、问路对话,建议整段跟读、背下来,下次真遇到就能张口就来。",
+      "next": "生活场景过关,进入很多人最想拿下的「职场英语」——自我介绍、开会发言、邮件口语化表达,下节课见真章。"
+     }
+    ]
+   },
+   {
+    "title": "职场场景·从自我介绍到开会发言",
+    "summary": "职场自我介绍、会议发言与得体沟通,把「对」说成「得体」",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "会议室里一句 \"Let's go around and introduce ourselves\",你准备好了吗?",
+      "markdown": "外企、跨国会议、和客户视频——职场英语的门槛不在难词,而在「得体」。\n\n一句自我介绍、一次表达不同意见,分寸拿捏得好,专业感立刻拉满。有道中教把职场高频场景整理成可直接套用的表达,这节课带你从「开口介绍自己」到「会上稳稳发言」。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "用 3 句话完成专业又自然的职场自我介绍",
+       "掌握会议中表达观点、赞同、异议、打断的得体说法",
+       "学会口头与邮件沟通里「软化语气」的礼貌表达"
+      ]
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "主持人",
+        "text": "Let's go around and introduce ourselves. Would you like to start?",
+        "note": "go around = 轮流一圈"
+       },
+       {
+        "speaker": "你",
+        "text": "Sure. Hi everyone, I'm Li Ming. I work on the marketing team.",
+        "note": "work on the … team = 在…团队;比 \"I am marketing\" 准确"
+       },
+       {
+        "speaker": "你",
+        "text": "I've been with the company for about two years, mainly handling social media.",
+        "note": "I've been with … for … = 入职…多久;handling = 负责"
+       },
+       {
+        "speaker": "你",
+        "text": "Nice to meet you all. Looking forward to working together.",
+        "note": "Looking forward to working together = 期待合作,收尾得体"
+       }
+      ]
+     },
+     {
+      "type": "example",
+      "markdown": "**会议万能句:**\n\n- 表达观点:**\"In my opinion, …\"** / **\"I think we should…\"**\n- 赞同:**\"That's a good point.\"** / **\"I agree with that.\"**\n- 委婉异议:**\"I see your point, but…\"** / **\"I'm not sure I fully agree.\"**(比直接 \"You're wrong\" 得体得多)\n- 补充:**\"Just to add to that, …\"**(在别人基础上补一句)"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "同事 A",
+        "text": "I think we should launch next week.",
+        "note": "launch = 上线 / 发布"
+       },
+       {
+        "speaker": "你",
+        "text": "Sorry to jump in — I see your point, but the data isn't ready yet.",
+        "note": "Sorry to jump in = 抱歉打断一下,礼貌插话"
+       },
+       {
+        "speaker": "同事 A",
+        "text": "Fair enough. What do you suggest?",
+        "note": "Fair enough = 有道理;What do you suggest = 你建议怎么做"
+       },
+       {
+        "speaker": "你",
+        "text": "Maybe we push it to the following week, just to be safe.",
+        "note": "push it to = 推迟到;just to be safe = 保险起见"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "自我介绍公式:姓名 + 部门/岗位 + 一句职责或年限 + 期待合作",
+       "表达异议先「共情」再「转折」:\"I see your point, but…\"",
+       "礼貌打断用 \"Sorry to jump in…\",别硬插",
+       "口头/邮件软化语气:多用 could / would / maybe / just,少用 must"
+      ]
+     },
+     {
+      "type": "compare",
+      "title": "职场里,「对」不等于「得体」",
+      "left": {
+       "heading": "❌ 太直 / 失礼",
+       "items": [
+        "You are wrong.(直接否定)",
+        "Send me the file now.(命令口气)",
+        "I can't do this.(显得推诿)"
+       ]
+      },
+      "right": {
+       "heading": "✅ 专业得体",
+       "items": [
+        "I'm not sure I fully agree — could we look at it again?",
+        "Could you send me the file when you get a chance?",
+        "That might be tricky for me — could we find another way?"
+       ]
+      }
+     },
+     {
+      "type": "quiz",
+      "question": "开会时你不同意同事的方案,最得体的说法是?",
+      "options": [
+       "You are totally wrong.",
+       "I see your point, but I'm not sure the timing works.",
+       "No. Bad idea.",
+       "I don't want to do that."
+      ],
+      "answerIndex": 1,
+      "explain": "职场表达异议讲究「先共情、后转折」。\"I see your point, but…\" 既表明你听懂了对方,又礼貌地提出保留意见;直接说 \"You are wrong / Bad idea\" 会显得咄咄逼人。"
+     },
+     {
+      "type": "summary",
+      "markdown": "职场口语的核心是「得体」二字:先共情再表达、多用软化词、把命令换成请求。到这里,你已经走完从「破除畏惧 → 纠音 → 语法 → 生活 → 职场」的完整开口路径。真正的流利,来自开口的次数——把每节课的对话大声跟读、反复用起来。",
+      "next": "想针对你的基础和目标(纠音、0 基础、应试、职场进阶)做定制训练?这正是《中教口语 1v1》的强项:按你的时间约课,老师一对一带你实景练、当场纠。带着这五节课的底子,去课堂上把它们说「活」吧。"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "key": "tangxue",
+  "subtitle": "每周3词·每词3课时，把高频词从\"认识\"练到\"会用会考\"",
+  "intro": "《躺学单词篇》节选梁焕臻「超频语境全能英语浸泡营」的单词讲解片段，专为有基础的英语学习者打造。课程秉持\"实用英语\"理念，从生活英语与传统应试英语入手，聚焦最高频、最容易\"认识却用不好\"的核心词。每周精讲3个单词，每个单词配套3课时——视频讲解、图文精讲、课后发音练习，带你从\"懂\"到\"记\"再到\"说\"。躺着刷，也能把一词多义、熟词生义、地道搭配和发音节奏逐个吃透，让听、说、读、写都获得扎实可见的进步，为语法与词汇根基打下地基。",
+  "level": "L1",
+  "instructorName": "梁焕臻",
+  "lessons": [
+   {
+    "title": "开篇导学：躺着也能把高频词学透",
+    "summary": "看懂躺学学法（每周3词·每词3课时），用示范词 get 走通'懂→记→说'全流程。",
+    "isFree": true,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "你'认识'get，却用不出来",
+      "markdown": "get 是英语里出现频率最高的动词之一，人人都'认识'。可真到嘴边，很多人只会挤出一句 \"I get...\" 然后卡住。问题不在拼写，在于它意思太多、用法太活。\n\n《躺学单词篇》不带你死背拼写，而是节选梁焕臻「超频语境全能英语浸泡营」里的单词讲解，专攻'高频词怎么用活'。躺着刷，也能把一个词吃透。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "看懂《躺学单词篇》的学法：每周3词、每词3课时",
+       "掌握 get 的4个核心用法（得到 / 到达 / 变得 / 听懂）",
+       "学会 get sth done——让别人替你做事的说法",
+       "用 get 完成一段真实的日常对话"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "躺学怎么排课：每周3词，一词3课时",
+      "markdown": "全程精讲12个高频词，每周拿下3个。每个词拆成3课时，滚动打通：\n\n1. **视频讲解**：跟梁老师在真实语境里拆词义、辨用法，先'懂'。\n2. **图文精讲**：把义项和高频搭配整理成图文卡片，随时回看，反复'记'。\n3. **课后发音练习**：跟读例句、练连读和纠音，最后'说'。\n\n不求多，只求把每个高频词练到脱口而出。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "第1课时 · 视频讲解",
+        "detail": "跟着语境理解一词多义，先把每个意思'看懂'。"
+       },
+       {
+        "title": "第2课时 · 图文精讲",
+        "detail": "义项 + 高频搭配整理成卡片，反复回看'记牢'。"
+       },
+       {
+        "title": "第3课时 · 课后发音练习",
+        "detail": "跟读例句、练连读弱读，把词'说出来'。"
+       }
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "示范词 get：一个词四种高频意思",
+      "markdown": "get 的难，不在拼写，在'一词多义'。四个最常用的意思，全靠语境区分：\n\n1. **得到** obtain\n2. **到达** arrive\n3. **变得** become（后接形容词）\n4. **听懂** understand\n\n这正是浸泡营强调的'超频语境'——同一个词，语境一换，意思就变。"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"I finally **got** the job.\" 我终于**拿到**了那份工作。（得到）\n- \"What time do you **get** home?\" 你几点**到**家？（到达）\n- \"It's **getting** cold.\" 天**变**冷了。（变得，get + 形容词）\n- \"Sorry, I don't **get** it.\" 抱歉，我没**听懂**。（理解）"
+     },
+     {
+      "type": "flashcard",
+      "front": "get sth done 是什么意思？",
+      "back": "让/请别人把某事做好——结构是 get + 宾语 + 过去分词。例：I need to **get my hair cut**. 我得去**剪个**头发（是让理发师剪，不是自己剪）。**get the car fixed** 把车修好。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "Hey, did you get my message?",
+        "note": "get = 收到"
+       },
+       {
+        "speaker": "B",
+        "text": "Yeah, I got it. What time do we meet?",
+        "note": "got it = 收到了 / 明白了"
+       },
+       {
+        "speaker": "A",
+        "text": "Let's meet at six. Can you get there on time?",
+        "note": "get there = 到那儿"
+       },
+       {
+        "speaker": "B",
+        "text": "No problem. See you then!"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "\"It's getting dark, let's go home.\" 这里的 get 最接近哪个意思？",
+      "options": [
+       "得到",
+       "变得",
+       "听懂",
+       "到达"
+      ],
+      "answerIndex": 1,
+      "explain": "get 后面接形容词 dark，表示'变得'——It's getting dark = 天正在变黑。这是 get 最容易被忽略的高频用法。"
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "躺学 = 每周3词，每词3课时（视频 / 图文 / 发音）",
+       "get 四义：得到 / 到达 / 变得（+形容词）/ 听懂",
+       "get sth done = 让别人替你把事做好",
+       "高频词的关键是'用活'，不是'背拼写'"
+      ]
+     },
+     {
+      "type": "summary",
+      "markdown": "今天你摸清了躺学的学法，也用 get 走了一遍'懂→记→说'。记住：高频词往往不是生词，难在意思多、用法活。",
+      "next": "下一课进入第1周的另外两个高频动词 take 和 make——同样是'认识但用不好'的狠角色，还会教你 make 和 do 到底怎么分。"
+     }
+    ]
+   },
+   {
+    "title": "第1周（下）：take 与 make——最常用，也最常错",
+    "summary": "生活高频动词 take 与 make：花时间、乘坐、使役，并理清 make 与 do。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "带伞、坐地铁、做决定——都绕不开 take 和 make",
+      "markdown": "生活里最常说的动作词，就是 take 和 make。可很多人一开口就错：想说'坐地铁'说成 \"sit subway\"，想说'做决定'说成 \"do a decision\"。\n\n这一课把这两个高频动词彻底用顺，让日常表达一开口就地道。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握 take 的4个高频意思（拿 / 花费时间 / 乘坐 / 服用采取）",
+       "掌握 make 的使役用法：make sb do / make sb + 形容词",
+       "分清 make 和 do 的区别，不再张冠李戴",
+       "用 take / make 说出一段出行对话"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "take：远不只是'拿'",
+      "markdown": "1. **拿 / 带** take an umbrella\n2. **花费（时间）** It takes + 时间\n3. **乘坐（交通工具）** take the bus / subway\n4. **服用 / 采取** take medicine, take a break\n\n其中'花费时间'这个义项，口语和应试都超高频，却最常被漏掉。"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"**Take** your jacket, it's cold outside.\" 外面冷，**带**上外套。\n- \"It **takes** 20 minutes to walk there.\" 走过去要**花** 20 分钟。\n- \"I usually **take** the subway to work.\" 我通常**坐**地铁上班。\n- \"Let's **take** a break.\" 我们**歇**一会儿。"
+     },
+     {
+      "type": "flashcard",
+      "front": "'坐公交去那儿要多久？'用英语怎么说？",
+      "back": "**How long does it take to get there by bus?** ——take 表'花费时间'，句型是 It takes +（人）+ 时间 + to do。回答：It takes about 20 minutes. 大约20分钟。"
+     },
+     {
+      "type": "concept",
+      "title": "make：核心是'造出'和'使得'",
+      "markdown": "make 有两根高频骨架：\n\n1. **制造 / 做出** make coffee / make a plan / make money\n2. **使役** make + 宾语 + 形容词或动词原形：make me happy（使我开心）、make it work（让它运转起来）\n\n注意：使役结构里动词用**原形**，不加 to——make him **stay**（不是 to stay）。"
+     },
+     {
+      "type": "compare",
+      "title": "make vs do 别再混",
+      "left": {
+       "heading": "make（造出产出）",
+       "items": [
+        "make dinner 做饭",
+        "make a decision 做决定",
+        "make a mistake 犯错",
+        "make money 赚钱",
+        "make a plan 制定计划"
+       ]
+      },
+      "right": {
+       "heading": "do（执行事务/动作）",
+       "items": [
+        "do homework 做作业",
+        "do the dishes 洗碗",
+        "do the laundry 洗衣服",
+        "do business 做生意",
+        "do me a favor 帮我个忙"
+       ]
+      }
+     },
+     {
+      "type": "example",
+      "markdown": "- \"This song **makes** me **happy**.\" 这首歌**让**我**开心**。（make + 宾 + 形容词）\n- \"My mom **made** me **clean** my room.\" 我妈**让**我**打扫**房间。（make + 宾 + 动词原形）\n- \"Can you **make it** to the party?\" 你能**赶到**派对吗？（make it = 赶到 / 成功）"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "How do we get to the museum?"
+       },
+       {
+        "speaker": "B",
+        "text": "Let's take the bus. It only takes 15 minutes.",
+        "note": "take the bus 坐公交 / takes 15 minutes 花15分钟"
+       },
+       {
+        "speaker": "A",
+        "text": "Great. Should we make a plan for lunch too?",
+        "note": "make a plan 制定计划"
+       },
+       {
+        "speaker": "B",
+        "text": "Sure. Let's make it simple — just grab a sandwich.",
+        "note": "make it simple 弄简单点"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "下面哪一句是正确的？",
+      "options": [
+       "I want to do a decision.",
+       "I want to make a decision.",
+       "I want to take a decision by sit.",
+       "I do a mistake yesterday."
+      ],
+      "answerIndex": 1,
+      "explain": "'做决定'是 make a decision，不是 do a decision；'犯错'是 make a mistake。规律：凭空'造出 / 做出'一个结果，用 make。"
+     },
+     {
+      "type": "summary",
+      "markdown": "今天拿下了 take（拿 / 花时间 / 乘坐 / 服用）和 make（造出 / 使役），还理清了 make 与 do 的分工。第1周的3个词（get、take、make）就此收齐。",
+      "next": "下一课挑战'熟词生义'——run 和 turn 看着简单，考试里却常常不是你以为的那个意思。"
+     }
+    ]
+   },
+   {
+    "title": "第2周：熟词生义——run 与 turn 的隐藏意思",
+    "summary": "熟词生义专攻：run（经营）、turn（结果是 / 拒绝）及其高频短语，靠语境判断。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "run 只会翻成'跑'？考试就是这么坑你的",
+      "markdown": "阅读里出现一句 \"She runs a company\"，要是翻成'她跑一家公司'就闹笑话了。\n\n高频词最爱考'熟词生义'——认识的词，藏着你不知道的意思。这一课专治 run 和 turn 这两个'看着眼熟、其实陌生'的高频词。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握 run 的熟词生义（经营 / 运行 / 流）和短语 run out of、run into",
+       "掌握 turn 的核心（转向 / 变成）和短语 turn out、turn down",
+       "学会靠语境判断同一短语的不同意思",
+       "用它们读懂并说出真实句子"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "run：远不止'跑'",
+      "markdown": "1. **经营 / 管理** run a business / shop——应试高频\n2. **（机器 / 程序）运行** The app runs smoothly.\n3. **（液体）流** My nose is running. 我在流鼻涕。\n4. **竞选** run for president"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"She **runs** a small coffee shop.\" 她**经营**一家小咖啡馆。\n- \"This app **runs** smoothly on my phone.\" 这个应用在我手机上**运行**流畅。\n- \"My nose won't stop **running**.\" 我鼻涕**流**个不停。"
+     },
+     {
+      "type": "flashcard",
+      "front": "run out of 和 run into 分别是什么意思？",
+      "back": "**run out of** = 用完 / 耗尽：We've **run out of** milk. 牛奶用完了。\n**run into** = 偶然遇到：I **ran into** an old friend. 我偶遇一位老朋友。（过去式是 ran）"
+     },
+     {
+      "type": "concept",
+      "title": "turn：转向 + 变成",
+      "markdown": "1. **转 / 转向** turn left, turn the key\n2. **变成** turn into：The rain turned into snow. 雨变成了雪。\n3. **高频短语** turn out（结果是）、turn down（拒绝 / 调小）、turn up（调大 / 出现）"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"**Turn** left at the corner.\" 在拐角**左转**。\n- \"It **turned out** that he was right.\" **结果证明**他是对的。（turn out）\n- \"She **turned down** the offer.\" 她**拒绝**了这个邀约。（turn down = 拒绝）\n- \"Could you **turn down** the music?\" 能把音乐**调小**点吗？（turn down = 调小）"
+     },
+     {
+      "type": "compare",
+      "title": "同一个 turn down，两个意思全靠语境",
+      "left": {
+       "heading": "turn down = 拒绝",
+       "items": [
+        "turned down the job offer 拒绝工作邀约",
+        "turned down my invitation 拒绝我的邀请",
+        "后面常接 offer / invitation / request"
+       ]
+      },
+      "right": {
+       "heading": "turn down = 调小",
+       "items": [
+        "turn down the music 把音乐调小",
+        "turn down the volume 调低音量",
+        "后面常接 music / volume / TV / heat"
+       ]
+      }
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "How did the interview go?"
+       },
+       {
+        "speaker": "B",
+        "text": "It turned out great! They offered me the job.",
+        "note": "turned out 结果是"
+       },
+       {
+        "speaker": "A",
+        "text": "That's awesome. Are you going to take it?"
+       },
+       {
+        "speaker": "B",
+        "text": "Actually, I turned it down. The hours were too long.",
+        "note": "turned it down 拒绝了"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "\"He runs three restaurants in this city.\" 这里的 runs 意思是？",
+      "options": [
+       "跑步经过",
+       "经营",
+       "流动",
+       "竞选"
+      ],
+      "answerIndex": 1,
+      "explain": "run + 生意 / 店 / 公司 = 经营、管理。He runs three restaurants = 他经营着三家餐厅。这是阅读里最常见的熟词生义之一。"
+     },
+     {
+      "type": "summary",
+      "markdown": "今天拿下 run（经营 / 运行 / 流）和 turn（转向 / 变成）的熟词生义与高频短语，还学会靠语境判断同一短语的不同意思——这正是'超频语境'的看家本领。",
+      "next": "下一课转向两个'名动两用'的高频词 point 和 matter——读写高频、考点密集，还藏着几个必会的固定表达。"
+     }
+    ]
+   },
+   {
+    "title": "第3周：名动两用——point 与 matter",
+    "summary": "名动两用高频词 point 与 matter，以及 no matter、as a matter of fact 等表达。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "\"What's the matter?\" 到底在问什么？",
+      "markdown": "有人对你说 \"What's the matter?\"，你却愣住——它可不是在问'什么物质'，是在问'你怎么了'。\n\npoint 和 matter 都是名词、动词两用的高频词，在阅读和写作里出现率极高。这一课把它们的常用意思和搭配一次讲透。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "掌握 point 的名词（要点 / 意义）与动词（指出）用法",
+       "掌握 matter 的名词（问题）与动词（要紧）用法",
+       "学会高频表达 no matter 与 as a matter of fact",
+       "用它们说出地道的日常回应"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "point：要点、意义、指出",
+      "markdown": "**名词：**\n1. 要点 / 观点 That's a good point. 你说得有道理。\n2. 意义 / 目的 What's the point? 有什么意义？\n\n**动词：**\n3. 指 point at / to something\n\n**短语：** point out = 指出"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"That's a good **point**.\" 你说得**有道理**。\n- \"What's the **point** of waiting?\" 等下去**有什么意义**？\n- \"Let me **point out** one problem.\" 我来**指出**一个问题。（point out）\n- \"She **pointed at** the map.\" 她**指着**地图。"
+     },
+     {
+      "type": "flashcard",
+      "front": "'等下去没意义'英语怎么说？",
+      "back": "**There's no point (in) waiting.** ——There's no point in doing sth = 做某事没意义 / 没必要。也可说 What's the point of waiting?"
+     },
+     {
+      "type": "concept",
+      "title": "matter：问题（名）+ 要紧（动）",
+      "markdown": "**名词：** 事情 / 麻烦 What's the matter? 怎么了？ / a serious matter 一件严肃的事\n\n**动词：** 要紧 / 重要 It doesn't matter. 没关系。 / Does it matter? 这重要吗？\n\n**固定表达：** no matter（无论）、as a matter of fact（事实上）"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"What's the **matter**? You look upset.\" **怎么了**？你看起来不开心。\n- \"It **doesn't matter**, we can try again.\" **没关系**，我们可以再试。\n- \"**No matter** what happens, I'll be there.\" **无论**发生什么，我都在。\n- \"**As a matter of fact**, I've read that book.\" **事实上**，我读过那本书。"
+     },
+     {
+      "type": "dialog",
+      "turns": [
+       {
+        "speaker": "A",
+        "text": "You look tired. What's the matter?",
+        "note": "What's the matter 怎么了"
+       },
+       {
+        "speaker": "B",
+        "text": "I stayed up late studying. But it doesn't matter, I'm fine.",
+        "note": "doesn't matter 没关系"
+       },
+       {
+        "speaker": "A",
+        "text": "Take care of yourself. Your health is what matters most.",
+        "note": "matters most 最要紧"
+       },
+       {
+        "speaker": "B",
+        "text": "You've got a point. I'll go to bed early tonight.",
+        "note": "got a point 你说得对"
+       }
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "point（名）：要点 / 意义；（动）：指、point out 指出",
+       "There's no point in doing = 做…没意义",
+       "matter（名）：问题、事情；（动）：要紧",
+       "no matter 无论 / as a matter of fact 事实上",
+       "What's the matter? = 怎么了（不是问'物质'）"
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "\"It doesn't matter.\" 最贴切的意思是？",
+      "options": [
+       "它没有物质",
+       "没关系 / 不要紧",
+       "它不算一件事",
+       "别管这件事"
+      ],
+      "answerIndex": 1,
+      "explain": "matter 作动词是'要紧、重要'。It doesn't matter = 这不要紧 = 没关系，是安慰别人或回应道歉时的高频口语。"
+     },
+     {
+      "type": "summary",
+      "markdown": "今天拿下 point 和 matter 两个名动两用高频词，以及 no matter、as a matter of fact 等必会表达。到这里，你已经攒下一批既能说、又能考的核心词。",
+      "next": "光会用还不够——下一课进入《躺学》的课后发音练习模块，教你把这些词说准：重音、连读、弱读。"
+     }
+    ]
+   },
+   {
+    "title": "课后发音练习专项：重音·连读·弱读",
+    "summary": "课后发音练习模块：单词重音、连读、弱读，用学过的词练准口语节奏。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "词都认识，一开口老外还是听不懂？",
+      "markdown": "很多人单词量不小，可一说话老外就皱眉——问题常常出在发音的'重音、连读、弱读'上。\n\n《躺学》每个词都配一节课后发音练习课时。这一课把方法讲清楚，直接用前面学过的 get / take / run 来练。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "听懂并读准单词重音（名动同形，重音不同）",
+       "掌握辅音 + 元音的连读规则",
+       "认识 wanna / gonna / gotta 这类高频弱读",
+       "用真实句子跟读，练准节奏"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "① 单词重音：重音一错，词性就变",
+      "markdown": "有些词名词和动词拼写一样，全靠重音区分：\n\n- **RE**cord（名 记录）/ re**CORD**（动 录制）\n- **PRE**sent（名 礼物）/ pre**SENT**（动 呈现 / 赠送）\n\n规律：很多'双音节名动同形词'，名词重音在前、动词重音在后。"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"This is a new **RE**cord.\" 这是一项新**纪录**。（名词，重音在前）\n- \"Please re**CORD** the class.\" 请**录**下这节课。（动词，重音在后）\n- \"What a nice **PRE**sent!\" 多好的**礼物**！（名词，重前）\n- \"Let me pre**SENT** my plan.\" 让我**展示**我的方案。（动词，重后）"
+     },
+     {
+      "type": "concept",
+      "title": "② 连读：辅音尾 + 元音头，连成一个音",
+      "markdown": "前一个词以辅音结尾、后一个词以元音开头，就会'粘'在一起读：\n\n- get up → \"ge-tup\"\n- take it → \"ta-kit\"\n- run out → \"ru-nout\"\n- an apple → \"a-napple\"\n\n连读是听力'听不清'的头号原因；自己会连，才真正听得懂。"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"**Get up**! We're late.\" 读作 \"ge-tup\"。快起床，我们迟到了。\n- \"I'll **take it**.\" 读作 \"ta-kit\"。我要了。\n- \"We **ran out of** time.\" 读作 \"ra-nou-tof\"。我们没时间了。"
+     },
+     {
+      "type": "concept",
+      "title": "③ 弱读：虚词读轻、读短",
+      "markdown": "英语句子里，实词（名 / 动 / 形）重读，虚词（to / of / and / a）弱读。日常口语还会进一步缩合：\n\n- want to → **wanna**\n- going to → **gonna**\n- got to → **gotta**\n- a lot of → **a lotta**\n\n弱读不是'偷懒'，是母语者的正常节奏。"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"I **wanna** get some coffee.\"（want to）我想去买杯咖啡。\n- \"It's **gonna** rain.\"（going to）要下雨了。\n- \"I've **gotta** take the bus.\"（got to）我得去坐公交。"
+     },
+     {
+      "type": "steps",
+      "steps": [
+       {
+        "title": "先慢读",
+        "detail": "对着图文精讲里的例句，一个音一个音读准，标出重音。"
+       },
+       {
+        "title": "再连读",
+        "detail": "找出辅音 + 元音的地方连起来，跟着示范读。"
+       },
+       {
+        "title": "后跟读",
+        "detail": "盖住中文，正常语速跟读整句，录音和示范对比。"
+       },
+       {
+        "title": "每天3句",
+        "detail": "用当周3个词的例句滚动练，量小但天天练。"
+       }
+      ]
+     },
+     {
+      "type": "quiz",
+      "question": "\"I've gotta go now.\" 里的 gotta 是什么的口语弱读？",
+      "options": [
+       "got a",
+       "go to",
+       "got to",
+       "gonna"
+      ],
+      "answerIndex": 2,
+      "explain": "gotta = got to，表示'不得不、得去'。I've gotta go = I have got to go = 我得走了。这类弱读是听懂真实口语的关键。"
+     },
+     {
+      "type": "summary",
+      "markdown": "今天掌握了发音三件套：单词重音、连读、弱读，并用 get / take / run 练了句子。把课后发音练习坚持下来，词才能真正'说得出、听得懂'。",
+      "next": "最后一课做系统复盘，把这些生活高频词迁移到阅读和写作，打通'实用英语'到'应试'。"
+     }
+    ]
+   },
+   {
+    "title": "系统复盘与应试迁移：从'会说'到'会考'",
+    "summary": "系统复盘并迁移到应试：识别熟词生义、掌握写作高分搭配 make an effort / take measures。",
+    "isFree": false,
+    "blocks": [
+     {
+      "type": "scene",
+      "title": "生活里会用，考试里也要能拿分",
+      "markdown": "《躺学》从生活英语入手，但目标是'听说读写扎实可见的进步'——这也包括应试。\n\n前面学的 get / take / make / run / turn / point / matter，既是口语高频，也是阅读、写作里的高频考点。这一课带你系统复盘，并把它们迁移到考试场景。"
+     },
+     {
+      "type": "objectives",
+      "items": [
+       "复盘本阶段核心高频词及其熟词生义",
+       "学会在阅读中识别熟词生义，不被'眼熟'骗到",
+       "掌握写作里的高分搭配（collocation）",
+       "建立'每周3词'的可持续复习节奏"
+      ]
+     },
+     {
+      "type": "keypoint",
+      "points": [
+       "get：得到 / 到达 / 变得 / 听懂；get sth done",
+       "take：拿 / 花时间 / 乘坐 / 服用；take a break",
+       "make：造出 / 使役；make ≠ do",
+       "run：经营 / 运行 / 流；run out of、run into",
+       "turn：转向 / 变成；turn out、turn down",
+       "point / matter：名动两用；no matter、as a matter of fact"
+      ]
+     },
+     {
+      "type": "concept",
+      "title": "应试第一坑：熟词生义",
+      "markdown": "阅读理解最爱在'认识的词'上做文章。看到 run / turn / point，先别急着套最熟的意思，回到句子的语境去判断：\n\n- \"run a business\" 经营（不是跑）\n- \"turn out\" 结果是（不是转出去）\n- \"make sense\" 讲得通、有道理"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"The company is **run** by two brothers.\" 这家公司由两兄弟**经营**。\n- \"The plan didn't **make sense** to me.\" 这个计划我觉得**讲不通**。（make sense = 有道理）\n- \"As it **turned out**, the rumor was false.\" **结果证明**，那个传言是假的。"
+     },
+     {
+      "type": "concept",
+      "title": "写作提分：用高频词的地道搭配",
+      "markdown": "写作不需要生僻词，把高频词的固定搭配用准，反而更显地道：\n\n- **make an effort to do** 努力做…\n- **take measures to do** 采取措施做…\n- **It doesn't matter whether…** 是否…并不重要\n- **There's no point in doing** 做…没意义"
+     },
+     {
+      "type": "example",
+      "markdown": "- \"We should **make an effort to** protect the environment.\" 我们应**努力**保护环境。\n- \"The government **took measures to** control prices.\" 政府**采取措施**控制物价。\n- \"**It doesn't matter whether** you win or lose; trying counts.\" 输赢**并不重要**，尝试才算数。"
+     },
+     {
+      "type": "compare",
+      "title": "同一个想法：普通表达 vs 高频搭配升级",
+      "left": {
+       "heading": "普通 / 易错",
+       "items": [
+        "I try hard to study.",
+        "The government did something about it.",
+        "Winning is not important."
+       ]
+      },
+      "right": {
+       "heading": "地道升级",
+       "items": [
+        "I make an effort to study.",
+        "The government took measures to deal with it.",
+        "It doesn't matter whether you win."
+       ]
+      }
+     },
+     {
+      "type": "flashcard",
+      "front": "写作里想说'努力做某事'，除了 try hard，更地道的搭配是？",
+      "back": "**make an effort to do sth**。例：She **makes an effort to** speak English every day. 她**努力**每天说英语。同类：take measures to do 采取措施做某事。"
+     },
+     {
+      "type": "quiz",
+      "question": "阅读里 \"This sentence doesn't make sense.\" 意思是？",
+      "options": [
+       "这句话没有感觉",
+       "这句话讲不通 / 没道理",
+       "这句话没意义地存在着",
+       "这句话没被造出来"
+      ],
+      "answerIndex": 1,
+      "explain": "make sense = 讲得通、有道理。doesn't make sense = 说不通、没道理。这是阅读与口语都极高频的固定搭配，属于必须秒懂的熟词生义。"
+     },
+     {
+      "type": "summary",
+      "markdown": "恭喜！你把一批最高频的生活英语词，从'认识'练到了'会用、会考'。按《躺学》每周3词、每词3课时（视频 / 图文 / 发音）的节奏坚持下去，听、说、读、写都会有扎实可见的进步。",
+      "next": "接下来可进入正课后续单元，跟着梁焕臻把剩余高频词逐个吃透，并把词汇根基延伸到语法与长难句。"
+     }
+    ]
+   }
+  ]
+ }
+]

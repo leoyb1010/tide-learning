@@ -15,6 +15,7 @@
     "db:push": "npm run db:deploy",
     "db:deploy": "bash scripts/migrate-deploy.sh",
     "db:seed": "tsx prisma/seed.ts",
+    "seed:youdao": "tsx prisma/seed-youdao.ts",
     "db:reset": "prisma migrate reset --force",
     "setup": "prisma generate && npm run db:deploy && npm run db:seed",
     "test": "vitest run",
