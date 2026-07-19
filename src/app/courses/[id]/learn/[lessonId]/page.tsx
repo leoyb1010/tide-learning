@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { getLessonForUser } from "@/lib/queries";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
@@ -87,6 +88,7 @@ export default async function LearnPage({
       sceneBgSrc={trackSceneSrc(course.category)}
       courseTemplate={course.template}
       dueReviewCount={dueReviewCount}
+      cspNonce={(await headers()).get("x-nonce") ?? undefined}
     />
   );
 }

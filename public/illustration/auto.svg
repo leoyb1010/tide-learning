@@ -1,0 +1,12 @@
+<svg viewBox="0 0 400 220" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="图解">
+  <rect width="400" height="220" rx="14" fill="#f1f2f4"/>
+  <line x1="200" y1="110" x2="118" y2="64" stroke="#d3dae2" stroke-width="1.5"/>
+  <line x1="200" y1="110" x2="286" y2="70" stroke="#d3dae2" stroke-width="1.5"/>
+  <line x1="200" y1="110" x2="120" y2="162" stroke="#d3dae2" stroke-width="1.5"/>
+  <line x1="200" y1="110" x2="284" y2="158" stroke="#d3dae2" stroke-width="1.5"/>
+  <circle cx="200" cy="110" r="20" fill="#33557a"/>
+  <circle cx="118" cy="64" r="10" fill="#ffffff" stroke="#d3dae2" stroke-width="1.5"/>
+  <circle cx="286" cy="70" r="10" fill="#ffffff" stroke="#d3dae2" stroke-width="1.5"/>
+  <circle cx="120" cy="162" r="10" fill="#ffffff" stroke="#d3dae2" stroke-width="1.5"/>
+  <circle cx="284" cy="158" r="13" fill="#e7edf4" stroke="#33557a" stroke-width="1.5"/>
+</svg>

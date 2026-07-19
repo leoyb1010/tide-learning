@@ -140,6 +140,7 @@ function buildHtml(notes: ExportNote[], opts: { pageTitle: string; subtitle: str
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.pageTitle)}</title>
 <style>
+.hs{margin-left:.12em} /* heti CJK-拉丁间距标注(renderMarkdown 产物) */
 :root{
   --surface:#ffffff;--surface2:#f7f7f5;--surface-inset:#f0efec;
   --ink:#1a1a1a;--ink2:#454545;--ink3:#6b6b6b;--ink4:#9a9a9a;
@@ -337,6 +338,7 @@ function buildPrintHtml(notes: ExportNote[], opts: { pageTitle: string; subtitle
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${esc(opts.pageTitle)}</title>
 <style>
+.hs{margin-left:.12em} /* heti CJK-拉丁间距标注(renderMarkdown 产物) */
 *{box-sizing:border-box}
 body{margin:0;background:#f4f3f0;color:#1a1a1a;
   font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;

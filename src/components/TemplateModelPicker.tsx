@@ -2,15 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  GraduationCap, MagnifyingGlass, BookOpen, Question, Wrench, Target,
-  Lock, Sparkle, Check, type Icon,
-} from "@phosphor-icons/react";
-
-/** 模板 icon 名 → phosphor 组件（templates.ts 的 icon 字段用这些名）。未知回落 Sparkle。 */
-const ICON_MAP: Record<string, Icon> = {
-  GraduationCap, MagnifyingGlass, BookOpen, Question, Wrench, Target,
-};
+import { Lock, Sparkle, Check } from "@phosphor-icons/react";
+import { TemplateCardArt } from "@/components/TemplateCardArt";
 
 interface TemplateOpt {
   key: string;
@@ -31,11 +24,6 @@ interface LockedModelOpt {
   label: string;
   desc: string;
 }
-
-const TEMPLATE_THUMBNAILS: Record<string, string> = {
-  language_immersion: "/templates/template-story.jpg",
-  kids_bright: "/templates/template-workshop.jpg",
-};
 
 /**
  * 造课「课件模板 + 生成模型」选择器（造课 Tab 与导入 Tab 共用）。
@@ -66,8 +54,6 @@ export function TemplateModelPicker({
   const [lockedModels, setLockedModels] = useState<LockedModelOpt[]>([]);
   const [defaultModel, setDefaultModel] = useState<string | null>(null);
   const [isSubscriber, setIsSubscriber] = useState(false);
-  // 模板缩略图（public/templates/template-<key>.jpg）加载失败的卡回落成图标渲染。
-  const [thumbFail, setThumbFail] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let alive = true;
@@ -101,10 +87,9 @@ export function TemplateModelPicker({
         <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
           课件模板
         </span>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           {templates.map((t) => {
             const active = (template || "classic") === t.key;
-            const TIcon = ICON_MAP[t.icon] ?? Sparkle;
             return (
               <button
                 key={t.key}
@@ -112,39 +97,32 @@ export function TemplateModelPicker({
                 onClick={() => setTemplate(t.key)}
                 title={t.recommendedFor}
                 aria-pressed={active}
-                className={`studio-press group relative flex flex-col items-start gap-1 rounded-[12px] border p-3 text-left transition-colors duration-150 ${
+                className={`studio-press group relative flex flex-col items-stretch gap-2 overflow-hidden rounded-[14px] border p-2.5 text-left transition-[border-color,box-shadow,transform] duration-200 ${
                   active
-                    ? "border-[var(--red)] bg-[var(--red-soft)]"
-                    : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)]"
+                    ? "border-[var(--red)] bg-[var(--surface)] shadow-[0_0_0_1px_var(--red),0_10px_28px_-16px_var(--red)]"
+                    : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)] hover:bg-[var(--surface)] hover:-translate-y-0.5"
                 }`}
               >
                 {active && (
-                  <span className="absolute right-2 top-2 z-10 grid h-4 w-4 place-items-center rounded-full bg-[var(--red)] text-white">
-                    <Check size={10} weight="bold" />
+                  <span className="absolute right-2 top-2 z-10 grid h-[18px] w-[18px] place-items-center rounded-full bg-[var(--red)] text-white shadow-[0_2px_8px_-2px_var(--red)]">
+                    <Check size={11} weight="bold" />
                   </span>
                 )}
-                {/* 缩略图（生图资产）优先；加载失败回落图标 */}
-                {!thumbFail[t.key] ? (
-
-                  <img
-                    src={TEMPLATE_THUMBNAILS[t.key] ?? `/templates/template-${t.key}.jpg`}
-                    alt=""
-                    loading="lazy"
-                    draggable={false}
-                    onError={() => setThumbFail((m) => ({ ...m, [t.key]: true }))}
-                    className={`h-16 w-full rounded-[8px] object-cover transition-opacity ${active ? "" : "opacity-90 group-hover:opacity-100"}`}
-                  />
-                ) : (
-                  <TIcon
-                    size={18}
-                    weight={active ? "fill" : "regular"}
-                    className={active ? "text-[var(--red)]" : "text-[var(--ink3)]"}
-                  />
-                )}
-                <span className={`text-[13px] font-semibold ${active ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
-                  {t.label}
+                {/* 卡面 = 该模板代表 art 的迷你课件样张(v4.2:真实 design token,所见即所得) */}
+                <span
+                  aria-hidden
+                  className={`block aspect-[16/9] w-full overflow-hidden rounded-[10px] border transition-[border-color,opacity] duration-200 ${
+                    active ? "border-[var(--red)]/40" : "border-[var(--border)] opacity-[0.96] group-hover:opacity-100"
+                  }`}
+                >
+                  <TemplateCardArt templateKey={t.key} />
                 </span>
-                <span className="text-[11px] leading-snug text-[var(--ink4)]">{t.tagline}</span>
+                <span className="flex flex-col gap-0.5 px-1 pb-0.5">
+                  <span className={`text-[13px] font-semibold leading-tight ${active ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
+                    {t.label}
+                  </span>
+                  <span className="text-[11px] leading-snug text-[var(--ink4)]">{t.tagline}</span>
+                </span>
               </button>
             );
           })}

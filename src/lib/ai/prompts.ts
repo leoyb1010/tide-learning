@@ -262,7 +262,7 @@ export function sourceContextBlock(rawText: string): string {
 }
 
 // ————————————————————————————————————————————————————————————
-//  搜索关键词扩展（去重 llm.ts 与 search-expand/route.ts 两份拷贝）
+//  搜索关键词扩展（供 llm.ts expandSearchKeywords 使用；原 search-expand 死路由已于蓝图 Stage 0 清理）
 // ————————————————————————————————————————————————————————————
 
 export const SEARCH_KEYWORDS_SYSTEM =

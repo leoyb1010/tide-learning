@@ -11,6 +11,8 @@ function esc(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+import { hetiSpacing } from "./cjk-spacing";
+
 export function renderMarkdown(src: string): string {
   if (!src) return "";
   const lines = esc(src).split("\n");
@@ -58,7 +60,8 @@ export function renderMarkdown(src: string): string {
   }
   if (inCode) out.push("</code></pre>");
   closeList();
-  return out.join("\n");
+  // heti CJK⇄半角自动间距（标签感知，跳过 pre/code；空 span 纯视觉，不改文本）。
+  return hetiSpacing(out.join("\n"));
 }
 
 function inline(s: string): string {

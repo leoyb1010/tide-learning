@@ -16,6 +16,13 @@ import { renderMarkdown } from "../markdown";
 import type { CourseDesign } from "./courseware-design";
 import type { LessonVariance } from "./courseware-variance";
 import { heroMotif, cornerMotif } from "./courseware-motifs";
+import { illustrationSvg } from "./courseware-illustrations";
+import { diagramHtml, DIAGRAM_CSS } from "./courseware-diagrams";
+import { highlightLinesSync } from "./courseware-highlight";
+import { hetiSpacing, HETI_SPACING_CSS } from "../cjk-spacing";
+import { renderFormula, katexSelfContainedCss } from "./courseware-math";
+import { interactiveHtml, INTERACTIVE_CSS, INTERACTIVE_RUNTIME } from "./courseware-interactive";
+import { hashSeed } from "./courseware-design";
 import { getModeProfile, type CoursewareMode } from "./courseware-catalog";
 
 // 款式层字体族（modeCss 按 mode 换字族，与 art 的配色正交）。自包含、无外链（CSP 只允 data: 字体）。
@@ -132,12 +139,17 @@ function baseCss(design: CourseDesign): string {
   --ct-ink:${a.ink};--ct-ink2:${a.ink2};--ct-ink3:${a.ink3};--ct-border:${a.border};
   --ct-accent:${a.accent};--ct-accent-ink:${a.accentInk};--ct-accent-soft:${a.accentSoft};
   --ct-radius:${a.radius}px;--ct-ease:${a.ease};
+  --ct-mono:${a.fontMono};
   --ct-shadow:${cardShadow};
 }
 html{color-scheme:${dark ? "dark" : "light"};-webkit-text-size-adjust:100%}
 body{background:var(--ct-bg);color:var(--ct-ink);
   font-family:${a.fontBody};line-height:1.68;font-size:16px;
-  padding:clamp(20px,5vw,56px) clamp(16px,5vw,40px) 120px;}
+  padding:clamp(20px,5vw,56px) clamp(16px,5vw,40px) 120px;
+  /* heti/现代排版：全角标点挤压 + CJK 严格换行。CJK-拉丁间距由服务端 .hs 标注负责,
+     故显式关掉原生 text-autospace(审计 P3:Safari 18.4+ 原生 1/8em 会与 .hs 叠加成双倍留白)。 */
+  text-spacing-trim:normal;text-autospace:no-autospace;line-break:strict;overflow-wrap:break-word;}
+${HETI_SPACING_CSS}
 /* 极淡纹理层：固定、pointer-events none，只做氛围（性能：不挂滚动容器） */
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
   ${a.texture === "none" ? "" : `background-image:${a.texture};background-size:26px 26px;opacity:.5;`}}
@@ -178,11 +190,23 @@ code{font-family:${a.fontMono};font-size:.92em;background:var(--ct-surface2);pad
 ul,ol{padding-left:1.2em;color:var(--ct-ink2)}
 li{margin:6px 0}
 a{color:var(--ct-accent-ink)}
-/* —— 场景开场 —— */
+/* —— 场景开场（蓝图 B1：5 构图库，破骨架冻结）—— */
 .opener{padding:clamp(28px,6vw,56px) 0}
 .opener--band{background:var(--ct-surface);border:1px solid var(--ct-border);border-radius:var(--ct-radius);
   box-shadow:var(--ct-shadow);padding:clamp(28px,5vw,48px)}
 .opener--left{border-left:4px solid var(--ct-accent);padding-left:clamp(20px,4vw,32px)}
+.opener--center{display:flex;flex-direction:column;align-items:center;text-align:center}
+.opener--center .lead{max-width:18ch}
+.opener--center .body{margin-left:auto;margin-right:auto}
+.opener--split{display:grid;gap:clamp(18px,4vw,40px);align-items:end}
+@media(min-width:620px){.opener--split{grid-template-columns:minmax(0,7fr) minmax(0,6fr)}
+  .opener--split .lead{font-size:clamp(30px,5.6vw,52px)}}
+.opener--poster{min-height:52vh;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center}
+.opener--poster .lead{font-size:clamp(32px,6.6vw,58px);max-width:16ch}
+.opener--poster .body{margin-left:auto;margin-right:auto}
+body.ct-paged .opener--poster{min-height:0}
+/* 蓝图 B1（审查 P2-4）：标题按可平衡断行排（「…却/卡住了」类 CJK 断裂），不支持的浏览器无害回退。 */
+.lead,.h-title,h1,h2,h3{text-wrap:balance}
 /* —— objectives —— */
 .obj{list-style:none;padding:0;display:grid;gap:12px}
 .obj li{display:flex;gap:12px;align-items:flex-start;color:var(--ct-ink)}
@@ -232,19 +256,34 @@ a{color:var(--ct-accent-ink)}
 /* —— quiz —— */
 .quiz .q{font-weight:650;color:var(--ct-ink);font-size:17px;margin-bottom:14px}
 .quiz .opts{display:grid;gap:9px}
-.quiz .opt{display:flex;justify-content:space-between;gap:12px;text-align:left;width:100%;cursor:pointer;
+.quiz .opt{display:flex;align-items:center;gap:11px;text-align:left;width:100%;cursor:pointer;
   background:var(--ct-surface2);border:1px solid var(--ct-border);border-radius:calc(var(--ct-radius) - 4px);
-  padding:13px 15px;font:inherit;font-size:15px;color:var(--ct-ink);transition:border-color .25s var(--ct-ease),transform .2s var(--ct-ease)}
+  padding:11px 15px 11px 11px;font:inherit;font-size:15px;color:var(--ct-ink);transition:border-color .25s var(--ct-ease),transform .2s var(--ct-ease)}
+/* v4.2:选项字母釦(A/B/C/D)——把选择题从「一排灰条」升到「设计过的答题卡」;判定后随 ok/no 换色。 */
+.quiz .opt .ol{flex:none;width:24px;height:24px;display:grid;place-items:center;border-radius:calc(var(--ct-radius) - 8px);
+  font-family:${a.fontMono};font-size:11.5px;font-weight:700;color:var(--ct-ink3);
+  background:var(--ct-surface);border:1px solid var(--ct-border)}
+.quiz .opt>span:not(.ol):not(.mk){flex:1}
+.quiz .opt .mk{margin-left:auto}
+.quiz .opt.ok .ol{background:#1f9e6e;border-color:#1f9e6e;color:#fff}
+.quiz .opt.no .ol{background:#c9403f;border-color:#c9403f;color:#fff}
 .quiz .opt:hover{border-color:var(--ct-accent)}
+.quiz .opt:hover .ol{border-color:var(--ct-accent);color:var(--ct-accent-ink)}
 .quiz .opt:active{transform:scale(.99)}
 .quiz .opt .mk{font-family:${a.fontMono};font-size:12px;color:var(--ct-ink3);opacity:0}
-.quiz .opt.ok{border-color:#1f9e6e;background:${dark ? "#0f2620" : "#e7f6ef"}}
+.quiz .opt.ok{border-color:#1f9e6e;background:${dark ? "#0f2620" : "#e7f6ef"};animation:ct-pop .34s var(--ct-ease)}
 .quiz .opt.ok .mk{opacity:1;color:#1f9e6e}
-.quiz .opt.no{border-color:var(--ct-accent);background:var(--ct-accent-soft)}
-.quiz .opt.no .mk{opacity:1;color:var(--ct-accent-ink)}
+/* 错误态用跨 art 固定警示红(green-accent 的 art 里 accent 错误态会与正确绿混淆);底为 12% 红,亮暗底皆可读。 */
+.quiz .opt.no{border-color:#c9403f;background:rgba(201,64,63,.12);animation:ct-shake .4s var(--ct-ease)}
+.quiz .opt.no .mk{opacity:1;color:#c9403f}
+/* 答题微反馈（v4 动效升级）：选对轻弹、选错横向抖动，只动 transform，reduce-motion 全禁。 */
+@keyframes ct-pop{0%{transform:scale(1)}40%{transform:scale(1.035)}100%{transform:scale(1)}}
+@keyframes ct-shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+.quiz.answered .opt:not(.ok):not(.no){opacity:.5;transition:opacity .3s var(--ct-ease)}
 .quiz .exp{margin-top:12px;font-size:14.5px;color:var(--ct-ink2);background:var(--ct-surface2);
-  border-radius:calc(var(--ct-radius) - 4px);padding:12px 14px;display:none}
-.quiz.answered .exp{display:block}
+  border-radius:calc(var(--ct-radius) - 4px);padding:12px 14px;max-height:0;overflow:hidden;opacity:0;
+  transition:max-height .4s var(--ct-ease),opacity .35s var(--ct-ease),padding .4s var(--ct-ease);padding-top:0;padding-bottom:0}
+.quiz.answered .exp{max-height:400px;opacity:1;padding-top:12px;padding-bottom:12px}
 /* —— flashcard —— */
 .fc{perspective:1200px;cursor:pointer}
 .fc .inner{position:relative;transition:transform .6s var(--ct-ease);transform-style:preserve-3d;min-height:120px}
@@ -272,6 +311,12 @@ a{color:var(--ct-accent-ink)}
 .ex .tag{font-family:${a.fontMono};font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ct-ink3);margin-bottom:8px;display:block}
 .img-ph{background:var(--ct-surface2);border:1px dashed var(--ct-border);border-radius:var(--ct-radius);
   padding:30px;text-align:center;color:var(--ct-ink3);font-size:14px}
+/* 蓝图 B4：内容级插图框景 */
+.illu{margin:0;border:1px solid var(--ct-border);border-radius:var(--ct-radius);overflow:hidden;box-shadow:var(--ct-shadow)}
+.illu figcaption{padding:10px 16px;border-top:1px solid var(--ct-border);background:var(--ct-surface2);
+  font-size:13.5px;color:var(--ct-ink2);text-align:center}
+${DIAGRAM_CSS}
+${INTERACTIVE_CSS}
 /* —— 补齐版式：variance 已抽签的 example/steps/compare/quiz/summary 新版式（破同型块单调）—— */
 .ex--quote{background:var(--ct-surface);border:1px solid var(--ct-border);border-radius:var(--ct-radius);box-shadow:var(--ct-shadow);padding:clamp(24px,4vw,36px) clamp(22px,4vw,32px);position:relative}
 .ex--quote::before{content:"\\201C";position:absolute;top:2px;left:14px;font-family:${a.fontDisplay};font-size:72px;line-height:1;color:var(--ct-accent);opacity:.22}
@@ -325,6 +370,14 @@ a{color:var(--ct-accent-ink)}
 .kp--kpi .item .b{width:auto;height:auto;background:none;padding:0;font-family:${a.fontMono};font-size:26px;font-weight:700;color:var(--ct-accent-ink)}
 /* —— 页内分步揭示（fragment）：data-steps 页的 stagger 子项逐个 frag-in（其余页仍整页入场）—— */
 [data-stagger]>*.frag-in{opacity:1;transform:none}
+/* 蓝图 B2（审查 P2-2）：分步页舞台预排——未揭示条目以幽灵占位显形（低透明、原位），
+   首步即可见整页结构，不再是「一条内容悬在 80% 空白上」；揭示时从幽灵淡入实体。 */
+body.ct-paged .deck>section[data-steps] [data-stagger]:not(.in)>*{opacity:.13;transform:none}
+body.ct-paged .deck>section[data-steps] [data-stagger]:not(.in)>*.frag-in{opacity:1}
+/* 蓝图 B3（审查 P2-3）：短内容页密度自适应——收窄版心 + 提字号，让少量内容占住舞台而非悬空。 */
+.pg-brief .ct-fit{max-width:640px;margin-left:auto;margin-right:auto}
+.pg-brief .body{font-size:clamp(17.5px,2.4vw,21px);line-height:1.8}
+.pg-brief .h-title{font-size:clamp(22px,3.8vw,30px)}
 /* —— 入场动效（GPU 安全：只动 transform/opacity）—— */
 [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ct-ease),transform .7s var(--ct-ease)}
 [data-reveal].m-fade{transform:none}
@@ -336,6 +389,9 @@ a{color:var(--ct-accent-ink)}
 @media (prefers-reduced-motion: reduce){
   [data-reveal],[data-stagger]>*{opacity:1!important;transform:none!important;transition:none!important}
   .fc .inner{transition:none}
+  /* v4 动效升级的答题反馈同样受 reduce-motion 约束（无障碍铁律）。 */
+  .quiz .opt.ok,.quiz .opt.no{animation:none!important}
+  .quiz .exp{transition:none!important}
 }
 @media (max-width:640px){
   .cmp,.kp{grid-template-columns:1fr}
@@ -344,11 +400,20 @@ a{color:var(--ct-accent-ink)}
 /* —— 翻页模式（默认；body.ct-paged 由运行时切换，父页可发 ct-mode 覆盖）——
    每个 .deck>section 即一页：单屏居中呈现，超高内容由 .ct-fit 等比缩放到一屏（不滚）。 */
 body.ct-paged{height:100vh;overflow:hidden;padding:0}
-body.ct-paged .deck{height:100%;max-width:880px;display:block;padding:clamp(16px,3.5vh,32px) clamp(18px,4.5vw,44px) 78px}
+/* deck 转 grid:同刻只有 .ct-cur 一页可见,grid 让「收身页」在视口垂直居中(块布局做不到)。 */
+body.ct-paged .deck{height:100%;max-width:880px;display:grid;align-items:center;justify-items:stretch;padding:clamp(16px,3.5vh,32px) clamp(18px,4.5vw,44px) 78px}
 body.ct-paged .deck>section{display:none;height:100%}
 body.ct-paged .deck>section.ct-cur{display:grid;place-items:center;overflow:hidden}
+/* v4.2 舞台收身(生产课件精进·实评「框满屏、内容浮中段、上下大片死空间」):
+   带框页(band/surface/figure/spotlight)不再撑满全屏——框随内容收身、整框居中,
+   留白回到框外(页底色)而非框内;min-height 兜底,极短内容不至于缩成贴纸。
+   hero/plain 保持撑满(hero 承载全出血母题背景,plain 的留白本就是构图)。 */
+body.ct-paged .deck>section.ct-cur.page--band,
+body.ct-paged .deck>section.ct-cur.page--surface,
+body.ct-paged .deck>section.ct-cur.page--figure,
+body.ct-paged .deck>section.ct-cur.page--spotlight{height:auto;max-height:100%;min-height:min(46vh,420px)}
 /* 缩到下限仍超高的页：改为本页内部纵向滚动 + 顶对齐，绝不裁切内容（长 steps/quiz/代码块保底可读）。 */
-body.ct-paged .deck>section.ct-cur.ct-scroll{place-items:start center;overflow-y:auto;overflow-x:hidden}
+body.ct-paged .deck>section.ct-cur.ct-scroll{place-items:start center;overflow-y:auto;overflow-x:hidden;height:100%}
 body.ct-paged .deck>section.ct-cur.ct-scroll .ct-fit{padding-bottom:10px}
 .ct-fit{width:100%;transform-origin:center center}
 body.ct-paged .ct-fit{transition:transform .28s var(--ct-ease)}
@@ -433,13 +498,19 @@ const RUNTIME_SCRIPT = `
           q.classList.add('answered');
           q.querySelectorAll('.opt').forEach(function(o,j){ if(j===ans) o.classList.add('ok'); });
           if(i!==ans) opt.classList.add('no');
+          // 蓝图 D2：作答结果回传宿主（进错题本/复习卡/学习数据）。沙箱内无网络，只能走 postMessage。
+          try{ parent.postMessage({type:'ct-quiz', bid:q.getAttribute('data-bid')||null, answer:i, correct:i===ans}, '*'); }catch(e){}
         });
       });
     });
   }
   function cards(){
     document.querySelectorAll('.fc').forEach(function(c){
-      c.addEventListener('click',function(){ c.classList.toggle('flip'); });
+      c.addEventListener('click',function(){
+        c.classList.toggle('flip');
+        // 蓝图 D2：首次翻面回传（复习行为信号）；之后的来回翻不重复上报。
+        if(!c.__ctFlipped){ c.__ctFlipped = true; try{ parent.postMessage({type:'ct-flash', bid:c.getAttribute('data-bid')||null}, '*'); }catch(e){} }
+      });
     });
   }
   function postHeight(){
@@ -539,6 +610,21 @@ const RUNTIME_SCRIPT = `
     else if (e.key === 'ArrowRight') { e.preventDefault(); nav(1); }
     else if ((e.key === ' ' || e.key === 'Spacebar') && tag !== 'BUTTON') { e.preventDefault(); nav(1); }
   });
+  // 蓝图 B6（审查 P1-3）：触摸/笔滑动翻页——此前移动端只能点页脚按钮。
+  // 水平位移 >56px 且明显大于纵向才翻，避开点按与本页内滚动；交互控件上的滑动不劫持。
+  var swx = null, swy = null;
+  // 审计修复：只认触摸/笔——鼠标横向拖选文字不应触发翻页（选区会被销毁）。
+  window.addEventListener('pointerdown', function(e){ if (e.isPrimary === false || e.pointerType === 'mouse') return; swx = e.clientX; swy = e.clientY; });
+  // 触摸被系统接管(滚动/手势)会发 pointercancel 而非 pointerup——不清起点的话,
+  // 混合输入设备上下一次 pointerup 会用陈旧起点误翻页。
+  window.addEventListener('pointercancel', function(){ swx = swy = null; });
+  window.addEventListener('pointerup', function(e){
+    if (swx == null || mode !== 'paged') { swx = swy = null; return; }
+    var dx = e.clientX - swx, dy = e.clientY - swy; swx = swy = null;
+    var tag = ((e.target && e.target.tagName) || '').toUpperCase();
+    if (tag === 'BUTTON' || tag === 'A' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (Math.abs(dx) > 56 && Math.abs(dx) > Math.abs(dy) * 1.4) nav(dx < 0 ? 1 : -1);
+  });
   // 能力宣告：父页可能晚于本脚本挂监听（SSR 下 iframe 先于 hydration 加载），
   // 故初始 + 延时重播 + 响应父页 ct-hello 握手，三路保证父页必收到。
   function announce(){
@@ -548,10 +634,13 @@ const RUNTIME_SCRIPT = `
     var d = e.data || {};
     if (d.type === 'ct-mode') setMode(d.mode);
     else if (d.type === 'ct-nav') nav(d.dir === -1 ? -1 : 1);
+    // v4.2 续读:宿主在握手后下发上次读到的页(0-indexed);越界钳制,revealAll 立即整页显示不走逐条。
+    else if (d.type === 'ct-goto' && typeof d.page === 'number') { if (mode === 'paged') show(d.page, true); }
     else if (d.type === 'ct-hello') announce();
   });
 
   reveal(); quiz(); cards();
+${INTERACTIVE_RUNTIME}
   setMode('paged');
   announce();
   window.addEventListener('load', function(){ postHeight(); fit(); });
@@ -582,7 +671,19 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
   const variant = v.variantForBlock(b.type, i);
   switch (b.type) {
     case "scene": {
-      const cls = variant === "hero-band" ? "opener opener--band" : variant === "hero-left" ? "opener opener--left" : "opener";
+      // 蓝图 B1：5 种开场构图（band 卡面 / left 竖线 / center 居中 / split 分屏 / poster 海报），
+      // 由 variance 抽签，破「每节第一页同一副骨架」。
+      if (variant === "hero-split") {
+        return `<section ${rv}><div class="opener opener--split">
+          <div><span class="eyebrow">场景 · 为什么学</span>${b.title ? `<h1 class="lead">${esc(b.title)}</h1>` : ""}</div>
+          ${b.markdown ? `<div class="body">${md(b.markdown)}</div>` : ""}</div></section>`;
+      }
+      const cls =
+        variant === "hero-band" ? "opener opener--band"
+        : variant === "hero-left" ? "opener opener--left"
+        : variant === "hero-center" ? "opener opener--center"
+        : variant === "hero-poster" ? "opener opener--poster"
+        : "opener";
       return `<section ${rv}><div class="${cls}"><span class="eyebrow">场景 · 为什么学</span>
         ${b.title ? `<h1 class="lead">${esc(b.title)}</h1>` : ""}
         ${b.markdown ? `<div class="body" style="margin-top:18px;max-width:60ch">${md(b.markdown)}</div>` : ""}</div></section>`;
@@ -674,8 +775,11 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       }</span><div class="body" style="color:var(--ct-ink)">${md(b.markdown)}</div></div></section>`;
     case "code": {
       // 终端/编辑器镜框 + 行号（交通灯点 + 文件名 tab + 逐行行号栏），远比裸 <pre> 专业。
-      const lines = String(b.code || "").split("\n");
-      const codeBody = lines.map((l) => `<span class="cl">${highlightCodeLine(l) || "&nbsp;"}</span>`).join("");
+      // v4.4：优先用 shiki（VS Code 同源着色，服务端渲染期已 ensure）；未就绪回落手写高亮。
+      const code = String(b.code || "");
+      const shiki = highlightLinesSync(code, b.lang, design.art.substrate === "dark");
+      const lines = shiki ?? code.split("\n").map((l) => highlightCodeLine(l));
+      const codeBody = lines.map((l) => `<span class="cl">${l || "&nbsp;"}</span>`).join("");
       return `<section ${rv}><div class="code-term">
         <div class="ct-bar"><span class="ct-dot r"></span><span class="ct-dot y"></span><span class="ct-dot g"></span><span class="ct-fname">${esc(b.lang || "code")}</span></div>
         <pre class="ct-code"><code>${codeBody}</code></pre>${
@@ -684,21 +788,22 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     }
     case "quiz": {
       const opts = `<div class="opts">${b.options
-        .map((o) => `<button class="opt"><span>${esc(o)}</span><span class="mk">●</span></button>`)
+        .map((o, oi) => `<button class="opt"><span class="ol">${String.fromCharCode(65 + oi)}</span><span>${esc(o)}</span><span class="mk">●</span></button>`)
         .join("")}</div>`;
       // split：题干与选项左右分栏（宽屏），与单列 stage 构图不同；交互 JS 靠 .quiz/.opt 不变。
+      // data-bid：块 id，作答结果经 ct-quiz 回传宿主时定位到具体块（蓝图 D2）。
       if (variant === "split") {
-        return `<section ${rv}><div class="card quiz quiz--split" data-answer="${b.answerIndex}"><span class="pill">随堂测</span>
+        return `<section ${rv}><div class="card quiz quiz--split" data-answer="${b.answerIndex}" data-bid="${esc(b.id)}"><span class="pill">随堂测</span>
           <div class="q-grid" style="margin-top:12px"><div class="q">${esc(b.question)}</div>${opts}</div>
           <div class="exp">${esc(b.explain)}</div></div></section>`;
       }
-      return `<section ${rv}><div class="card quiz" data-answer="${b.answerIndex}"><span class="pill">随堂测</span>
+      return `<section ${rv}><div class="card quiz" data-answer="${b.answerIndex}" data-bid="${esc(b.id)}"><span class="pill">随堂测</span>
         <div class="q" style="margin-top:12px">${esc(b.question)}</div>
         ${opts}
         <div class="exp">${esc(b.explain)}</div></div></section>`;
     }
     case "flashcard":
-      return `<section ${rv}><div class="fc"><div class="inner">
+      return `<section ${rv}><div class="fc" data-bid="${esc(b.id)}"><div class="inner">
         <div class="face front"><span class="lab">记忆卡 · 点击翻面</span><div class="t">${esc(b.front)}</div></div>
         <div class="face back"><span class="lab">答案</span><div class="t">${esc(b.back)}</div></div>
       </div></div></section>`;
@@ -708,9 +813,29 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
         <div class="body" style="margin-top:12px;color:var(--ct-ink)">${md(b.markdown)}</div></div>
         ${b.next ? `<div class="next"><b>下一节</b>${esc(b.next)}</div>` : ""}</div></section>`;
     }
-    case "image":
-      // 沙箱 CSP 禁外链，站内图无法直接加载；渲染优雅占位（有 caption 显 caption），不留破图、不外泄。
-      return `<section ${rv}><div class="img-ph">${esc(b.caption || b.alt || "图解")}</div></section>`;
+    case "image": {
+      // 蓝图 B4（审查 P1-10）：image 块不再是文字占位——按 caption 语义 + 种子生成主题化内联插图
+      // （概念图/流程/比例环/柱图/几何场景，全取 art token 上色），CSP 自包含铁律不变。
+      const label = b.caption || b.alt || "";
+      const svg = illustrationSvg(design.art, hashSeed(`illu:${b.id}:${label}`), label);
+      return `<section ${rv}><figure class="illu">${svg}${label ? `<figcaption>${esc(label)}</figcaption>` : ""}</figure></section>`;
+    }
+    case "diagram": {
+      // v4.3 语义图示(leohtml 纪律):结构取自关系、节点标签来自内容、方向显式、结果强调。
+      // 节点自带卡面,不再套外层 card(避免与 surface/figure 页型双重框)。
+      return `<section ${rv}>${diagramHtml(b)}</section>`;
+    }
+    case "formula": {
+      // v4.3 公式(KaTeX):服务端渲染自包含 HTML;display 独立居中,caption 作图注。
+      const inner = renderFormula(b.latex, b.display !== false);
+      return `<section ${rv}><figure class="ct-formula">${inner}${
+        b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ""
+      }</figure></section>`;
+    }
+    case "fillblank":
+    case "dragwords":
+      // v4.3 交互块(H5P 式):填空/拖词,判分经 ct-quiz 回传宿主进错题闭环(见 courseware-interactive)。
+      return `<section ${rv}>${interactiveHtml(b)}</section>`;
     default:
       return "";
   }
@@ -737,7 +862,15 @@ const STAGE_POOL: readonly Stage[] = ["band", "surface", "figure", "plain"];
 // 暗场额外掺入 spotlight（径向聚光戏剧页），给深色方向更强的构图对比。
 const STAGE_POOL_DARK: readonly Stage[] = ["band", "surface", "figure", "spotlight", "plain"];
 // 这些 block 天然可「逐条揭示」，其页启用 fragment 分步（data-steps）。
-const FRAG_TYPES = new Set(["steps", "keypoint", "objectives", "dialog"]);
+const FRAG_TYPES = new Set(["steps", "keypoint", "objectives", "dialog", "diagram"]);
+
+/** 公式框景 CSS（仅含 formula 块的课注入；配色吃 art token，KaTeX 文字色继承随主题）。 */
+const FORMULA_FRAME_CSS =
+  ".ct-formula{margin:0;padding:clamp(14px,3vw,22px);background:var(--ct-surface);border:1px solid var(--ct-border);" +
+  "border-radius:var(--ct-radius);box-shadow:var(--ct-shadow);overflow-x:auto;text-align:center}" +
+  ".ct-formula .katex{color:var(--ct-ink);font-size:1.15em}" +
+  ".ct-formula figcaption{margin-top:10px;font-size:13px;color:var(--ct-ink3);text-align:center}" +
+  ".ct-formula-fallback{font-family:var(--ct-mono,monospace);color:var(--ct-accent-ink);background:var(--ct-surface2);padding:2px 6px;border-radius:4px}";
 
 function stageFor(type: string, i: number, seed: number, prev: Stage | null, pool: readonly Stage[]): Stage {
   if (type === "scene" || type === "summary") return "hero";
@@ -877,6 +1010,21 @@ ${m} .body{font-size:17px;line-height:1.8}
   }
 }
 
+/** 蓝图 B3：块的可见文字量估算——短内容页升级构图（收窄版心+提字号），修「内容悬空+下半页死空间」。 */
+function blockTextLen(b: IdBlock): number {
+  switch (b.type) {
+    case "concept":
+      return (b.title?.length ?? 0) + b.markdown.length;
+    case "example":
+    case "callout":
+      return b.markdown.length;
+    case "summary":
+      return b.markdown.length + (b.next?.length ?? 0);
+    default:
+      return Number.MAX_SAFE_INTEGER; // 结构块（steps/quiz/dialog…）不参与 brief 判定
+  }
+}
+
 /** 确定性渲染：给定输入必产同一自包含 HTML（含 CSP、内联样式脚本、reduce-motion、页型舞台+签名母题）。 */
 export function renderCoursewareHtml(input: RenderInput): string {
   const { title, blocks, design, variance } = input;
@@ -892,14 +1040,21 @@ export function renderCoursewareHtml(input: RenderInput): string {
       const deco = stage === "hero" ? heroMotif(design.art, (variance.seed + i) >>> 0) : stage === "figure" ? cornerMotif(design.art) : "";
       // 可分步页加 data-steps：翻页运行时会让其 stagger 子项逐条揭示（先看一条再看下一条）。
       const steps = FRAG_TYPES.has(b.type) ? " data-steps" : "";
-      return `<section class="page page--${stage}"${steps}>${deco}${renderBlock(b, i, design, variance)}</section>`;
+      const brief = blockTextLen(b) < 150 ? " pg-brief" : "";
+      return `<section class="page page--${stage}${brief}"${steps}>${deco}${renderBlock(b, i, design, variance)}</section>`;
     })
     .join("\n");
+  // heti CJK⇄半角间距：对正文统一处理一遍（标签感知，跳过 script/style/pre/code；
+  // 代码块与运行时脚本不受影响，母题 SVG 无 CJK-拉丁混排）。
+  const spacedBody = hetiSpacing(body);
+  // KaTeX CSS+字体按需注入：仅当本节含 formula 块（无公式课零成本，见 courseware-math）。
+  const hasFormula = blocks.some((b) => b.type === "formula");
+  const mathCss = hasFormula ? katexSelfContainedCss() + FORMULA_FRAME_CSS : "";
   return (
     `<!doctype html><html lang="zh-CN"><head>${CSP_META}` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<title>${esc(title)}</title><style>${baseCss(design)}${modeCss(mode)}</style></head>` +
-    `<body class="ct-mode-${mode}"><main class="deck">${body}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
+    `<title>${esc(title)}</title><style>${baseCss(design)}${modeCss(mode)}${mathCss}</style></head>` +
+    `<body class="ct-mode-${mode}"><main class="deck">${spacedBody}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
   );
 }
 
@@ -907,6 +1062,54 @@ export function renderCoursewareHtml(input: RenderInput): string {
 export function buildContract(html: string): CoursewareContract {
   const checksum = "sha256:" + createHash("sha256").update(html, "utf8").digest("hex");
   return { renderMode: "sandbox_srcdoc", contractVersion: HTML_CONTRACT_VERSION, html, hasScript: true, checksum };
+}
+
+// ————————————————————————————————————————————————————————————
+//  bespoke 协议壳（蓝图 A5）—— LLM 产物不实现宿主协议，由平台注入
+// ————————————————————————————————————————————————————————————
+
+/**
+ * bespoke 适配脚本：LLM 的 bespoke HTML 是「孤岛页」——不发 ct-height 会卡在宿主 560px 兜底高度，
+ * 不响应 ct-hello 握手，quiz 结果也不回传。此脚本注入后补齐三件事（滚动语义，不冒充翻页能力，
+ * 故**不发 ct-ready**——宿主对无 ct-ready 的课件正确回落滚动模式）：
+ *  1) ct-height 高度上报（load + ResizeObserver + 定时重播 + 响应 ct-hello/ct-mode）；
+ *  2) ct-quiz 判分回传：约定 .quiz[data-answer]>.opt 结构（prompt 已要求），捕获阶段监听不干扰模型自带 JS；
+ *  3) ct-flash 翻卡回传：.fc 点击首次上报。
+ */
+const BESPOKE_ADAPTER_SCRIPT = `
+(function(){
+  if (window.__ctBespokeAdapter) return; window.__ctBespokeAdapter = true;
+  function h(){ try{ return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0); }catch(e){ return 0; } }
+  function post(m){ try{ parent.postMessage(m, '*'); }catch(e){} }
+  function announce(){ var v = h(); if (v > 0) post({type:'ct-height', height: v}); }
+  window.addEventListener('message', function(e){ var d = e.data || {}; if (d.type === 'ct-hello' || d.type === 'ct-mode') announce(); });
+  window.addEventListener('load', announce);
+  if ('ResizeObserver' in window) { try{ new ResizeObserver(announce).observe(document.documentElement); }catch(e){} }
+  setTimeout(announce, 300); setTimeout(announce, 1200);
+  document.addEventListener('click', function(ev){
+    var t = ev.target;
+    while (t && t !== document && !(t.classList && t.classList.contains('opt'))) t = t.parentNode;
+    if (!t || t === document) return;
+    var q = t.closest ? t.closest('.quiz[data-answer]') : null;
+    if (!q || q.__ctReported) return;
+    var opts = q.querySelectorAll('.opt'); var idx = -1;
+    for (var i = 0; i < opts.length; i++) if (opts[i] === t) idx = i;
+    var ans = parseInt(q.getAttribute('data-answer'), 10);
+    if (idx >= 0 && !isNaN(ans)) { q.__ctReported = true; post({type:'ct-quiz', bid: q.getAttribute('data-bid') || null, answer: idx, correct: idx === ans}); }
+  }, true);
+  document.addEventListener('click', function(ev){
+    var t = ev.target && ev.target.closest ? ev.target.closest('.fc') : null;
+    if (t && !t.__ctFlipped) { t.__ctFlipped = true; post({type:'ct-flash', bid: t.getAttribute('data-bid') || null}); }
+  }, true);
+})();
+`;
+
+/** 给 bespoke HTML 注入协议壳（幂等；无 </body> 时追加到尾部）。在 enforceTrustedCsp 之后调用。 */
+export function injectBespokeAdapter(html: string): string {
+  const h = html || "";
+  if (h.includes("__ctBespokeAdapter")) return h;
+  const tag = `<script data-ct-bespoke-adapter>${BESPOKE_ADAPTER_SCRIPT}</script>`;
+  return /<\/body>/i.test(h) ? h.replace(/<\/body>/i, `${tag}</body>`) : h + tag;
 }
 
 // ————————————————————————————————————————————————————————————
@@ -918,31 +1121,100 @@ export interface CoursewareLint {
   issues: string[];
 }
 
-/** 机检一段课件 HTML 的安全与反 slop 底线（见计划 §4机制三 / §7）。确定性渲染器的产物应恒过此门。 */
-export function validateCoursewareHtml(html: string): CoursewareLint {
-  const issues: string[] = [];
+/** 蓝图 A4：lint 分级 —— security 一票拒收；style 只记录（能自愈的先过 normalizeCoursewareStyle）。 */
+export interface CoursewareLintSplit {
+  security: string[];
+  style: string[];
+}
+
+/**
+ * 机检分级（蓝图 A4）：把原「任一违规整节拒收」拆成两级——
+ * security：CSP/外链/网络调用等硬底线，违者拒收回落确定性渲染（不变）；
+ * style：字体/投影/纯黑白底/scroll 监听/layout 动画/占位垃圾/营销词等观感与性能问题，
+ *        不再整节拒收（此前 chat 已产出的 HTML 有 3/7 节因一条投影 lint 被白扔，评估 §三.4），
+ *        可修的由 normalizeCoursewareStyle 后处理归一，其余仅记录观测。
+ */
+export function splitCoursewareLint(html: string): CoursewareLintSplit {
+  const security: string[] = [];
+  const style: string[] = [];
   const h = html || "";
 
-  // —— 安全硬门 ——
-  if (!/Content-Security-Policy/i.test(h)) issues.push("缺少 CSP meta");
-  if (!/connect-src\s+'none'/i.test(h)) issues.push("CSP 未掐断网络(connect-src 'none')");
+  // —— 安全硬门（拒收）——
+  if (!/Content-Security-Policy/i.test(h)) security.push("缺少 CSP meta");
+  if (!/connect-src\s+'none'/i.test(h)) security.push("CSP 未掐断网络(connect-src 'none')");
   // 外链资源（http/https 或协议相对 //host）——课件必须自包含、无外链
-  if (/\b(?:src|href)\s*=\s*["'](?:https?:)?\/\//i.test(h)) issues.push("含外链资源(src/href 外链)");
-  if (/url\(\s*["']?(?:https?:)?\/\//i.test(h)) issues.push("CSS 含外链 url()");
-  if (/\.(?:src|href)\s*=\s*["'][^"']*\/\//i.test(h)) issues.push("JS 赋值外链(.src/.href //)");
-  if (/\b(?:fetch|XMLHttpRequest|WebSocket|sendBeacon)\b/.test(h)) issues.push("含网络调用(fetch/XHR/WS)");
-  if (!/prefers-reduced-motion/i.test(h)) issues.push("缺少 reduce-motion 分支");
+  if (/\b(?:src|href)\s*=\s*["'](?:https?:)?\/\//i.test(h)) security.push("含外链资源(src/href 外链)");
+  if (/url\(\s*["']?(?:https?:)?\/\//i.test(h)) security.push("CSS 含外链 url()");
+  if (/\.(?:src|href)\s*=\s*["'][^"']*\/\//i.test(h)) security.push("JS 赋值外链(.src/.href //)");
+  if (/\b(?:fetch|XMLHttpRequest|WebSocket|sendBeacon)\b/.test(h)) security.push("含网络调用(fetch/XHR/WS)");
+  // 审计修复：scroll 监听与 layout 属性动画是不可机械自愈的性能硬伤（低端机掉帧发热），
+  // 保持一票拒收（归 security 桶=拒收桶），不随风格软门放行。
+  if (/addEventListener\(\s*["']scroll["']/.test(h)) security.push("用了 scroll 监听(性能杀手)");
+  if (/@keyframes[^}]*\b(?:top|left|width|height)\s*:/i.test(h)) security.push("动画了 layout 属性(非 GPU 安全)");
 
-  // —— 反 slop / 性能 ——
-  if (/font-family[^;}]*\b(Inter|Roboto|Arial|Open Sans|Helvetica)\b/i.test(h)) issues.push("使用了廉价默认字体");
-  if (/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0?\.[1-9]/i.test(h)) issues.push("硬黑投影(rgba(0,0,0,.1+))");
-  if (/background[^;}]*#(?:000000|000|ffffff|fff)\b/i.test(h)) issues.push("纯黑/纯白背景");
-  if (/addEventListener\(\s*["']scroll["']/.test(h)) issues.push("用了 scroll 监听(性能杀手)");
-  if (/@keyframes[^}]*\b(?:top|left|width|height)\s*:/i.test(h)) issues.push("动画了 layout 属性(非 GPU 安全)");
-  if (/John Doe|Lorem Ipsum|Acme\b/i.test(h)) issues.push("含占位垃圾");
-  if (/颠覆认知|全网最强|小白秒变|Unleash|Seamless|Next-Gen/i.test(h)) issues.push("含 AI 陈词/夸张营销");
+  // —— 风格软门（自愈或记录）——
+  if (!/prefers-reduced-motion/i.test(h)) style.push("缺少 reduce-motion 分支");
+  if (/font-family[^;}]*\b(Inter|Roboto|Arial|Open Sans|Helvetica)\b/i.test(h)) style.push("使用了廉价默认字体");
+  // 审计修复：只认「shadow 声明里的纯黑」为硬黑投影——正文色/遮罩的 rgba(0,0,0,.x) 是合法用法，
+  // 原全局匹配会把 color:rgba(0,0,0,.85) 也判违规并被自愈改淡到不可读。
+  if (/(?:box-shadow|text-shadow)[^;}]*rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0?\.[1-9]/i.test(h)) style.push("硬黑投影(shadow 用纯黑)");
+  if (/background[^;}]*#(?:000000|000|ffffff|fff)\b/i.test(h)) style.push("纯黑/纯白背景");
+  if (/John Doe|Lorem Ipsum|Acme\b/i.test(h)) style.push("含占位垃圾");
+  if (/颠覆认知|全网最强|小白秒变|Unleash|Seamless|Next-Gen/i.test(h)) style.push("含 AI 陈词/夸张营销");
 
+  return { security, style };
+}
+
+/** 机检一段课件 HTML 的安全与反 slop 底线（见计划 §4机制三 / §7）。确定性渲染器的产物应恒过此门。 */
+export function validateCoursewareHtml(html: string): CoursewareLint {
+  const { security, style } = splitCoursewareLint(html);
+  const issues = [...security, ...style];
   return { ok: issues.length === 0, issues };
+}
+
+/**
+ * 蓝图 A4：风格软违规后处理自愈——把可机械修正的 style lint 直接改到 HTML 里，
+ * 保住 LLM 已产出的整节 bespoke，而不是拒收白扔。修正全部替换为中性安全值
+ * （不猜设计意图，只消除违规本身）；不可机械修正的项（scroll 监听/营销词等）留给 lint 观测。
+ */
+export function normalizeCoursewareStyle(html: string): { html: string; fixes: string[] } {
+  let h = html || "";
+  const fixes: string[] = [];
+
+  // 硬黑投影 → 带色相投影色。审计修复：只改 box-shadow/text-shadow 声明内的纯黑，
+  // 且**保留原透明度**——原实现全局替换并把 α 钉死 .10，会把正文色 rgba(0,0,0,.85)、
+  // 弹层遮罩 rgba(0,0,0,.6) 一并改到近乎不可见。
+  if (/(?:box-shadow|text-shadow)[^;}]*rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0?\.[1-9]/i.test(h)) {
+    h = h.replace(/((?:box-shadow|text-shadow)[^;}]*)/gi, (decl) =>
+      decl.replace(/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*(0?\.\d+)\s*\)/gi, "rgba(18,24,32,$1)"),
+    );
+    fixes.push("shadow 纯黑→带色相投影色(保留透明度)");
+  }
+
+  // 廉价默认字体 → system-ui（只动 font-family 声明内的字体名，不碰正文文字）
+  if (/font-family[^;}]*\b(Inter|Roboto|Arial|Open Sans|Helvetica)\b/i.test(h)) {
+    h = h.replace(/(font-family[^;}]*)/gi, (decl) =>
+      decl.replace(/\b(Inter|Roboto|Arial|Open Sans|Helvetica)\b/gi, "system-ui"),
+    );
+    fixes.push("廉价字体→system-ui");
+  }
+
+  // 纯黑/纯白背景 → 近黑/暖白（保留背景声明结构，只替换 hex）
+  if (/background[^;}]*#(?:000000|000|ffffff|fff)\b/i.test(h)) {
+    h = h.replace(/(background[^;}]*?)#(000000|000)\b/gi, "$1#0c0f14");
+    h = h.replace(/(background[^;}]*?)#(ffffff|fff)\b/gi, "$1#fcfbf7");
+    fixes.push("纯黑/纯白背景→近黑/暖白");
+  }
+
+  // 缺 reduce-motion → 注入全局降级分支（放 </head> 前，对整页动画/过渡一刀切降级）
+  if (!/prefers-reduced-motion/i.test(h)) {
+    const inject =
+      "<style>@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style>";
+    h = /<\/head>/i.test(h) ? h.replace(/<\/head>/i, `${inject}</head>`) : inject + h;
+    fixes.push("注入 reduce-motion 降级");
+  }
+
+  return { html: h, fixes };
 }
 
 // ————————————————————————————————————————————————————————————
@@ -957,6 +1229,44 @@ export interface CoursewareDiversity {
   substantial: boolean;
   ok: boolean;
   reasons: string[];
+}
+
+/** 蓝图 C2：视觉高级分（0-100，确定性可测指标聚合）。低分触发 C1 回炉，入 qualityJson.visual 供看板。 */
+export interface CoursewareVisualScore {
+  score: number;
+  metrics: {
+    distinctBackgrounds: number;
+    svgCount: number;
+    sectionCount: number;
+    textLen: number;
+    avgTextPerSection: number;
+  };
+}
+
+/**
+ * 视觉高级分：不判美丑（那是人审的事），只量「有没有做设计动作」的确定性信号——
+ * 表面分化（背景种类）、图形量（内联 SVG）、分区节奏（section 数）、密度（每区文字量落在可读带）。
+ * 阈值经 12 art 快照基线校准：确定性渲染器产物恒 ≥70；纯文字墙 ≤45。
+ */
+export function scoreCoursewareVisual(html: string): CoursewareVisualScore {
+  const d = assessCoursewareDiversity(html);
+  const sections = Math.max(1, d.sectionCount);
+  const avg = Math.round(d.textLen / sections);
+  let score = 40;
+  score += Math.min(20, d.distinctBackgrounds * 2); // 表面分化
+  score += Math.min(12, d.svgCount * 4); // 图形动作
+  score += d.sectionCount >= 6 ? 14 : d.sectionCount >= 3 ? 8 : 0; // 分区节奏
+  score += avg >= 60 && avg <= 700 ? 14 : avg > 0 ? 6 : 0; // 密度可读带
+  return {
+    score: Math.max(0, Math.min(100, score)),
+    metrics: {
+      distinctBackgrounds: d.distinctBackgrounds,
+      svgCount: d.svgCount,
+      sectionCount: d.sectionCount,
+      textLen: d.textLen,
+      avgTextPerSection: avg,
+    },
+  };
 }
 
 /**

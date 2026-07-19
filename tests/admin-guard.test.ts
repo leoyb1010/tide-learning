@@ -67,9 +67,9 @@ describe("canAccessGate —— 页面 gate 与角色权限对齐", () => {
 });
 
 describe("adminNavForUser —— 导航按有效权限过滤（P2-1）", () => {
-  it("reviewer 只看到「内容审核」一个入口", () => {
+  it("reviewer 只看到 content:review 门下的入口（内容审核 + 生成质量）", () => {
     const nav = adminNavForUser("reviewer");
-    expect(nav.map((n) => n.href)).toEqual(["/admin/moderation"]);
+    expect(nav.map((n) => n.href)).toEqual(["/admin/moderation", "/admin/gen-quality"]);
   });
 
   it("admin 看到全部入口", () => {

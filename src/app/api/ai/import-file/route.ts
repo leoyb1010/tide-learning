@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { requireLLMAccess } from "@/lib/ai-guard";
+import { requireCourseGenAccess } from "@/lib/ai-guard";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 import { paragraphizePlainText } from "@/lib/note-structure";
 import { structureImportedTextIntoCourse, MIN_IMPORT_TEXT, MAX_IMPORT_TEXT } from "@/lib/course-import";
@@ -101,12 +101,12 @@ async function extractText(kind: FileKind, bytes: Buffer): Promise<string> {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user, snapshot } = await requireLLMAccess({
+    const { user, snapshot } = await requireCourseGenAccess({
       deniedMessage: "AI 导入为订阅会员权益，订阅后即可使用",
       spendScene: "import_source",
     });
 
-    if (!acquireInflight("import_source", user.id)) {
+    if (!acquireInflight("course_gen", user.id)) {
       return fail("已有生成任务进行中，请稍后再试", 409);
     }
     try {
@@ -175,7 +175,7 @@ export async function POST(req: NextRequest) {
 
       return ok(result);
     } finally {
-      releaseInflight("import_source", user.id);
+      releaseInflight("course_gen", user.id);
     }
   });
 }

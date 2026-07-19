@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { CornersOut, CornersIn, Sparkle } from "@phosphor-icons/react";
+import { track } from "@/lib/analytics-client";
 
 /**
  * HtmlCourseware —— AI 生成的自包含 HTML 课件的**沙箱渲染器**（v3.4：默认翻页，可切滚动）。
@@ -22,7 +23,33 @@ import { CornersOut, CornersIn, Sparkle } from "@phosphor-icons/react";
 type ViewMode = "paged" | "scroll";
 const VIEW_PREF_KEY = "tide-courseware-view";
 
-export function HtmlCourseware({ html }: { html: string }) {
+/**
+ * 审计修复(P0)：middleware 的 CSP 是 `script-src 'self' 'nonce-…'`,而 **srcdoc iframe 继承父文档 CSP**,
+ * 课件运行时的内联 <script> 无 nonce 会被整段拦截——翻页/高度上报/测验判分全废。
+ * 服务端页面把本次请求的 nonce 传进来,这里注入到课件 HTML 的 <script> 标签上。
+ * 课件 HTML 是我方管线产物(过 CSP/lint 硬门后落库),给它发 nonce 不扩大信任面;sandbox 铁律不变。
+ */
+function injectNonce(html: string, nonce: string | undefined): string {
+  if (!nonce || !/^[\w+/=-]+$/.test(nonce)) return html;
+  return html.replace(/<script\b(?![^>]*\bnonce=)/gi, `<script nonce="${nonce}"`);
+}
+
+export function HtmlCourseware({
+  html,
+  lessonId,
+  nonce,
+  onPage,
+  initialPage,
+}: {
+  html: string;
+  lessonId?: string;
+  /** 父页 CSP nonce(middleware x-nonce)。不传则不注入——独立/测试渲染场景仍可用。 */
+  nonce?: string;
+  /** 翻页课件页码变化回调(index 0 起, total 总页数)。宿主用它接进度上报(蓝图 D1 补口)。 */
+  onPage?: (index: number, total: number) => void;
+  /** v4.2 续读:上次读到的页(0-indexed)。收到 ct-ready 后一次性下发 ct-goto 恢复位置。 */
+  initialPage?: number;
+}) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number>(560);
   const [fullscreen, setFullscreen] = useState(false);
@@ -34,6 +61,12 @@ export function HtmlCourseware({ html }: { html: string }) {
   modeRef.current = mode;
   // 课件是否在视口内——键盘翻页只在可见时劫持，避免课件滚出屏幕后仍吞掉 ←/→/空格。
   const visibleRef = useRef(true);
+  // 蓝图 D2：已上报过的 quiz 块（同一次会话内去重，服务端 upsert 兜底幂等）。
+  // 注：Player 侧以 key={lesson.id} 挂载本组件,换课必重挂,Set 不会跨课残留(审计修复 H1)。
+  const reportedQuizRef = useRef<Set<string>>(new Set());
+  // 续读 ct-goto 只发一次(ct-ready 会重播)。
+  const sentGotoRef = useRef(false);
+  const srcdocHtml = useMemo(() => injectNonce(html, nonce), [html, nonce]);
 
   // 视图偏好：默认翻页；用户切过则记住（挂载时读一次）。
   useEffect(() => {
@@ -67,13 +100,39 @@ export function HtmlCourseware({ html }: { html: string }) {
         }
         // 运行时就绪后同步当前模式（覆盖 iframe 内的默认翻页，比如用户偏好是滚动）。
         postToFrame({ type: "ct-mode", mode: modeRef.current });
+        // v4.2 续读:一次性恢复上次读到的页(ct-ready 重播时靠 ref 幂等,不反复跳页打断用户)。
+        if (initialPage && initialPage > 0 && !sentGotoRef.current) {
+          sentGotoRef.current = true;
+          postToFrame({ type: "ct-goto", page: initialPage });
+        }
       } else if (d.type === "ct-page" && typeof d.index === "number" && typeof d.total === "number") {
         setPage({ index: d.index, total: d.total });
+        // 蓝图 D1 补口：HTML 课件此前只更新页码 UI、从不上报进度——主力课型的 streak/完课恒空。
+        onPage?.(d.index, d.total);
+      } else if (d.type === "ct-flash" && lessonId) {
+        // 审计修复：ct-flash 此前是无人接收的死信号——翻卡行为记入前端埋点(复习意愿信号,不落业务表)。
+        track("courseware_flashcard_flip", { lesson_id: lessonId, block_id: typeof d.bid === "string" ? d.bid : null });
+      } else if (d.type === "ct-quiz" && lessonId && typeof d.correct === "boolean") {
+        // 蓝图 D2（审查 P0-6）：课件内答题结果落库——进掌握度表，答错自动转错题复习卡。
+        // 沙箱 connect-src 'none'，课件自身无法发请求，必须由宿主代发。失败静默（学习主链不受影响）。
+        const bid = typeof d.bid === "string" && d.bid ? d.bid : null;
+        if (bid && !reportedQuizRef.current.has(bid)) {
+          reportedQuizRef.current.add(bid);
+          fetch(`/api/lessons/${lessonId}/quiz-result`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              blockId: bid,
+              answerIndex: typeof d.answer === "number" ? d.answer : 0,
+              correct: d.correct,
+            }),
+          }).catch(() => {});
+        }
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [postToFrame]);
+  }, [postToFrame, lessonId, onPage, initialPage]);
 
   const switchMode = useCallback(
     (m: ViewMode) => {
@@ -143,10 +202,11 @@ export function HtmlCourseware({ html }: { html: string }) {
 
   const paged = pagedReady && mode === "paged";
   // 翻页=固定视口档（单屏一页）；滚动=iframe 上报的全高；全屏恒撑满（减顶栏 41px）。
+  // 蓝图 B6：上限 640→760，高屏设备不再留一大截底部空白（下限与 clamp 结构不变，矮屏不回退）。
   const frameHeight = fullscreen
     ? "calc(100vh - 41px)"
     : paged
-      ? "clamp(460px, calc(100vh - 260px), 640px)"
+      ? "clamp(460px, calc(100vh - 240px), 760px)"
       : `${height}px`;
 
   return (
@@ -209,7 +269,7 @@ export function HtmlCourseware({ html }: { html: string }) {
       </div>
       <iframe
         ref={iframeRef}
-        srcDoc={html}
+        srcDoc={srcdocHtml}
         // 安全核心：只给 allow-scripts；绝不给 allow-same-origin / allow-top-navigation / allow-popups / allow-forms。
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"

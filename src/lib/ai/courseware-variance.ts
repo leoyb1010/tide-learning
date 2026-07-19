@@ -21,7 +21,9 @@ function subSeed(seed: number, salt: number): number {
 }
 
 // —— 每种场景/块型的版式原型池（渲染器据 variant 走不同 HTML/CSS 布局）——
-const OPENER_LAYOUTS = ["hero-center", "hero-left", "hero-band"] as const;
+// 蓝图 B1（审查 P2-1「开场骨架冻结」）：开场构图 3 → 5 —— 新增 split（左右分屏）与 poster（满版海报），
+// 且 hero-center 此前在池里却未被渲染器实现（默默落到默认左对齐），本轮一并真正落地。
+const OPENER_LAYOUTS = ["hero-center", "hero-left", "hero-band", "hero-split", "hero-poster"] as const;
 const CONCEPT_LAYOUTS = ["accent-bar", "big-lead", "split-note", "framed"] as const;
 const EXAMPLE_LAYOUTS = ["quote-card", "ticket", "inline-mark"] as const;
 const STEPS_LAYOUTS = ["timeline", "numbered-cards", "rail"] as const;

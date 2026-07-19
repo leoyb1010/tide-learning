@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/db";
 import { CATEGORY_LABELS } from "@/lib/queries";
+import { loadCjkSubset } from "@/lib/og-fonts";
 
 /**
  * 课程动态社交预览图（Next.js 约定文件）。
@@ -56,27 +57,6 @@ function compactCount(n: number): string {
  * Google CSS2 的 text= 只返回用到的字形，体积极小；失败则返回 null，
  * satori 用内置拉丁字体兜底渲染数字/英文（中文会缺，但不至于整图报错）。
  */
-async function loadCjkSubset(text: string, weight: 700 | 900): Promise<ArrayBuffer | null> {
-  try {
-    const uniq = Array.from(new Set(text.split(""))).join("");
-    const cssUrl =
-      `https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@${weight}` +
-      `&text=${encodeURIComponent(uniq)}`;
-    const cssRes = await fetch(cssUrl, {
-      headers: { "User-Agent": "Mozilla/5.0 (compatible)" }, // 触发 ttf/otf 而非 woff2（satori 不吃 woff2）
-      next: { revalidate: 60 * 60 * 24 * 30 }, // 子集稳定，缓存 30 天
-    });
-    if (!cssRes.ok) return null;
-    const css = await cssRes.text();
-    const m = css.match(/src:\s*url\(([^)]+)\)\s*format\('(?:truetype|opentype)'\)/);
-    if (!m) return null;
-    const fontRes = await fetch(m[1], { next: { revalidate: 60 * 60 * 24 * 30 } });
-    if (!fontRes.ok) return null;
-    return await fontRes.arrayBuffer();
-  } catch {
-    return null;
-  }
-}
 
 export default async function CourseOgImage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

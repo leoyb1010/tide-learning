@@ -8,6 +8,8 @@ import { getTemplate, templateHardRequirement, checkTemplateAdherence } from "./
 import { resolveCourseDesign, serializeCourseDesign } from "./ai/courseware-design";
 import { resolveCoursewareMode } from "./ai/courseware-catalog";
 import { renderAndStoreLessonHtml, createCoursewareBudget } from "./ai/courseware-gen";
+import { selectBespokeModel } from "./ai/models";
+import { scanBlocksSafety } from "./content-safety";
 
 /**
  * 造课内核 —— 引擎A 的可复用逻辑层（供 route / after() 后台续跑 / 共创闭环共用）。
@@ -86,8 +88,8 @@ export interface LessonCoreResult {
 //  造课质量评估（规则，零额外 LLM 调用）—— 流3 · U7
 // ————————————————————————————————————————————————————————————
 
-/** 视觉表现力强的块型集合（对应 prompt「硬性规则」中的视觉块要求）。 */
-const VISUAL_BLOCK_TYPES = new Set(["compare", "steps", "dialog", "flashcard", "callout"]);
+/** 视觉表现力强的块型集合（对应 prompt「硬性规则」中的视觉块要求）。diagram 为 v4.3 语义图示。 */
+const VISUAL_BLOCK_TYPES = new Set(["compare", "steps", "dialog", "flashcard", "callout", "diagram"]);
 /** 交互块集合（quiz 检查理解 / flashcard 记忆点）。 */
 const INTERACTIVE_BLOCK_TYPES = new Set(["quiz", "flashcard"]);
 /** 低于此分视为「弱课件」，记录供 admin 观测 / 后续重生成决策（不阻断，永不空课）。 */
@@ -174,6 +176,65 @@ export function scoreLesson(blocks: { type: string }[], templateKey?: string | n
     visualCount,
     conceptRatio: Math.round(conceptRatio * 100) / 100,
   };
+}
+
+/**
+ * writeLessonBlocks —— blocksJson 的**唯一写入口**(v4.2 治理·审计 H4 拆雷)。
+ * 任何改写课节内容层的代码(生成/未来 regen/manual 编辑)都必须走这里,三件事强制成套:
+ *  1) 旧内容存档:prior.blocksJson 非空时写 LessonRevision(内容层真值+当时的 html,S1 蓝图
+ *     宣称的 regen 档位此前是死路径,在此落地),保留最近 3 版;
+ *  2) 失效派生层:清 htmlJson/renderEngine/renderSourceHash——否则 courseware-gen 的 B5 复用
+ *     路径会把「旧 blocks 的 bespoke HTML」盖上新哈希永久端给用户(1↔2 成套,缺一即雷);
+ *  3) 集市重审:内容被改写且课已上架(shared)→ 复位 pending 走人工复核(过审后改内容的
+ *     TOCTOU 通道在写入口关死,与 market/share 的改文案复审同族)。
+ * 今天唯一调用方是 generateLessonCore(空节首次生成:1/3 为无操作,2 清的是 null);
+ * 价值在于未来任何 regen 入口天然安全,不依赖每个作者记住三件套。
+ */
+export async function writeLessonBlocks(opts: {
+  lessonId: string;
+  courseId: string;
+  blocksJson: string;
+  qualityJson: string;
+  reason: "generate" | "regen" | "manual";
+}): Promise<void> {
+  const prior = await prisma.lesson.findUnique({
+    where: { id: opts.lessonId },
+    select: { blocksJson: true, htmlJson: true, course: { select: { sharedStatus: true } } },
+  });
+
+  if (prior?.blocksJson) {
+    try {
+      await prisma.lessonRevision.create({
+        data: { lessonId: opts.lessonId, blocksJson: prior.blocksJson, htmlJson: prior.htmlJson, reason: opts.reason },
+      });
+      const keep = await prisma.lessonRevision.findMany({
+        where: { lessonId: opts.lessonId },
+        orderBy: { createdAt: "desc" },
+        take: 3,
+        select: { id: true },
+      });
+      await prisma.lessonRevision.deleteMany({
+        where: { lessonId: opts.lessonId, id: { notIn: keep.map((r) => r.id) } },
+      });
+    } catch {
+      // 存档失败不阻塞内容写入主链
+    }
+  }
+
+  await prisma.lesson.update({
+    where: { id: opts.lessonId },
+    data: {
+      blocksJson: opts.blocksJson,
+      qualityJson: opts.qualityJson,
+      htmlJson: null,
+      renderEngine: null,
+      renderSourceHash: null,
+    },
+  });
+
+  if (prior?.blocksJson && prior.course?.sharedStatus === "shared") {
+    await prisma.course.update({ where: { id: opts.courseId }, data: { sharedStatus: "pending" } });
+  }
 }
 
 /** 节级 claim 的 TTL：认领超时未落库视为死锁可重取（generateLessonCore 抢占 /
@@ -325,7 +386,7 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     "- objectives 目标必须具体可衡量。\n" +
     "- 破折号零容忍：所有块的所有文字字段（含 scene/concept 的 markdown、callout、example、summary 的 markdown 与 next、dialog 的 text 等）一律禁止出现破折号（— 或 ——）；需要停顿、转折、引出下文时，改用逗号、句号、冒号或分号。\n" +
     "\n" +
-    "【12 种块的字段结构与最小示例（只用这些类型，其余一律不要输出）】\n" +
+    "【18 种块的字段结构与最小示例（只用这些类型，其余一律不要输出）】\n" +
     '- scene：{"type":"scene","title":"迟到的道歉","markdown":"你约了客户却堵在路上……"}\n' +
     '- objectives：{"type":"objectives","items":["能用 3 种句式表达歉意","能区分正式与随意场合"]}\n' +
     '- concept：{"type":"concept","title":"什么是虚拟语气","markdown":"用于假设或非真实……"}\n' +
@@ -338,7 +399,21 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     '- callout：{"type":"callout","tone":"warn","markdown":"注意：这个词在正式场合别用。"}（tone 仅 info 或 warn）\n' +
     '- quiz：{"type":"quiz","question":"下列哪句最自然？","options":["I arrived.","I\'m here now."],"answerIndex":1,"explain":"口语中 I\'m here now 更常用。"}（answerIndex 从 0 开始）\n' +
     '- flashcard：{"type":"flashcard","front":"apologize 的名词形式？","back":"apology"}\n' +
+    '- fillblank（填空练习）：{"type":"fillblank","prompt":"补全句子","segments":["I ","to school every day."],"blanks":[["go","walk"]]}' +
+    "（segments 是文本段，blanks 是段间的空，每空给一个可接受写法数组；段数必须 = 空数+1。适合考查关键词/搭配）\n" +
+    '- dragwords（选词填空）：{"type":"dragwords","prompt":"选词填空","segments":["虚拟语气用于","的情况。"],"blanks":["假设"],"distractors":["陈述","命令"]}' +
+    "（同 segments/空交替；blanks 是每空正解，distractors 是干扰词，一起打乱进词库供点选。适合考查概念/术语辨析）\n" +
     '- summary：{"type":"summary","markdown":"本节你掌握了三种道歉句式……","next":"下节我们学如何回应别人的道歉。"}\n' +
+    '- diagram：{"type":"diagram","kind":"flow","title":"给 AI 派活的四段式","items":[{"label":"背景","detail":"你是谁、什么场景"},{"label":"目标"},{"label":"约束"},{"label":"可用初稿","detail":"一次到位的产出"}],"note":"顺序不可换：先给背景再谈格式。"}\n' +
+    "  【语义图示选型（本节内容含下列关系时，用 1 个 diagram 块把它画出来，胜过大段文字）】\n" +
+    "  · 先后顺序/流程 → kind:flow（末项写产出/结果）  · 循环往复 → kind:cycle（3-6 个环节）\n" +
+    "  · 一个中心多个参与方/组成 → kind:hub（items 第 1 项是中心）  · 层级/依托关系 → kind:layers（自顶向下排列）\n" +
+    "  · 筛选/转化/漏斗 → kind:funnel（宽到窄，末项是转化结果）\n" +
+    "  铁律：label 必须来自本节真实内容（2-8 字最佳），detail 一句话可选；不许造数据、不许用抽象占位词。\n" +
+    '- formula：{"type":"formula","latex":"\\\\frac{\\\\partial L}{\\\\partial w} = \\\\sum_i (\\\\hat{y}_i - y_i) x_i","caption":"损失对权重的梯度","display":true}' +
+    "（涉及数学公式/方程/推导时用它，latex 为标准 LaTeX 语法，平台用 KaTeX 精确渲染。理科/编程/金融课的公式一律用 formula，不要塞进 markdown 文本）\n" +
+    '- image：{"type":"image","src":"/illustration/auto.svg","caption":"晨间公园的问候场景"}（src 固定填 "/illustration/auto.svg"，' +
+    "平台按 caption 配氛围插图。注意：流程/循环/结构/层级/转化这类**关系**一律用 diagram 块，公式用 formula 块，image 只用于纯氛围/场景配图）\n" +
     "\n" +
     "全程中文讲解（示例中的目标语言词句除外），贴合本节目标、循序渐进、不与前序节重复。\n" +
     COMPLIANCE_GUARDRAIL + "\n" +
@@ -412,14 +487,96 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
       ]);
     }
 
-    // —— 层3 后处理质量评估（规则，轻量、不阻塞、不二次调用 LLM）——
-    // 把原「块型混合度」观测升级为可查的质量分（六项规则，见 scoreLesson）：
-    // 块数/开头钩子/结尾小结/交互块/视觉强块/concept 占比。只观测、不 throw、不重生成、不改内容。
-    const quality = scoreLesson(blocks, course.template);
+    // —— 层3 后处理质量评估 ——
+    // 质量分（六项规则，见 scoreLesson）+ 模板遵循度机检（story→dialog、socratic→≥3 quiz…）。
+    let quality = scoreLesson(blocks, course.template);
+    let adherence = checkTemplateAdherence(blocks, course.template);
+
+    // —— 蓝图 C1（审查 P1-4）：不达标不再「只观测」——一次纠偏重生成闭环 ——
+    // 质量分不及格或模板签名缺失 → 带问题清单整体重写一次；premium 课升白名单强模型执笔。
+    // 采纳规则：新版「双达标」或分数更高才替换，否则沿用第一版（绝不因纠偏产出更差而回退质量）。
+    let regenInfo: { attempted: boolean; adopted: boolean; model: string | null; beforeScore: number } | null = null;
+    if (!usedFallback && (!quality.passed || !adherence.ok)) {
+      const escalated = course.qualityTier === "premium" ? (selectBespokeModel(undefined)?.key ?? null) : null;
+      const regenModel = escalated ?? course.modelUsed ?? null;
+      // flags 是六项布尔（true=达标），把未达标项翻译成可执行的修正指令。
+      const FLAG_HINTS: Record<string, string> = {
+        countOk: "块数不在 8-12 的要求区间",
+        hasOpening: "缺开场钩子(scene/objectives 开头)",
+        hasSummary: "缺 summary 结尾块",
+        hasInteractive: "缺交互块(quiz 或 flashcard)",
+        hasVisuals: "视觉强块不足(compare/steps/dialog/flashcard/callout 至少 2 种)",
+        conceptRatioOk: "concept 大段文字占比过高(文字墙)",
+      };
+      const flagHints = Object.entries(quality.flags)
+        .filter(([, ok]) => !ok)
+        .map(([k]) => FLAG_HINTS[k] ?? k);
+      const fixHints = [...flagHints, ...adherence.missing.map((m) => `缺模板签名要素:${m}`)].slice(0, 8);
+      regenInfo = { attempted: true, adopted: false, model: regenModel, beforeScore: quality.score };
+      try {
+        const retry = await chatJson<LessonGenResult>({
+          system:
+            system +
+            `\n【上一版审校未通过，请整体重写】问题清单：${fixHints.join("、")}。` +
+            `请重新输出完整 {blocks:[...]} JSON，逐条修正上述问题；其余规则不变。`,
+          user: userMsg,
+          temperature: Math.max(0.4, tmpl.temperature - 0.1), // 纠偏轮收敛些，优先修对而非发散
+          maxTokens: 10000,
+          timeoutMs: 90_000, // v4.2 调参:纠偏轮可能升 opus/slow 档执笔,默认 60s 偶发掐死整轮重写
+          model: regenModel ?? undefined,
+          onUsage: creditingOnUsage(userId, "generate_lesson"),
+        });
+        const fixed = validateBlocks(retry?.blocks ?? retry);
+        if (fixed.length > 0) {
+          const q2 = scoreLesson(fixed, course.template);
+          const a2 = checkTemplateAdherence(fixed, course.template);
+          if ((q2.passed && a2.ok) || q2.score > quality.score) {
+            blocks = fixed;
+            quality = q2;
+            adherence = a2;
+            regenInfo.adopted = true;
+          }
+        }
+      } catch {
+        // 纠偏失败沿用第一版，不阻塞主链（额度已按实际 token 记账）。
+      }
+      await track({
+        eventName: "ai_gen_lesson_regen",
+        userId,
+        properties: {
+          courseId: course.id,
+          lessonId: lesson.id,
+          adopted: regenInfo.adopted,
+          model: regenInfo.model,
+          beforeScore: regenInfo.beforeScore,
+          afterScore: quality.score,
+        },
+      });
+    }
+
+    // —— 蓝图 C4（审查 P1-5）：产出侧安全机检（独立于 prompt 合规段的复核层）——
+    // block 级命中：弃用整节产出换安全占位（不让违规内容落库）；review 级：仅入档观测，
+    // 私有课低门槛放行，集市分享另有高门槛（见 market/share 的强制人工审核）。
+    const safety = scanBlocksSafety(blocks);
+    if (safety.level === "block") {
+      await track({
+        eventName: "ai_gen_safety_block",
+        userId,
+        properties: { courseId: course.id, lessonId: lesson.id, hits: safety.hits.map((h) => h.word).slice(0, 10) },
+      });
+      usedFallback = true;
+      blocks = validateBlocks([
+        {
+          type: "concept",
+          title: lesson.title,
+          markdown: "本节内容未通过安全审核，暂不展示。可调整课程主题或表述后重新生成。",
+        },
+      ]);
+      quality = scoreLesson(blocks, course.template);
+      adherence = checkTemplateAdherence(blocks, course.template);
+    }
+
     const { conceptCount, visualCount, conceptRatio } = quality;
-    // v3.3 模板遵循度机检（与通用质量分正交）：查本节是否含本模板的签名块（story→dialog、
-    // socratic→≥3 quiz…）。此前「选了模板却生成得千篇一律」完全无法发现，这里落成可查事件。
-    const adherence = checkTemplateAdherence(blocks, course.template);
     // 兼容旧埋点：concept 占比过高（文字墙）仍单独发 ai_gen_block_mix，便于既有看板延续。
     if (!usedFallback && conceptRatio > 0.6) {
       await track({
@@ -468,10 +625,20 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
 
     const blocksJson = JSON.stringify({ version: 1, blocks });
 
-    // —— 写入本节 ——
-    await prisma.lesson.update({
-      where: { id: lesson.id },
-      data: { blocksJson },
+    // —— 写入本节(经唯一写入口 writeLessonBlocks;蓝图 C2 质量档案随内容一起落库)——
+    await writeLessonBlocks({
+      lessonId: lesson.id,
+      courseId: course.id,
+      blocksJson,
+      qualityJson: JSON.stringify({
+        score: usedFallback ? 0 : quality.score,
+        passed: !usedFallback && quality.passed,
+        flags: quality.flags,
+        adherence: { ok: adherence.ok, missing: adherence.missing },
+        regen: regenInfo,
+        safety: { level: safety.level, hits: safety.hits.map((h) => h.word).slice(0, 10) },
+      }),
+      reason: "generate",
     });
 
     // 是否所有 lesson 都已生成 blocksJson（还剩多少空节）
@@ -802,9 +969,10 @@ async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
     // bespoke HTML 单节 maxTokens 16000，是最贵的出口。此前整课的多节精修不校验余额，
     // 可把余额刷成大额负数。这里按累计预估投影余额：预算不足时对剩余节「降级为免费确定性渲染」
     // （enhance=false，仍产出多样化 HTML，只是不走 LLM 精修），而非无脑继续烧钱。
-    const htmlPerLessonCost = premium
-      ? estimateCredits("generate_lesson_html", undefined, course.modelUsed ?? undefined)
-      : 0;
+    // 审计修复：投影成本按「实际会执行的精修模型」估算——A2 解耦后 bespoke 可能回落白名单强模型
+    // （costWeight 更高），仍按 course.modelUsed 估会系统性低估、把余额刷成大额负数。
+    const bespokeModelKey = premium ? (selectBespokeModel(course.modelUsed)?.key ?? course.modelUsed ?? undefined) : undefined;
+    const htmlPerLessonCost = premium ? estimateCredits("generate_lesson_html", undefined, bespokeModelKey) : 0;
     let htmlProjectedBalance = premium && course.authorUserId ? await getBalanceFresh(course.authorUserId) : 0;
     for (const l of lessons) {
       // 仅 premium 且投影余额足够才走 LLM 精修；否则降级为免费确定性渲染。

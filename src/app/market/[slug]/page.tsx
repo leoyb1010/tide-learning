@@ -18,6 +18,7 @@ import {
   ShieldCheck,
 } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
+import { prisma } from "@/lib/db";
 import { buildStallDetail } from "@/lib/market-data";
 import { CoverBg } from "@/components/ui";
 import { RatingStars } from "@/components/RatingStars";
@@ -69,6 +70,13 @@ export default async function MarketProductPage({
   // 进学习：第 1 节 lesson（拿走后书架落地即在此节起始）。学习台路由与 S3 一致。
   const firstLesson = lessons[0];
   const learnHref = firstLesson ? `/courses/${stall.slug}/learn/${firstLesson.id}` : `/courses/${stall.slug}`;
+
+  // 审计修复(2026-07-19)：试读入口与 preview 页同口径——免费节须有 htmlJson,否则按钮是 404 死链。
+  const previewable =
+    lessons.some((l) => l.isFree) &&
+    (await prisma.lesson.count({
+      where: { courseId: stall.id, isFree: true, status: "published", htmlJson: { not: null } },
+    })) > 0;
 
   return (
     <div className="studio-rise mx-auto flex w-full max-w-[1120px] flex-col gap-6">
@@ -216,6 +224,15 @@ export default async function MarketProductPage({
                 );
               })}
             </ul>
+            {/* 蓝图 D4 入口：集市商品页免登录试读首个免费课件——「先看货再决定拿走/购买」的转化钩子。 */}
+            {previewable && (
+              <Link
+                href={`/courses/${stall.slug || stall.id}/preview`}
+                className="studio-press mt-3 inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)]"
+              >
+                <Play size={14} weight="fill" className="text-[var(--red)]" /> 免登录试读课件
+              </Link>
+            )}
           </div>
         </div>
 

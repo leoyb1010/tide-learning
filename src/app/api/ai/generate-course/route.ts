@@ -4,7 +4,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
-import { requireLLMAccess } from "@/lib/ai-guard";
+import { requireCourseGenAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
@@ -38,12 +38,13 @@ interface OutlineResult {
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    // 权益闸门：AI 能力需订阅（余额预检留到限流之后，保持原有先限流再预检的顺序）
-    const { user, snapshot } = await requireLLMAccess({ precheckSpend: false });
+    // 权益闸门（蓝图 D5）：订阅者照旧；免费用户每月 N 次体验造课（standard 档 + free tier 模型，
+    // 见 requireCourseGenAccess）。余额预检留到限流之后，保持原有顺序。
+    const { user, snapshot } = await requireCourseGenAccess({ precheckSpend: false });
 
     // 端点级幂等（P2）：同一用户已有未完成的造课请求（进程内 in-flight 锁）直接拒绝，
     // 防双击/重放并发建两门课、双份大纲扣费。finally 释放。
-    if (!acquireInflight("generate_course", user.id)) {
+    if (!acquireInflight("course_gen", user.id)) {
       return fail("已有生成任务进行中，请稍后再试", 409);
     }
     try {
@@ -210,7 +211,7 @@ export async function POST(req: NextRequest) {
         lessons: created.lessons,
       });
     } finally {
-      releaseInflight("generate_course", user.id);
+      releaseInflight("course_gen", user.id);
     }
   });
 }

@@ -296,6 +296,42 @@ export async function ensureMonthlyGrant(
 }
 
 /**
+ * 蓝图 D5（审查 P1-9）：免费用户月度体验积分——解「不订阅→没体验过造课→不订阅」的冷启动死锁。
+ * 额度走 env FREE_MONTHLY_CREDITS（默认 100 分 ≈ 一门 standard 课），水位线复用 monthlyGrantKey
+ * 列、键前缀 "free:" 与会员月赠区分。月中升级订阅时会员月赠仍可发（键不同），双发上限一次、金额小，
+ * 属可接受的宽松侧取舍。发放幂等/防并发与 ensureMonthlyGrant 同款事务二次确认。
+ */
+export function freeMonthlyCreditAmount(): number {
+  const n = Number(process.env.FREE_MONTHLY_CREDITS);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 100;
+}
+
+export async function ensureFreeMonthlyGrant(userId: string, monthKey: string): Promise<void> {
+  const amount = freeMonthlyCreditAmount();
+  if (amount <= 0) return; // 运营可用 FREE_MONTHLY_CREDITS=0 关闭免费体验
+  const freeKey = `free:${monthKey}`;
+  await ensureAccount(userId);
+  // 审计修复：水位线改用不可变台账 (type, refId) 查重，**不写 monthlyGrantKey**——
+  // 此前与会员月赠共用该列互相覆盖，订阅态每翻转一次即可再领一轮（月度幂等被打穿）。
+  const already = await prisma.creditLedger.findFirst({
+    where: { userId, type: "monthly_grant", refId: freeKey },
+    select: { id: true },
+  });
+  if (already) return;
+  await prisma.$transaction(async (tx) => {
+    const fresh = await tx.creditLedger.findFirst({ where: { userId, type: "monthly_grant", refId: freeKey }, select: { id: true } });
+    if (fresh) return; // 事务内二次确认防并发双发
+    const updated = await tx.creditAccount.update({
+      where: { userId },
+      data: { balance: { increment: amount }, totalEarned: { increment: amount } },
+    });
+    await tx.creditLedger.create({
+      data: { userId, delta: amount, type: "monthly_grant", refId: freeKey, balanceAfter: updated.balance, reason: `${monthKey} 免费体验积分 (+${amount})` },
+    });
+  });
+}
+
+/**
  * 便捷 helper：把 llm.ts 的 onUsage 回调直接对接到记账。
  * P2-2：改用 Next 的 after()——onUsage 常在流式生成过程中触发，此时用 fire-and-forget 的 void
  * 记账可能随响应返回被打断而丢账。after() 保证「响应体返回后」仍在同一请求生命周期内落账。

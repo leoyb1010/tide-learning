@@ -13,7 +13,7 @@ export interface CourseTemplate {
   key: string; // 落库到 Course.template
   label: string; // UI 卡片标题
   tagline: string; // UI 卡片一句话
-  icon: string; // phosphor 图标名（前端 ICON_MAP 映射）
+  icon: string; // 图标名（遗产字段:卡面已改用 TemplateCardArt 迷你样张,仅 API 契约保留）
   recommendedFor: string; // 适合什么内容（UI hover）
   outlineRules: string; // 注入大纲 system 的结构规则段
   lessonRecipe: string; // 注入逐节 system 的块配方段（最关键）

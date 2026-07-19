@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { requireLLMAccess } from "@/lib/ai-guard";
+import { requireCourseGenAccess } from "@/lib/ai-guard";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 import { structureImportedTextIntoCourse, MIN_IMPORT_TEXT, MAX_IMPORT_TEXT } from "@/lib/course-import";
 import { isValidTemplate } from "@/lib/ai/templates";
@@ -22,14 +22,14 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
     // 导入切章为高成本生成（import_source 权重 1.0）：预检按该场景最坏成本设门槛，
     // 与造课对齐，堵住负余额/欠账继续导入。逐节生成扣费在 generateLessonCore 按真实 token 记。
-    const { user, snapshot } = await requireLLMAccess({
+    const { user, snapshot } = await requireCourseGenAccess({
       deniedMessage: "AI 导入为订阅会员权益，订阅后即可使用",
       spendScene: "import_source",
     });
 
     // 端点级幂等（P2）：同一用户已有未完成的导入请求（进程内 in-flight 锁，与文件导入共用同一 key）
     // 直接拒绝，防双击/重放并发建两门课、双份切章扣费。finally 释放。
-    if (!acquireInflight("import_source", user.id)) {
+    if (!acquireInflight("course_gen", user.id)) {
       return fail("已有生成任务进行中，请稍后再试", 409);
     }
     try {
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
       return ok(result);
     } finally {
-      releaseInflight("import_source", user.id);
+      releaseInflight("course_gen", user.id);
     }
   });
 }

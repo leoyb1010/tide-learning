@@ -196,12 +196,45 @@ model Lesson {
   status        String    @default("published")
   publishedAt   DateTime?
   createdAt     DateTime  @default(now())
+  qualityJson   String? // 蓝图 C2：本节质量档案 {score, flags, passed, adherence, regen, safety, visual}（生成/渲染时写入，供质量看板与重生成闭环）
 
-  progress  LearningProgress[]
-  notes     Note[]
-  subtitles Subtitle[]
+  progress    LearningProgress[]
+  notes       Note[]
+  subtitles   Subtitle[]
+  revisions   LessonRevision[]
+  quizResults LessonQuizResult[]
 
   @@index([courseId, sortOrder])
+}
+
+// 蓝图 S1：轻版本化——重生成/重渲染前把旧内容存档（保留最近 3 版），给「后悔药」不做完整 VCS。
+model LessonRevision {
+  id         String   @id @default(cuid())
+  lessonId   String
+  lesson     Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  blocksJson String? // 存档时的内容层真值（可空：仅重渲染 HTML 时 blocks 未变则只存 htmlJson）
+  htmlJson   String? // 存档时的 HTML 契约
+  reason     String // rerender / regen / manual —— 触发存档的入口
+  createdAt  DateTime @default(now())
+
+  @@index([lessonId, createdAt])
+}
+
+// 蓝图 D2：课件内练习结果——quiz 作答经 ct-quiz 回传宿主后落库，喂错题本/复习卡/掌握度。
+// userId 为软 FK（对齐 Course.authorUserId 口径，删号清理由 account/delete 统一处理）。
+model LessonQuizResult {
+  id          String   @id @default(cuid())
+  userId      String
+  lessonId    String
+  lesson      Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  blockId     String // 块 id（blocksJson 内的 quiz 块）
+  answerIndex Int
+  correct     Boolean
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, lessonId, blockId]) // 同题重答取最新（upsert）
+  @@index([userId, createdAt])
 }
 
 // ---------- 字幕（C1：字幕划线捕捉）----------
@@ -876,9 +909,21 @@ model ReviewCard {
   front        String
   back         String
   dueAt        DateTime // 下次复习
-  ease         Float    @default(2.5)
-  intervalDays Int      @default(0)
+  ease         Float    @default(2.5) // 遗产：简化 SM-2 难度系数（FSRS 换代后仅展示，不驱动调度）
+  intervalDays Int      @default(0) // 遗产/展示：上次排程的间隔天数（FSRS 回填 scheduled_days）
   createdAt    DateTime @default(now())
+
+  // —— FSRS-6 调度状态（v4.4，吸收 ts-fsrs）——
+  // 存量卡这些列为 NULL/0 → 首次评分时按「新卡」冷启动（见 lib/srs reconstructCard）。
+  stability     Float? // 记忆稳定度（天）
+  difficulty    Float? // 卡片难度（1-10）
+  state         Int      @default(0) // 0=New 1=Learning 2=Review 3=Relearning
+  reps          Int      @default(0) // 累计复习次数
+  lapses        Int      @default(0) // 累计遗忘次数
+  elapsedDays   Int      @default(0) // 上次复习到本次的实际间隔
+  scheduledDays Int      @default(0) // 排程间隔
+  learningSteps Int      @default(0) // 学习/再学习步数
+  lastReview    DateTime? // 上次复习时刻
 
   @@index([userId, dueAt])
 }

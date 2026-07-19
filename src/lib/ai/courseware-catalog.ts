@@ -179,27 +179,6 @@ export function getModeProfile(mode: CoursewareMode): ModeProfile {
 }
 
 /**
- * 确定性内容分类器（吸收 scout 的「内容类型驱动」思想）：由 category/template/标题/已生成 block
- * 打出内容标签（code/ai/concept-map/exam/dialogue/lecture）。喂给 mode 路由、LLM 风格指令、未来 affinity 评分。
- * 纯正则 + block 统计，零 LLM。
- */
-export function contentTagsFor(
-  input: { category?: string | null; template?: string | null; title?: string | null },
-  blocks?: Array<{ type: string }>,
-): string[] {
-  const tags = new Set<string>();
-  const t = input.title || "";
-  const hasBlock = (ty: string) => Boolean(blocks && blocks.some((b) => b.type === ty));
-  if (/编程|代码|程序|python|java(?:script)?|前端|后端|算法|开发|命令行|函数|接口|\bapi\b|\bsql\b|\bgit\b|脚本|部署|数据库/i.test(t) || hasBlock("code")) tags.add("code");
-  if (input.category === "ai_skill" || /\bai\b|大模型|人工智能|神经网络|深度学习|机器学习/i.test(t)) tags.add("ai");
-  if (/知识图谱|思维导图|体系|架构|图谱|全景|框架/i.test(t)) tags.add("concept-map");
-  if (input.template === "exam_sprint" || /测验|练习|自测|刷题|考点|冲刺|真题|模拟题/i.test(t)) tags.add("exam");
-  if (/口语|对话|会话|speaking|情景/i.test(t) || hasBlock("dialog")) tags.add("dialogue");
-  if (/讲义|精读|论文|学术|考研|语法|文献|讲座|通识|读写/i.test(t)) tags.add("lecture");
-  return Array.from(tags);
-}
-
-/**
  * 给 LLM 增强路径拼一段「本课风格指令」：mode 的 llmGuidance + 页型词汇 + block 强调。
  * synthesizeViaLLM 注入此段，让模型的 bespoke HTML 贴合内容类型对应的呈现风格（而非千篇一律）。
  */
