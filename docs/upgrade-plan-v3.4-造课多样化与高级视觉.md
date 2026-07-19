@@ -23,7 +23,7 @@
    主造课在 `course-gen.ts:797` 调 `renderAndStoreLessonHtml` → 只走 `renderCoursewareHtml`（确定性）。
    带 `enhance:true` 的 bespoke 路径只在独立按需接口 `generate-lesson-html/route.ts` 被触发。
    → **正常造出来的每一门课都停在确定性「地板」，永远够不到 bespoke「天花板」。** 这是「不够漂亮高级」的根因。
-2. **模型现实约束**：CLAUDE.md 记 DeepSeek 余额 0；记忆里已切到有道 NewAPI 网关（gpt-5.5 / MiniMax-M3 / glm-5.2 / claude-sonnet-5）。
+2. **模型现实约束**：CLAUDE.md 记 DeepSeek 余额 0；记忆里已切到有道 NewAPI 网关（gpt-5.6-sol / MiniMax-M3 / glm-5.2 / claude-sonnet-5）。
    上限路径要产**高级 HTML**，必须路由到强模型，且要成本闸门。
 3. **模板差异「感知不到」**：模板主要改**块内容**（recipe/口吻），对**长相**影响间接。用户翻两门课觉得「长得差不多」。
 4. **确定性底座本身还不够「高级」**：既然 fallback 永远兜底，底座的封面/字阶/留白/节奏就是大多数课的真实观感。
