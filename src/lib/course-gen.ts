@@ -647,6 +647,11 @@ export async function generateLessonCore(lessonId: string, userId: string): Prom
     });
     const allReady = remaining === 0;
     if (allReady && course.genStatus !== "ready") {
+      // 根因修复(2026-07-20)：此收尾是「逐节路径补齐最后一节」的唯一出口（前端逐节重试 /
+      // 续造与后台流水竞速）。此前只置 ready 不渲染 HTML 课件 → 整课 htmlJson 缺失，
+      // 学员端永远回落旧版块课件（部署实锤：opus 邮件课 8/8 有 blocksJson、0/8 有 htmlJson）。
+      // renderAndStoreLessonHtml 有 claim+源哈希短路，与后台流水收尾重复调用为幂等 no-op。
+      await renderCourseHtmlBestEffort(course.id);
       await prisma.course.update({
         where: { id: course.id },
         data: { genStatus: "ready" },
@@ -941,7 +946,7 @@ export async function reconcileStaleGenJobs(userId?: string): Promise<{ reconcil
  * best-effort：为一门课的所有已就绪节渲染确定性 HTML 课件（Web 端多样化高级课件层）。
  * 全段包 try/catch，任何失败都不冒泡（HTML 只是块的表现层，块永远是兜底）。持久化课级 designJson 保稳定。
  */
-async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
+export async function renderCourseHtmlBestEffort(courseId: string): Promise<void> {
   try {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
@@ -1023,34 +1028,35 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     const start = await readGenProgress(courseId);
     let failed = start.failed;
 
-    // —— 逐节积分门（P1-3 修复）——
+    // —— 逐节积分门（P1-3 修复；2026-07-20 根因返修）——
     // 此前整课扇出只在入口预检一次(3分)，随后全部空节逐个扣费但不再校验余额，
     // 使余额仅剩个位数的订阅用户可发起 premium 造课把余额刷成大额负数。
-    // 这里按「所选模型 × 逐节典型 token」估单节成本，用累计预估兜底：
-    // 逐节扣费经 creditingOnUsage→after() 延迟落账、循环内读余额会滞后，故不依赖实时余额，
-    // 而是从起始余额减去每节预估成本；投影余额低于单节门槛即停止后续节
-    // （剩余空节留空→收尾判为 failed，前端显示「继续生成」，充值后可续）。
+    // 首版用「起始余额 - 每节预估累减」的投影兜底，但预估按 maxTokens 最坏值估
+    // （opus 预估 120+/节 vs 实扣 28/节），逐节累减把误差放大 4 倍——部署实锤：
+    // 956 分余额在第 7 节被误停，课程收尾 failed、HTML 渲染整段被跳过。
+    // 现改为每节前读实时余额：扣费经 after() 延迟落账最多滞后 1~2 节，
+    // 门槛仍留一整节最坏预估作缓冲，且 recordLlmSpend 本就允许欠账（下次 assertCanSpend 拦），
+    // 最坏透支有界（滞后节实扣 + 一节），不再误伤余额充足的用户。
     const genCourse = await prisma.course.findUnique({
       where: { id: courseId },
       select: { modelUsed: true },
     });
     const genModel = genCourse?.modelUsed ?? undefined;
     const perLessonCost = estimateCredits("generate_lesson", undefined, genModel);
-    let projectedBalance = await getBalanceFresh(userId);
     let stoppedForCredits = false;
 
     for (const { id: lessonId } of pending) {
-      // 投影余额不足以覆盖下一节的预估成本 → 停止扇出，避免一次授权把余额刷成大额负数。
-      if (projectedBalance < perLessonCost) {
+      // 实时余额不足以覆盖下一节的最坏预估成本 → 停止扇出。
+      const balanceNow = await getBalanceFresh(userId);
+      if (balanceNow < perLessonCost) {
         stoppedForCredits = true;
-        console.warn(`[course-gen] 逐节积分门：余额不足（投影 ${projectedBalance} < 单节门槛 ${perLessonCost}），停止后续节`, courseId);
+        console.warn(`[course-gen] 逐节积分门：余额不足（实时 ${balanceNow} < 单节门槛 ${perLessonCost}），停止后续节`, courseId);
         break;
       }
       await updateGenJob(courseId, { currentLessonId: lessonId });
       try {
         const r = await generateLessonCore(lessonId, userId);
         if (r.failed) failed += 1;
-        else projectedBalance -= perLessonCost; // 成功生成才计入预估扣减
       } catch (e) {
         // 越权 / 章节不存在 / 未知异常：标记失败继续，绝不中断整条后台流水
         console.error("[course-gen] lesson failed in background:", lessonId, e);
@@ -1082,6 +1088,8 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       if (stoppedForCredits) {
         console.warn(`[course-gen] 造课因积分不足截停，剩余 ${remaining} 节待续（充值后可继续生成）`, courseId);
       }
+      // 已完成的节也先渲染 HTML（幂等）：截停/部分失败的课在续造前不至于用旧版块课件示人。
+      await renderCourseHtmlBestEffort(courseId);
       await prisma.course.update({ where: { id: courseId }, data: { genStatus: "failed" } });
       await finalizeGenJob(courseId, "failed");
     }
