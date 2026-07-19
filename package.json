@@ -19,7 +19,14 @@
     "db:reset": "prisma migrate reset --force",
     "setup": "prisma generate && npm run db:deploy && npm run db:seed",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "snap:courseware": "tsx scripts/courseware-snapshots.mts",
+    "check:render": "tsx scripts/render-check.mts",
+    "video:courseware": "tsx scripts/export-courseware-video.mts",
+    "check:embed": "tsx scripts/embed-e2e.mts",
+    "audit:quality": "tsx scripts/quality-audit.mts",
+    "rerender:courseware": "tsx scripts/rerender-courseware.mts",
+    "enrich:diagrams": "tsx scripts/enrich-diagrams.mts"
   },
   "dependencies": {
     "@mozilla/readability": "^0.6.0",
@@ -27,14 +34,16 @@
     "@prisma/client": "^6.1.0",
     "@types/jsdom": "^28.0.3",
     "framer-motion": "^12.42.2",
-    "geist": "^1.7.2",
     "jsdom": "^29.1.1",
+    "katex": "^0.18.1",
     "mammoth": "^1.12.0",
     "next": "15.5.20",
     "pdf-parse": "^1.1.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "shiki": "^4.3.1",
+    "ts-fsrs": "^5.4.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",

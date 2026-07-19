@@ -1352,6 +1352,11 @@ body::before {
 /* Markdown 渲染（笔记预览） */
 .tide-md .tide-md-h { font-weight: 600; margin: 0.4em 0 0.2em; color: var(--color-ink-950); }
 .tide-md .tide-md-p { margin: 0.2em 0; }
+/* heti CJK⇄半角间距标注（renderMarkdown 全站产出，空 span 纯视觉留白，不改文本）。 */
+.hs { margin-left: 0.12em; }
+/* heti/现代排版：全角标点挤压 + CJK 严格换行。CJK-拉丁间距由 renderMarkdown 的 .hs 标注负责,
+   显式关掉原生 text-autospace,避免 Safari 18.4+ 原生间距与 .hs 叠加成双倍留白。 */
+.tide-md, .prose-body { text-spacing-trim: normal; text-autospace: no-autospace; line-break: strict; }
 .tide-md .tide-md-ul, .tide-md .tide-md-ol { margin: 0.3em 0; padding-left: 1.2em; }
 .tide-md .tide-md-ul { list-style: disc; }
 .tide-md .tide-md-ol { list-style: decimal; }

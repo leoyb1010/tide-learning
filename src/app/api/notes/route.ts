@@ -1,6 +1,7 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { recordActivity } from "@/lib/gamification";
 import { requireUser, getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, canAccessLesson } from "@/lib/entitlement";
 import { hasPurchasedCourse } from "@/lib/queries";
@@ -278,6 +279,9 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       properties: { course_id: courseId, lesson_id: lessonId, kind, source, has_timestamp: timestampSec != null },
     });
+
+    // 蓝图 D1（审查 P0-7）：记笔记计入激励系统（潮汐日历 notes 水位 + streak 当日点亮）。
+    after(() => recordActivity(user.id, { notes: 1 }).catch(() => {}));
 
     // 拍平标签结构，与 GET 列表一致
     return ok({ ...note, tags: note.tags.map((t) => t.tag) });

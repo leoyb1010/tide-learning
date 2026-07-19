@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/session";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { requireLLMAccess } from "@/lib/ai-guard";
+import { requireLessonGenAccess } from "@/lib/ai-guard";
 import { generateLessonCore } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +19,23 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    // 逐节生成为高成本 AI（generate_lesson 权重 1.0）：预检按该场景最坏成本设门槛，
-    // 与造课对齐，堵住负余额/欠账继续逐节刷。扣费在内核 generateLessonCore 按真实 token 记。
-    const { user } = await requireLLMAccess({ spendScene: "generate_lesson" });
 
-    assertUserRateLimit(user.id, "ai_gen_lesson", 60, 3_600_000);
+    // 审计修复：鉴权+限流必须先于任何业务 DB 触达——否则匿名请求可用随机 lessonId
+    // 无限流打库。requireUser 在最前（401 短路），限流其次，之后才查归属。
+    const preUser = await requireUser();
+    assertUserRateLimit(preUser.id, "ai_gen_lesson", 60, 3_600_000);
 
     const body = (await req.json().catch(() => null)) as { lessonId?: string } | null;
     const lessonId = body?.lessonId?.trim();
     if (!lessonId) return fail("缺少 lessonId");
+
+    // 蓝图 D5：取目标节归属，免费用户对「自己名下的体验课」放行逐节流水（重试/续跑可用）；
+    // 其余仍走会员门。余额预检按 generate_lesson 最坏成本，扣费在内核按真实 token 记。
+    const target = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { course: { select: { authorUserId: true } } },
+    });
+    const { user } = await requireLessonGenAccess(target?.course?.authorUserId, { spendScene: "generate_lesson" });
 
     // 内核负责：越权校验 / LLM 生成 / 校验重试 / 降级 / 扣费 / 写库 / genStatus 收尾。
     // 结构性错误（章节不存在 / 越权）以 Error 抛出，这里映射为 4xx。

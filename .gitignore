@@ -34,3 +34,8 @@ ios/**/*.xcodeproj/
 ios/**/xcuserdata/
 ios/**/.DS_Store
 dist/
+
+# 一次性审查报告截图目录(体积大,勿入库)
+/report/
+/report-v*/
+

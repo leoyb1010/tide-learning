@@ -1,121 +1,95 @@
 import { describe, it, expect } from "vitest";
-import {
-  scheduleNext,
-  DAY_MS,
-  EASE_DEFAULT,
-  EASE_MAX,
-  EASE_MIN,
-} from "@/lib/srs";
+import { scheduleFsrs, Grade, isGrade, rememberedToGrade, DAY_MS } from "@/lib/srs";
 
 /**
- * SRS（简化 SM-2）调度纯函数单测。
- *
- * 目标：锁死 scheduleNext 的行为，等价于 /api/ai/review-card PATCH 此前的内联实现——
- *   - 记得：ease += 0.1（上限 2.8）；首次 → 1 天，之后 max(1, round(旧间隔 × 新 ease))。
- *   - 忘了：ease -= 0.2（下限 1.3）；间隔重置 1 天。
- *   - dueAt = now + intervalDays 天。
+ * SRS（FSRS-6）调度单测。
+ * 旧「简化 SM-2」已于 2026-07-19 换代删除（无生产回退路径），其测试段随之移除（git 历史可查）。
  * 所有用例注入固定 now，避免依赖真实时钟。
  */
 
-// 固定基准时刻，dueAt 断言可精确到毫秒。
-const NOW = Date.UTC(2026, 6, 5, 0, 0, 0); // 2026-07-05T00:00:00Z
+const NOW = Date.UTC(2026, 6, 19, 0, 0, 0);
 
-describe("scheduleNext —— 首次复习", () => {
-  it("首次记得（间隔 0）→ 间隔 1 天，ease 升 0.1", () => {
-    const r = scheduleNext({ ease: EASE_DEFAULT, intervalDays: 0 }, true, NOW);
-    expect(r.intervalDays).toBe(1);
-    expect(r.ease).toBeCloseTo(2.6, 10);
-    expect(r.dueAt.getTime()).toBe(NOW + 1 * DAY_MS);
-  });
-
-  it("首次忘了（间隔 0）→ 间隔 1 天，ease 降 0.2", () => {
-    const r = scheduleNext({ ease: EASE_DEFAULT, intervalDays: 0 }, false, NOW);
-    expect(r.intervalDays).toBe(1);
-    expect(r.ease).toBeCloseTo(2.3, 10);
-    expect(r.dueAt.getTime()).toBe(NOW + 1 * DAY_MS);
-  });
-
-  it("ease 缺省（null/undefined）按 2.5 起算", () => {
-    const rNull = scheduleNext({ ease: null, intervalDays: 0 }, true, NOW);
-    expect(rNull.ease).toBeCloseTo(2.6, 10);
-    const rUndef = scheduleNext({ intervalDays: 0 }, true, NOW);
-    expect(rUndef.ease).toBeCloseTo(2.6, 10);
+describe("isGrade —— 评分校验", () => {
+  it("只接受 1/2/3/4", () => {
+    for (const g of [1, 2, 3, 4]) expect(isGrade(g)).toBe(true);
+    for (const g of [0, 5, -1, 3.5, "3", null, undefined, NaN]) expect(isGrade(g)).toBe(false);
   });
 });
 
-describe("scheduleNext —— 记得（已有间隔）", () => {
-  it("间隔翻倍并乘以更新后的 ease，四舍五入", () => {
-    // ease 2.5 → 2.6；间隔 4 × 2.6 = 10.4 → round 10
-    const r = scheduleNext({ ease: 2.5, intervalDays: 4 }, true, NOW);
-    expect(r.ease).toBeCloseTo(2.6, 10);
-    expect(r.intervalDays).toBe(10);
-    expect(r.dueAt.getTime()).toBe(NOW + 10 * DAY_MS);
-  });
-
-  it("四舍五入向上取整示例（round，非 floor）", () => {
-    // ease 1.7 → 1.8；间隔 3 × 1.8 = 5.4 → round 5
-    expect(scheduleNext({ ease: 1.7, intervalDays: 3 }, true, NOW).intervalDays).toBe(5);
-    // ease 1.9 → 2.0；间隔 3 × 2.0 = 6 → 6
-    expect(scheduleNext({ ease: 1.9, intervalDays: 3 }, true, NOW).intervalDays).toBe(6);
-  });
-
-  it("间隔至少为 1（下限保护）", () => {
-    // 极端：间隔 1 × ease 1.4（1.3+0.1）= 1.4 → round 1
-    const r = scheduleNext({ ease: 1.3, intervalDays: 1 }, true, NOW);
-    expect(r.intervalDays).toBeGreaterThanOrEqual(1);
-    expect(r.intervalDays).toBe(1);
+describe("rememberedToGrade —— 两键兼容映射", () => {
+  it("记得→Good(3)，忘了→Again(1)", () => {
+    expect(rememberedToGrade(true)).toBe(Grade.Good);
+    expect(rememberedToGrade(false)).toBe(Grade.Again);
   });
 });
 
-describe("scheduleNext —— ease 上下限", () => {
-  it("记得时 ease 封顶 2.8（不超过上限）", () => {
-    // 2.8 + 0.1 = 2.9 → 封顶 2.8
-    const r = scheduleNext({ ease: EASE_MAX, intervalDays: 5 }, true, NOW);
-    expect(r.ease).toBe(EASE_MAX);
-    // 间隔 5 × 2.8 = 14
-    expect(r.intervalDays).toBe(14);
+describe("scheduleFsrs —— 新卡冷启动（存量卡 stability/difficulty 为空）", () => {
+  const newCard = { dueAt: new Date(NOW), stability: null, difficulty: null, state: 0 };
+
+  it("Good → 进入学习态，产出正的 stability/difficulty", () => {
+    const r = scheduleFsrs(newCard, Grade.Good, NOW);
+    expect(r.state).toBe(1); // Learning
+    expect(r.stability).toBeGreaterThan(0);
+    expect(r.difficulty).toBeGreaterThan(0);
+    expect(r.reps).toBe(1);
+    expect(r.dueAt.getTime()).toBeGreaterThanOrEqual(NOW);
+    expect(r.lastReview.getTime()).toBe(NOW);
   });
 
-  it("接近上限时抬到但不越过 2.8", () => {
-    // 2.75 + 0.1 = 2.85 → 封顶 2.8
-    const r = scheduleNext({ ease: 2.75, intervalDays: 2 }, true, NOW);
-    expect(r.ease).toBe(EASE_MAX);
+  it("Easy → 直接跳到复习态，间隔明显更长", () => {
+    const good = scheduleFsrs(newCard, Grade.Good, NOW);
+    const easy = scheduleFsrs(newCard, Grade.Easy, NOW);
+    expect(easy.state).toBe(2); // Review
+    expect(easy.scheduledDays).toBeGreaterThan(good.scheduledDays);
   });
 
-  it("忘了时 ease 触底 1.3（不低于下限）", () => {
-    // 1.3 - 0.2 = 1.1 → 触底 1.3
-    const r = scheduleNext({ ease: EASE_MIN, intervalDays: 20 }, false, NOW);
-    expect(r.ease).toBe(EASE_MIN);
-    expect(r.intervalDays).toBe(1);
-  });
-
-  it("接近下限时压到但不越过 1.3", () => {
-    // 1.4 - 0.2 = 1.2 → 触底 1.3
-    const r = scheduleNext({ ease: 1.4, intervalDays: 20 }, false, NOW);
-    expect(r.ease).toBe(EASE_MIN);
-  });
-});
-
-describe("scheduleNext —— 忘了总是重置间隔", () => {
-  it("无论旧间隔多大，忘了都归 1 天", () => {
-    for (const interval of [0, 1, 7, 30, 365]) {
-      const r = scheduleNext({ ease: 2.5, intervalDays: interval }, false, NOW);
-      expect(r.intervalDays).toBe(1);
-      expect(r.dueAt.getTime()).toBe(NOW + 1 * DAY_MS);
-    }
+  it("四档区分度：Again ≤ Hard ≤ Good ≤ Easy 的稳定度单调不减", () => {
+    const s = [Grade.Again, Grade.Hard, Grade.Good, Grade.Easy].map(
+      (g) => scheduleFsrs(newCard, g, NOW).stability,
+    );
+    for (let i = 1; i < s.length; i++) expect(s[i]).toBeGreaterThanOrEqual(s[i - 1]);
   });
 });
 
-describe("scheduleNext —— 纯函数性（不依赖真实时钟）", () => {
-  it("相同入参与 now 产出完全一致（可确定复现）", () => {
-    const a = scheduleNext({ ease: 2.5, intervalDays: 4 }, true, NOW);
-    const b = scheduleNext({ ease: 2.5, intervalDays: 4 }, true, NOW);
+describe("scheduleFsrs —— 成熟卡（复习态）", () => {
+  const mature = {
+    dueAt: new Date(NOW),
+    stability: 15,
+    difficulty: 5,
+    state: 2,
+    reps: 5,
+    lapses: 1,
+    elapsedDays: 15,
+    scheduledDays: 15,
+    learningSteps: 0,
+    lastReview: new Date(NOW - 15 * DAY_MS),
+  };
+
+  it("Good → 间隔在旧间隔基础上增长（FSRS 相比 SM-2 的核心优势）", () => {
+    const r = scheduleFsrs(mature, Grade.Good, NOW);
+    expect(r.scheduledDays).toBeGreaterThan(15);
+    expect(r.state).toBe(2);
+    expect(r.reps).toBe(6);
+  });
+
+  it("Again → 记一次遗忘（lapses+1）并转再学习态", () => {
+    const r = scheduleFsrs(mature, Grade.Again, NOW);
+    expect(r.lapses).toBe(2);
+    expect(r.state).toBe(3); // Relearning
+  });
+
+  it("纯函数：同输入同 now 完全可复现", () => {
+    const a = scheduleFsrs(mature, Grade.Good, NOW);
+    const b = scheduleFsrs(mature, Grade.Good, NOW);
     expect(a).toEqual(b);
   });
 
-  it("不修改入参对象", () => {
-    const card = { ease: 2.5, intervalDays: 4 };
-    scheduleNext(card, true, NOW);
-    expect(card).toEqual({ ease: 2.5, intervalDays: 4 });
+  it("调度产物的整数列恒为整数（Prisma Int 列安全）", () => {
+    for (const g of [Grade.Again, Grade.Hard, Grade.Good, Grade.Easy]) {
+      const r = scheduleFsrs(mature, g, NOW);
+      for (const v of [r.state, r.reps, r.lapses, r.elapsedDays, r.scheduledDays, r.learningSteps, r.intervalDays]) {
+        expect(Number.isInteger(v)).toBe(true);
+      }
+    }
   });
 });

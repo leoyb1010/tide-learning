@@ -6,6 +6,7 @@ import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { track } from "@/lib/analytics";
 import { notify } from "@/lib/notify";
+import { scanContentSafety } from "@/lib/content-safety";
 
 export const dynamic = "force-dynamic";
 
@@ -179,6 +180,20 @@ export async function POST(req: NextRequest) {
     const priceProvided = body?.priceCredits !== undefined;
     const priceChanged = priceProvided && (oldPrice ?? 0) !== (priceForDb ?? 0);
 
+    // 审计修复(2026-07-19 P2·审核 TOCTOU)：语义1/2 的改文案路径此前完全不复审——
+    // 干净文案过审上架后,可改成违规/引流文案白嫖集市展示位。这两条路径的新文案先过
+    // 黑名单+内容安全机检,任何命中(含 review 级)直接拒:有争议的文案请走语义3 重新上架送审,
+    // 那条路 review 级会正确落 pending 人工复核,不在这里悄悄放行。
+    if (
+      (body?.action === "update" || course.sharedStatus === "shared") &&
+      (displayData.title !== undefined || displayData.subtitle !== undefined)
+    ) {
+      const nextText = `${displayData.title ?? course.title}\n${displayData.subtitle ?? course.subtitle ?? ""}`;
+      if (hitBlocklist(nextText) || scanContentSafety(nextText).level !== "ok") {
+        return fail("新文案含违规或需审核的表述，请修改后重试");
+      }
+    }
+
     // —— 语义 1：action="update" —— 仅更新展示信息/定价，不动 sharedStatus、不触发审核。
     if (body?.action === "update") {
       const data: Record<string, unknown> = { ...displayData };
@@ -255,6 +270,28 @@ export async function POST(req: NextRequest) {
       return fail("课程标题或简介含违规词，请修改后再分享");
     }
 
+    // —— 1.5 蓝图 C4（审查 P1-5）：正文安全机检——此前只审标题+简介，课程正文裸奔上架。
+    // block 级：秒拒；review 级：即便 LLM 判 approved 也强制降级 pending 走人工（集市高门槛）。
+    const lessonBodies = await prisma.lesson.findMany({
+      where: { courseId: course.id },
+      select: { blocksJson: true, articleMd: true },
+      take: 60,
+    });
+    const bodyText = lessonBodies
+      .map((l) => `${l.blocksJson ?? ""}\n${l.articleMd ?? ""}`)
+      .join("\n")
+      .slice(0, 200_000);
+    const bodySafety = scanContentSafety(bodyText);
+    if (bodySafety.level === "block") {
+      await prisma.course.update({ where: { id: course.id }, data: { sharedStatus: "rejected" } });
+      await track({
+        eventName: "market_share",
+        userId: user.id,
+        properties: { courseId: course.id, verdict: "rejected", reason: "content_safety_block", hits: bodySafety.hits.map((h) => h.word).slice(0, 10) },
+      });
+      return fail("课程内容含违规信息，无法分享到集市");
+    }
+
     // —— 2. LLM 审核（标题 + 简介）——
     const system =
       "你是学习平台「课程集市」的内容审核员。集市展示用户自己用 AI 造或导入整理的课程，供他人申请学习。" +
@@ -282,6 +319,12 @@ export async function POST(req: NextRequest) {
       // AI 不可用时降级为 pending（进人工队列）
       verdict = "pending";
       reason = "审核服务繁忙，已转人工复核";
+    }
+
+    // 蓝图 C4：正文 review 级命中 → 不允许自动过审，强制转人工复核。
+    if (bodySafety.level === "review" && verdict === "approved") {
+      verdict = "pending";
+      reason = "课程正文含需人工复核的表述";
     }
 
     const sharedStatus = verdict === "approved" ? "shared" : verdict === "pending" ? "pending" : "rejected";

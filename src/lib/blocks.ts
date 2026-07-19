@@ -2,7 +2,8 @@
  * 块协议 —— AI 生成课/导入课的结构化课件单元（纯函数，无副作用，无 IO）。
  *
  * 设计要点：
- *   - 白名单类型：只认 concept/code/quiz/keypoint/callout 五种块，其余一律丢弃。
+ *   - 白名单类型：只认 BLOCK_TYPES 里的 14 种块（concept/code/quiz/keypoint/callout/
+ *     objectives/scene/dialog/steps/compare/example/flashcard/summary/image），其余一律丢弃。
  *   - 永不抛错：validateBlocks 无论输入多脏，都返回合法数组（哪怕空数组）——
  *     LLM 输出不可信，校验层是最后一道防线，绝不把非法结构写进库。
  *   - 稳定 id：每块生成可复现前缀 + 随机后缀，供伴侣锚点 / 笔记 anchorRef 引用。
@@ -26,12 +27,25 @@ export type Block =
   | { type: "example"; markdown: string } // 例子/案例
   | { type: "flashcard"; front: string; back: string } // 内联翻转卡，可存复习
   | { type: "summary"; markdown: string; next?: string } // 节尾小结 + 下节预告钩子
-  | { type: "image"; src: string; caption?: string; alt?: string }; // 课件图解：站内图 + 可选说明/替代文本
-
-export interface CourseBlocks {
-  version: 1;
-  blocks: (Block & { id: string })[];
-}
+  | { type: "image"; src: string; caption?: string; alt?: string } // 课件图解：站内图 + 可选说明/替代文本
+  // v4.3 公式块（吸收 KaTeX）：latex 源，服务端渲染为自包含 HTML；display=独立居中/inline=行内。
+  | { type: "formula"; latex: string; display?: boolean; caption?: string }
+  // v4.3 交互块（吸收 H5P 交互设计，自研确定性渲染 + 判分回传 ct-quiz 进错题闭环）：
+  //  - fillblank 填空：blanks 由学员键入，每空 answers 多写法都算对；
+  //  - dragwords 拖词：blanks 从打乱的词库（正解 + 干扰词）点选填入（移动友好，不用 HTML5 拖拽）。
+  | { type: "fillblank"; prompt?: string; segments: string[]; blanks: string[][] }
+  | { type: "dragwords"; prompt?: string; segments: string[]; blanks: string[]; distractors?: string[] }
+  // v4.3 语义图示（leohtml 图示纪律:结构取自关系、节点必须有完整标签与明确方向,拒绝装饰性无标签图形）
+  | {
+      type: "diagram";
+      /** 关系→结构:flow=顺序流程 cycle=循环运转 hub=中心与参与者 layers=层级(自顶向下) funnel=筛选/转化 */
+      kind: "flow" | "cycle" | "hub" | "layers" | "funnel";
+      title?: string;
+      /** 节点标签取自内容本身;flow/funnel 末项=结果,hub 首项=中心。 */
+      items: { label: string; detail?: string }[];
+      /** 一句话点明图示要说明的结论(渲染在图下方)。 */
+      note?: string;
+    };
 
 // —— 约束常量 ——
 const MAX_MARKDOWN = 4000;
@@ -42,8 +56,20 @@ const MAX_TURNS = 20; // dialog 轮次上限
 const MAX_STEPS = 12; // steps 步骤上限
 const BLOCK_TYPES = new Set([
   "concept", "code", "quiz", "keypoint", "callout",
-  "objectives", "scene", "dialog", "steps", "compare", "example", "flashcard", "summary", "image",
+  "objectives", "scene", "dialog", "steps", "compare", "example", "flashcard", "summary", "image", "diagram", "formula",
+  "fillblank", "dragwords",
 ]);
+
+/** 公式 latex 长度上限（防超长 latex 撑爆渲染/存储）。 */
+const MAX_LATEX = 1200;
+/** 交互块：空数上限（防异常长），词库干扰词上限。 */
+const MAX_BLANKS = 8;
+const MAX_DISTRACTORS = 8;
+
+/** diagram 块 kind 白名单与节点数窗口(cycle/hub 至少 3 个节点才成形)。 */
+const DIAGRAM_KINDS = new Set(["flow", "cycle", "hub", "layers", "funnel"]);
+const DIAGRAM_MIN: Record<string, number> = { flow: 2, cycle: 3, hub: 3, layers: 2, funnel: 2 };
+const MAX_DIAGRAM_ITEMS = 6;
 
 /**
  * 图片块 src 白名单前缀：只认站内绝对路径（/ 开头，指向 public/ 下真实资产）。
@@ -78,9 +104,27 @@ function clampStr(v: unknown, max: number): string {
   return v.length > max ? v.slice(0, max) : v;
 }
 
-/** 生成稳定块 id：blk_ + 序号 + 随机后缀。 */
+/**
+ * 块 id（审计修复 2026-07-18）：必须**确定性且跨解析稳定**——课件 HTML 的 data-bid、
+ * LessonQuizResult 幂等键、错题转复习卡的块匹配都以它为锚。原实现带 Math.random 后缀，
+ * 同一 blocksJson 每次 validate 得到不同 id，导致答题回传的 bid 永远匹配不上（D2 闭环断裂）。
+ * 现规则：入参块自带合法 id 则原样保留（存量 blocksJson 已含持久化 id），否则用纯序号 id。
+ */
 function makeId(index: number): string {
-  return `blk_${index}_${Math.random().toString(36).slice(2, 8)}`;
+  return `blk_${index}`;
+}
+
+function keepId(raw: unknown, index: number, seen: Set<string>): string {
+  let id = makeId(index);
+  if (raw && typeof raw === "object" && typeof (raw as { id?: unknown }).id === "string") {
+    const explicit = (raw as { id: string }).id.trim();
+    if (/^[\w-]{1,64}$/.test(explicit)) id = explicit;
+  }
+  // 去重（审计修复 H3）：LLM 回声/混合输入可能带重复 id——重复 bid 会让 quiz upsert 幂等键
+  // 撞车(后答覆盖先答)、错题转卡 find 恒取第一个。确定性追加后缀,同输入必得同输出。
+  while (seen.has(id)) id = `${id}_dup`;
+  seen.add(id);
+  return id;
 }
 
 /**
@@ -103,13 +147,14 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
   }
 
   const out: (Block & { id: string })[] = [];
+  const seenIds = new Set<string>();
   for (const item of arr) {
     if (!item || typeof item !== "object") continue;
     const b = item as Record<string, unknown>;
     const type = b.type;
     if (typeof type !== "string" || !BLOCK_TYPES.has(type)) continue;
 
-    const id = makeId(out.length);
+    const id = keepId(b, out.length, seenIds);
 
     switch (type) {
       case "concept": {
@@ -255,6 +300,78 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
         out.push(block);
         break;
       }
+      case "formula": {
+        // 公式块：latex 必填（截断防爆）；display 缺省 true（独立居中，课件里公式一般单列展示）。
+        const latex = clampStr(b.latex, MAX_LATEX);
+        if (!latex) continue;
+        const caption = clampStr(b.caption, 200);
+        const block: Block & { id: string } = { id, type: "formula", latex, display: b.display !== false };
+        if (caption) block.caption = caption;
+        out.push(block);
+        break;
+      }
+      case "fillblank": {
+        // 填空：segments 文本段（N 段）与 blanks（N-1 个空，每空多写法）交替。
+        // 段可为空串（空在句首/两空相邻是合法结构位），故保留空串、只截长限量。
+        const segments = (Array.isArray(b.segments) ? b.segments : [])
+          .filter((s): s is string => typeof s === "string")
+          .map((s) => clampStr(s, 400))
+          .slice(0, MAX_BLANKS + 1);
+        const rawBlanks = Array.isArray(b.blanks) ? b.blanks : [];
+        const blanks = rawBlanks
+          .map((alt) => clampStrArray(alt, 80, 6))
+          .filter((alt) => alt.length > 0)
+          .slice(0, MAX_BLANKS);
+        // 结构成立：至少 1 个空，且段数 = 空数 + 1（渲染按 seg,blank,seg,blank… 交替）。
+        if (blanks.length === 0 || segments.length !== blanks.length + 1) continue;
+        const prompt = clampStr(b.prompt, 200);
+        const block: Block & { id: string } = { id, type: "fillblank", segments, blanks };
+        if (prompt) block.prompt = prompt;
+        out.push(block);
+        break;
+      }
+      case "dragwords": {
+        // 拖词：segments（N 段）与 blanks（N-1 个正解词）交替；distractors 干扰词入词库。
+        // 段同 fillblank 允许空串（结构位）。
+        const segments = (Array.isArray(b.segments) ? b.segments : [])
+          .filter((s): s is string => typeof s === "string")
+          .map((s) => clampStr(s, 400))
+          .slice(0, MAX_BLANKS + 1);
+        const blanks = clampStrArray(b.blanks, 60, MAX_BLANKS);
+        if (blanks.length === 0 || segments.length !== blanks.length + 1) continue;
+        const distractors = clampStrArray(b.distractors, 60, MAX_DISTRACTORS);
+        const prompt = clampStr(b.prompt, 200);
+        const block: Block & { id: string } = { id, type: "dragwords", segments, blanks };
+        if (distractors.length) block.distractors = distractors;
+        if (prompt) block.prompt = prompt;
+        out.push(block);
+        break;
+      }
+      case "diagram": {
+        // 语义图示铁律（leohtml）：kind 白名单、节点须有标签、数量落在该结构成形的窗口内,否则整块丢弃。
+        const kind = typeof b.kind === "string" && DIAGRAM_KINDS.has(b.kind) ? (b.kind as "flow") : null;
+        if (!kind) continue;
+        const rawItems = Array.isArray(b.items) ? b.items : [];
+        const items = rawItems
+          .filter((s): s is Record<string, unknown> => Boolean(s) && typeof s === "object")
+          .map((s) => {
+            const label = clampStr(s.label, 40);
+            const detail = clampStr(s.detail, 90);
+            const item: { label: string; detail?: string } = { label };
+            if (detail) item.detail = detail;
+            return item;
+          })
+          .filter((s) => s.label)
+          .slice(0, MAX_DIAGRAM_ITEMS);
+        if (items.length < (DIAGRAM_MIN[kind] ?? 2)) continue;
+        const title = clampStr(b.title, 60);
+        const note = clampStr(b.note, 140);
+        const block: Block & { id: string } = { id, type: "diagram", kind, items };
+        if (title) block.title = title;
+        if (note) block.note = note;
+        out.push(block);
+        break;
+      }
     }
   }
   return out;
@@ -321,6 +438,30 @@ export function blocksToPlainText(blocks: (Block & { id: string })[]): string {
         if (b.caption) parts.push(b.caption);
         else if (b.alt) parts.push(b.alt);
         break;
+      case "diagram":
+        if (b.title) parts.push(b.title);
+        parts.push(b.items.map((s) => `${s.label}${s.detail ? `: ${s.detail}` : ""}`).join(" → "));
+        if (b.note) parts.push(b.note);
+        break;
+      case "formula":
+        // 公式无自然语言，取 caption 作可读文本（供检索/伴侣上下文）；latex 本身不入检索。
+        if (b.caption) parts.push(b.caption);
+        break;
+      case "fillblank": {
+        // 还原完整句（空处填第一个正解），供检索/伴侣上下文。
+        let s = b.segments[0] ?? "";
+        b.blanks.forEach((alt, i) => { s += (alt[0] ?? "____") + (b.segments[i + 1] ?? ""); });
+        if (b.prompt) parts.push(b.prompt);
+        parts.push(s);
+        break;
+      }
+      case "dragwords": {
+        let s = b.segments[0] ?? "";
+        b.blanks.forEach((w, i) => { s += w + (b.segments[i + 1] ?? ""); });
+        if (b.prompt) parts.push(b.prompt);
+        parts.push(s);
+        break;
+      }
     }
   }
   return parts.join("\n\n").trim();

@@ -11,9 +11,13 @@
 `next dev` 会对**每个路由首次访问按需编译**（冷 1~1.5s+，热才 ~20ms）——这就是「每个页面都很慢」的来源，不是代码问题。**给别人体验/演示的测试版应跑生产构建**（零按需编译，实测冷 200 响应 5~50ms，快 30~150 倍）：
 - 一键：`preview_start("tide-prod")`（launch.json 已配，会 `npm run build` 后 `next start`）。
 - 或手动：`npm run build` 后
-  `env DATABASE_URL="file:/Users/leoyuan/tide-work/prisma/dev.db" PAY_MOCK_SECRET="<非示例随机值>" ./node_modules/.bin/next start -p 3100`
-- ⚠️ 生产守卫（`src/instrumentation.ts`）会 fail-fast 拒绝启动，必须满足：**DATABASE_URL 用绝对路径**（本地库真身在 `prisma/dev.db`，Prisma 把相对 `file:` 解析到 schema 目录），**PAY_MOCK_SECRET 不能是示例值 `dev-mock-secret`**。漏配会整站 500。
+  `env DATABASE_URL="file:/Users/leoyuan/tide-work/prisma/dev.db" ALLOW_LOCAL_PRODUCTION=1 STORAGE_MODE=local STREAM_SIGNING_SECRET="<任意≥32字符>" PAY_MOCK_SECRET="<非示例随机值>" ./node_modules/.bin/next start -p 3100`
+- ⚠️ 生产守卫（`src/instrumentation.ts`）会 fail-fast 拒绝启动（2026-07 审计后收紧）。本地预览必须：**`ALLOW_LOCAL_PRODUCTION=1`**（跳过 stripe/HTTPS 域名/持久化目录等真实生产项）、**DATABASE_URL 用绝对路径**、**STORAGE_MODE=local**、**STREAM_SIGNING_SECRET ≥32 字符**、**PAY_MOCK_SECRET 不能是示例值 `dev-mock-secret`**。漏配会启动即抛错/整站 500。
 - dev（`npm run dev`）不触发生产守卫，用于日常改代码 + HMR。
+- ⚠️ **重启生产服要按端口杀**：`lsof -ti :3100 | xargs kill`。Next 15 的真实服务进程叫 `next-server`,
+  `pkill -f "next start"` 只杀得掉包装进程——旧构建残留会导致「页面 200 但静态资源全 400」的诡异半死状态。
+- ⚠️ **dev 服务器运行时绝不能 `npm run build`**：两者共写 `.next`,构建清单会被污染
+  （症状：HTML 引用无哈希的 `main-app.js` → 404 → 全站不水合）。先杀 dev 再 build。
 
 ## 容器宽度规范（STUDIO v2，防对齐漂移）
 页面主容器 `max-w-` 只用这几档，别自创中间值：
@@ -37,4 +41,7 @@
   它以真实 HTTP 响应校验 iOS 消费的高危 DTO（LessonAggregate / MarketStall / ShelfCourse / DeskData / Note 等）的非 Optional 字段与日期格式；任一字段被删/改名/改类型即红，防止 Swift 解码整屏崩。需生产服务器在 3100 运行；脚本只读、可重复跑、不留脏数据。
 - `npm test` 全绿（含 `tests/contract.test.ts`，服务器未起时该组自动 skip 不误红）。
 - 涉及页面/类型改动跑 `npx tsc --noEmit` 无错。
+- **课件/宿主/CSP 相关改动必须跑嵌入层 E2E**：`npm run check:embed`（需 3100 生产服在跑）。
+  它在真实 learn/preview 页断言 ct-ready 握手、iframe 首屏文字、翻页进度上报——快照/单测/契约
+  全绿也发现不了「课件嵌在 App 里被 CSP/宿主问题弄死」这一类 P0（2026-07-19 实锤过一次）。
 - 服务端未捕获的 500 会落盘到 `logs/api-errors-YYYY-MM-DD.jsonl`（已 gitignore），在 `/admin/errors`（仅 admin 角色）查看近 200 条 + 今日计数。

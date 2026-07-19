@@ -1,8 +1,9 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser, getCurrentUser } from "@/lib/session";
 import { getLessonForUser } from "@/lib/queries";
 import { track } from "@/lib/analytics";
+import { recordActivity } from "@/lib/gamification";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 
 // 进度上限：约 24 小时（秒）。翻页 index 同用此上限，实际远小于此，只为挡住溢出/脏数据。
@@ -42,6 +43,12 @@ export async function POST(req: NextRequest) {
     // 到此 view.access 必为 true（上方已挡）；completed 直接以入参为准。
     const canComplete = completed === true;
 
+    // 蓝图 D1：取写前进度，供激励水位按「前进量」保守折算（防高频上报刷水位）。
+    const prevProgress = await prisma.learningProgress.findUnique({
+      where: { userId_lessonId: { userId: user.id, lessonId } },
+      select: { progressSec: true, lastSlideIndex: true },
+    });
+
     await prisma.learningProgress.upsert({
       where: { userId_lessonId: { userId: user.id, lessonId } },
       create: {
@@ -63,6 +70,15 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       properties: { course_id: view.course.id, lesson_id: lessonId, progress_sec: safeProgress, kind: isSlide ? "slide" : "video" },
     });
+    // 蓝图 D1（审查 P0-7）：学习进度接线激励系统——此前 recordActivity 全仓零调用，
+    // streak/潮汐日历/成就对真实用户恒为空。minutes 按前进量折算（回看/重复上报记 0，仅点亮当日）；
+    // 完课至少记 1 分钟。after() 响应后执行，失败静默，不影响进度写入主链。
+    const advancedMinutes = isSlide
+      ? (safeProgress > (prevProgress?.lastSlideIndex ?? 0) ? 1 : 0)
+      : Math.min(30, Math.max(0, Math.round((safeProgress - (prevProgress?.progressSec ?? 0)) / 60)));
+    after(() =>
+      recordActivity(user.id, { minutes: canComplete ? Math.max(1, advancedMinutes) : advancedMinutes }).catch(() => {}),
+    );
     return ok({ saved: true });
   });
 }

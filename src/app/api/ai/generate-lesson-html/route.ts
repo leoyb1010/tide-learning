@@ -1,7 +1,9 @@
 import { NextRequest } from "next/server";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { requireLLMAccess } from "@/lib/ai-guard";
+import { requireLessonGenAccess } from "@/lib/ai-guard";
+import { prisma } from "@/lib/db";
+import { requireUser } from "@/lib/session";
 import { selectModelFor } from "@/lib/ai/models";
 import { generateLessonHtml } from "@/lib/ai/courseware-gen";
 
@@ -19,12 +21,23 @@ export const dynamic = "force-dynamic";
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user, snapshot } = await requireLLMAccess({ spendScene: "generate_lesson_html" });
-    assertUserRateLimit(user.id, "ai_gen_lesson_html", 60, 3_600_000);
+
+    // 审计修复：鉴权+限流先于任何业务 DB 触达（同 generate-lesson，防匿名无限流打库）。
+    const preUser = await requireUser();
+    assertUserRateLimit(preUser.id, "ai_gen_lesson_html", 60, 3_600_000);
 
     const body = (await req.json().catch(() => null)) as { lessonId?: string; enhance?: boolean; model?: string } | null;
     const lessonId = body?.lessonId?.trim();
     if (!lessonId) return fail("缺少 lessonId");
+
+    // 蓝图 D5：免费用户对自己名下课放行（确定性渲染零 LLM 成本）；enhance 精修仍会员专属（下方钳制）。
+    const target = await prisma.lesson.findUnique({
+      where: { id: lessonId },
+      select: { course: { select: { authorUserId: true } } },
+    });
+    const { user, snapshot } = await requireLessonGenAccess(target?.course?.authorUserId, {
+      spendScene: "generate_lesson_html",
+    });
 
     // 按用户档位校验请求模型（tier 门控）：resolveModel/chat 只查 isModelUsable 不查 tier，
     // 直传 body.model 会让「非会员档」绕过 premium 门。此处经 selectModelFor 按 canUseLLM(=会员) 过滤，
@@ -34,7 +47,8 @@ export async function POST(req: NextRequest) {
     let result;
     try {
       result = await generateLessonHtml(lessonId, user.id, {
-        enhance: Boolean(body?.enhance),
+        // 蓝图 D5 钳制：bespoke 精修是订阅权益，免费体验课只走确定性渲染（不花 LLM 钱）。
+        enhance: Boolean(body?.enhance) && snapshot.isSubscriber,
         model: allowedModel?.key ?? null,
       });
     } catch (e) {

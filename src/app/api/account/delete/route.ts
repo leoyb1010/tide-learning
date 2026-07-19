@@ -47,6 +47,8 @@ export async function POST(req: NextRequest) {
       await tx.note.deleteMany({ where: { userId: user.id } });
       await tx.noteTag.deleteMany({ where: { userId: user.id } });
       await tx.learningProgress.deleteMany({ where: { userId: user.id } });
+      // 审计修复：LessonQuizResult.userId 为软 FK,他人课程里的答题记录不会随本人课程级联,须显式清理。
+      await tx.lessonQuizResult.deleteMany({ where: { userId: user.id } });
       await tx.courseReview.deleteMany({ where: { userId: user.id } });
       await tx.coursePurchase.deleteMany({ where: { userId: user.id } });
       await tx.reviewCard.deleteMany({ where: { userId: user.id } });

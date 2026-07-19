@@ -1,5 +1,6 @@
-import { NextRequest } from "next/server";
+import { NextRequest, after } from "next/server";
 import { prisma } from "@/lib/db";
+import { recordActivity } from "@/lib/gamification";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
@@ -7,11 +8,10 @@ import { chatJson } from "@/lib/llm";
 import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
-import { scheduleNext } from "@/lib/srs";
+import { scheduleFsrs, isGrade, rememberedToGrade, Grade, DAY_MS, type GradeValue } from "@/lib/srs";
 
 export const dynamic = "force-dynamic";
 
-const DAY_MS = 86_400_000;
 const MAX_FRONT = 500;
 const MAX_BACK = 2000;
 // 拼接笔记文本的总量上限（与 generate-exam 的素材 12_000 口径一致），防超长 prompt 撑爆成本
@@ -202,18 +202,19 @@ export async function GET(req: NextRequest) {
     const practice = new URL(req.url).searchParams.get("practice") === "1";
 
     // 加练模式：从未到期卡里抽最早的 10 张（提前复习，dueAt > now）
+    // select 只取响应真正用到的字段（dueAt 用于 orderBy 无需 select；审计清理:intervalDays/ease 冗余）。
     const cards = practice
       ? await prisma.reviewCard.findMany({
           where: { userId: user.id, dueAt: { gt: now } },
           orderBy: { dueAt: "asc" },
           take: 10,
-          select: { id: true, front: true, back: true, dueAt: true, intervalDays: true, ease: true, courseId: true },
+          select: { id: true, front: true, back: true, courseId: true },
         })
       : await prisma.reviewCard.findMany({
           where: { userId: user.id, dueAt: { lte: now } },
           orderBy: { dueAt: "asc" },
           take: 60,
-          select: { id: true, front: true, back: true, dueAt: true, intervalDays: true, ease: true, courseId: true },
+          select: { id: true, front: true, back: true, courseId: true },
         });
 
     // 今日到期总数（任务卡用；加练时也真实反映到期量，通常为 0）
@@ -259,10 +260,12 @@ export async function GET(req: NextRequest) {
 }
 
 /**
- * PATCH /api/ai/review-card —— §5.4 提交复习结果，更新调度（简化 SM-2）。
- * 入参：{ cardId, remembered: boolean }
- *   - 记得：intervalDays 翻倍（首次记得为 1 天），ease 略升，dueAt = now + 新间隔。
- *   - 忘了：间隔重置为 1 天，ease 略降（不低于 1.3），dueAt = now + 1 天。
+ * PATCH /api/ai/review-card —— §5.4 提交复习结果，更新调度（FSRS-6，吸收 ts-fsrs）。
+ * 入参（二选一，向后兼容）：
+ *   A) { cardId, grade: 1|2|3|4 }        —— Again/Hard/Good/Easy 四档（新客户端）。
+ *   B) { cardId, remembered: boolean }   —— 记得/忘了两键（老客户端，映射 Good/Again）。
+ * FSRS 依据 difficulty/stability/retrievability 三变量算下一轮到期与状态列（见 lib/srs）。
+ * 存量卡无 FSRS 状态 → 首次评分按「新卡」冷启动，之后自然收敛。
  * 越权铁律：updateMany + where 强制 userId，命中 0 视为无权限/不存在。
  */
 export async function PATCH(req: NextRequest) {
@@ -272,33 +275,72 @@ export async function PATCH(req: NextRequest) {
 
     const body = (await req.json().catch(() => null)) as {
       cardId?: string;
+      grade?: number;
       remembered?: boolean;
     } | null;
     const cardId = body?.cardId?.trim();
-    if (!cardId || typeof body?.remembered !== "boolean") return fail("请提供 cardId 与 remembered");
+    if (!cardId) return fail("请提供 cardId");
 
-    // 只取本人卡片
+    // 评分归一：优先 grade(四档)，否则 remembered(两键映射)。都缺则报错。
+    let grade: GradeValue;
+    if (body?.grade !== undefined) {
+      if (!isGrade(body.grade)) return fail("grade 必须为 1(Again)/2(Hard)/3(Good)/4(Easy)");
+      grade = body.grade;
+    } else if (typeof body?.remembered === "boolean") {
+      grade = rememberedToGrade(body.remembered);
+    } else {
+      return fail("请提供 grade(1-4) 或 remembered(boolean)");
+    }
+
+    // 只取本人卡片（含 FSRS 调度列）。
     const card = await prisma.reviewCard.findFirst({
       where: { id: cardId, userId: user.id },
-      select: { id: true, intervalDays: true, ease: true },
+      select: {
+        id: true,
+        dueAt: true,
+        stability: true,
+        difficulty: true,
+        state: true,
+        reps: true,
+        lapses: true,
+        elapsedDays: true,
+        scheduledDays: true,
+        learningSteps: true,
+        lastReview: true,
+      },
     });
     if (!card) return fail("复习卡不存在", 404);
 
-    const remembered = body.remembered;
-    // 调度逻辑抽到 @/lib/srs 的纯函数（行为与此前内联实现逐字节等价，便于测试/升 FSRS）。
-    const { ease, intervalDays, dueAt } = scheduleNext(card, remembered);
+    // FSRS-6 调度（纯函数，@/lib/srs）。
+    const r = scheduleFsrs(card, grade);
 
     await prisma.reviewCard.updateMany({
       where: { id: cardId, userId: user.id },
-      data: { intervalDays, ease, dueAt },
+      data: {
+        dueAt: r.dueAt,
+        stability: r.stability,
+        difficulty: r.difficulty,
+        state: r.state,
+        reps: r.reps,
+        lapses: r.lapses,
+        elapsedDays: r.elapsedDays,
+        scheduledDays: r.scheduledDays,
+        learningSteps: r.learningSteps,
+        lastReview: r.lastReview,
+        intervalDays: r.intervalDays, // 遗产列回填，UI/旧查询无缝
+      },
     });
 
     await track({
       eventName: "review_card_grade",
       userId: user.id,
-      properties: { cardId, remembered, intervalDays, ease },
+      // remembered 保留为兼容字段（grade>=3 视为记得），既有看板与 streak 推算不受影响。
+      properties: { cardId, grade, remembered: grade >= Grade.Good, intervalDays: r.intervalDays },
     });
 
-    return ok({ id: cardId, intervalDays, ease, dueAt });
+    // 蓝图 D1（审查 P0-7）：复习打分计入激励系统（全局 streak/潮汐日历）。
+    after(() => recordActivity(user.id, { minutes: 1 }).catch(() => {}));
+
+    return ok({ id: cardId, grade, intervalDays: r.intervalDays, dueAt: r.dueAt, state: r.state });
   });
 }

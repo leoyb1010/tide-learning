@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import dynamic from "next/dynamic";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
+import { freeCourseGenRemaining } from "@/lib/ai-guard";
 import { prisma } from "@/lib/db";
 import type { GeneratingCourse } from "@/components/CreateStudio";
 
@@ -49,6 +50,14 @@ export default async function CreatePage() {
 
   const snapshot = await resolveEntitlement(user.id);
 
+  // 蓝图 D5：免费用户每月 N 次体验造课——展示态与闸门共用 freeCourseGenRemaining 唯一口径
+  // （审计修复：不再各自复制月界统计与开关判断），真正的闸门仍在 route 内二次校验。
+  let canCreate = snapshot.canUseLLM;
+  if (!canCreate) {
+    const remaining = await freeCourseGenRemaining(user.id);
+    canCreate = remaining !== null && remaining > 0;
+  }
+
   // —— 剧场恢复预取：服务端直接把「我正在生成中的课」透给客户端 ——
   // 服务端 after() 关页面也继续跑，回到 /create 时用它渲染「生产中横幅」，
   // 无需前端再单查列表；genStatus=generating 为准，按 createdAt desc 取最近若干。
@@ -78,7 +87,7 @@ export default async function CreatePage() {
     <div className="mx-auto flex min-h-[calc(100vh-160px)] w-full max-w-[1040px] flex-col justify-center py-8 sm:py-12">
       {/* CreateStudio 用 useSearchParams 读 ?prompt，Next15 需 Suspense 边界 */}
       <Suspense fallback={null}>
-        <CreateStudio canUseLLM={snapshot.canUseLLM} generatingCourses={generatingCourses} />
+        <CreateStudio canUseLLM={canCreate} generatingCourses={generatingCourses} />
       </Suspense>
     </div>
   );

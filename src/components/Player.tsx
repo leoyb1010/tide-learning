@@ -21,6 +21,7 @@ import { BlockRenderer } from "./BlockRenderer";
 import { BlockSlideshow } from "./BlockSlideshow";
 import { CompanionPanel } from "./CompanionPanel";
 import { validateBlocks } from "@/lib/blocks";
+import { renderMarkdown } from "@/lib/markdown";
 import { coursewareThemeAttr } from "@/lib/ai/themes";
 import { HtmlCourseware } from "./HtmlCourseware";
 import { trapFocus } from "./focus-trap";
@@ -47,7 +48,7 @@ interface LessonData {
 export function Player({
   courseId, courseSlug, courseTitle, lesson, access, canCreateNote,
   outline, prevLessonId, nextLessonId, remainingLessons, isLoggedIn, initialProgress, initialSlidePage, initialNotes,
-  posterSrc, sceneBgSrc, courseTemplate, dueReviewCount = 0,
+  posterSrc, sceneBgSrc, courseTemplate, dueReviewCount = 0, cspNonce,
 }: {
   courseId: string; courseSlug: string; courseTitle: string;
   lesson: LessonData; access: boolean; canCreateNote: boolean;
@@ -63,6 +64,8 @@ export function Player({
   courseTemplate?: string | null;
   /** 问题⑧：当前用户到期待复习卡数量（server 端 count）。>0 时在课末插入「顺手复习」触点，把复习带进学习流。 */
   dueReviewCount?: number;
+  /** middleware CSP nonce(服务端页面读 x-nonce 传入)。HTML 课件 srcdoc 继承父页 CSP,内联运行时需带 nonce 才能执行。 */
+  cspNonce?: string;
 }) {
   const { toast } = useToast();
   const { theme, toggleTheme } = useMode();
@@ -439,6 +442,22 @@ export function Player({
     setNextCountdown(3);
     setShowNextCard(true);
   }, [nextHref]);
+
+  // v4.2:article/mixed 的「标记读完」——与块课完课同语义落库(kind:slide/completed),弹下一节卡。
+  // 初始已读态:article 课历史完课会把 lastSlideIndex 写为 1(initialSlidePage>0 即已读过)。
+  const [articleDone, setArticleDone] = useState(
+    (lesson.contentType === "article" || lesson.contentType === "mixed") && initialSlidePage > 0,
+  );
+  const markArticleDone = useCallback(() => {
+    setArticleDone(true);
+    fetch("/api/progress", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }),
+    }).catch(() => {});
+    track("lesson_article_done", { lesson_id: lesson.id });
+    onBlockComplete();
+  }, [lesson.id, onBlockComplete]);
 
   // 滚动模式完课：滚动读到末块（BlockRenderer.onReachEnd）时上报一次完课并弹下一节卡，
   // 与翻页模式末页完课语义一致。与翻页共享 blockCompletedRef 去抖：本节已上报过完课
@@ -831,7 +850,19 @@ export function Player({
           <div className={focus ? "mx-auto w-full max-w-4xl" : "min-w-0"}>
             {isHtmlLesson ? (
               // v3.3 多样化 HTML 课件：沙箱 iframe 渲染 AI 生成的自包含高级课件（见 HtmlCourseware / 计划 §7）。
-              <HtmlCourseware html={htmlContract!.html as string} />
+              // key=lesson.id：换课强制重挂,清掉跨课残留的去重集/页码 state(审计修复 H1);
+              // onPage 接页序进度上报(蓝图 D1 补口:此前 HTML 课件零进度、streak 恒空),末页触发下一节卡。
+              <HtmlCourseware
+                key={lesson.id}
+                html={htmlContract!.html as string}
+                lessonId={lesson.id}
+                nonce={cspNonce}
+                initialPage={initialSlidePage > 1 ? initialSlidePage - 1 : 0}
+                onPage={(i, t) => {
+                  reportBlockPage(i, t);
+                  if (t > 0 && i + 1 >= t) onBlockComplete();
+                }}
+              />
             ) : isBlockLesson ? (
               // 块课件：左侧内容区渲染块。v3.1 若有视频课件（ready/生成中），先给出「图文 / 视频」切换 Tab。
               <div>
@@ -926,11 +957,39 @@ export function Player({
               </div>
             ) : lesson.contentType === "live" ? (
               <LiveBanner lesson={lesson} />
-            ) : lesson.contentType === "article" && lesson.articleMd ? (
-              <article className="prose-body rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-8">
-                <h2 className="text-2xl font-bold leading-snug tracking-tight text-[var(--ink)]">{lesson.title}</h2>
-                <div className="mt-4 whitespace-pre-wrap text-[15px] leading-[1.85] text-[var(--ink2)]">{lesson.articleMd}</div>
-              </article>
+            ) : (lesson.contentType === "article" || lesson.contentType === "mixed") && lesson.articleMd ? (
+              /* 蓝图 Stage1（审查 P2-6）：article 走 renderMarkdown（此前纯文本 pre-wrap，标题/列表/代码全糊成段）；
+                 mixed 声明于 schema 但原分派树无分支、误落视频兜底，这里正文为主;有视频时视频区随后渲染(审计修复 H2:
+                 原注释宣称"下方卡片补充"但无任何渲染点,mixed 的视频会整个丢失)。 */
+              <>
+                <article className="prose-body rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:p-8">
+                  <h2 className="text-2xl font-bold leading-snug tracking-tight text-[var(--ink)]">{lesson.title}</h2>
+                  <div
+                    className="mt-4 text-[15px] leading-[1.85] text-[var(--ink2)]"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(lesson.articleMd) }}
+                  />
+                  {/* v4.2 完课补口:article/mixed 无播放器,time 永不推进,此前没有任何完课/激励路径。
+                      「标记读完」走与块课滚动完课同一语义(kind:slide, completed)。 */}
+                  {isLoggedIn && access && (
+                    <div className="mt-6 border-t border-[var(--border)] pt-4">
+                      {articleDone ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-[var(--ok)]">
+                          <Check size={15} weight="bold" /> 已读完本节
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={markArticleDone}
+                          className="studio-press rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+                        >
+                          <Check size={14} weight="bold" className="mr-1 inline-block" /> 标记读完本节
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </article>
+                {lesson.contentType === "mixed" && lesson.videoUrl && <div className="mt-4">{VideoArea}</div>}
+              </>
             ) : VideoArea}
 
             <div className="mt-4 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]">

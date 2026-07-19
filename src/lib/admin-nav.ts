@@ -25,6 +25,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/content-calendar", label: "内容排期", gate: "course:write" },
   { href: "/admin/demands", label: "需求审核", gate: "demand:moderate" },
   { href: "/admin/moderation", label: "内容审核", gate: "content:review" },
+  { href: "/admin/gen-quality", label: "生成质量", gate: "content:review" },
   { href: "/admin/leads", label: "建联队列", gate: "lead:manage" },
   { href: "/admin/orders", label: "订单/订阅", gate: "order:read" },
   { href: "/admin/credits", label: "积分管理", gate: "order:refund" },

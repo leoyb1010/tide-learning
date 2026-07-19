@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { Play, LockSimple, Check, CaretRight, ShareNetwork, Users, Clock, ListChecks, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { getCourseDetail, listCourses } from "@/lib/queries";
+import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { canAccessTrack } from "@/lib/entitlement";
 import { Button } from "@/components/ui";
@@ -45,6 +46,13 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
   const { course, snapshot, categoryLabel, durationText, lessons, owned, progress } = detail;
   const firstFree = lessons.find((l) => l.isFree);
+  // 审计修复(2026-07-19)：preview 页要求免费节**有 htmlJson**才渲染,video/article 课挂「免登录试读」按钮
+  // 会 404 死链(实测 8/23 门已发布课命中)。入口按同口径预检,查不到就不渲染按钮。
+  const previewable = firstFree
+    ? (await prisma.lesson.count({
+        where: { courseId: course.id, isFree: true, status: "published", htmlJson: { not: null } },
+      })) > 0
+    : false;
   const firstLesson = lessons[0];
   const needsCompliance = ["life", "silver_english"].includes(course.category) && course.reviewerName;
   const hasAccess = owned || canAccessTrack(course.category, snapshot); // 买断或订阅均可访问
@@ -319,6 +327,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               ) : (
                 <>
                   {firstFree && <Button href={`/courses/${course.slug}/learn/${firstFree.id}`} full size="lg" className="cta-glow">免费试学第一章</Button>}
+                  {/* 蓝图 D4 入口：免登录课件试读（此前预览页无任何入口）——游客零门槛看到课件质感再决定登录/订阅。 */}
+                  {previewable && (
+                    <Button href={`/courses/${course.slug}/preview`} variant="secondary" full>
+                      免登录试读课件
+                    </Button>
+                  )}
                   <Button href={`/pricing?next=${encodeURIComponent(`/courses/${course.slug}/learn/${firstLesson?.id ?? ""}`)}`} variant="secondary" full>订阅解锁全部</Button>
                   {/* 英语赛道提供预约试听（有道 0转正入口） */}
                   {isEnglish && <TrialBooking courseId={course.id} track={course.category} source="youdao_dict" />}

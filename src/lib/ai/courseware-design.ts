@@ -366,7 +366,10 @@ export interface CourseDesign {
   density: number;
 }
 
-/** 赛道/模板 → 三旋钮基线（银发低动效低密度；科技/理科高变化高动效）。 */
+/**
+ * 赛道/模板 → 三旋钮基线（银发低动效低密度；科技/理科高变化高动效）。
+ * 蓝图 A6：全赛道差异化——此前只特判 3 个赛道，其余全落 7/6/5，评估证实现库 designJson 数值三维死钉。
+ */
 function knobsFor(category: string | null | undefined): { variance: number; motion: number; density: number } {
   switch (category) {
     case "silver_english":
@@ -375,9 +378,20 @@ function knobsFor(category: string | null | undefined): { variance: number; moti
       return { variance: 8, motion: 7, density: 5 };
     case "english_oral":
       return { variance: 7, motion: 6, density: 4 };
+    case "english_foundation":
+      return { variance: 6, motion: 5, density: 6 }; // 备考向：信息密度高、动效克制
+    case "life":
+      return { variance: 5, motion: 4, density: 4 }; // 生活实用：冷静克制，不炫技
+    case "user_imported":
+      return { variance: 6, motion: 5, density: 5 }; // 导入课：素材主导，中性基线
     default:
       return { variance: 7, motion: 6, density: 5 };
   }
+}
+
+/** 蓝图 A6：按课 id 给旋钮 ±1 确定性抖动——同赛道不同课不再共享同一组数值（可复现，无随机源）。 */
+function jitterKnob(name: string, courseId: string, base: number): number {
+  return clampKnob(base + ((hashSeed(`knob:${name}:${courseId}`) % 3) - 1));
 }
 
 /**
@@ -429,7 +443,12 @@ export function resolveCourseDesign(course: {
   }
 
   const k = knobsFor(course.category);
-  return { art, variance: k.variance, motion: k.motion, density: k.density };
+  return {
+    art,
+    variance: jitterKnob("variance", course.id, k.variance),
+    motion: jitterKnob("motion", course.id, k.motion),
+    density: jitterKnob("density", course.id, k.density),
+  };
 }
 
 function clampKnob(n: number): number {

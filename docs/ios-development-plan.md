@@ -227,7 +227,7 @@ actor APIClient {
 | `/ai/note-transform` | POST | 笔记转换（大纲/行动项/翻译/周报）| ★ |
 | `/ai/review-card` | GET/POST/PATCH | 复习卡队列/建卡/评分 | ★ |
 | `/ai/generate-exam` | POST | 模拟考试出卷 | ★ |
-| `/ai/search-expand` | POST | 搜索关键词扩展（可选，客户端可不接）| ○ |
+| `/ai/search-expand(已废弃 2026-07-18:死端点已下线,语义搜索走 /courses SSR)` | POST | 搜索关键词扩展（可选，客户端可不接）| ○ |
 
 **笔记系统**
 | `/notes` | GET/POST | 笔记列表/创建（含独立笔记）| ★ |
@@ -383,7 +383,7 @@ struct NotificationDTO: Codable, Identifiable {
 ```
 
 ### 6.2 块课件协议（ai_block）
-后端 `blocksJson` 是 `{version, blocks:[...]}`，块类型白名单：`concept/code/quiz/keypoint/callout`。iOS 定义对应 enum + 渲染器（对齐 Web `BlockRenderer`）：
+后端 `blocksJson` 是 `{version, blocks:[...]}`，块类型白名单已扩到 15 种：基础 `concept/code/quiz/keypoint/callout` + v3 叙事 `objectives/scene/dialog/steps/compare/example/flashcard/summary/image` + **v4.3 `diagram`（语义图示：kind=flow/cycle/hub/layers/funnel + items[{label,detail}] + note，2026-07-19 起存量 87/89 节已含）**。iOS 渲染器按白名单消费、未知类型静默跳过（前向兼容铁律）；`diagram` 未实现前跳过不崩，但建议对齐 Web 版实现（信息密度高）。iOS 定义对应 enum + 渲染器（对齐 Web `BlockRenderer`）：
 ```swift
 enum Block: Codable {
     case concept(title: String, body: String)

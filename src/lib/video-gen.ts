@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { track } from "./analytics";
 import { validateBlocks, type Block } from "./blocks";
+import { hasModalityAvailable } from "./ai/models";
 
 /**
  * 视频课件生成内核（v3.1）—— 把一节块课件（blocks）转成「带旁白 + 字幕」的视频课件。
@@ -24,9 +25,14 @@ import { validateBlocks, type Block } from "./blocks";
 
 export type VideoMode = "mock" | "real";
 
-/** 读取视频生成模式。默认 mock（未配置真实 provider 时优雅降级，不阻断流程）。 */
+/**
+ * 读取视频生成模式。默认 mock（未配置真实 provider 时优雅降级，不阻断流程）。
+ * 蓝图 E2：除显式 VIDEO_MODE=real 外，模型注册表登记了可用 video 模态模型时也视为 real——
+ * 「接新模型 = 注册表加一行 + env」，无需再动开关。
+ */
 export function videoMode(): VideoMode {
-  return process.env.VIDEO_MODE === "real" ? "real" : "mock";
+  if (process.env.VIDEO_MODE === "real") return "real";
+  return hasModalityAvailable("video") ? "real" : "mock";
 }
 
 // ————————————————————————————————————————————————————————————

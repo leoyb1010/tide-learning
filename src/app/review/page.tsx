@@ -5,7 +5,6 @@ import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ArrowsClockwise,
   CheckCircle,
-  XCircle,
   Confetti,
   BookOpen,
   CardsThree,
@@ -15,12 +14,10 @@ import {
   Trophy,
   CalendarCheck,
   Star,
-  ArrowRight,
-  ArrowLeft,
   ShareNetwork,
   Target,
+  Exam as ExamIcon,
 } from "@phosphor-icons/react";
-import { CalendarCheck as CalendarCheckIcon, Exam as ExamIcon } from "@phosphor-icons/react";
 import { EmptyTide } from "@/components/TideIllustration";
 import { ErrorState, Button } from "@/components/ui";
 import { SharePanel } from "@/components/SharePanel";
@@ -269,8 +266,8 @@ function HeadlineStat({
    滑块尺寸/位移由测量的按钮几何驱动（--seg-x/--seg-w），窗口尺寸变化时重测。
    reduce-motion 下滑块瞬时归位（CSS 层已关缓动）。触达高度 ≥44px（.seg-btn）。
    ============================================================ */
-const SEGMENTS: { key: ReviewTab; label: string; Icon: typeof CalendarCheckIcon }[] = [
-  { key: "daily", label: "每日复习", Icon: CalendarCheckIcon },
+const SEGMENTS: { key: ReviewTab; label: string; Icon: typeof CalendarCheck }[] = [
+  { key: "daily", label: "每日复习", Icon: CalendarCheck },
   { key: "exam", label: "模拟考试", Icon: ExamIcon },
 ];
 
@@ -350,7 +347,7 @@ const SEC_PER_CARD = 24; // 预计每张约 24s，用于任务卡时长估算
  * §5.4 / v2.3 §4 复习室，从「能用」到「想来」。
  * 三段式：任务卡(task) → 卡堆练习(review) → 结算(done)。
  * 保留 3D 翻面；新增卡堆视觉、评分飞出、连击 combo、水位进度、结算 confetti、加练。
- * 键盘：← 忘了 / → 记得 / 空格翻面。
+ * 键盘：空格翻面；翻面后 1/2/3/4 = 完全忘/吃力/记得/秒答（FSRS 四档，兼容 ←=完全忘、→=记得）。
  */
 function DailyReview({
   onRoundAccuracy,
@@ -429,10 +426,12 @@ function DailyReview({
   const reviewed = results.length;
   const done = cards !== null && total > 0 && started && idx >= total;
 
-  // 提交复习结果：更新调度 → 记结果/连击 → 飞出 → 前进
+  // 提交复习结果（FSRS 四档 1-4）：更新调度 → 记结果/连击 → 飞出 → 前进。
+  // remembered 由 grade 派生（Good/Easy 视为记得），复用既有连击/飞出/结算语义。
   const grade = useCallback(
-    async (remembered: boolean) => {
+    async (g: 1 | 2 | 3 | 4) => {
       if (!current || grading || flipped === false) return;
+      const remembered = g >= 3;
       setGrading(true);
       setFlyDir(remembered ? 1 : -1);
 
@@ -453,7 +452,7 @@ function DailyReview({
         const r = await fetch("/api/ai/review-card", {
           method: "PATCH",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ cardId: current.id, remembered }),
+          body: JSON.stringify({ cardId: current.id, grade: g }),
         })
           .then((res) => res.json())
           .catch(() => null);
@@ -461,7 +460,7 @@ function DailyReview({
       } catch {
         /* 静默：不阻断练习 */
       }
-      track("review_card_grade", { remembered, combo: nextCombo, practice: isPractice });
+      track("review_card_grade", { grade: g, remembered, combo: nextCombo, practice: isPractice });
 
       const captured = current;
       setResults((rs) => [...rs, { card: captured, remembered, nextDueAt }]);
@@ -479,7 +478,7 @@ function DailyReview({
     [current, grading, flipped, reduce, isPractice],
   );
 
-  // 键盘：← 忘了 / → 记得 / 空格翻面
+  // 键盘：空格翻面；翻面后 1/2/3/4 = Again/Hard/Good/Easy，兼容 ←=Again、→=Good（肌肉记忆）。
   useEffect(() => {
     if (!started || done) return;
     function onKey(e: KeyboardEvent) {
@@ -489,12 +488,17 @@ function DailyReview({
       if (e.key === " " || e.key === "Spacebar") {
         e.preventDefault();
         setFlipped((f) => !f);
-      } else if (e.key === "ArrowRight" && flipped) {
+        return;
+      }
+      if (!flipped) return;
+      const g = e.key === "1" || e.key === "ArrowLeft" ? 1
+        : e.key === "2" ? 2
+        : e.key === "3" || e.key === "ArrowRight" ? 3
+        : e.key === "4" ? 4
+        : 0;
+      if (g) {
         e.preventDefault();
-        void grade(true);
-      } else if (e.key === "ArrowLeft" && flipped) {
-        e.preventDefault();
-        void grade(false);
+        void grade(g as 1 | 2 | 3 | 4);
       }
     }
     window.addEventListener("keydown", onKey);
@@ -518,7 +522,7 @@ function DailyReview({
                 : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)]"
             }`}
           >
-            {isPractice ? <Lightning size={12} weight="fill" /> : <CalendarCheckIcon size={12} weight="fill" />}
+            {isPractice ? <Lightning size={12} weight="fill" /> : <CalendarCheck size={12} weight="fill" />}
             {isPractice ? "加练模式" : "今日复习"}
           </span>
           <div className="flex items-center gap-2.5">
@@ -703,7 +707,7 @@ function TaskCard({
           <Lightning size={18} weight="fill" /> 开始复习
         </button>
         <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">
-          键盘：空格翻面 · <ArrowLeft size={11} className="inline" /> 忘了 · <ArrowRight size={11} className="inline" /> 记得
+          键盘：空格翻面 · 1/2/3/4 = 完全忘 / 吃力 / 记得 / 秒答
         </p>
       </div>
     </motion.div>
@@ -759,7 +763,7 @@ function ReviewStage({
   comboBurst: boolean;
   reduce: boolean;
   onFlip: () => void;
-  onGrade: (remembered: boolean) => void;
+  onGrade: (g: 1 | 2 | 3 | 4) => void;
 }) {
   // 飞出：右飞(记得, +x 上旋) / 左飞(忘了, -x 下旋)
   const exitTransition = reduce
@@ -860,7 +864,7 @@ function ReviewStage({
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(current.back) }}
                 />
                 <div className="mt-5 inline-flex items-center gap-1.5 text-[12px] text-[var(--ink4)]">
-                  <ArrowsClockwise size={13} /> 用 ← 忘了 / → 记得 评分
+                  <ArrowsClockwise size={13} /> 按回忆难度评分：1 完全忘 · 2 吃力 · 3 记得 · 4 秒答
                 </div>
               </div>
             </button>
@@ -868,26 +872,28 @@ function ReviewStage({
         </AnimatePresence>
       </div>
 
-      {/* 记得 / 忘了，翻面后才可评分 */}
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          disabled={!flipped || grading}
-          onClick={() => onGrade(false)}
-          className="studio-press inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--warn-soft)] bg-[var(--surface)] py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--warn)] hover:text-[var(--warn)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <XCircle size={18} weight="fill" className="text-[var(--warn)]" /> 忘了
-          <kbd className="mono ml-1 hidden rounded border border-[var(--border)] px-1 text-[10px] text-[var(--ink4)] sm:inline">←</kbd>
-        </button>
-        <button
-          type="button"
-          disabled={!flipped || grading}
-          onClick={() => onGrade(true)}
-          className="hover-sheen studio-press inline-flex items-center justify-center gap-2 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] py-3.5 text-[14px] font-semibold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--red)] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          <CheckCircle size={18} weight="fill" /> 记得
-          <kbd className="mono ml-1 hidden rounded border border-[var(--red-soft-border)] px-1 text-[10px] text-[var(--red-ink)] sm:inline">→</kbd>
-        </button>
+      {/* FSRS 四档评分（翻面后才可评分）：完全忘 / 吃力 / 记得 / 秒答。
+          评分粒度直接喂给 FSRS 的 difficulty/stability 更新，比两键更贴合真实记忆强度。 */}
+      <div className="grid grid-cols-4 gap-2">
+        {(
+          [
+            { g: 1, label: "完全忘", key: "1", cls: "border-[var(--warn-soft)] text-[var(--warn)] hover:border-[var(--warn)]" },
+            { g: 2, label: "吃力", key: "2", cls: "border-[var(--border)] text-[var(--ink2)] hover:border-[var(--ink3)] hover:text-[var(--ink)]" },
+            { g: 3, label: "记得", key: "3", cls: "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)] hover:border-[var(--red)]" },
+            { g: 4, label: "秒答", key: "4", cls: "border-[var(--ok-soft,var(--border))] text-[var(--ok)] hover:border-[var(--ok)]" },
+          ] as const
+        ).map(({ g, label, key, cls }) => (
+          <button
+            key={g}
+            type="button"
+            disabled={!flipped || grading}
+            onClick={() => onGrade(g)}
+            className={`studio-press inline-flex flex-col items-center justify-center gap-0.5 rounded-[14px] border bg-[var(--surface)] py-3 text-[13px] font-semibold shadow-[var(--card),var(--inner-hi)] transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${cls}`}
+          >
+            {label}
+            <kbd className="mono hidden rounded border border-[var(--border)] px-1 text-[10px] text-[var(--ink4)] sm:inline">{key}</kbd>
+          </button>
+        ))}
       </div>
       {!flipped && (
         <p className="text-center text-[12px] text-[var(--ink4)]">先回忆，再翻面自评。主动回忆才记得牢。</p>
