@@ -49,7 +49,7 @@ export function hasModalityAvailable(modality: "tts" | "image" | "video"): boole
  * v3.4 bespoke HTML 只允许强模型；可用环境变量逗号列表覆盖，便于网关模型升级时零代码切换。
  * 蓝图 A3：清掉不在注册表里的死条目（原首位 claude-sonnet-5 未注册，导致白名单命中率为 0 的一环）。
  */
-const DEFAULT_BESPOKE_MODELS = ["claude-opus-4-8", "gpt-5.5", "glm-5.2"];
+const DEFAULT_BESPOKE_MODELS = ["claude-opus-4-8", "gpt-5.6-sol", "glm-5.2"];
 
 export function bespokeModelKeys(): string[] {
   const configured = process.env.COURSEWARE_BESPOKE_MODELS?.split(",").map((v) => v.trim()).filter(Boolean);
@@ -58,8 +58,8 @@ export function bespokeModelKeys(): string[] {
 
 export const LLM_MODELS: LlmModelEntry[] = [
   {
-    key: "gpt-5.5",
-    label: "GPT-5.5",
+    key: "gpt-5.6-sol",
+    label: "GPT-5.6 Sol",
     desc: "综合质量最高，适合完整体系化造课",
     tier: "free",
     costWeight: 1,

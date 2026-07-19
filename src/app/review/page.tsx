@@ -366,6 +366,7 @@ function DailyReview({
   const [dueToday, setDueToday] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [isPractice, setIsPractice] = useState(false);
+  const [practiceEmpty, setPracticeEmpty] = useState(false);
 
   // 段位：任务卡尚未开始 → 练习中
   const [started, setStarted] = useState(false);
@@ -403,6 +404,9 @@ function DailyReview({
       // 同步今日概览给外壳战报区（真实字段，非加练时才反映今日到期）
       onOverviewChange?.({ dueToday: nextDue, streakDays: nextStreak });
       setIsPractice(Boolean(res.data?.practice));
+      // 加练也拉不到卡（全库无未到期卡）：给出显式反馈——此前点「加练 10 张」拉到 0 张
+      // 界面维持空态原样，看起来像按钮失灵（2026-07-20 部署实锤）。
+      setPracticeEmpty(Boolean(res.data?.practice) && (res.data?.cards ?? []).length === 0);
       // 重置一轮状态
       setIdx(0);
       setFlipped(false);
@@ -560,7 +564,7 @@ function DailyReview({
           action={<Button href="/login?next=/review">去登录</Button>}
         />
       ) : total === 0 ? (
-        <EmptyState onPractice={() => void load(true)} />
+        <EmptyState onPractice={() => void load(true)} practiceEmpty={practiceEmpty} />
       ) : done ? (
         <SettlementState
           results={results}
@@ -1158,11 +1162,15 @@ function ReviewSkeleton() {
 /* ============================================================
    空态：今日无到期，加练 10 张（从未到期卡抽最早 10 张）
    ============================================================ */
-function EmptyState({ onPractice }: { onPractice: () => void }) {
+function EmptyState({ onPractice, practiceEmpty }: { onPractice: () => void; practiceEmpty?: boolean }) {
   return (
     <EmptyTide
       variant="review"
-      description="今日无到期的复习卡。想趁热打铁？加练 10 张提前巩固，或去笔记馆生成新卡。"
+      description={
+        practiceEmpty
+          ? "还没有可加练的卡片——复习卡来自课程测验的错题和笔记转化。先去上课做题，或在笔记馆把笔记转成卡片。"
+          : "今日无到期的复习卡。想趁热打铁？加练 10 张提前巩固，或去笔记馆生成新卡。"
+      }
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
           <button
