@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { ok, handle } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { getGenJobsFor, finalizeGenJob, isGenJobStale, reconcileStaleGenJobs } from "@/lib/course-gen";
+import { getGenJobsFor, finalizeGenJob, isGenJobStale, reconcileStaleGenJobs, renderCourseHtmlBestEffort } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +48,9 @@ export async function GET() {
       // 列表自愈：全部 lesson 已就绪但 course.genStatus 没被后台收尾时，直接收敛 ready，
       // 避免“正在生成”横幅永久出现。
       if (total > 0 && done === total) {
+        // 根因修复(2026-07-20)：自愈收敛也必须补渲 HTML 课件（幂等，已渲节被源哈希短路），
+        // 否则经此路收尾的课整课无 htmlJson，永远回落旧版块课件。
+        await renderCourseHtmlBestEffort(c.id);
         await prisma.course.update({ where: { id: c.id }, data: { genStatus: "ready" } });
         await finalizeGenJob(c.id, "done");
         continue;

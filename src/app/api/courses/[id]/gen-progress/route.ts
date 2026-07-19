@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { readGenProgress, getGenJob, finalizeGenJob, isGenJobStale } from "@/lib/course-gen";
+import { readGenProgress, getGenJob, finalizeGenJob, isGenJobStale, renderCourseHtmlBestEffort } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +50,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     // 自愈收尾：后台 after() 在 serverless/重启/超时时可能来不及执行最终 finalize，
     // 导致所有节都 ready 但 Course 仍是 generating。轮询接口是用户正在看的路径，顺手收敛为 ready。
     if (genStatus === "generating" && total > 0 && doneByLessons === total) {
+      // 根因修复(2026-07-20)：自愈收敛也必须补渲 HTML 课件（幂等，已渲节被源哈希短路），
+      // 否则经此路收尾的课整课无 htmlJson，永远回落旧版块课件。
+      await renderCourseHtmlBestEffort(course.id);
       await prisma.course.update({ where: { id: course.id }, data: { genStatus: "ready" } });
       await finalizeGenJob(course.id, "done");
       genStatus = "ready";
