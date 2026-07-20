@@ -38,7 +38,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const user = await requireUser();
 
-    assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
+    // 独立作用域（2026-07-20 修复）：重拟大纲按真实 token 计费,不该吃掉当天的造课名额。
+    assertUserRateLimit(user.id, "ai_outline_regen", 15, 86_400_000);
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
 
