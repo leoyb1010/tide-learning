@@ -153,22 +153,37 @@ const TEMPLATE_MODE: Record<string, CoursewareMode> = {
   classic: "deck-horizontal",
 };
 
+// v5：合成皮肤 artKey 恒为 "generated"（不在 ART_TO_MODE），其版式基因 layout 才携带 mode 意图。
+// 作为标题启发式之后的一层兜底：内容结构（标题）优先，标题无强信号时用 LLM 选的 layout 定 mode
+// （比盲目回落 scroll-lesson 更贴合），修 review #2。
+const LAYOUT_TO_MODE: Record<string, CoursewareMode> = {
+  editorial: "editorial-academic",
+  terminal: "developer-training",
+  magazine: "deck-horizontal",
+  zen: "scroll-lesson",
+  soft: "scroll-lesson",
+};
+
 /**
- * 解析一门课的课件 mode：标题强信号 > 已定艺术方向蕴含 > 课型模板 > 兜底 scroll-lesson。
- * 造课/导入两条链路都可调用（都能拿到 title/template/artKey）。
+ * 解析一门课的课件 mode：标题强信号 > 已定艺术方向蕴含 > 版式基因 > 课型模板 > 兜底 scroll-lesson。
+ * 造课/导入两条链路都可调用（都能拿到 title/template/artKey；合成皮肤额外传 layout）。
  */
 export function resolveCoursewareMode(input: {
   title?: string | null;
   template?: string | null;
   artKey?: string | null;
+  /** v5 合成皮肤的版式基因；artKey="generated" 命中不到 ART_TO_MODE 时作 mode 兜底信号。 */
+  layout?: string | null;
 }): CoursewareMode {
   // artKey 优先：艺术方向是已锁定的视觉决策（且它本身已吸收标题的内容信号），
   // 据它反推 mode，保证注入 LLM 的风格指令/范例与 art token 同源不矛盾（见审查 P2）。
   if (input.artKey && ART_TO_MODE[input.artKey]) return ART_TO_MODE[input.artKey];
-  // 无已定 artKey（如独立调用）才用标题启发式。
+  // 无已定 artKey（如独立调用/合成皮肤）才用标题启发式。
   if (input.title) {
     for (const h of MODE_HINTS) if (h.re.test(input.title)) return h.mode;
   }
+  // 标题无强信号时，用合成皮肤的版式基因定 mode（LLM 看着内容选的，比默认更贴合）。
+  if (input.layout && LAYOUT_TO_MODE[input.layout]) return LAYOUT_TO_MODE[input.layout];
   if (input.template && TEMPLATE_MODE[input.template]) return TEMPLATE_MODE[input.template];
   return "scroll-lesson";
 }
@@ -183,7 +198,7 @@ export function getModeProfile(mode: CoursewareMode): ModeProfile {
  * synthesizeViaLLM 注入此段，让模型的 bespoke HTML 贴合内容类型对应的呈现风格（而非千篇一律）。
  */
 export function llmStyleBrief(design: CourseDesign, title?: string | null): string {
-  const mode = resolveCoursewareMode({ title, artKey: design.art.key });
+  const mode = resolveCoursewareMode({ title, artKey: design.art.key, layout: design.art.layout });
   const p = getModeProfile(mode);
   return (
     `【课件风格 mode：${p.label}（${p.mode}）】${p.llmGuidance}\n` +

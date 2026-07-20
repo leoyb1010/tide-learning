@@ -38,8 +38,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
 
     // 保留旋钮、只换艺术方向，序列化回 designJson。
+    // v5：用户手动选固定皮肤 = 明确覆盖合成皮肤,必须清掉 brief（否则 serializeCourseDesign 仍按 brief 存,
+    // 换肤被忽略）。清 brief 后序列化落传统 artKey 格式,用户选择生效。
     const cur = resolveCourseDesign(course);
-    const nextDesign = { ...cur, art: getArtDirection(artKey) };
+    const nextDesign = { ...cur, art: getArtDirection(artKey), brief: undefined };
     await prisma.course.update({ where: { id: course.id }, data: { designJson: serializeCourseDesign(nextDesign) } });
 
     // 逐节确定性重渲（仅有内容块的节）。mode 随新 artKey 反推，保证风格与 art token 同源。
