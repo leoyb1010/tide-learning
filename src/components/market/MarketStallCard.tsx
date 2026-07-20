@@ -256,7 +256,7 @@ export function MarketStallCard({
           )}
           <span className="min-w-0 flex-1">
             <span className="flex items-center gap-1">
-              <span className="truncate text-[12.5px] font-semibold text-[var(--ink)]">{stall.seller.nickname}</span>
+              <span className="truncate text-[13px] font-semibold text-[var(--ink)]">{stall.seller.nickname}</span>
               {badge.tier >= 3 && <SealCheck size={12} weight="fill" className="shrink-0 text-[var(--red)]" />}
             </span>
             <span
@@ -269,7 +269,7 @@ export function MarketStallCard({
         </div>
 
         {/* 交易气息数字条：成交 · 学习人数 */}
-        <div className="mt-3 flex items-center gap-3 text-[11.5px] text-[var(--ink3)]">
+        <div className="mt-3 flex items-center gap-3 text-[12px] text-[var(--ink3)]">
           <span className="flex items-center gap-1" title={stall.isPaid ? "付费成交数" : "被拿走到书架的人数"}>
             <Package size={13} weight="fill" className="text-[var(--ink4)]" />
             <span className="mono text-[var(--ink2)]">{abbrevCount(volume)}</span> {stall.isPaid ? "成交" : "拿走"}
@@ -288,7 +288,7 @@ export function MarketStallCard({
         {/* ——— CTA（关键红，唯一强调）——— */}
         <div className="mt-auto pt-3.5">
           {stall.mine ? (
-            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)]">
+            <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)]">
               <Storefront size={14} weight="fill" className="text-[var(--red)]" />
               你的摊位
             </span>
@@ -300,7 +300,7 @@ export function MarketStallCard({
                 e.stopPropagation();
                 router.push(detailHref);
               }}
-              className="studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--border2)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-bold text-[var(--ink)] transition-all hover:border-[var(--red)] hover:text-[var(--red)]"
+              className="studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-bold text-[var(--ink)] transition-all hover:border-[var(--red)] hover:text-[var(--red)]"
             >
               <CheckCircle size={15} weight="fill" className="text-[var(--ok)]" />
               已在书架 · 去学习
@@ -308,7 +308,7 @@ export function MarketStallCard({
             </button>
           ) : subCovered ? (
             // 价签智能化（U4-a）：已订阅覆盖本赛道的付费课 → 「订阅已含·去学习」，进详情页开始学（不扣积分）
-            <span className="studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--info-soft-border,var(--border2))] bg-[var(--info-soft)] px-4 py-2.5 text-[13px] font-bold text-[var(--info)] transition-all group-hover:brightness-[1.02]">
+            <span className="studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--info-soft-border,var(--border2))] bg-[var(--info-soft)] px-4 py-2.5 text-[13px] font-bold text-[var(--info)] transition-all group-hover:brightness-[1.02]">
               <SealCheck size={15} weight="fill" />
               订阅已含 · 去学习
               <ArrowRight size={14} weight="bold" />
@@ -318,14 +318,14 @@ export function MarketStallCard({
             <button
               type="button"
               onClick={collectFree}
-              className="cta-glow studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
+              className="cta-glow studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
             >
               <Gift size={15} weight="fill" />
               免费拿走
             </button>
           ) : (
             // 付费课：跳详情页确认购买（避免卡上误触扣积分）
-            <span className="cta-glow studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all group-hover:brightness-105">
+            <span className="cta-glow studio-press inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all group-hover:brightness-105">
               <Handbag size={15} weight="fill" />
               <span className="mono">{price.amount}</span> 积分 · 查看购买
             </span>

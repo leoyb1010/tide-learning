@@ -27,7 +27,7 @@ export default function Loading() {
       </div>
 
       {/* 搜索框 */}
-      <div className="skeleton h-11 w-full rounded-[13px]" />
+      <div className="skeleton h-11 w-full rounded-[14px]" />
 
       {/* 「全部」视图：双列笔记卡网格骨架 */}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

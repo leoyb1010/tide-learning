@@ -140,7 +140,7 @@ export function DeskDemo() {
               {showCaret && <span className="demo-caret ml-0.5" />}
             </p>
             <span
-              className="hidden shrink-0 items-center gap-1 rounded-[9px] px-2.5 py-1.5 text-[11px] font-bold text-white sm:inline-flex lg:px-3.5 lg:py-2 lg:text-[13px]"
+              className="hidden shrink-0 items-center gap-1 rounded-[10px] px-2.5 py-1.5 text-[11px] font-bold text-white sm:inline-flex lg:px-3.5 lg:py-2 lg:text-[13px]"
               style={{ background: "var(--red)" }}
             >
               造课

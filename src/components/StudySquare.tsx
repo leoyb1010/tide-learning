@@ -79,7 +79,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
       )}
 
       {/* 排序 Tab（最新 / 热门） */}
-      <div className="inline-flex rounded-[11px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
+      <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
         {SORTS.map((s) => {
           const active = sort === s.key;
           return (
@@ -121,7 +121,7 @@ export function StudySquare({ canPost, isLoggedIn }: { canPost: boolean; isLogge
       {/* 话题过滤条（点击帖内话题后出现，可一键清除） */}
       {tag && (
         <div className="flex items-center gap-2">
-          <span className="mono inline-flex items-center gap-1.5 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1 text-[12.5px] font-medium text-[var(--red)]">
+          <span className="mono inline-flex items-center gap-1.5 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1 text-[13px] font-medium text-[var(--red)]">
             #{tag}
             <button onClick={() => setTag(null)} title="清除话题筛选" aria-label="清除话题筛选" className="studio-press">
               <X size={12} weight="bold" />

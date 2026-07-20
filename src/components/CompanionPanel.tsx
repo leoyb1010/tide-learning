@@ -102,7 +102,7 @@ export function CompanionPanel({ lessonId, courseId }: { lessonId: string; cours
           <button
             onClick={send}
             disabled={loading || !input.trim()}
-            className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[var(--ink)] text-[var(--surface)] transition-opacity disabled:opacity-40"
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--ink)] text-[var(--surface)] transition-opacity disabled:opacity-40"
             title="发送" aria-label="发送"
           >
             <PaperPlaneRight size={15} weight="fill" />

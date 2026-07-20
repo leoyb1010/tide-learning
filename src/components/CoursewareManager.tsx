@@ -100,7 +100,7 @@ export function CoursewareManager({
       <div className="flex items-center gap-2">
         <Palette size={16} weight="fill" className="text-[var(--red)]" />
         <span className="text-[13px] font-semibold text-[var(--ink)]">内容管理 · 可控编辑</span>
-        <span className="mono text-[10.5px] text-[var(--ink4)]">换肤免费 · 改写按节计费</span>
+        <span className="mono text-[11px] text-[var(--ink4)]">换肤免费 · 改写按节计费</span>
       </div>
 
       {/* —— L5 换肤 —— */}
@@ -115,7 +115,7 @@ export function CoursewareManager({
               type="button"
               disabled={!!themeBusy}
               onClick={() => switchSkin(s.key)}
-              className={`studio-press inline-flex items-center justify-center gap-1 rounded-[10px] border px-2 py-2 text-[11.5px] font-semibold transition-colors disabled:opacity-60 ${
+              className={`studio-press inline-flex items-center justify-center gap-1 rounded-[10px] border px-2 py-2 text-[12px] font-semibold transition-colors disabled:opacity-60 ${
                 active
                   ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--red-ink)]"
                   : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] hover:border-[var(--border2)]"
@@ -137,7 +137,7 @@ export function CoursewareManager({
             className="flex items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
           >
             <span className="mono text-[11px] text-[var(--ink4)]">{String(i + 1).padStart(2, "0")}</span>
-            <span className="flex-1 truncate text-[12.5px] text-[var(--ink2)]">{l.title}</span>
+            <span className="flex-1 truncate text-[13px] text-[var(--ink2)]">{l.title}</span>
             <button
               type="button"
               onClick={() => setEditFor(l)}
@@ -259,7 +259,7 @@ function RewriteDialog({
         placeholder="≤200 字修改指令，可留空"
         className="mt-3 w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] outline-none focus:border-[var(--ink3)]"
       />
-      <div className="mono mt-1 text-right text-[10.5px] text-[var(--ink4)]">{instruction.length}/200</div>
+      <div className="mono mt-1 text-right text-[11px] text-[var(--ink4)]">{instruction.length}/200</div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -354,15 +354,15 @@ function HistoryDialog({ lesson, onClose }: { lesson: ManagerLesson; onClose: ()
           {rows.map((rev) => (
             <li key={rev.id} className="flex items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
               <div className="min-w-0 flex-1">
-                <p className="text-[12.5px] font-semibold text-[var(--ink)]">{REASON_LABEL[rev.reason] ?? rev.reason}</p>
-                <p className="mono text-[10.5px] text-[var(--ink4)]">{new Date(rev.createdAt).toLocaleString("zh-CN")}</p>
+                <p className="text-[13px] font-semibold text-[var(--ink)]">{REASON_LABEL[rev.reason] ?? rev.reason}</p>
+                <p className="mono text-[11px] text-[var(--ink4)]">{new Date(rev.createdAt).toLocaleString("zh-CN")}</p>
               </div>
               <button
                 type="button"
                 disabled={!rev.hasBlocks || !!rollingBack}
                 title={rev.hasBlocks ? "回滚到此版本" : "该版本仅排版快照，不可回滚"}
                 onClick={() => rollback(rev.id)}
-                className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)] disabled:opacity-40"
+                className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)] disabled:opacity-40"
               >
                 {rollingBack === rev.id ? <Spinner size={11} /> : <ClockCounterClockwise size={12} weight="bold" />}
                 回滚

@@ -67,7 +67,7 @@ export default async function DemandsPage() {
           </div>
           <Link
             href="/demands/new"
-            className="cta-glow studio-press inline-flex items-center gap-2 rounded-[13px] bg-[var(--red)] px-6 py-3 text-[14px] font-bold text-white transition-all hover:brightness-105"
+            className="cta-glow studio-press inline-flex items-center gap-2 rounded-[14px] bg-[var(--red)] px-6 py-3 text-[14px] font-bold text-white transition-all hover:brightness-105"
           >
             <Plus size={16} weight="bold" />
             提交需求

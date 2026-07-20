@@ -153,12 +153,12 @@ export default async function HistoryPage({
           <CaretLeft size={13} weight="bold" /> 成长档案
         </Link>
         <header className="flex items-center gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[13px] bg-[var(--red-soft)] text-[var(--red)]">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-[14px] bg-[var(--red-soft)] text-[var(--red)]">
             <ClockCounterClockwise size={22} weight="fill" />
           </span>
           <div className="min-w-0">
             <h1 className="text-[24px] font-extrabold tracking-tight text-[var(--ink)]">学习记录</h1>
-            <p className="mt-0.5 text-[13.5px] text-[var(--ink2)]">
+            <p className="mt-0.5 text-[14px] text-[var(--ink2)]">
               {totalCourses > 0 ? (
                 <>
                   你在 <span className="mono font-semibold text-[var(--ink)]">{totalCourses}</span> 门课程留下过学习足迹
@@ -180,7 +180,7 @@ export default async function HistoryPage({
             action={
               <Link
                 href="/courses"
-                className="studio-press cta-glow hover-sheen inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-5 py-2.5 text-[14px] font-semibold text-white"
+                className="studio-press cta-glow hover-sheen inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-5 py-2.5 text-[14px] font-semibold text-white"
               >
                 <GraduationCap size={16} weight="fill" /> 去选课
               </Link>

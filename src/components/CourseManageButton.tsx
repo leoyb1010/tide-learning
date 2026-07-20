@@ -160,43 +160,43 @@ export function CourseManageButton({
             <div className="grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)]">
               <div className="flex flex-col items-center gap-0.5 px-2 py-3">
                 <span className="inline-flex items-center gap-1 text-[13px] font-bold text-[var(--ok)]">已上架</span>
-                <span className="text-[10.5px] text-[var(--ink4)]">{isFree ? "免费" : `${priceCredits} 积分`}</span>
+                <span className="text-[11px] text-[var(--ink4)]">{isFree ? "免费" : `${priceCredits} 积分`}</span>
               </div>
               <div className="flex flex-col items-center gap-0.5 px-2 py-3">
                 <span className="mono inline-flex items-center gap-1 text-[15px] font-bold text-[var(--ink)]">
                   <Package size={12} weight="fill" className="text-[var(--ink4)]" />
                   {salesCount}
                 </span>
-                <span className="text-[10.5px] text-[var(--ink4)]">{isFree ? "被拿走" : "成交"}</span>
+                <span className="text-[11px] text-[var(--ink4)]">{isFree ? "被拿走" : "成交"}</span>
               </div>
               <div className="flex flex-col items-center gap-0.5 px-2 py-3">
                 <span className="mono inline-flex items-center gap-1 text-[15px] font-bold text-[var(--ok)]">
                   <Coins size={12} weight="fill" />
                   +{income}
                 </span>
-                <span className="text-[10.5px] text-[var(--ink4)]">累计收益</span>
+                <span className="text-[11px] text-[var(--ink4)]">累计收益</span>
               </div>
             </div>
 
             <PriceField isPaid={isPaid} setIsPaid={setIsPaid} price={price} setPrice={setPrice} />
 
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-semibold text-[var(--ink2)]">标题（2-80 字）</span>
+              <span className="text-[13px] font-semibold text-[var(--ink2)]">标题（2-80 字）</span>
               <input
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 maxLength={80}
-                className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
+                className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
               />
             </label>
             <label className="flex flex-col gap-1.5">
-              <span className="text-[12.5px] font-semibold text-[var(--ink2)]">简介（最多 160 字，可留空）</span>
+              <span className="text-[13px] font-semibold text-[var(--ink2)]">简介（最多 160 字，可留空）</span>
               <textarea
                 value={subtitle}
                 onChange={(e) => setSubtitle(e.target.value)}
                 maxLength={160}
                 rows={2}
-                className="resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] leading-relaxed text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
+                className="resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[14px] leading-relaxed text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
               />
             </label>
 
@@ -230,7 +230,7 @@ export function CourseManageButton({
                     type="button"
                     onClick={() => setConfirmDelist(true)}
                     disabled={loading}
-                    className="rounded-[10px] border border-transparent bg-[var(--red-soft)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--red)] transition-colors hover:brightness-95 disabled:opacity-50"
+                    className="rounded-[10px] border border-transparent bg-[var(--red-soft)] px-3.5 py-2 text-[13px] font-semibold text-[var(--red)] transition-colors hover:brightness-95 disabled:opacity-50"
                   >
                     下架
                   </button>

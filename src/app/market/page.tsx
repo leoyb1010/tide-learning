@@ -94,7 +94,7 @@ export default async function MarketPage({
           COURSE MARKET
         </div>
         <div className="flex items-center gap-2.5">
-          <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-[var(--red-soft)]">
+          <span className="grid h-9 w-9 place-items-center rounded-[12px] bg-[var(--red-soft)]">
             <Storefront size={18} weight="fill" className="text-[var(--red)]" />
           </span>
           <h1 className="text-[26px] font-extrabold tracking-tight text-[var(--ink)]">课程集市</h1>
@@ -179,10 +179,10 @@ export default async function MarketPage({
       {/* ——— 未登录引导 ——— */}
       {!user && stalls.length > 0 && (
         <div className="flex flex-col items-center justify-between gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-5 py-4 shadow-[var(--inner-hi)] sm:flex-row">
-          <p className="text-[13.5px] text-[var(--ink2)]">登录后可把喜欢的课拿到你的书架，付费课用积分购买。</p>
+          <p className="text-[14px] text-[var(--ink2)]">登录后可把喜欢的课拿到你的书架，付费课用积分购买。</p>
           <Link
             href="/login?next=/market"
-            className="cta-glow studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105"
+            className="cta-glow studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105"
           >
             <SignIn size={15} weight="bold" />
             去登录
@@ -198,7 +198,7 @@ export default async function MarketPage({
           </span>
           <div>
             <p className="text-[16px] font-bold text-[var(--ink)]">集市还没开张</p>
-            <p className="mt-1 text-[13.5px] leading-[1.6] text-[var(--ink2)]">
+            <p className="mt-1 text-[14px] leading-[1.6] text-[var(--ink2)]">
               还没有课摆上摊。去造一门课，第一个把它分享到集市，让同学们拿走。
             </p>
           </div>
@@ -265,7 +265,7 @@ export default async function MarketPage({
           {/* ——— 底部引导：也来摆一摊（带当前分类上下文，#13 轻量）——— */}
           <Link
             href={createHref}
-            className="group flex items-center justify-center gap-2 rounded-[14px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-5 py-4 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--inner-hi)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
+            className="group flex items-center justify-center gap-2 rounded-[14px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-5 py-4 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--inner-hi)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
           >
             <Sparkle size={16} weight="fill" className="text-[var(--red)]" />
             {category === "all" ? "造一门课，也来集市摆一摊" : `造一门「${trackLabel(category)}」课，也来摆一摊`}

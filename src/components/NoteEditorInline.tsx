@@ -65,7 +65,7 @@ export function NoteEditorInline({
         value={title}
         onChange={(e) => setTitle(e.target.value)}
         placeholder="标题（可留空）"
-        className="w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[18px] font-bold text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] placeholder:font-normal focus:border-[var(--ink3)]"
+        className="w-full rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-[18px] font-bold text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] placeholder:font-normal focus:border-[var(--ink3)]"
       />
       <textarea
         value={contentMd}
@@ -79,7 +79,7 @@ export function NoteEditorInline({
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] disabled:opacity-45"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] disabled:opacity-45"
         >
           <X size={14} weight="bold" /> 取消
         </button>
@@ -87,7 +87,7 @@ export function NoteEditorInline({
           type="button"
           onClick={() => void save()}
           disabled={saving}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--red)] bg-[var(--red)] px-4 py-2 text-[13px] font-semibold text-white shadow-[var(--card)] transition-opacity hover:opacity-90 disabled:opacity-45"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red)] bg-[var(--red)] px-4 py-2 text-[13px] font-semibold text-white shadow-[var(--card)] transition-opacity hover:opacity-90 disabled:opacity-45"
         >
           {saving ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-current border-t-transparent" />

@@ -97,7 +97,7 @@ export async function StudentCard({ data, headerAction }: { data: StudentCardDat
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
             {/* 校徽（public/brand/studio-emblem.png，红色单色浮雕）：白底芯片衬托，证件感 */}
-            <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-[9px] bg-white/95 shadow-[var(--red-glow)]">
+            <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-[10px] bg-white/95 shadow-[var(--red-glow)]">
               { }
               <img src="/brand/studio-emblem.png" alt="" className="h-7 w-7" draggable={false} />
             </span>
@@ -109,11 +109,11 @@ export async function StudentCard({ data, headerAction }: { data: StudentCardDat
           {/* 右侧：订阅胶囊 + 可选操作（如分享按钮，走 flex 流内，避免与胶囊绝对定位重叠）*/}
           <div className="flex items-center gap-2">
             {data.isSubscriber ? (
-              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline-on-dark)] bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--ink-on-dark)]">
+              <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline-on-dark)] bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-on-dark)]">
                 <SealCheck size={12} weight="fill" className="text-[var(--red)]" /> 会员
               </span>
             ) : (
-              <span className="inline-flex items-center rounded-full border border-[var(--hairline-on-dark)] px-2.5 py-1 text-[10.5px] font-medium text-[var(--ink-on-dark-2)]">
+              <span className="inline-flex items-center rounded-full border border-[var(--hairline-on-dark)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-on-dark-2)]">
                 免费学员
               </span>
             )}
@@ -200,7 +200,7 @@ export async function StudentCard({ data, headerAction }: { data: StudentCardDat
                 className="h-[72px] w-[72px] rounded-[8px] border border-[var(--border)] bg-[var(--surface)] p-1.5 opacity-90 transition-opacity group-hover:opacity-100 [&>svg]:h-full [&>svg]:w-full"
                 dangerouslySetInnerHTML={{ __html: qrSvg }}
               />
-              <span className="text-[9.5px] leading-none text-[var(--ink4)] transition-colors group-hover:text-[var(--ink3)]">
+              <span className="text-[10px] leading-none text-[var(--ink4)] transition-colors group-hover:text-[var(--ink3)]">
                 扫码看主页
               </span>
             </a>
@@ -215,7 +215,7 @@ export async function StudentCard({ data, headerAction }: { data: StudentCardDat
 function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink4)]">{label}</dt>
+      <dt className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink4)]">{label}</dt>
       <dd className={`mt-1 truncate text-[13px] font-semibold text-[var(--ink)] ${mono ? "mono tracking-[0.06em]" : ""}`}>{value}</dd>
     </div>
   );

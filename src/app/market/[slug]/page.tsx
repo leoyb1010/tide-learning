@@ -159,7 +159,7 @@ export default async function MarketProductPage({
               </span>
             </div>
             {stall.subtitle && (
-              <p className="text-[15.5px] leading-[1.6] text-[var(--ink)]">{stall.subtitle}</p>
+              <p className="text-[16px] leading-[1.6] text-[var(--ink)]">{stall.subtitle}</p>
             )}
             {description && description !== stall.subtitle && (
               <p className="text-[14px] leading-[1.78] text-[var(--ink2)]">{description}</p>
@@ -284,7 +284,7 @@ export default async function MarketProductPage({
             </div>
 
             {/* 交易信任点 */}
-            <ul className="mt-4 space-y-2 border-t border-[var(--border)] pt-4 text-[12.5px] leading-[1.5] text-[var(--ink2)]">
+            <ul className="mt-4 space-y-2 border-t border-[var(--border)] pt-4 text-[13px] leading-[1.5] text-[var(--ink2)]">
               <li className="flex items-start gap-2">
                 <ShieldCheck size={14} weight="fill" className="mt-0.5 shrink-0 text-[var(--ok)]" />
                 <span>{price.free ? "免费拿走，永久进入你的书架" : "购买后永久进入书架，随课更新持续获得新内容"}</span>
@@ -331,7 +331,7 @@ export default async function MarketProductPage({
               </div>
             </div>
             {/* 店铺经营数据 */}
-            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface-inset)]">
+            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)]">
               <ShopStat value={`${shop.stallCount}`} label="在架课" />
               <ShopStat value={abbrevCount(shop.totalCollects)} label="累计拿走" />
               <ShopStat value={abbrevCount(shop.totalSales)} label="付费成交" />
@@ -364,7 +364,7 @@ function ShopStat({ value, label }: { value: string; label: string }) {
   return (
     <div className="flex flex-col items-center gap-0.5 px-2 py-3">
       <span className="mono text-[16px] font-extrabold leading-none text-[var(--ink)]">{value}</span>
-      <span className="text-[10.5px] text-[var(--ink4)]">{label}</span>
+      <span className="text-[11px] text-[var(--ink4)]">{label}</span>
     </div>
   );
 }

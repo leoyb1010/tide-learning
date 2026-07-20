@@ -246,7 +246,7 @@ async function ShelfNew() {
             <Link
               key={u.id}
               href={`/courses/${u.courseSlug}`}
-              className="studio-lift flex flex-col rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]"
+              className="studio-lift flex flex-col rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]"
             >
               <span className="self-start rounded-full bg-[var(--new-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--new-ink)]">
                 上新

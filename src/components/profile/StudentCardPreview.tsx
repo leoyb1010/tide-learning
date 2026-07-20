@@ -55,7 +55,7 @@ export function StudentCardPreview({
         />
         <div className="relative flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5">
-            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[var(--red)] text-white shadow-[var(--red-glow)]">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px] bg-[var(--red)] text-white shadow-[var(--red-glow)]">
               <GraduationCap size={17} weight="fill" />
             </span>
             <div className="leading-tight">
@@ -64,11 +64,11 @@ export function StudentCardPreview({
             </div>
           </div>
           {isSubscriber ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline-on-dark)] bg-white/10 px-2.5 py-1 text-[10.5px] font-semibold text-[var(--ink-on-dark)]">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--hairline-on-dark)] bg-white/10 px-2.5 py-1 text-[11px] font-semibold text-[var(--ink-on-dark)]">
               <SealCheck size={12} weight="fill" className="text-[var(--red)]" /> 会员
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full border border-[var(--hairline-on-dark)] px-2.5 py-1 text-[10.5px] font-medium text-[var(--ink-on-dark-2)]">
+            <span className="inline-flex items-center rounded-full border border-[var(--hairline-on-dark)] px-2.5 py-1 text-[11px] font-medium text-[var(--ink-on-dark-2)]">
               免费学员
             </span>
           )}
@@ -150,7 +150,7 @@ export function StudentCardPreview({
 function InfoRow({ label, value, mono = false }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="mono text-[9.5px] uppercase tracking-[0.16em] text-[var(--ink4)]">{label}</dt>
+      <dt className="mono text-[10px] uppercase tracking-[0.16em] text-[var(--ink4)]">{label}</dt>
       <dd className={`mt-1 truncate text-[13px] font-semibold text-[var(--ink)] ${mono ? "mono tracking-[0.06em]" : ""}`}>
         {value}
       </dd>

@@ -22,10 +22,10 @@ export function CommunityTabs({
   return (
     <div className="space-y-5">
       {/* Tab 切换 */}
-      <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13.5px] font-semibold">
+      <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[14px] font-semibold">
         <button
           onClick={() => setTab("cocreate")}
-          className={`whitespace-nowrap rounded-[9px] px-5 py-2 transition-colors ${
+          className={`whitespace-nowrap rounded-[10px] px-5 py-2 transition-colors ${
             tab === "cocreate"
               ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
               : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -35,7 +35,7 @@ export function CommunityTabs({
         </button>
         <button
           onClick={() => setTab("square")}
-          className={`whitespace-nowrap rounded-[9px] px-5 py-2 transition-colors ${
+          className={`whitespace-nowrap rounded-[10px] px-5 py-2 transition-colors ${
             tab === "square"
               ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
               : "text-[var(--ink3)] hover:text-[var(--ink)]"

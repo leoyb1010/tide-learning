@@ -220,7 +220,7 @@ function DeskCard({
         <h3 className="relative mt-2 text-[17px] font-bold text-[var(--scene-ink)] lg:mt-2.5 lg:text-[21px]">
           {desk.title}
         </h3>
-        <p className="relative mt-1.5 text-[12.5px] leading-[1.65] text-[var(--scene-ink-2)] lg:text-[14px]">
+        <p className="relative mt-1.5 text-[13px] leading-[1.65] text-[var(--scene-ink-2)] lg:text-[14px]">
           {desk.desc}
         </p>
 
@@ -231,7 +231,7 @@ function DeskCard({
 
         <Link
           href={desk.href}
-          className="relative mt-4 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-bold text-[var(--scene-ink)] transition-colors hover:text-[var(--red)] lg:mt-5 lg:text-[14px]"
+          className="relative mt-4 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-bold text-[var(--scene-ink)] transition-colors hover:text-[var(--red)] lg:mt-5 lg:text-[14px]"
         >
           {desk.cta}
           <ArrowRight size={13} weight="bold" aria-hidden className="transition-transform group-hover:translate-x-0.5" />
@@ -402,7 +402,7 @@ function MiniForge() {
           transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
         >
           <Sparkle size={13} weight="fill" style={{ color: "var(--red)" }} className="shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: "var(--scene-ink-2)" }}>
+          <span className="min-w-0 flex-1 truncate text-[12px]" style={{ color: "var(--scene-ink-2)" }}>
             “{cur.ask}”
           </span>
         </motion.div>
@@ -426,16 +426,16 @@ function MiniForge() {
               transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
             >
               <div
-                className="flex h-full w-[38%] shrink-0 items-center justify-center rounded-[9px]"
+                className="flex h-full w-[38%] shrink-0 items-center justify-center rounded-[10px]"
                 style={{ background: cur.grad }}
               >
                 <Books size={22} weight="fill" color="rgba(255,255,255,.92)" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[11.5px] font-bold" style={{ color: "var(--scene-ink)" }}>
+                <p className="truncate text-[12px] font-bold" style={{ color: "var(--scene-ink)" }}>
                   {cur.course}
                 </p>
-                <p className="mono mt-1 text-[9.5px] uppercase tracking-[0.08em]" style={{ color: "var(--ok)" }}>
+                <p className="mono mt-1 text-[10px] uppercase tracking-[0.08em]" style={{ color: "var(--ok)" }}>
                   ✓ 已生成 · 含测验与复习卡
                 </p>
               </div>

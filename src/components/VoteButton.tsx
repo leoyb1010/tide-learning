@@ -132,7 +132,7 @@ export function VoteButton({
 
   return (
     <div className="flex flex-col items-end gap-1.5">
-      <Ripple className="rounded-[13px]" color="rgba(252,1,26,0.28)">
+      <Ripple className="rounded-[14px]" color="rgba(252,1,26,0.28)">
         <button
           onClick={vote}
           disabled={!canVote || loading}
@@ -147,7 +147,7 @@ export function VoteButton({
           }
           aria-pressed={lit}
           title={cooling ? disabledReason : undefined}
-          className={`group/vote studio-press relative flex min-h-[44px] items-center gap-2 rounded-[13px] border px-3.5 py-2 text-sm font-semibold shadow-[var(--card)] transition-[color,background-color,border-color,box-shadow] duration-[var(--dur-fast)] [transition-timing-function:var(--ease-tide)] disabled:cursor-not-allowed disabled:opacity-70 ${shellCls}`}
+          className={`group/vote studio-press relative flex min-h-[44px] items-center gap-2 rounded-[14px] border px-3.5 py-2 text-sm font-semibold shadow-[var(--card)] transition-[color,background-color,border-color,box-shadow] duration-[var(--dur-fast)] [transition-timing-function:var(--ease-tide)] disabled:cursor-not-allowed disabled:opacity-70 ${shellCls}`}
         >
           {/* 火种 / 火苗：容器承接迸发+摇曳动效，火星在此层向上飞散 */}
           <span className="relative inline-flex h-[18px] w-[18px] items-center justify-center">

@@ -141,7 +141,7 @@ function ReviewsError({ onRetry }: { onRetry: () => void }) {
       </div>
       <button
         onClick={onRetry}
-        className="studio-press inline-flex min-h-[44px] items-center rounded-[11px] border border-[var(--red-soft-border)] bg-[var(--surface)] px-5 text-[13px] font-semibold text-[var(--red)] transition-colors hover:border-[var(--red)]"
+        className="studio-press inline-flex min-h-[44px] items-center rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--surface)] px-5 text-[13px] font-semibold text-[var(--red)] transition-colors hover:border-[var(--red)]"
       >
         重新加载
       </button>
@@ -215,7 +215,7 @@ function ReviewsBody({
           {!formOpen ? (
             <button
               onClick={() => setFormOpen(true)}
-              className="studio-press inline-flex min-h-[44px] items-center gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 text-[13.5px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
+              className="studio-press inline-flex min-h-[44px] items-center gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 text-[14px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
             >
               <PencilSimple size={16} weight="bold" />
               {mine ? "修改我的评价" : "写下我的评价"}
@@ -238,7 +238,7 @@ function ReviewsBody({
       )}
       {/* 登录但没学过：温和引导（学过才可评，避免刷分） */}
       {isLoggedIn && !canReview && (
-        <p className="rounded-[12px] border border-dashed border-[var(--border2)] bg-[var(--surface2)] px-4 py-3 text-[12.5px] text-[var(--ink2)]">
+        <p className="rounded-[12px] border border-dashed border-[var(--border2)] bg-[var(--surface2)] px-4 py-3 text-[13px] text-[var(--ink2)]">
           学过这门课就能写评价，先去学一节，回来分享你的收获。
         </p>
       )}
@@ -294,7 +294,7 @@ function ReviewItem({ review, index, reduce }: { review: ReviewView; index: numb
               {initial}
             </span>
           )}
-          <span className="truncate text-[13.5px] font-semibold text-[var(--ink)]">{review.author.nickname}</span>
+          <span className="truncate text-[14px] font-semibold text-[var(--ink)]">{review.author.nickname}</span>
         </div>
         <span className="flex shrink-0 items-center gap-[1px]" aria-label={`${review.rating} 星`}>
           {Array.from({ length: 5 }).map((_, i) => (
@@ -308,7 +308,7 @@ function ReviewItem({ review, index, reduce }: { review: ReviewView; index: numb
         </span>
       </div>
       {review.comment && (
-        <p className="mt-2.5 text-[13.5px] leading-[1.7] text-[var(--ink2)]">{review.comment}</p>
+        <p className="mt-2.5 text-[14px] leading-[1.7] text-[var(--ink2)]">{review.comment}</p>
       )}
     </motion.li>
   );
@@ -375,7 +375,7 @@ function ReviewForm({
       className="rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)]"
     >
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[13.5px] font-semibold text-[var(--ink)]">我的评分</span>
+        <span className="text-[14px] font-semibold text-[var(--ink)]">我的评分</span>
         <div className="flex items-center gap-1" onMouseLeave={() => setHover(0)}>
           {[1, 2, 3, 4, 5].map((star) => (
             <button
@@ -384,7 +384,7 @@ function ReviewForm({
               aria-label={`${star} 星`}
               onMouseEnter={() => setHover(star)}
               onClick={() => setRating(star)}
-              className="grid h-9 w-9 place-items-center rounded-[9px] transition-transform hover:scale-110"
+              className="grid h-9 w-9 place-items-center rounded-[10px] transition-transform hover:scale-110"
             >
               <Star
                 size={24}
@@ -415,7 +415,7 @@ function ReviewForm({
         onChange={(e) => setComment(e.target.value.slice(0, 500))}
         rows={3}
         placeholder="说说这门课哪里帮到你了（选填，最多 500 字）"
-        className="mt-3 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[13.5px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
+        className="mt-3 w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 text-[14px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
       />
 
       <div className="mt-3 flex items-center justify-between gap-3">
@@ -423,14 +423,14 @@ function ReviewForm({
         <div className="flex items-center gap-2">
           <button
             onClick={onCancel}
-            className="studio-press inline-flex min-h-[44px] items-center rounded-[11px] px-4 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+            className="studio-press inline-flex min-h-[44px] items-center rounded-[12px] px-4 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
           >
             取消
           </button>
           <button
             onClick={submit}
             disabled={submitting || rating < 1}
-            className="cta-glow studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-5 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
+            className="cta-glow studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-5 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
           >
             <CheckCircle size={16} weight="fill" />
             {submitting ? "提交中" : initial ? "更新评价" : "发布评价"}

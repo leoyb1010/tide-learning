@@ -39,7 +39,7 @@ export function PriceField({
 }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[12.5px] font-semibold text-[var(--ink2)]">定价</span>
+      <span className="text-[13px] font-semibold text-[var(--ink2)]">定价</span>
       <div className="flex items-center gap-2">
         <div className="flex overflow-hidden rounded-[10px] border border-[var(--border)]">
           <button
@@ -78,7 +78,7 @@ export function PriceField({
           </div>
         )}
       </div>
-      <p className="text-[11.5px] text-[var(--ink4)]">
+      <p className="text-[12px] text-[var(--ink4)]">
         {isPaid ? "别人购买后你可得售价的 70%，即时入账积分。" : "免费课任何人都可直接拿走，你会获得小额创作激励。"}
       </p>
     </div>
@@ -201,22 +201,22 @@ export function ShareToMarketButton({
           {hasMeta && (
             <>
               <label className="flex flex-col gap-1.5">
-                <span className="text-[12.5px] font-semibold text-[var(--ink2)]">标题（2-80 字）</span>
+                <span className="text-[13px] font-semibold text-[var(--ink2)]">标题（2-80 字）</span>
                 <input
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   maxLength={80}
-                  className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
+                  className="rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[14px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
                 />
               </label>
               <label className="flex flex-col gap-1.5">
-                <span className="text-[12.5px] font-semibold text-[var(--ink2)]">简介（最多 160 字，可留空）</span>
+                <span className="text-[13px] font-semibold text-[var(--ink2)]">简介（最多 160 字，可留空）</span>
                 <textarea
                   value={subtitle}
                   onChange={(e) => setSubtitle(e.target.value)}
                   maxLength={160}
                   rows={2}
-                  className="resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13.5px] leading-relaxed text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
+                  className="resize-none rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[14px] leading-relaxed text-[var(--ink)] outline-none transition-colors focus:border-[var(--border2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
                 />
               </label>
             </>

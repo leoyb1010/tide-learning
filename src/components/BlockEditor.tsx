@@ -101,7 +101,7 @@ export function BlockEditor({ lessonId, lessonTitle, onClose }: { lessonId: stri
           {blocks.map((b, i) => (
             <div key={(b.id as string) ?? i} className="rounded-[12px] border border-[var(--border)] bg-[var(--surface)] p-3">
               <div className="mb-2 flex items-center gap-2">
-                <span className="mono rounded-full bg-[var(--surface-inset)] px-2 py-0.5 text-[10.5px] font-semibold text-[var(--ink3)]">{TYPE_LABEL[b.type] ?? b.type}</span>
+                <span className="mono rounded-full bg-[var(--surface-inset)] px-2 py-0.5 text-[11px] font-semibold text-[var(--ink3)]">{TYPE_LABEL[b.type] ?? b.type}</span>
                 <div className="ml-auto flex items-center gap-1">
                   <button type="button" disabled={i === 0} onClick={() => move(i, -1)} title="上移" className="studio-press rounded-md p-1 text-[var(--ink3)] hover:text-[var(--ink)] disabled:opacity-30"><ArrowUp size={13} weight="bold" /></button>
                   <button type="button" disabled={i === blocks.length - 1} onClick={() => move(i, 1)} title="下移" className="studio-press rounded-md p-1 text-[var(--ink3)] hover:text-[var(--ink)] disabled:opacity-30"><ArrowDown size={13} weight="bold" /></button>

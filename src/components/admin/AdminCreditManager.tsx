@@ -174,7 +174,7 @@ export function AdminCreditManager() {
                   {submitting === u.id ? "提交中…" : "调账"}
                 </button>
               </div>
-              <p className="mt-1.5 text-[11.5px] text-[var(--ink4)]">正数为补偿入账，负数为扣减（不透支，余额不足将拒绝）。</p>
+              <p className="mt-1.5 text-[12px] text-[var(--ink4)]">正数为补偿入账，负数为扣减（不透支，余额不足将拒绝）。</p>
 
               {/* 最近流水 */}
               <div className="mt-4">
@@ -183,7 +183,7 @@ export function AdminCreditManager() {
                   <p className="text-[12px] text-[var(--ink4)]">暂无流水。</p>
                 ) : (
                   <div className="overflow-x-auto rounded-[12px] border border-[var(--border)]">
-                    <table className="w-full text-[12.5px]">
+                    <table className="w-full text-[13px]">
                       <thead className="border-b border-[var(--border)] text-left text-[var(--ink4)]">
                         <tr>
                           <th className="px-3 py-2 font-medium">时间</th>

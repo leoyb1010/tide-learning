@@ -175,7 +175,7 @@ export function OutlineCheckpoint({
               <li
                 key={l.id ?? `new-${i}`}
                 style={{ "--i": i } as CSSProperties}
-                className={`gen-row-in flex items-center gap-1.5 rounded-[11px] border px-2.5 py-2 transition-colors ${
+                className={`gen-row-in flex items-center gap-1.5 rounded-[12px] border px-2.5 py-2 transition-colors ${
                   i === selected
                     ? "border-[var(--red-soft-border)] bg-[var(--red-soft)]"
                     : "border-[var(--border)] bg-[var(--surface)]"
@@ -187,7 +187,7 @@ export function OutlineCheckpoint({
                   className="flex min-w-0 flex-1 items-center gap-2 text-left"
                 >
                   <span className="mono text-[11px] text-[var(--ink4)]">{String(i + 1).padStart(2, "0")}</span>
-                  <span className="truncate text-[12.5px] font-medium text-[var(--ink)]">{l.title || "（未命名）"}</span>
+                  <span className="truncate text-[13px] font-medium text-[var(--ink)]">{l.title || "（未命名）"}</span>
                 </button>
                 <button type="button" disabled={i === 0} onClick={() => move(i, -1)} title="上移" className="studio-press shrink-0 rounded-md p-1 text-[var(--ink3)] hover:text-[var(--ink)] disabled:opacity-30">
                   <ArrowUp size={13} weight="bold" />
@@ -204,7 +204,7 @@ export function OutlineCheckpoint({
           <button
             type="button"
             onClick={add}
-            className="studio-press mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] border border-dashed border-[var(--border2)] px-3 py-2 text-[12px] font-semibold text-[var(--ink3)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)]"
+            className="studio-press mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-dashed border-[var(--border2)] px-3 py-2 text-[12px] font-semibold text-[var(--ink3)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)]"
           >
             <Plus size={13} weight="bold" /> 加一节
           </button>
@@ -214,13 +214,13 @@ export function OutlineCheckpoint({
         <div className="flex flex-col p-4">
           {cur && (
             <div className="flex-1">
-              <label className="mono text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">节标题</label>
+              <label className="mono text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">节标题</label>
               <input
                 value={cur.title}
                 onChange={(e) => update(selected, { title: e.target.value.slice(0, 120) })}
                 className="mt-1 w-full rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--ink3)]"
               />
-              <label className="mono mt-3 block text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">学习目标</label>
+              <label className="mono mt-3 block text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">学习目标</label>
               <textarea
                 value={cur.summary ?? ""}
                 onChange={(e) => update(selected, { summary: e.target.value.slice(0, 300) })}
@@ -245,7 +245,7 @@ export function OutlineCheckpoint({
               type="button"
               onClick={confirm}
               disabled={busy}
-              className="cta-glow studio-press inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[13px] bg-[var(--red)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)] disabled:opacity-60"
+              className="cta-glow studio-press inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[14px] bg-[var(--red)] px-5 text-[15px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)] disabled:opacity-60"
             >
               {confirming ? <Spinner size={14} /> : <Check size={16} weight="bold" />}
               {confirming ? "开工中" : "确认开工，开始逐节生成"}

@@ -290,7 +290,7 @@ function ApproveBtn({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-[11px] bg-[var(--ink)] px-4 py-2 text-[13px] font-bold text-[var(--surface)] transition-opacity hover:opacity-90 disabled:opacity-50"
+      className="rounded-[12px] bg-[var(--ink)] px-4 py-2 text-[13px] font-bold text-[var(--surface)] transition-opacity hover:opacity-90 disabled:opacity-50"
     >
       {label}
     </button>
@@ -303,7 +303,7 @@ function RejectBtn({ onClick, disabled }: { onClick: () => void; disabled: boole
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-[11px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-bold text-[var(--red)] transition-colors hover:border-[var(--red)] disabled:opacity-50"
+      className="rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2 text-[13px] font-bold text-[var(--red)] transition-colors hover:border-[var(--red)] disabled:opacity-50"
     >
       拒绝
     </button>

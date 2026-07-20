@@ -538,7 +538,7 @@ export function BlockSlideshow({
                 <button
                   type="button"
                   onClick={() => setHelpOpen(false)}
-                  className="studio-press relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+                  className="studio-press relative grid h-8 w-8 place-items-center rounded-[10px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
                   title="关闭"
                   aria-label="关闭"
                 >

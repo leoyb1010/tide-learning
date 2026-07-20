@@ -98,7 +98,7 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
         onClick={() => setOpen((v) => !v)}
         disabled={busy !== null || empty}
         title={empty ? "本笔记本还没有笔记" : undefined}
-        className="studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[12.5px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45"
+        className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45"
       >
         <Sparkle size={14} weight="fill" className="text-[var(--red)]" />
         {busy ? "整理中…" : "AI 整理本笔记本"}
@@ -156,7 +156,7 @@ function CopyRow({ copied, onCopy }: { copied: boolean; onCopy: () => void }) {
       <button
         type="button"
         onClick={onCopy}
-        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
       >
         {copied ? <Check size={13} weight="bold" className="text-[var(--red)]" /> : <Copy size={13} />}
         {copied ? "已复制" : "复制"}

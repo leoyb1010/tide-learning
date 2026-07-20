@@ -110,7 +110,7 @@ export function PermissionMatrix({ initialRows, permissions, defaults, adminLock
       </header>
 
       {error && (
-        <div className="rounded-[13px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[13px] text-[var(--red-ink)]">
+        <div className="rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[13px] text-[var(--red-ink)]">
           {error}
         </div>
       )}

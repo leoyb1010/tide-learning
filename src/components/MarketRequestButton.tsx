@@ -63,7 +63,7 @@ export function MarketRequestButton({
   // 非「未申请」态：显示只读状态徽标。
   if (state === "approved") {
     return (
-      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)]">
+      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)]">
         <CheckCircle size={15} weight="fill" className="text-[var(--red)]" />
         已获学习权
       </span>
@@ -71,7 +71,7 @@ export function MarketRequestButton({
   }
   if (state === "pending") {
     return (
-      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)]">
+      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)]">
         <HourglassMedium size={15} weight="fill" />
         申请审核中
       </span>
@@ -79,7 +79,7 @@ export function MarketRequestButton({
   }
   if (state === "rejected") {
     return (
-      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink4)]">
+      <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink4)]">
         申请未通过
       </span>
     );
@@ -89,7 +89,7 @@ export function MarketRequestButton({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="studio-press inline-flex w-full items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
+        className="studio-press inline-flex w-full items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-bold text-white transition-all hover:brightness-105"
       >
         <GraduationCap size={15} weight="fill" />
         申请学习
@@ -105,19 +105,19 @@ export function MarketRequestButton({
         maxLength={200}
         rows={2}
         placeholder={`想对作者说点什么？（选填）想学《${courseTitle}》的原因…`}
-        className="w-full resize-none rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] px-3 py-2.5 text-[13px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+        className="w-full resize-none rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-3 py-2.5 text-[13px] leading-[1.6] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
       />
       <div className="flex items-center gap-2">
         <button
           onClick={() => { setOpen(false); setMessage(""); }}
-          className="studio-press rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+          className="studio-press rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
         >
           取消
         </button>
         <button
           onClick={submit}
           disabled={loading}
-          className="studio-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
+          className="studio-press inline-flex flex-1 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
         >
           <PaperPlaneRight size={14} weight="fill" />
           {loading ? "提交中…" : "提交申请"}

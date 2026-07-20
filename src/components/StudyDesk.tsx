@@ -212,13 +212,13 @@ export function StudyDesk({
             {greeting}，{nickname}
           </span>
           {litToday ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--ok)_28%,transparent)] bg-[var(--ok-soft)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--ok)]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[color-mix(in_srgb,var(--ok)_28%,transparent)] bg-[var(--ok-soft)] px-2.5 py-1 text-[12px] font-medium text-[var(--ok)]">
               <Flame size={11} weight="fill" />
               已连续
               <span className="mono num-pop font-bold">{streak}</span>天
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-1 text-[11.5px] text-[var(--ink3)]">
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface2)] px-2.5 py-1 text-[12px] text-[var(--ink3)]">
               <Flame size={11} weight="regular" className="text-[var(--ink4)]" />
               连续
               <span className="mono num-pop font-bold text-[var(--ink2)]">{streak}</span>天 · 今天来点亮
@@ -258,7 +258,7 @@ export function StudyDesk({
             <button
               type="submit"
               disabled={!value.trim()}
-              className="studio-press cta-glow inline-flex h-[46px] shrink-0 items-center gap-1.5 rounded-[13px] bg-[var(--red)] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[var(--red-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-inset)] disabled:text-[var(--ink4)] disabled:shadow-none"
+              className="studio-press cta-glow inline-flex h-[46px] shrink-0 items-center gap-1.5 rounded-[14px] bg-[var(--red)] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[var(--red-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-inset)] disabled:text-[var(--ink4)] disabled:shadow-none"
             >
               <MagicWand size={17} weight="fill" className="hidden sm:block" />
               <span className="hidden sm:inline">造课</span>
@@ -286,7 +286,7 @@ export function StudyDesk({
                   >
                     <BookOpen size={16} weight="fill" className="mt-0.5 shrink-0 text-[var(--red)]" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">{s.title}</span>
+                      <span className="block truncate text-[14px] font-semibold text-[var(--ink)]">{s.title}</span>
                       {s.snippet && (
                         <span className="mt-0.5 block truncate text-[12px] text-[var(--ink4)]">{s.snippet}</span>
                       )}
@@ -371,9 +371,9 @@ export function StudyDesk({
               </div>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="mono text-[10.5px] text-[var(--ink4)]">从上次继续 · {resume.courseTitle}</p>
-              <p className="mt-0.5 truncate text-[13.5px] font-semibold text-[var(--ink)]">{resume.lessonTitle}</p>
-              <p className="mono mt-0.5 text-[10.5px] text-[var(--ink3)]">{resume.remainText}</p>
+              <p className="mono text-[11px] text-[var(--ink4)]">从上次继续 · {resume.courseTitle}</p>
+              <p className="mt-0.5 truncate text-[14px] font-semibold text-[var(--ink)]">{resume.lessonTitle}</p>
+              <p className="mono mt-0.5 text-[11px] text-[var(--ink3)]">{resume.remainText}</p>
             </div>
             <span className="mono num-pop shrink-0 text-[14px] font-bold text-[var(--red)]">{resume.progressPct}%</span>
             <ArrowRight size={15} weight="bold" className="shrink-0 text-[var(--ink4)] transition-transform group-hover:translate-x-0.5" />
@@ -403,7 +403,7 @@ export function StudyDesk({
               </span>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[13px] font-semibold text-[var(--ink)]">{r.lessonTitle}</p>
-                <p className="mono text-[10.5px] text-[var(--ink4)]">{r.courseTitle} · {r.remainText}</p>
+                <p className="mono text-[11px] text-[var(--ink4)]">{r.courseTitle} · {r.remainText}</p>
               </div>
               <ArrowRight size={14} weight="bold" className="shrink-0 text-[var(--ink4)] transition-transform group-hover:translate-x-0.5" />
             </Link>
@@ -433,7 +433,7 @@ export function StudyDesk({
             </span>
             <span>我的书架</span>
             {shelfCount > 0 && (
-              <span className="mono num inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--red)] px-1.5 text-[10.5px] font-bold leading-none text-white">
+              <span className="mono num inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[var(--red)] px-1.5 text-[11px] font-bold leading-none text-white">
                 {shelfCount > 99 ? "99+" : shelfCount}
               </span>
             )}
@@ -458,7 +458,7 @@ export function StudyDesk({
               <span className="mono num-pop text-[24px] font-bold leading-none text-[var(--ink)]">{myCourseCount}</span>
               <span className="text-[12px] text-[var(--ink3)]">门我的课</span>
             </p>
-            <p className="mt-auto flex items-center gap-1 pt-3 text-[11.5px] text-[var(--ink3)]">
+            <p className="mt-auto flex items-center gap-1 pt-3 text-[12px] text-[var(--ink3)]">
               AI 造课与导入
               <ArrowRight size={12} weight="bold" className="text-[var(--ink4)] transition-transform group-hover:translate-x-0.5" />
             </p>
@@ -485,7 +485,7 @@ export function StudyDesk({
               </span>
               <span className="text-[12px] text-[var(--ink3)]">条最近笔记</span>
             </p>
-            <p className="mt-auto flex items-center gap-1 pt-3 text-[11.5px] text-[var(--ink3)]">
+            <p className="mt-auto flex items-center gap-1 pt-3 text-[12px] text-[var(--ink3)]">
               {recentNotes.length > 0 ? (
                 <span className="truncate">{recentNotes[0].title}</span>
               ) : (
@@ -522,7 +522,7 @@ export function StudyDesk({
               </span>
               <span className="text-[12px] text-[var(--ink3)]">张待复习</span>
             </p>
-            <p className="mt-auto pt-3 text-[11.5px] text-[var(--ink3)]">
+            <p className="mt-auto pt-3 text-[12px] text-[var(--ink3)]">
               {dueReviewCount > 0 ? "趁热复习，记得更牢" : "全部复习完，节奏很稳"}
             </p>
           </Link>
@@ -550,7 +550,7 @@ export function StudyDesk({
             </div>
             <div className="min-w-0 flex-1">
               <p className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink-on-dark-3)]">AI 今日建议</p>
-              <p className="mt-1.5 text-[13.5px] font-semibold leading-[1.6] text-white">{advice}</p>
+              <p className="mt-1.5 text-[14px] font-semibold leading-[1.6] text-white">{advice}</p>
             </div>
             <Link
               href={resume ? `/courses/${resume.courseSlug}/learn/${resume.lessonId}` : "/courses"}
@@ -569,13 +569,13 @@ export function StudyDesk({
               <span className="absolute inline-flex h-full w-full rounded-full bg-[var(--red)] opacity-60 motion-safe:animate-ping" />
               <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[var(--red)]" />
             </span>
-            <p className="text-[12.5px] text-[var(--ink2)]">
+            <p className="text-[13px] text-[var(--ink2)]">
               此刻 <span className="mono font-semibold text-[var(--ink)]">{onlineCount.toLocaleString("en-US")}</span> 人在自习
             </p>
           </div>
           <Link
             href={focusHref}
-            className="studio-press cta-glow inline-flex items-center justify-center gap-2 rounded-[var(--radius-card-sm)] bg-[var(--red)] px-4 py-3 text-[13.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+            className="studio-press cta-glow inline-flex items-center justify-center gap-2 rounded-[var(--radius-card-sm)] bg-[var(--red)] px-4 py-3 text-[14px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
           >
             <Lightning size={15} weight="fill" />
             进入专注

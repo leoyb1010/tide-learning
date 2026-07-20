@@ -211,7 +211,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                 <Link
                   key={l.href}
                   href={l.href}
-                  className={`shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2 text-[13.5px] font-semibold transition-colors ${lateItem ? "hidden lg:block" : ""} ${
+                  className={`shrink-0 whitespace-nowrap rounded-[10px] px-3 py-2 text-[14px] font-semibold transition-colors ${lateItem ? "hidden lg:block" : ""} ${
                     active ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
                   }`}
                 >
@@ -231,7 +231,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                   onClick={() => setResumeOpen((o) => !o)}
                   aria-expanded={resumeOpen}
                   aria-haspopup="menu"
-                  className="studio-lift flex max-w-[220px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-2.5 pr-2.5 text-[12.5px] shadow-[var(--card)] transition-colors hover:border-[var(--ink4)]"
+                  className="studio-lift flex max-w-[220px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] py-1.5 pl-2.5 pr-2.5 text-[13px] shadow-[var(--card)] transition-colors hover:border-[var(--ink4)]"
                   title={`继续学习：${resume.courseTitle} · ${resume.lessonTitle}`}
                 >
                   <Play size={12} weight="fill" className="shrink-0 text-[var(--red)]" />
@@ -269,7 +269,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                             <span className="block truncate text-[13px] font-semibold text-[var(--ink)] group-hover:text-[var(--red)]">
                               {c.courseTitle}
                             </span>
-                            <span className="mono text-[10.5px] text-[var(--ink4)]">进度 {c.coursePct}%</span>
+                            <span className="mono text-[11px] text-[var(--ink4)]">进度 {c.coursePct}%</span>
                           </span>
                           <Play size={12} weight="fill" className="shrink-0 text-[var(--ink4)] group-hover:text-[var(--red)]" />
                         </Link>
@@ -277,7 +277,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                     </div>
                     <Link
                       href="/me/history"
-                      className="flex items-center justify-between border-t border-[var(--border)] px-3.5 py-2.5 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
+                      className="flex items-center justify-between border-t border-[var(--border)] px-3.5 py-2.5 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
                     >
                       <span className="flex items-center gap-2">
                         <ClockCounterClockwise size={15} weight="fill" className="text-[var(--ink3)]" />
@@ -371,7 +371,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                         return (
                           <Link
                             href="/pricing"
-                            className={`mt-2.5 flex items-center justify-between rounded-[9px] border px-3 py-2 transition-colors ${pill.cls}`}
+                            className={`mt-2.5 flex items-center justify-between rounded-[10px] border px-3 py-2 transition-colors ${pill.cls}`}
                           >
                             <span className="flex items-center gap-1.5 text-[12px] font-medium">
                               <Crown size={14} weight={pill.fill ? "fill" : "regular"} /> {pill.short}
@@ -382,7 +382,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                           </Link>
                         );
                       })()}
-                      <Link href="/me" className="mt-2 flex items-center justify-between rounded-[9px] bg-[var(--surface2)] px-3 py-2 transition-colors hover:bg-[var(--surface-inset)]">
+                      <Link href="/me" className="mt-2 flex items-center justify-between rounded-[10px] bg-[var(--surface2)] px-3 py-2 transition-colors hover:bg-[var(--surface-inset)]">
                         <span className="flex items-center gap-1.5 text-[12px] text-[var(--ink2)]"><Coins size={14} weight="fill" className="text-[var(--red)]" /> 积分</span>
                         <span className="mono text-[13px] font-bold text-[var(--ink)]">{(user.credits ?? 0).toLocaleString()}</span>
                       </Link>
@@ -400,7 +400,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
                         type="button"
                         onClick={logout}
                         disabled={logoutPending}
-                        className="flex w-full items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--red)] disabled:cursor-wait disabled:opacity-60"
+                        className="flex w-full items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--red)] disabled:cursor-wait disabled:opacity-60"
                       >
                         <SignOut size={16} /> {logoutPending ? "退出中..." : "退出登录"}
                       </button>
@@ -454,14 +454,14 @@ export function TopNav({ user }: { user: NavUser | null }) {
               <button
                 onClick={() => setDrawerOpen(false)}
                 title="关闭" aria-label="关闭"
-                className="relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
+                className="relative grid h-8 w-8 place-items-center rounded-[10px] text-[var(--ink3)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
               >
                 <X size={18} />
               </button>
             </div>
             <nav className="flex flex-col gap-1">
               {links.map((l) => (
-                <Link key={l.href} href={l.href} className={`flex items-center gap-3 rounded-[11px] px-3 py-2.5 text-[14px] font-semibold ${isActive(l.href) ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)]"}`}>
+                <Link key={l.href} href={l.href} className={`flex items-center gap-3 rounded-[12px] px-3 py-2.5 text-[14px] font-semibold ${isActive(l.href) ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:bg-[var(--surface2)]"}`}>
                   <l.Icon size={18} weight={isActive(l.href) ? "fill" : "regular"} /> {l.label}
                 </Link>
               ))}
@@ -475,7 +475,7 @@ export function TopNav({ user }: { user: NavUser | null }) {
 
 function MenuItem({ href, Icon, label }: { href: string; Icon: typeof House; label: string }) {
   return (
-    <Link href={href} className="flex items-center gap-2.5 rounded-[9px] px-3 py-2 text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]">
+    <Link href={href} className="flex items-center gap-2.5 rounded-[10px] px-3 py-2 text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]">
       <Icon size={16} weight="fill" className="text-[var(--ink3)]" /> {label}
     </Link>
   );

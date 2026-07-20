@@ -84,7 +84,7 @@ export function CourseGenControls({
           type="button"
           onClick={onResume}
           disabled={resuming}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)] disabled:opacity-60"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)] disabled:opacity-60"
         >
           {resuming ? <Spinner size={12} /> : <ArrowClockwise size={13} weight="bold" />}
           {resuming ? "续跑中" : status === "paused" ? "继续生产" : "继续生成"}
@@ -93,7 +93,7 @@ export function CourseGenControls({
         <Link
           href="/create"
           onClick={() => track("gen_view_progress_click", { course_id: courseId, source: "me_courses" })}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--red-ink)] transition-colors duration-150 hover:brightness-[0.98]"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1.5 text-[13px] font-semibold text-[var(--red-ink)] transition-colors duration-150 hover:brightness-[0.98]"
         >
           查看进度
           <ArrowRight size={13} weight="bold" />

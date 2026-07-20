@@ -211,7 +211,7 @@ export function DeskShelf({ open, onClose }: { open: boolean; onClose: () => voi
       >
         {/* 头部：标题 + 总册数 + 关闭 */}
         <header className="relative flex shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3.5 shadow-[var(--inner-hi)] sm:px-5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]">
             <Books size={18} weight="fill" />
           </span>
           <div className="min-w-0 flex-1">
@@ -338,7 +338,7 @@ function ShelfSection({
           <span className="h-4 w-1.5 rounded-full bg-[var(--red)]" aria-hidden />
           <div className="flex flex-col">
             <h3 className="text-[14px] font-bold leading-tight tracking-tight text-[var(--ink)]">{label}</h3>
-            <span className="text-[11.5px] leading-tight text-[var(--ink3)]">{blurb}</span>
+            <span className="text-[12px] leading-tight text-[var(--ink3)]">{blurb}</span>
           </div>
         </div>
         <span className="mono shrink-0 text-[11px] tracking-wide text-[var(--ink4)]">
@@ -411,12 +411,12 @@ function ShelfCard({
           {/* 底部暗角，保证角标可读 */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-transparent" />
           {/* 赛道标（左上） */}
-          <span className="absolute left-2 top-2 rounded-full bg-black/35 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-white/90 backdrop-blur-sm">
+          <span className="absolute left-2 top-2 rounded-full bg-black/35 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-white/90 backdrop-blur-sm">
             {course.categoryLabel}
           </span>
           {/* 生成态旗标 / 已完成星标（右上） */}
           {notReady ? (
-            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9.5px] font-bold text-white backdrop-blur-sm">
+            <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
               {generating && <CircleNotch size={9} weight="bold" className="animate-spin" />}
               {genFlagText}
             </span>
@@ -432,14 +432,14 @@ function ShelfCard({
             {course.lessonsCount} 节
           </span>
           {/* 进度%（右下） */}
-          <span className="mono absolute bottom-2 right-2 text-[10.5px] font-bold text-white">
+          <span className="mono absolute bottom-2 right-2 text-[11px] font-bold text-white">
             {notReady ? `${genPct}%` : `${course.progress}%`}
           </span>
         </div>
 
         {/* 卡底：标题 + 进度条 */}
         <div className="p-2.5">
-          <p className="line-clamp-2 min-h-[2.4em] text-[12.5px] font-semibold leading-[1.2] tracking-tight text-[var(--ink)]">
+          <p className="line-clamp-2 min-h-[2.4em] text-[13px] font-semibold leading-[1.2] tracking-tight text-[var(--ink)]">
             {course.title}
           </p>
           <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-[var(--surface-inset)]">
@@ -455,7 +455,7 @@ function ShelfCard({
           continue = 主操作（卡本身已可点，这里给显式按钮 + 进度环）；
           自造课额外给 分享到集市 / 删除（去 /me/courses 管理页，不在书桌直接删）。 */}
       <div className="shelf-card-actions pointer-events-none absolute left-1/2 top-1.5 z-10 w-[calc(100%-12px)] max-w-[220px] -translate-x-1/2 opacity-0 transition-opacity duration-200 group-hover/card:pointer-events-auto group-hover/card:opacity-100 group-focus-within/card:pointer-events-auto group-focus-within/card:opacity-100">
-        <div className="elev-3 flex flex-col gap-1.5 rounded-[13px] p-2">
+        <div className="elev-3 flex flex-col gap-1.5 rounded-[14px] p-2">
           {/* 标题 + 进度环 */}
           <div className="flex items-center gap-2 px-0.5">
             <ProgressRing pct={notReady ? genPct : course.progress} />
@@ -471,7 +471,7 @@ function ShelfCard({
             <Link
               href="/create"
               onClick={onNavigate}
-              className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+              className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[13px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
             >
               {generating ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : <ArrowClockwise size={14} weight="bold" />}
               {genActionText}
@@ -480,7 +480,7 @@ function ShelfCard({
             <Link
               href={`/courses/${course.slug}`}
               onClick={onNavigate}
-              className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
+              className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[13px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
             >
               {course.progress >= 100 ? (
                 <>

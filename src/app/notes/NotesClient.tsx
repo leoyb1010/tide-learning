@@ -377,14 +377,14 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="搜索标题、正文或剪藏原文…"
-              className="w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] py-2.5 pl-10 pr-4 text-[14px] text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+              className="w-full rounded-[14px] border border-[var(--border)] bg-[var(--surface)] py-2.5 pl-10 pr-4 text-[14px] text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
             />
           </div>
           {courseOptions.length > 0 && (
             <select
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
-              className="rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink2)] shadow-[var(--card)] outline-none transition-colors focus:border-[var(--ink3)]"
+              className="rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[13px] font-medium text-[var(--ink2)] shadow-[var(--card)] outline-none transition-colors focus:border-[var(--ink3)]"
             >
               <option value="">全部课程</option>
               {courseOptions.map((c) => (
@@ -433,7 +433,7 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
                   type="button"
                   onClick={() => void loadMore()}
                   disabled={loadingMore}
-                  className="studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:text-[var(--ink)] disabled:opacity-55"
+                  className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:text-[var(--ink)] disabled:opacity-55"
                 >
                   {loadingMore ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : null}
                   {loadingMore ? "加载中…" : "加载更多"}
@@ -653,8 +653,8 @@ function AiTidyMenu({
         type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={busy !== null}
-        className={`studio-press inline-flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45 ${
-          compact ? "px-3 py-1.5 text-[12px]" : "px-3.5 py-2 text-[12.5px]"
+        className={`studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45 ${
+          compact ? "px-3 py-1.5 text-[12px]" : "px-3.5 py-2 text-[13px]"
         }`}
       >
         {busy ? (
@@ -753,7 +753,7 @@ function ResultActions({
         type="button"
         onClick={onSave}
         disabled={saving || saved}
-        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
+        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1.5 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
       >
         {saved ? <Check size={13} weight="bold" /> : <FloppyDisk size={13} weight="bold" />}
         {saved ? "已保存" : saving ? "保存中…" : "存为笔记"}
@@ -761,7 +761,7 @@ function ResultActions({
       <button
         type="button"
         onClick={onCopy}
-        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+        className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
       >
         {copied ? <Check size={13} weight="bold" className="text-[var(--red)]" /> : <Copy size={13} />}
         {copied ? "已复制" : "复制"}
@@ -1168,7 +1168,7 @@ function WritePanel({
           <select
             value={notebookId}
             onChange={(e) => setNotebookId(e.target.value)}
-            className="min-h-[44px] rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)]"
+            className="min-h-[44px] rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)]"
           >
             <option value="">未归类</option>
             {options.notebooks.map((nb) => (
@@ -1188,7 +1188,7 @@ function WritePanel({
             value={courseId}
             onChange={(e) => setCourseId(e.target.value)}
             disabled={options.courses.length === 0}
-            className="min-h-[44px] rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)] disabled:opacity-55"
+            className="min-h-[44px] rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-[13px] text-[var(--ink)] outline-none transition-colors focus:border-[var(--ink3)] disabled:opacity-55"
           >
             <option value="">{options.courses.length === 0 ? "暂无在学课程" : "不关联"}</option>
             {options.courses.map((c) => (
@@ -1214,7 +1214,7 @@ function WritePanel({
                   key={t.id}
                   type="button"
                   onClick={() => toggleTag(t.id)}
-                  className={`inline-flex min-h-[32px] items-center gap-1 rounded-full px-3 py-1 text-[12.5px] font-medium transition-colors ${
+                  className={`inline-flex min-h-[32px] items-center gap-1 rounded-full px-3 py-1 text-[13px] font-medium transition-colors ${
                     active
                       ? "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
                       : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -1239,13 +1239,13 @@ function WritePanel({
             }}
             placeholder="新建标签，回车添加"
             maxLength={20}
-            className="min-h-[40px] flex-1 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+            className="min-h-[40px] flex-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
           />
           <button
             type="button"
             onClick={() => void createTag()}
             disabled={creatingTag || !newTag.trim()}
-            className="studio-press inline-flex min-h-[40px] items-center gap-1 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-55"
+            className="studio-press inline-flex min-h-[40px] items-center gap-1 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-55"
           >
             {creatingTag ? <CircleNotch size={13} weight="bold" className="animate-spin" /> : <Plus size={13} weight="bold" />}
             添加

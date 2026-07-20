@@ -166,7 +166,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
                   type="button"
                   onClick={() => setMoreOpen(false)}
                   title="关闭" aria-label="关闭"
-                  className="relative grid h-8 w-8 place-items-center rounded-[9px] text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
+                  className="relative grid h-8 w-8 place-items-center rounded-[10px] text-[var(--ink3)] transition-colors hover:bg-[var(--surface2)] after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']"
                 >
                   <X size={17} weight="bold" />
                 </button>
@@ -186,7 +186,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
                       }`}
                     >
                       <span
-                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[11px] ${
+                        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] ${
                           active
                             ? "bg-[var(--red)] text-white"
                             : "border border-[var(--border)] bg-[var(--surface2)] text-[var(--ink2)]"
@@ -195,7 +195,7 @@ export function MobileTabs({ loggedIn }: { loggedIn: boolean }) {
                         <l.Icon size={19} weight={active ? "fill" : "regular"} />
                       </span>
                       <span className="min-w-0">
-                        <span className={`block text-[13.5px] font-semibold ${active ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>{l.label}</span>
+                        <span className={`block text-[14px] font-semibold ${active ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>{l.label}</span>
                         <span className="mt-0.5 block truncate text-[11px] text-[var(--ink4)]">{l.desc}</span>
                       </span>
                     </Link>

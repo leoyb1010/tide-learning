@@ -211,12 +211,12 @@ export function DeleteAccountButton({ requiresPassword }: { requiresPassword: bo
       </p>
       <label className="mt-3 block text-[12px] font-medium text-[var(--ink2)]">
         输入“注销账号”
-        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} className="mt-1.5 w-full rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]" />
+        <input value={confirmation} onChange={(e) => setConfirmation(e.target.value)} className="mt-1.5 w-full rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]" />
       </label>
       {requiresPassword && (
         <label className="mt-3 block text-[12px] font-medium text-[var(--ink2)]">
           当前密码
-          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5 w-full rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]" />
+          <input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1.5 w-full rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px]" />
         </label>
       )}
       {error && <p className="mt-2 text-[12px] font-medium text-[var(--red)]">{error}</p>}

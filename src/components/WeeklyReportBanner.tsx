@@ -196,9 +196,9 @@ function ReportChip({
         >
           {value}
         </span>
-        <span className="text-[10.5px] text-[var(--ink3)]">{unit}</span>
+        <span className="text-[11px] text-[var(--ink3)]">{unit}</span>
       </p>
-      <p className="mt-1 truncate text-[10.5px] text-[var(--ink3)]">{hint}</p>
+      <p className="mt-1 truncate text-[11px] text-[var(--ink3)]">{hint}</p>
       {/* 迷你趋势：7 天极小柱，峰值/今日红点睛，纯装饰性 spark */}
       <MiniSpark days={spark} highlightToday={kind === "day"} />
     </button>
@@ -344,7 +344,7 @@ function ReportDialog({
             {/* 7 天柱图（周/月侧重；日报也展示，突出今日柱） */}
             <div className="mt-4 rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface2)] p-4">
               <div className="flex items-baseline justify-between">
-                <h3 className="text-[12.5px] font-bold text-[var(--ink)]">本周学习节奏</h3>
+                <h3 className="text-[13px] font-bold text-[var(--ink)]">本周学习节奏</h3>
                 <span className="mono text-[10px] uppercase tracking-[0.14em] text-[var(--ink4)]">
                   分钟 · 天
                 </span>
@@ -392,7 +392,7 @@ function ReportDialog({
             {kind === "month" && (
               <div className="mt-3 flex items-center gap-2 rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface2)] px-3.5 py-3">
                 <Sparkle size={14} weight="fill" className="shrink-0 text-[var(--red)]" />
-                <p className="text-[11.5px] leading-[1.5] text-[var(--ink3)]">
+                <p className="text-[12px] leading-[1.5] text-[var(--ink3)]">
                   近两周共学习{" "}
                   <span className="mono font-bold text-[var(--ink)]">{recentMinutes}</span> 分钟，本周{" "}
                   <DeltaInline delta={report.minutes} /> 上周。持续学下去，月度轨迹会更清晰。
@@ -402,7 +402,7 @@ function ReportDialog({
 
             {/* 底部：分享（周报分享图已就绪，复用同一份周数据） */}
             <div className="mt-4 flex items-center justify-between gap-3">
-              <p className="min-w-0 text-[11.5px] text-[var(--ink3)]">
+              <p className="min-w-0 text-[12px] text-[var(--ink3)]">
                 {activeDayCount > 0
                   ? `本周已有 ${activeDayCount} 天在学，继续保持`
                   : "点亮第一课，开启你的一周"}
@@ -456,7 +456,7 @@ function StatCell({
       className="flex flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card),var(--inner-hi)]"
     >
       <div className="flex items-center justify-between gap-2">
-        <span className={`flex h-7 w-7 items-center justify-center rounded-[9px] border ${TONE_ICON[tone]}`}>
+        <span className={`flex h-7 w-7 items-center justify-center rounded-[10px] border ${TONE_ICON[tone]}`}>
           {icon}
         </span>
         {delta ? <DeltaPill delta={delta} /> : null}
@@ -467,7 +467,7 @@ function StatCell({
         </span>
         <span className="text-[11px] text-[var(--ink3)]">{unit}</span>
       </p>
-      <p className="mt-1 text-[11.5px] text-[var(--ink3)]">{label}</p>
+      <p className="mt-1 text-[12px] text-[var(--ink3)]">{label}</p>
     </div>
   );
 }

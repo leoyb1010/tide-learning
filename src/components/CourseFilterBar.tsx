@@ -30,7 +30,7 @@ export function CourseFilterBar({ category, sort, q }: { category: string; sort:
         defaultValue={q}
         onKeyDown={(e) => { if (e.key === "Enter") update("q", (e.target as HTMLInputElement).value); }}
         placeholder="搜索课程标题…"
-        className="w-full rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
+        className="w-full rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm text-[var(--ink)] shadow-[var(--card)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red-soft)]"
       />
       <div className="flex flex-wrap items-center gap-2">
         {CATEGORIES.map((c) => (

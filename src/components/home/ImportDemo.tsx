@@ -68,11 +68,11 @@ export function ImportDemo() {
         }}
       >
         <FileText size={16} weight="fill" style={{ color: "var(--info)" }} className="shrink-0" />
-        <span className="min-w-0 flex-1 truncate text-[11.5px]" style={{ color: "var(--scene-ink-2)" }}>
+        <span className="min-w-0 flex-1 truncate text-[12px]" style={{ color: "var(--scene-ink-2)" }}>
           我的资料 · 理财入门笔记.pdf
         </span>
         <span
-          className="mono shrink-0 text-[9.5px] font-bold uppercase tracking-[0.1em]"
+          className="mono shrink-0 text-[10px] font-bold uppercase tracking-[0.1em]"
           style={{ color: stage === "scan" ? "var(--red)" : "var(--scene-ink-3)" }}
         >
           {stage === "scan" ? "读取中" : "已读完"}
@@ -97,7 +97,7 @@ export function ImportDemo() {
                 transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1], delay: motionOk ? i * 0.16 : 0 }}
               >
                 <span
-                  className="mono flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full text-[8.5px] font-bold"
+                  className="mono flex h-[15px] w-[15px] shrink-0 items-center justify-center rounded-full text-[9px] font-bold"
                   style={{ background: "var(--scene-card-2)", color: "var(--scene-ink-3)", border: "1px solid var(--scene-hairline)" }}
                 >
                   {i + 1}
@@ -132,7 +132,7 @@ export function ImportDemo() {
           {stage === "done" ? (
             <motion.span
               key="done"
-              className="flex items-center gap-1.5 text-[10.5px] font-semibold"
+              className="flex items-center gap-1.5 text-[11px] font-semibold"
               style={{ color: "var(--ok)" }}
               initial={motionOk ? { opacity: 0, y: 4 } : false}
               animate={{ opacity: 1, y: 0 }}
@@ -145,7 +145,7 @@ export function ImportDemo() {
           ) : (
             <motion.span
               key="working"
-              className="mono flex items-center gap-1.5 text-[9.5px] uppercase tracking-[0.12em]"
+              className="mono flex items-center gap-1.5 text-[10px] uppercase tracking-[0.12em]"
               style={{ color: "var(--scene-ink-3)" }}
               initial={false}
               animate={{ opacity: 1 }}

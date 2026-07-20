@@ -67,7 +67,7 @@ export function HistoryGroups({ courses }: { courses: HistoryCourse[] }) {
                 color={c.coverColor}
                 imageSrc={c.coverSrc}
                 alt={c.title}
-                className="h-14 w-[84px] shrink-0 rounded-[11px]"
+                className="h-14 w-[84px] shrink-0 rounded-[12px]"
               />
               <div className="min-w-0 flex-1">
                 <div className="mono text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">
@@ -132,7 +132,7 @@ export function HistoryGroups({ courses }: { courses: HistoryCourse[] }) {
                         {l.done ? <Check size={13} weight="bold" /> : l.sortOrder + 1}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-[13.5px] font-semibold text-[var(--ink)]">
+                        <p className="truncate text-[14px] font-semibold text-[var(--ink)]">
                           {l.title}
                         </p>
                         <div className="mt-1 flex items-center gap-2">
@@ -150,7 +150,7 @@ export function HistoryGroups({ courses }: { courses: HistoryCourse[] }) {
                       {/* 从该章节进度「继续/重温」 */}
                       <Link
                         href={`/courses/${c.slug}/learn/${l.lessonId}`}
-                        className="studio-press inline-flex h-9 shrink-0 items-center gap-1 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-semibold text-white transition-[filter] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
+                        className="studio-press inline-flex h-9 shrink-0 items-center gap-1 rounded-[10px] bg-[var(--red)] px-3 text-[13px] font-semibold text-white transition-[filter] hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
                       >
                         <Play size={11} weight="fill" /> {l.done ? "重温" : "继续"}
                       </Link>

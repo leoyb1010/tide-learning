@@ -57,7 +57,7 @@ export function AccessRequestActions({ requestId }: { requestId: string }) {
       <button
         onClick={() => decide(false)}
         disabled={loading !== null}
-        className="studio-press inline-flex items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)] disabled:opacity-50"
+        className="studio-press inline-flex items-center gap-1 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)] disabled:opacity-50"
       >
         <X size={13} weight="bold" />
         {loading === "reject" ? "…" : "拒绝"}
@@ -65,7 +65,7 @@ export function AccessRequestActions({ requestId }: { requestId: string }) {
       <button
         onClick={() => decide(true)}
         disabled={loading !== null}
-        className="studio-press inline-flex items-center gap-1 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[12.5px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
+        className="studio-press inline-flex items-center gap-1 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
       >
         <Check size={13} weight="bold" />
         {loading === "approve" ? "…" : "批准"}

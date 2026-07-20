@@ -137,7 +137,7 @@ export function NoteTransformPanel({ noteId, noteTitle }: { noteId: string; note
   return (
     <section className="studio-rise rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card)]">
       <header className="mb-3.5 flex items-center gap-2">
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-[9px] bg-[var(--surface2)]">
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-[10px] bg-[var(--surface2)]">
           <Sparkle size={15} weight="fill" className="text-[var(--red)]" />
         </span>
         <div>
@@ -191,7 +191,7 @@ export function NoteTransformPanel({ noteId, noteTitle }: { noteId: string; note
 
       {/* result */}
       {result && !busy && (
-        <div className="mt-4 rounded-[13px] border border-[var(--border)] bg-[var(--surface-inset)] p-4">
+        <div className="mt-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] p-4">
           <div className="mb-2.5 flex items-center justify-between">
             <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[var(--ink)]">
               <Sparkle size={13} weight="fill" className="text-[var(--red)]" /> {ACTION_LABEL[result.action]}
@@ -200,7 +200,7 @@ export function NoteTransformPanel({ noteId, noteTitle }: { noteId: string; note
               <button
                 type="button"
                 onClick={copyResult}
-                className="studio-press inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+                className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
               >
                 {copied ? <Check size={12} weight="bold" className="text-[var(--red)]" /> : <Copy size={12} />}
                 {copied ? "已复制" : "复制"}
@@ -209,7 +209,7 @@ export function NoteTransformPanel({ noteId, noteTitle }: { noteId: string; note
                 type="button"
                 onClick={saveAsNote}
                 disabled={saving}
-                className="studio-press inline-flex items-center gap-1.5 rounded-[9px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-45"
+                className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-2.5 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-45"
               >
                 <FloppyDisk size={12} weight="bold" /> {saving ? "保存中…" : "存为新笔记"}
               </button>

@@ -153,21 +153,21 @@ export default async function MyCoursesPage() {
         <div className="hidden shrink-0 items-center gap-2 sm:flex">
           <Link
             href="/me/earnings"
-            className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+            className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[14px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
           >
             <Coins size={15} weight="fill" />
             我的收益
           </Link>
           <Link
             href="/market"
-            className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+            className="studio-press inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[14px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
           >
             <Storefront size={15} weight="fill" />
             逛集市
           </Link>
           <Link
             href="/create"
-            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--red)] px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 hover:brightness-105 active:translate-y-px"
+            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--red)] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 hover:brightness-105 active:translate-y-px"
           >
             <Plus size={15} weight="bold" />
             造一门新课
@@ -183,7 +183,7 @@ export default async function MyCoursesPage() {
           </span>
           <div>
             <p className="text-[16px] font-bold text-[var(--ink)]">还没有专属课</p>
-            <p className="mt-1 text-[13.5px] text-[var(--ink2)]">一句话描述你想学的，或粘贴一段资料，AI 现场帮你搭一门课。</p>
+            <p className="mt-1 text-[14px] text-[var(--ink2)]">一句话描述你想学的，或粘贴一段资料，AI 现场帮你搭一门课。</p>
           </div>
           <Link
             href="/create"
@@ -246,7 +246,7 @@ export default async function MyCoursesPage() {
                       {(() => {
                         const badge = SHARE_BADGE[c.sharedStatus as ShareState] ?? SHARE_BADGE.private;
                         return (
-                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10.5px] font-semibold ${badge.cls}`}>
+                          <span className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[11px] font-semibold ${badge.cls}`}>
                             {badge.label}
                             {c.sharedStatus === "shared" && (c.priceCredits ?? 0) > 0 && (
                               <span className="mono inline-flex items-center gap-0.5">
@@ -318,7 +318,7 @@ export default async function MyCoursesPage() {
                     // 大纲待确认（L2）：不轮询进度，直接给「去确认大纲」深链，回 /create 打开该草稿的检查点。
                     <Link
                       href={`/create?draft=${c.id}`}
-                      className="studio-press inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)]"
+                      className="studio-press inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)]"
                     >
                       去确认大纲
                       <ArrowRight size={13} weight="bold" />
@@ -353,8 +353,8 @@ export default async function MyCoursesPage() {
         {pendingRequests.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-10 text-center">
             <HourglassMedium size={22} weight="regular" className="text-[var(--ink4)]" />
-            <p className="text-[13.5px] font-semibold text-[var(--ink2)]">暂无待批准的申请</p>
-            <p className="text-[12.5px] text-[var(--ink3)]">把你的课分享到集市，就有机会收到同学的学习申请。</p>
+            <p className="text-[14px] font-semibold text-[var(--ink2)]">暂无待批准的申请</p>
+            <p className="text-[13px] text-[var(--ink3)]">把你的课分享到集市，就有机会收到同学的学习申请。</p>
           </div>
         ) : (
           <ul className="flex flex-col gap-2.5">
@@ -372,7 +372,7 @@ export default async function MyCoursesPage() {
                     <span className="text-[13px] text-[var(--ink3)]">申请学习</span>
                     <span className="truncate text-[13px] font-semibold text-[var(--ink2)]">《{reqCourseMap.get(r.courseId) ?? "课程"}》</span>
                   </div>
-                  {r.message && <p className="line-clamp-2 text-[12.5px] leading-[1.55] text-[var(--ink3)]">“{r.message}”</p>}
+                  {r.message && <p className="line-clamp-2 text-[13px] leading-[1.55] text-[var(--ink3)]">“{r.message}”</p>}
                 </div>
                 <div className="shrink-0">
                   <AccessRequestActions requestId={r.id} />

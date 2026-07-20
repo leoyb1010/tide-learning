@@ -143,7 +143,7 @@ export function CreditCard() {
         <button
           type="button"
           onClick={() => setRechargeOpen(true)}
-          className="studio-press cta-glow inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-3.5 py-2 text-[12.5px] font-bold text-white"
+          className="studio-press cta-glow inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-3.5 py-2 text-[13px] font-bold text-white"
         >
           <Plus size={13} weight="bold" /> 充值
         </button>
@@ -163,7 +163,7 @@ export function CreditCard() {
       {/* 本月消耗 + 近 7 笔消耗微曲线 */}
       <div className="mt-4 flex items-end justify-between border-t border-[var(--border)] pt-3">
         <div>
-          <span className="block text-[12.5px] text-[var(--ink3)]">本月消耗</span>
+          <span className="block text-[13px] text-[var(--ink3)]">本月消耗</span>
           <span className="mono mt-0.5 block text-[16px] font-bold text-[var(--ink)]">{monthSpend.toLocaleString()}</span>
         </div>
         {spendSeries.length > 1 && (
@@ -183,7 +183,7 @@ export function CreditCard() {
       <button
         type="button"
         onClick={() => setDetailOpen((v) => !v)}
-        className="mt-2 flex w-full items-center justify-between rounded-[10px] py-1.5 text-left text-[12.5px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+        className="mt-2 flex w-full items-center justify-between rounded-[10px] py-1.5 text-left text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
         aria-expanded={detailOpen}
       >
         <span>最近流水</span>
@@ -202,7 +202,7 @@ export function CreditCard() {
                 className="flex items-center justify-between rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] px-3 py-2"
               >
                 <div className="min-w-0">
-                  <span className="block truncate text-[12.5px] text-[var(--ink2)]">
+                  <span className="block truncate text-[13px] text-[var(--ink2)]">
                     {l.reason ?? TYPE_LABEL[l.type] ?? l.type}
                   </span>
                   <span className="mono block text-[10px] tracking-[0.06em] text-[var(--ink4)]">{fmtDate(l.createdAt)}</span>
