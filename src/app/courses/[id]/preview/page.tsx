@@ -67,7 +67,8 @@ export default async function CoursePreviewPage({ params }: { params: Promise<{ 
 
       {/* 水印容器：不拦截交互（翻页/测验仍可体验），仅叠加半透明标识。 */}
       <div className="relative mt-5">
-        <HtmlCourseware html={html} nonce={(await headers()).get("x-nonce") ?? undefined} />
+        {/* lessonId → 课件走独立同源文档路由(免登录试读:该节 isFree,路由允许匿名),不再受父页 CSP/nonce 约束。 */}
+        <HtmlCourseware html={html} lessonId={lesson.id} nonce={(await headers()).get("x-nonce") ?? undefined} />
         <div
           aria-hidden
           className="mono pointer-events-none absolute right-4 top-12 z-10 select-none rounded-md bg-black/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white/80"
