@@ -40,6 +40,27 @@ export interface ArtDirection {
   texture: string;
   // —— 动效基调 ——
   ease: string; // cubic-bezier
+  // —— 视觉基因（v4.5：leohtml 精髓入渲染器——版式个性 + 动效签名，皮肤真正长得不一样）——
+  /** 版式基因：editorial=超大衬线左对齐 / terminal=等宽窄栏全宽 / magazine=巨型粗黑不对称 / zen=极简大留白 / soft=柔和居中(默认) */
+  layout: "editorial" | "terminal" | "magazine" | "zen" | "soft";
+  /** 进场动效签名：rise=淡入上浮(默认) / draw=线条描画感(下划线生长) / type=终端逐字浮现 / curtain=幕帘揭幕 / slide=大块侧滑 */
+  motion: "rise" | "draw" | "type" | "curtain" | "slide";
+}
+
+/** v4.5 视觉基因分配表：按皮肤气质指派版式基因与动效签名（未列出的回落 soft/rise）。 */
+const ART_GENES: Record<string, { layout: ArtDirection["layout"]; motion: ArtDirection["motion"] }> = {
+  editorial_paper: { layout: "editorial", motion: "rise" },
+  dark_tech: { layout: "terminal", motion: "slide" },
+  blueprint: { layout: "editorial", motion: "draw" },
+  soft_structure: { layout: "soft", motion: "rise" },
+  scoreboard: { layout: "magazine", motion: "slide" },
+  storybook: { layout: "soft", motion: "curtain" },
+  cinematic_neon: { layout: "magazine", motion: "curtain" },
+  dev_terminal: { layout: "terminal", motion: "type" },
+  academic_lecture: { layout: "editorial", motion: "draw" },
+  magazine_bold: { layout: "magazine", motion: "slide" },
+  zen_mono: { layout: "zen", motion: "rise" },
+  journal_washi: { layout: "zen", motion: "curtain" },
 }
 
 /**
@@ -47,7 +68,7 @@ export interface ArtDirection {
  * 字体只用跨平台高质量系统栈（Apple 上 system-ui = SF Pro，衬线用 Georgia/Songti，等宽用 SF Mono），
  * 因为沙箱 CSP 禁外链、内联 web font 体积大，MVP 用系统栈换零依赖 + 稳定跨端（属有意取舍）。
  */
-export const ART_DIRECTIONS: ArtDirection[] = [
+const BASE_ARTS: Omit<ArtDirection, "layout" | "motion">[] = [
   {
     key: "editorial_paper",
     label: "编辑纸刊",
@@ -102,7 +123,7 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     label: "工程蓝图",
     mood: "冷青网格 + 等宽标题 + 蓝白，工具/实战的图纸感",
     substrate: "light",
-    bg: "#eaf1f5",
+    bg: "#e2ecf7",
     surface: "#f7fafc",
     surfaceAlt: "#dfeaf0",
     ink: "#0f2230",
@@ -151,7 +172,7 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     label: "冲刺计分",
     mood: "高对比暖白 + 警示红 + 等宽数字，备考/考点的紧凑高能",
     substrate: "light",
-    bg: "#faf9f6",
+    bg: "#fdf6ea",
     surface: "#ffffff",
     surfaceAlt: "#f1efe9",
     ink: "#161719",
@@ -175,7 +196,7 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     label: "剧场绘本",
     mood: "柔紫幕布 + 大圆角 + 圆润字，口语/青少/银发的代入感",
     substrate: "light",
-    bg: "#f7f1fb",
+    bg: "#f3e9fb",
     surface: "#fdfbff",
     surfaceAlt: "#efe4f6",
     ink: "#2c2338",
@@ -296,13 +317,19 @@ export const ART_DIRECTIONS: ArtDirection[] = [
     label: "和纸手账",
     mood: "暖和纸 + 胶带拼贴 + 靛青与朱砂，亲切但不幼稚",
     substrate: "light",
-    bg: "#f4eddf", surface: "#fffaf0", surfaceAlt: "#ebe0ce", ink: "#2b2925", ink2: "#615b52", ink3: "#91877a",
+    bg: "#efe3cb", surface: "#fffaf0", surfaceAlt: "#ebe0ce", ink: "#2b2925", ink2: "#615b52", ink3: "#91877a",
     border: "#ddcfb9", accent: "#b74b3d", accentInk: "#91382e", accentSoft: "#f2dcd4",
     fontDisplay: "'Kaiti SC', 'Songti SC', Georgia, serif", fontBody: "system-ui, -apple-system, 'PingFang SC', sans-serif", fontMono: "ui-monospace, 'SF Mono', Menlo, monospace",
     displayWeight: 700, displayTracking: "-0.01em", radius: 12,
     texture: "radial-gradient(circle at 1px 1px, rgba(80,60,35,.055) 1px, transparent 0)", ease: "cubic-bezier(0.16, 1, 0.3, 1)",
   },
 ];
+
+/** 基底皮肤 × 视觉基因合并成完整艺术方向（未配基因的回落 soft/rise，保证类型完备）。 */
+export const ART_DIRECTIONS: ArtDirection[] = BASE_ARTS.map((a) => ({
+  ...a,
+  ...(ART_GENES[a.key] ?? { layout: "soft" as const, motion: "rise" as const }),
+}));
 
 const ART_BY_KEY = new Map(ART_DIRECTIONS.map((a) => [a.key, a]));
 

@@ -13,7 +13,7 @@
 import { createHash } from "crypto";
 import type { Block } from "../blocks";
 import { renderMarkdown } from "../markdown";
-import type { CourseDesign } from "./courseware-design";
+import type { CourseDesign, ArtDirection } from "./courseware-design";
 import type { LessonVariance } from "./courseware-variance";
 import { heroMotif, cornerMotif } from "./courseware-motifs";
 import { illustrationSvg } from "./courseware-illustrations";
@@ -167,7 +167,7 @@ body.ct-paged .page--band,body.ct-paged .page--surface,body.ct-paged .page--figu
 /* hero/plain 不加框：hero 承载全出血签名母题背景，plain 交给内容自身结构，形成留白节奏。 */
 .sec-fig{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
 .sec-fig svg{width:100%;height:100%;display:block}
-.sec-corner{position:absolute;top:14px;right:14px;width:24px;height:24px;z-index:0;pointer-events:none}
+.sec-corner{position:absolute;top:14px;right:14px;width:40px;height:40px;z-index:0;pointer-events:none;opacity:.85}
 .sec-corner svg{width:100%;height:100%;display:block}
 h1,h2,h3{font-family:${a.fontDisplay};font-weight:${a.displayWeight};letter-spacing:${a.displayTracking};line-height:1.14}
 .eyebrow{font-family:${a.fontMono};font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--ct-ink3);display:inline-block;margin-bottom:14px}
@@ -1042,8 +1042,18 @@ export function renderCoursewareHtml(input: RenderInput): string {
     .map((b, i) => {
       const stage = stageFor(b.type, i, variance.seed >>> 0, prev, pool);
       prev = stage;
-      // 全出血装饰层（不随内容缩放，见运行时 wrapping 保留逻辑）：hero 用大幅母题背景，figure 用角标。
-      const deco = stage === "hero" ? heroMotif(design.art, (variance.seed + i) >>> 0) : stage === "figure" ? cornerMotif(design.art) : "";
+      // 全出血装饰层（不随内容缩放，见运行时 wrapping 保留逻辑）。
+      // v4.5:此前大幅母题**只画在 hero(第一页)**,第 2 页起全课回到无装饰同质——皮肤个性荡然无存。
+      // 现在 spotlight 页也铺大幅母题(换种子避免与 hero 重复),band 页加角标,figure 保持角标:
+      // 每门课翻到任何一页都带着自己皮肤的视觉签名。
+      const deco =
+        stage === "hero"
+          ? heroMotif(design.art, (variance.seed + i) >>> 0)
+          : stage === "spotlight"
+            ? heroMotif(design.art, (variance.seed * 31 + i * 7 + 13) >>> 0)
+            : stage === "figure" || stage === "band"
+              ? cornerMotif(design.art)
+              : "";
       // 可分步页加 data-steps：翻页运行时会让其 stagger 子项逐条揭示（先看一条再看下一条）。
       const steps = FRAG_TYPES.has(b.type) ? " data-steps" : "";
       const brief = blockTextLen(b) < 150 ? " pg-brief" : "";
@@ -1059,9 +1069,76 @@ export function renderCoursewareHtml(input: RenderInput): string {
   return (
     `<!doctype html><html lang="zh-CN"><head>${CSP_META}` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<title>${esc(title)}</title><style>${baseCss(design)}${modeCss(mode)}${mathCss}</style></head>` +
-    `<body class="ct-mode-${mode}"><main class="deck">${spacedBody}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
+    `<title>${esc(title)}</title><style>${baseCss(design)}${geneCss(design.art)}${modeCss(mode)}${mathCss}</style></head>` +
+    // v4.5 视觉基因:body 挂 ct-l-*(版式)/ct-m-*(动效签名)类,geneCss 据此分支——皮肤不再只是换色。
+    `<body class="ct-mode-${mode} ct-l-${design.art.layout} ct-m-${design.art.motion}"><main class="deck">${spacedBody}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
   );
+}
+
+/**
+ * v4.5 视觉基因 CSS(leohtml 精髓入渲染器)——按皮肤的 layout(版式基因)与 motion(动效签名)分支。
+ * 此前所有皮肤共用同一套版式与同一个淡入动效,「皮肤」只是换色,12 套里 9 套米白底肉眼无差。
+ * 版式基因改标题字阶/对齐/构图气质;动效签名给进场以性格。铁律不破:只动 transform/opacity/clip-path
+ * (合成友好),全部挂 .ct-js 下(JS 没跑=完整可读文档),reduce-motion 由 baseCss 的 !important 兜底。
+ */
+function geneCss(a: ArtDirection): string {
+  const layout: Record<ArtDirection["layout"], string> = {
+    soft: "", // 默认基线,不加料
+    editorial: `
+/* 版式基因·editorial:超大衬线标题、左对齐、强调下划线——编辑部气质 */
+.ct-l-editorial .lead{font-size:clamp(32px,6vw,56px);line-height:1.12;text-align:left}
+.ct-l-editorial .opener--center{align-items:flex-start;text-align:left}
+.ct-l-editorial .opener--center .body{margin-left:0;margin-right:0}
+.ct-l-editorial .h-title{font-size:clamp(23px,3.8vw,30px);display:inline-block;border-bottom:2px solid var(--ct-accent);padding-bottom:5px}
+.ct-l-editorial .kicker{letter-spacing:.22em}`,
+    terminal: `
+/* 版式基因·terminal:等宽标题、提示符、左线代码气质 */
+.ct-l-terminal .lead{font-family:${a.fontMono};font-size:clamp(23px,4.4vw,38px);letter-spacing:-0.01em;text-align:left}
+.ct-l-terminal .lead::before{content:"❯ ";color:var(--ct-accent)}
+.ct-l-terminal .opener--center{align-items:flex-start;text-align:left}
+.ct-l-terminal .h-title{font-family:${a.fontMono};font-size:clamp(18px,3vw,24px);border-left:3px solid var(--ct-accent);padding-left:12px}`,
+    magazine: `
+/* 版式基因·magazine:巨型粗黑标题、反居中堆叠——杂志封面气质 */
+.ct-l-magazine .lead{font-size:clamp(38px,7.6vw,72px);font-weight:900;letter-spacing:-0.03em;line-height:1.05;text-align:left}
+.ct-l-magazine .opener--center{align-items:flex-start;text-align:left}
+.ct-l-magazine .opener--center .body{margin-left:0;margin-right:0}
+.ct-l-magazine .h-title{font-size:clamp(25px,4.4vw,34px);font-weight:850;letter-spacing:-0.02em}`,
+    zen: `
+/* 版式基因·zen:细字重、宽字距、发丝线、大留白——禅意气质 */
+.ct-l-zen .lead{font-weight:500;letter-spacing:.05em;font-size:clamp(25px,4.4vw,38px)}
+.ct-l-zen .h-title{font-weight:600;letter-spacing:.09em;font-size:clamp(17px,2.8vw,22px)}
+.ct-l-zen .h-title::after{content:"";display:block;width:28px;height:1px;background:var(--ct-accent);margin-top:10px}
+.ct-l-zen .page--surface,.ct-l-zen .page--band{padding:clamp(26px,5vw,46px)}`,
+  };
+  const motion: Record<ArtDirection["motion"], string> = {
+    rise: "", // 默认基线(淡入上浮)在 baseCss
+    draw: `
+/* 动效签名·draw:内容自左向右「描画」显影(clip-path 揭示),标题下划线随之生长 */
+.ct-js .ct-m-draw [data-reveal]{opacity:0;transform:none;clip-path:inset(0 92% 0 0);transition:opacity .5s var(--ct-ease),clip-path .8s var(--ct-ease)}
+.ct-js .ct-m-draw [data-reveal].in{opacity:1;clip-path:inset(0 0 0 0)}
+.ct-js .ct-m-draw .h-title{border-image:linear-gradient(90deg,var(--ct-accent),var(--ct-accent)) 1;border-image-width:0 0 2px 0}`,
+    type: `
+/* 动效签名·type:终端逐档浮现(steps 时序,机械感)+ 开场光标 */
+.ct-js .ct-m-type [data-reveal]{opacity:0;transform:translateY(8px);transition:opacity .42s steps(7),transform .42s steps(7)}
+.ct-js .ct-m-type [data-reveal].in{opacity:1;transform:none}
+.ct-js .ct-m-type [data-stagger]>*{transition-timing-function:steps(5),steps(5)}
+.ct-js .ct-m-type .opener .lead::after{content:"▊";margin-left:6px;color:var(--ct-accent);animation:ctCaret 1.1s steps(1) infinite}
+@keyframes ctCaret{50%{opacity:0}}`,
+    curtain: `
+/* 动效签名·curtain:自上而下缓幕揭示,拉长节奏,剧场感 */
+.ct-js .ct-m-curtain [data-reveal]{opacity:0;transform:translateY(-14px);transition:opacity .9s var(--ct-ease),transform .9s var(--ct-ease)}
+.ct-js .ct-m-curtain [data-reveal].in{opacity:1;transform:none}
+.ct-js .ct-m-curtain [data-stagger].in>*{transition-delay:calc(var(--i,0) * 140ms)}`,
+    slide: `
+/* 动效签名·slide:大块横向滑入,奇偶交替方向——版面有冲击力 */
+.ct-js .ct-m-slide [data-reveal]{opacity:0;transform:translateX(-30px);transition:opacity .55s var(--ct-ease),transform .55s var(--ct-ease)}
+.ct-js .ct-m-slide .deck>section:nth-of-type(even) [data-reveal]{transform:translateX(30px)}
+/* 揭示态必须压过上面按奇偶分支的隐藏态(同高特异性,靠书写顺序取胜)——否则 .in 后仍停在位移/透明,整页无字 */
+.ct-js .ct-m-slide .deck>section:nth-of-type(odd) [data-reveal].in,
+.ct-js .ct-m-slide .deck>section:nth-of-type(even) [data-reveal].in,
+.ct-js .ct-m-slide [data-reveal].in{opacity:1;transform:none}`,
+  };
+  return layout[a.layout] + motion[a.motion];
 }
 
 /** 包成渲染契约 DTO（含 sha256 校验和；hasScript 恒 true，因含入场/交互/高度上报脚本）。 */

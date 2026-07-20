@@ -27,7 +27,7 @@ import {
 } from "./courseware-html";
 import { ensureHighlighter } from "./courseware-highlight";
 
-const HTML_RENDER_VERSION = "v4.4.0"; // v4.4 永不空白底线：隐藏初始态全部挂 .ct-js(运行时首行加),JS 没跑=完整可读文档
+const HTML_RENDER_VERSION = "v4.5.0"; // v4.5 视觉基因：皮肤获得版式基因+动效签名+全页母题+浅色底拉开——不再只是换色
 const HTML_CLAIM_TTL_MS = 10 * 60_000;
 const DEFAULT_PREMIUM_LESSON_BUDGET = 6;
 
