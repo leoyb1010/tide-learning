@@ -26,6 +26,8 @@ import {
   FilePdf,
   FileDoc,
   FileText,
+  SlidersHorizontal,
+  Pause,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
 import { TemplateModelPicker } from "@/components/TemplateModelPicker";
@@ -35,6 +37,8 @@ import { track } from "@/lib/analytics-client";
 import Link from "next/link";
 import { ProgressRing, Spinner, useAutoGoCountdown, useGenPolling, type GenProgress } from "@/components/GenProgress";
 import { GenStage, TypewriterText, type GenStageLesson, type GenStageLessonState } from "@/components/GenStage";
+import { CoursewareManager } from "@/components/CoursewareManager";
+import { OutlineCheckpoint } from "@/components/OutlineCheckpoint";
 
 /**
  * 剧场恢复用：由 /create server component 预取的「我正在生成中的课」摘要。
@@ -91,7 +95,7 @@ type LessonState = "pending" | "writing" | "done" | "failed";
  * - lessons：步骤3 逐节写作
  * - done：完成页（造课清单 / 升维报告）
  */
-type Phase = "idle" | "understand" | "outline" | "lessons" | "done";
+type Phase = "idle" | "understand" | "outline" | "checkpoint" | "lessons" | "done";
 
 interface OutlineLesson {
   id: string;
@@ -156,6 +160,10 @@ export function CreateStudio({
   const [template, setTemplate] = useState<string>("classic");
   const [model, setModel] = useState<string>("");
   const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
+  // L2 专业模式：开则造课先停在大纲检查点（outline_draft），由用户确认后再扇出逐节生成。
+  const [proMode, setProMode] = useState(false);
+  // 大纲检查点数据（generate-course 返回 checkpoint:true 时填充；确认后清空进剧场）。
+  const [checkpoint, setCheckpoint] = useState<{ courseId: string; slug: string; title: string; lessons: OutlineLesson[] } | null>(null);
   // P1-1：AI 是否可用（服务端配了可用模型）。默认 true 避免加载态闪禁用；TemplateModelPicker
   // 拉到 defaultModel=null（未配 key）时置 false，据此禁用生成 CTA 并显示维护横幅，
   // 避免用户填完表单点生成才收到 503。
@@ -204,6 +212,43 @@ export function CreateStudio({
     setLessons([]);
     setWritingIndex(0);
     setSummary(null);
+    setCheckpoint(null);
+  }
+
+  // L2 检查点「确认开工」后：服务端已扇出，前端进入逐节剧场（writeLessons 与后台幂等并跑）。
+  async function proceedFromCheckpoint(confirmedLessons: { id: string; title: string }[]) {
+    if (!checkpoint) return;
+    const cp = checkpoint;
+    const initial = confirmedLessons.map((l) => ({ id: l.id, title: l.title, state: "pending" as LessonState }));
+    setLessons(initial);
+    setCheckpoint(null);
+    setLiveGen({
+      id: cp.courseId,
+      slug: cp.slug,
+      title: cp.title,
+      isImport: false,
+      total: initial.length,
+      done: 0,
+      firstLessonId: initial[0]?.id ?? "",
+    });
+    setPhase("lessons");
+    const succeeded = await writeLessons(initial);
+    setSummary({
+      courseId: cp.courseId,
+      slug: cp.slug,
+      firstLessonId: initial[0]?.id ?? "",
+      total: initial.length,
+      succeeded,
+      quizzes: succeeded,
+      cards: succeeded,
+    });
+    setLiveGen(null);
+    setPhase("done");
+    if (succeeded < initial.length) {
+      toast(`已生成 ${succeeded}/${initial.length} 节，个别章节可在完成页重试`, { tone: "warn" });
+    } else {
+      toast("课程已生成，开始学习吧", { tone: "success" });
+    }
   }
 
   // —— 造课发起后的「已落库课」引用：用于「可退出」时把它加进生产中横幅，退出不丢记录 ——
@@ -352,7 +397,7 @@ export function CreateStudio({
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: q, category: category || undefined, template, model: model || undefined, qualityTier }),
+        body: JSON.stringify({ prompt: q, category: category || undefined, template, model: model || undefined, qualityTier, checkpoint: proMode }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
@@ -362,9 +407,16 @@ export function CreateStudio({
         }
         throw new Error(json?.error || "生成失败");
       }
-      const data = json.data as { courseId: string; slug: string; title?: string; lessons: OutlineLesson[] };
+      const data = json.data as { courseId: string; slug: string; title?: string; checkpoint?: boolean; lessons: OutlineLesson[] };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("大纲为空，请调整需求重试");
+
+      // L2 检查点模式：大纲已落库为 outline_draft，停在检查点让用户增删改排序，确认后才扇出。
+      if (data.checkpoint) {
+        setCheckpoint({ courseId: data.courseId, slug: data.slug, title: data.title || outline[0]?.title || data.slug, lessons: outline });
+        setPhase("checkpoint");
+        return;
+      }
 
       // 课此刻已落库为 generating 态（generate-course 事务已建 Course + 空节 + course_gen job，
       // 且 after() 后台已接管生成）。记下它，供「可退出」后顶部横幅接手显示进度、绝不丢记录。
@@ -722,6 +774,43 @@ export function CreateStudio({
               {/* v3.2：课件模板 + 生成模型选择 */}
               <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
 
+              {/* L2 专业模式开关：开启后先给你一份可增删改排序的大纲，确认后才逐节生成（可控造课）。 */}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={proMode}
+                onClick={() => setProMode((v) => !v)}
+                className={`studio-press flex min-h-[44px] items-center gap-3 rounded-[14px] border px-4 py-3 text-left transition-colors duration-150 ${
+                  proMode
+                    ? "border-[var(--red-soft-border)] bg-[var(--red-soft)]"
+                    : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)]"
+                }`}
+              >
+                <span
+                  className={`grid h-9 w-9 shrink-0 place-items-center rounded-[10px] ${
+                    proMode ? "bg-[var(--red)] text-white" : "bg-[var(--surface)] text-[var(--ink3)]"
+                  }`}
+                >
+                  <SlidersHorizontal size={16} weight="fill" />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13.5px] font-semibold text-[var(--ink)]">专业模式 · 大纲我来定</span>
+                  <span className="block text-[12px] leading-snug text-[var(--ink3)]">先看大纲，可增删改排序、重拟，满意再逐节生成，不满意不烧整门课的钱</span>
+                </span>
+                <span
+                  className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
+                    proMode ? "bg-[var(--red)]" : "bg-[var(--border2)]"
+                  }`}
+                  aria-hidden="true"
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-[var(--card)] transition-transform duration-200 ${
+                      proMode ? "translate-x-[22px]" : "translate-x-0.5"
+                    }`}
+                  />
+                </span>
+              </button>
+
               {/* v3.1：生成视频课件开关。选中后逐节写完块课件，再把课件转成带旁白的视频课件。 */}
               <button
                 type="button"
@@ -908,11 +997,20 @@ export function CreateStudio({
             </div>
           )}
         </div>
+      ) : phase === "checkpoint" && checkpoint ? (
+        <OutlineCheckpoint
+          courseId={checkpoint.courseId}
+          courseTitle={checkpoint.title}
+          initialLessons={checkpoint.lessons.map((l) => ({ id: l.id, title: l.title }))}
+          onConfirmed={proceedFromCheckpoint}
+          onCancel={resetTheater}
+        />
       ) : phase === "done" && summary ? (
         <DonePanel
           source={source}
           summary={summary}
           lessons={lessons}
+          canUseLLM={canUseLLM}
           onStart={() => router.push(`/courses/${summary.slug}/learn/${summary.firstLessonId}`)}
           onViewShelf={() => router.push("/desk?shelf=1")}
           onRetry={retryLesson}
@@ -1119,6 +1217,7 @@ function DonePanel({
   source,
   summary,
   lessons,
+  canUseLLM,
   onStart,
   onViewShelf,
   onRetry,
@@ -1127,6 +1226,7 @@ function DonePanel({
   source: "generate" | "import";
   summary: DoneSummary;
   lessons: OutlineLesson[];
+  canUseLLM: boolean;
   onStart: () => void;
   onViewShelf: () => void;
   onRetry: (lessonId: string) => void;
@@ -1135,6 +1235,8 @@ function DonePanel({
   const reduce = useReducedMotion();
   const failed = lessons.filter((l) => l.state === "failed");
   const isImport = source === "import";
+  // 成稿后可控编辑：仅对「已成功写完的节」提供改写/回滚/换肤（失败节先重试再管理）。
+  const doneLessons = lessons.filter((l) => l.state !== "failed" && l.state !== "writing").map((l) => ({ id: l.id, title: l.title }));
 
   // 「这门课包含」/「升维报告」条目。
   // 大数字行只放纯数字（保证 18px extrabold 强调档整齐）；「AI 伴侣」不是可数量，
@@ -1253,6 +1355,11 @@ function DonePanel({
         </div>
       )}
 
+      {/* 可控编辑（L4/L5）：成稿后换肤 / 逐节改写 / 版本回滚 / 会员精修——至少有一节写成才展示。 */}
+      {doneLessons.length > 0 && (
+        <CoursewareManager courseId={summary.courseId} lessons={doneLessons} isSubscriber={canUseLLM} />
+      )}
+
       {/* 主行动 —— 造课完成闭环三去向：立即开始学 / 查看我的书架 / 分享到集市 */}
       <div className="mt-5 flex flex-col gap-2.5">
         {/* 首选：立即开始学（红 CTA，最强引导） */}
@@ -1367,9 +1474,32 @@ function RecoveryTheater({
   onDone: (courseId: string) => void;
 }) {
   const router = useRouter();
+  const { toast } = useToast();
   const { progress, loading, error } = useGenPolling(course.id, {
     onReady: () => onDone(course.id),
   });
+  // L3 暂停：调 pause-gen 置 paused（后台停扇出、已完成节保留），随后退出剧场；
+  // 续造在「我的课」的「继续生产」按钮（避免轮询已在 paused 终态停摆后无法在原地重启的复杂度）。
+  const [pausing, setPausing] = useState(false);
+  async function pauseGen() {
+    if (pausing) return;
+    setPausing(true);
+    track("gen_pause_click", { course_id: course.id, source: "recovery_theater" });
+    try {
+      const r = await fetch(`/api/courses/${course.id}/pause-gen`, { method: "POST", credentials: "same-origin" });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok) {
+        toast("已暂停生产，已完成的节保留，可在「我的课」继续生产", { tone: "success" });
+        onExit();
+      } else {
+        toast(j?.error || "暂停失败，请稍后再试", { tone: "warn" });
+      }
+    } catch {
+      toast("网络异常，请稍后再试", { tone: "warn" });
+    } finally {
+      setPausing(false);
+    }
+  }
 
   const total = progress?.total ?? course.total;
   const done = progress?.done ?? course.done;
@@ -1377,6 +1507,9 @@ function RecoveryTheater({
   const genStatus = progress?.genStatus ?? "generating";
   const isReady = genStatus === "ready";
   const isFailed = genStatus === "failed";
+  const isPaused = genStatus === "paused";
+  // 生产中（非就绪/失败/暂停）才给「暂停」入口。
+  const canPause = !isReady && !isFailed && !isPaused;
   const currentLessonId = progress?.currentLessonId ?? null;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
 
@@ -1431,10 +1564,22 @@ function RecoveryTheater({
         </button>
         <div className="min-w-0 flex-1 text-center">
           <div className="mono text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--red)]">
-            {isReady ? "AI STUDIO · 已就绪" : "AI STUDIO · 生产中"}
+            {isReady ? "AI STUDIO · 已就绪" : isPaused ? "AI STUDIO · 已暂停" : "AI STUDIO · 生产中"}
           </div>
         </div>
-        <div className="w-[92px] shrink-0" aria-hidden="true" />
+        {canPause ? (
+          <button
+            type="button"
+            onClick={pauseGen}
+            disabled={pausing}
+            className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--warn)] hover:text-[var(--ink)] disabled:opacity-60"
+          >
+            {pausing ? <Spinner size={13} /> : <Pause size={14} weight="fill" />}
+            暂停
+          </button>
+        ) : (
+          <div className="w-[92px] shrink-0" aria-hidden="true" />
+        )}
       </div>
 
       <div
