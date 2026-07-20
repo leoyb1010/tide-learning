@@ -9,6 +9,8 @@ import { resolveCourseDesign, serializeCourseDesign } from "./ai/courseware-desi
 import { resolveCoursewareMode } from "./ai/courseware-catalog";
 import { renderAndStoreLessonHtml, createCoursewareBudget } from "./ai/courseware-gen";
 import { selectBespokeModel } from "./ai/models";
+import { judgeLesson, type LessonJudgeVerdict } from "./ai/lesson-judge";
+import { readBlueprint, blueprintLessonFragment } from "./ai/blueprint";
 import { scanBlocksSafety } from "./content-safety";
 
 /**
@@ -292,6 +294,9 @@ export async function generateLessonCore(
   if (!lesson || !lesson.course) throw new Error("章节不存在");
   const course = lesson.course;
   if (course.authorUserId !== userId) throw new Error("无权操作该课程");
+  // 深度模式（内容深化管线）：premium 档课程走「更长更透」的产出要求 + LLM 评审把关，
+  // 目标单节 3500+ 字、每讲解块 4-6 句配具体案例，作为付费档的真实内容差异化（非仅排版精修）。
+  const deep = course.qualityTier === "premium";
 
   // —— 暂停闸门（L3 可控造课）：课程被用户暂停时，常规生成路径（首次扇出/前端逐节/续造）一律 no-op，
   // 防止后台流水或前端 writeLessons 在暂停期间继续写节、把 paused course 意外推到 ready。
@@ -354,6 +359,14 @@ export async function generateLessonCore(
       select: { rawText: true },
     });
     if (src?.rawText) sourceCtx = sourceContextBlock(src.rawText);
+  }
+
+  // L1 课程蓝图（专业模式）：受众/口吻/块偏好定制 + 参考资料 grounding。
+  const blueprint = readBlueprint(course.blueprintJson);
+  const blueprintFragment = blueprintLessonFragment(blueprint);
+  // 参考资料 grounding：用户粘贴的真实素材注入生成，缓解「例子全虚构、无出处」（与导入课同机制）。
+  if (blueprint?.referenceText && !sourceCtx) {
+    sourceCtx = sourceContextBlock(blueprint.referenceText);
   }
 
   // v3.2 课件模板：规定本节块的种类/顺序/数量，是六种课型差异化的核心。放在最前，优先遵循。
@@ -443,6 +456,16 @@ export async function generateLessonCore(
     COMPLIANCE_GUARDRAIL + "\n" +
     // recency 锚点：整段 system 最后再点一次模板名，压实签名块要求，抵消「通用规则冲刷模板特征」。
     `【最后提醒】本节请务必体现「${tmpl.label}」的模板特征，落实上方签名块硬性要求，不要退化成千篇一律的通用结构。\n` +
+    // L1 专业模式蓝图：受众/口吻/块偏好定制（referenceText 另经 sourceCtx grounding 注入）。
+    blueprintFragment +
+    // 内容深化（premium 深度模式）：把「结构合格但内容单薄」抬到「讲透、够长、有真实案例」。
+    (deep
+      ? "【深度模式（本节按此加码，不得因此牺牲块协议与合规）】\n" +
+        "- 本节目标篇幅 3500 字以上：每个讲解块（concept/example/steps/dialog）都写足 4-6 句，给足原理、边界与「怎么用」，杜绝一两句带过。\n" +
+        "- 每个核心概念都要配一个具体到能想象的真实案例或类比（有人物、有场景、有数字或对话），不要泛泛而谈。\n" +
+        "- 块数取 10-14 块，主体讲解块与视觉/交互块交替推进，节奏不塌。\n" +
+        "- 宁可不给具体数据，也不要编造数字/日期/名称；涉及事实处用「通常/大多/约」等限定，不假装精确。\n"
+      : "") +
     // L4 可控造课：用户对本节的定向重造指令（最高优先级修正意图，但仍受上方结构/合规硬约束与块协议约束）。
     (isRegen && opts?.instruction
       ? `【用户对本节的定向修改要求（请重点满足，但不得违反上方结构、合规与块协议硬约束）】${sanitizePromptField(opts.instruction).slice(0, 200)}\n`
@@ -521,11 +544,24 @@ export async function generateLessonCore(
     let quality = scoreLesson(blocks, course.template);
     let adherence = checkTemplateAdherence(blocks, course.template);
 
+    // —— LLM 内容评审（替代只看结构的通胀规则分）——
+    // 规则分只查结构（块型齐不齐），看不出「结构合格但内容空洞」。用一次便宜的 LLM 评审从
+    // 深度/准确/文字三轴把关，不达标连同规则问题一起喂给下方纠偏重写定向修。fail-open 不阻断出课。
+    // 不向用户计费：评审是平台质量兜底（QA 用户自己内容还收费，优化观感差），成本由平台吸收。
+    let judge: LessonJudgeVerdict = { passed: true, depth: 5, accuracy: 5, voice: 5, issues: [], judged: false };
+    if (!usedFallback) {
+      judge = await judgeLesson(
+        blocks,
+        { courseTitle: course.title, lessonTitle: lesson.title, objective: lesson.summary, category: course.category },
+        { model: course.modelUsed ?? undefined },
+      );
+    }
+
     // —— 蓝图 C1（审查 P1-4）：不达标不再「只观测」——一次纠偏重生成闭环 ——
-    // 质量分不及格或模板签名缺失 → 带问题清单整体重写一次；premium 课升白名单强模型执笔。
+    // 触发条件：规则不及格 或 模板签名缺失 或 LLM 评审判不达标（内容太浅/编造/AI 腔）。
     // 采纳规则：新版「双达标」或分数更高才替换，否则沿用第一版（绝不因纠偏产出更差而回退质量）。
     let regenInfo: { attempted: boolean; adopted: boolean; model: string | null; beforeScore: number } | null = null;
-    if (!usedFallback && (!quality.passed || !adherence.ok)) {
+    if (!usedFallback && (!quality.passed || !adherence.ok || !judge.passed)) {
       const escalated = course.qualityTier === "premium" ? (selectBespokeModel(undefined)?.key ?? null) : null;
       // 纠偏轮模型：premium 升白名单强模型；否则用本次覆盖模型（L4）或课级模型。
       const regenModel = escalated ?? opts?.model ?? course.modelUsed ?? null;
@@ -541,7 +577,9 @@ export async function generateLessonCore(
       const flagHints = Object.entries(quality.flags)
         .filter(([, ok]) => !ok)
         .map(([k]) => FLAG_HINTS[k] ?? k);
-      const fixHints = [...flagHints, ...adherence.missing.map((m) => `缺模板签名要素:${m}`)].slice(0, 8);
+      // 纠偏清单 = 规则未达标项 + 模板签名缺失 + LLM 评审的具体内容问题（深度/准确/文字）。
+      const judgeHints = judge.judged && !judge.passed ? judge.issues : [];
+      const fixHints = [...flagHints, ...adherence.missing.map((m) => `缺模板签名要素:${m}`), ...judgeHints].slice(0, 10);
       regenInfo = { attempted: true, adopted: false, model: regenModel, beforeScore: quality.score };
       try {
         const retry = await chatJson<LessonGenResult>({
@@ -667,6 +705,9 @@ export async function generateLessonCore(
         adherence: { ok: adherence.ok, missing: adherence.missing },
         regen: regenInfo,
         safety: { level: safety.level, hits: safety.hits.map((h) => h.word).slice(0, 10) },
+        // LLM 内容评审档案（judged=false 表示评审未真实执行/降级节，分数不作可信依据）。
+        judge: { judged: judge.judged, passed: judge.passed, depth: judge.depth, accuracy: judge.accuracy, voice: judge.voice },
+        deep,
       }),
       // regen 模式走 "regen" 归档语义（writeLessonBlocks 会把当前版本存入 LessonRevision 后悔药）。
       reason: isRegen ? "regen" : "generate",

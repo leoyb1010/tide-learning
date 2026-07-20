@@ -135,6 +135,7 @@ model Course {
   template         String?   // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
   modelUsed        String?   // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
   qualityTier      String    @default("standard") // v3.4 standard=确定性 / premium=优先 bespoke 精修
+  blueprintJson    String?   // L1 课程蓝图（专业模式）：{audience,tone,length,blockPrefs[],referenceText}，透传进大纲/逐节 prompt 定制 + grounding
   premiumRenderCount Int     @default(0) // 成功命中 bespoke 的章节数
   deterministicRenderCount Int @default(0) // 确定性渲染或回落的章节数
   designJson       String?   // v3.3 课级设计系统（艺术方向 + 配色/字体 token + 动效旋钮）JSON，供 HTML 课件生成注入（见 src/lib/ai/courseware-design.ts）

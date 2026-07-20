@@ -7,6 +7,7 @@ import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
+import { readBlueprint, blueprintOutlineFragment, lessonCountForLength } from "@/lib/ai/blueprint";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
@@ -47,7 +48,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     try {
       const course = await prisma.course.findUnique({
         where: { id },
-        select: { id: true, authorUserId: true, genStatus: true, category: true, template: true, modelUsed: true },
+        select: { id: true, authorUserId: true, genStatus: true, category: true, template: true, modelUsed: true, blueprintJson: true },
       });
       if (!course) return fail("课程不存在", 404);
       if (course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
@@ -77,10 +78,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       if (!basePrompt) return fail("缺少原始需求，无法重新生成大纲", 400);
 
       const category = course.category || "ai_skill";
+      const blueprint = readBlueprint(course.blueprintJson);
       const { system, user: userMsg } = courseOutlinePrompt({ prompt: basePrompt, category, template: course.template ?? undefined });
       const result = await chatJson<OutlineResult>({
         system,
-        user: userMsg,
+        user: userMsg + blueprintOutlineFragment(blueprint),
         temperature: 0.5,
         maxTokens: 6000,
         model: course.modelUsed ?? undefined,
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           title: o.title.trim().slice(0, 120),
           objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
         }))
-        .slice(0, 8);
+        .slice(0, lessonCountForLength(blueprint?.length));
       if (outline.length === 0) throw new AppError("大纲生成失败，请调整需求后重试", 502);
 
       // 全量替换：删掉现有空节（outline_draft 态全部 blocksJson=null），按新大纲重建。
