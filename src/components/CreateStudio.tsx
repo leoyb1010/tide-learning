@@ -39,6 +39,7 @@ import { ProgressRing, Spinner, useAutoGoCountdown, useGenPolling, type GenProgr
 import { GenStage, TypewriterText, type GenStageLesson, type GenStageLessonState } from "@/components/GenStage";
 import { CoursewareManager } from "@/components/CoursewareManager";
 import { OutlineCheckpoint } from "@/components/OutlineCheckpoint";
+import { trackLabel } from "@/lib/tracks";
 
 /**
  * 剧场恢复用：由 /create server component 预取的「我正在生成中的课」摘要。
@@ -65,14 +66,14 @@ export interface DraftCheckpoint {
   lessons: { id: string; title: string }[];
 }
 
-// 赛道选项（与 src/lib/tracks.ts 的 key/label 对齐；这里只取造课常用赛道）
+// 赛道选项（只取造课常用赛道；label 从 lib/tracks.ts 单一真源派生，避免两处手抄漂移）。
 const TRACK_OPTIONS: { key: string; label: string }[] = [
-  { key: "ai_skill", label: "AI 技能" },
-  { key: "english_oral", label: "口语实战" },
-  { key: "english_foundation", label: "听说读写全能" },
-  { key: "life", label: "生活实用" },
-  { key: "silver_english", label: "银发口语" },
-];
+  "ai_skill",
+  "english_oral",
+  "english_foundation",
+  "life",
+  "silver_english",
+].map((key) => ({ key, label: trackLabel(key) }));
 
 // 造课首屏「试试这些」灵感 chip（与 iOS 端 CreateView 对齐/本地化）：
 // 点击即填充 prompt，给空输入框一个明确的启动引导，降冷启动门槛。
