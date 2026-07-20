@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CaretRight, Cards, Play, Flame, Medal, Check, ClockCounterClockwise, Storefront, Clock, NotePencil, Coins, Trophy, BookBookmark, ShoppingBag, TrendUp, ArrowClockwise } from "@phosphor-icons/react/dist/ssr";
+import { EntryTile } from "@/components/EntryTile";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, STATUS_LABELS } from "@/lib/entitlement";
 import { getGamificationSummary, getYearHeatmap } from "@/lib/gamification";
@@ -290,101 +291,41 @@ export default async function MePage() {
         {/* 层3 · 入口行：全部学习记录 + 我的复习（等高两列对齐）*/}
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {learning.length > 0 && (
-            <Link
+            <EntryTile
               href="/me/history"
-              className="studio-lift hover-sheen flex min-h-[68px] items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] bg-[var(--surface-inset)] text-[var(--ink3)]">
-                  <ClockCounterClockwise size={18} weight="fill" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-[14px] font-bold text-[var(--ink)]">全部学习记录</p>
-                  <p className="truncate text-[12px] text-[var(--ink3)]">按课程分组看进度足迹</p>
-                </div>
-              </div>
-              <CaretRight size={15} weight="bold" className="shrink-0 text-[var(--ink4)]" />
-            </Link>
+              icon={<ClockCounterClockwise size={18} weight="fill" />}
+              title="全部学习记录"
+              desc="按课程分组看进度足迹"
+            />
           )}
 
           {/* 我的复习入口（待复习用 --warn 语义，红只留给关键信号） */}
-          <Link
+          <EntryTile
             href="/review"
-            className="studio-lift hover-sheen flex min-h-[68px] items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
-          >
-            <div className="flex items-center gap-3">
-              <div
-                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[12px] ${dueCount > 0 ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--surface-inset)] text-[var(--ink3)]"}`}
-              >
-                <Cards size={18} weight="fill" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[14px] font-bold text-[var(--ink)]">我的复习</p>
-                <p className="text-[12px] text-[var(--ink3)]">
-                  {dueCount > 0 ? (
-                    <>
-                      <span className="mono font-semibold text-[var(--warn)]">{dueCount}</span> 张待复习
-                    </>
-                  ) : (
-                    "暂无到期复习卡"
-                  )}
-                </p>
-              </div>
-            </div>
-            <CaretRight size={15} weight="bold" className="shrink-0 text-[var(--ink4)]" />
-          </Link>
+            icon={<Cards size={18} weight="fill" />}
+            iconClassName={dueCount > 0 ? "bg-[var(--warn-soft)] text-[var(--warn)]" : "bg-[var(--surface-inset)] text-[var(--ink3)]"}
+            title="我的复习"
+            desc={dueCount > 0 ? (<><span className="mono font-semibold text-[var(--warn)]">{dueCount}</span> 张待复习</>) : "暂无到期复习卡"}
+          />
         </div>
       </section>
 
       {/* ============ 学习资产（我在平台沉淀的东西：笔记本 / 已购课程）============ */}
       <section className="studio-rise grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <Link
+        <EntryTile
           href="/notes?view=notebook"
-          className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--info-soft)] text-[var(--info)]">
-              <BookBookmark size={18} weight="fill" />
-            </div>
-            <div>
-              <p className="text-[14px] font-bold text-[var(--ink)]">我的笔记本</p>
-              <p className="text-[12px] text-[var(--ink3)]">
-                {notebookCount > 0 ? (
-                  <>
-                    <span className="mono font-semibold text-[var(--ink2)]">{notebookCount}</span> 个主题空间
-                  </>
-                ) : (
-                  "把笔记归入主题空间，成体系"
-                )}
-              </p>
-            </div>
-          </div>
-          <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
-        </Link>
+          icon={<BookBookmark size={18} weight="fill" />}
+          iconClassName="bg-[var(--info-soft)] text-[var(--info)]"
+          title="我的笔记本"
+          desc={notebookCount > 0 ? (<><span className="mono font-semibold text-[var(--ink2)]">{notebookCount}</span> 个主题空间</>) : "把笔记归入主题空间，成体系"}
+        />
 
-        <Link
+        <EntryTile
           href="/me/courses"
-          className="studio-lift hover-sheen flex items-center justify-between rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[var(--surface-inset)] text-[var(--ink3)]">
-              <ShoppingBag size={18} weight="fill" />
-            </div>
-            <div>
-              <p className="text-[14px] font-bold text-[var(--ink)]">我的课程</p>
-              <p className="text-[12px] text-[var(--ink3)]">
-                {purchasedCount > 0 ? (
-                  <>
-                    已入手 <span className="mono font-semibold text-[var(--ink2)]">{purchasedCount}</span> 门 · 含创建与订阅
-                  </>
-                ) : (
-                  "已购、已创建与订阅可学的课都在这"
-                )}
-              </p>
-            </div>
-          </div>
-          <CaretRight size={15} weight="bold" className="text-[var(--ink4)]" />
-        </Link>
+          icon={<ShoppingBag size={18} weight="fill" />}
+          title="我的课程"
+          desc={purchasedCount > 0 ? (<>已入手 <span className="mono font-semibold text-[var(--ink2)]">{purchasedCount}</span> 门 · 含创建与订阅</>) : "已购、已创建与订阅可学的课都在这"}
+        />
       </section>
 
       {/* ============ 第三段 · 成长足迹（次要）============ */}

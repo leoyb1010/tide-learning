@@ -11,6 +11,7 @@ import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
 import { isValidTemplate, pickTemplate } from "@/lib/ai/templates";
 import { selectModelFor } from "@/lib/ai/models";
+import { parseBlueprint, serializeBlueprint, blueprintOutlineFragment, lessonCountForLength } from "@/lib/ai/blueprint";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
@@ -59,9 +60,13 @@ export async function POST(req: NextRequest) {
         qualityTier?: string;
         /** L2 可控造课：专业模式下先停在大纲检查点（outline_draft），由用户确认后再扇出逐节生成。 */
         checkpoint?: boolean;
+        /** L1 课程蓝图（专业模式）：受众/口吻/篇幅/块偏好/参考资料，透传进大纲与逐节 prompt。 */
+        blueprint?: unknown;
       } | null;
       // 专业模式大纲检查点：置真则大纲落库后停在 outline_draft，不自动扇出（等 /outline/confirm）。
       const checkpoint = body?.checkpoint === true;
+      // L1 蓝图：白名单校验后落库 blueprintJson（逐节生成读它定制内容 + grounding）。
+      const blueprint = parseBlueprint(body?.blueprint);
       const prompt = body?.prompt?.trim();
       if (!prompt) return fail("请描述你想学的内容");
       if (prompt.length < 4) return fail("需求太短，请多说几个字（至少 4 字）");
@@ -97,10 +102,12 @@ export async function POST(req: NextRequest) {
       // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 模板结构 + 合规底线。
       // 输出契约不变：{title, subtitle, intro, outline:[{title, objective, difficulty}]}。
       const { system, user: userMsg } = courseOutlinePrompt({ prompt, category, template });
+      // L1 蓝图：受众/口吻/篇幅影响大纲规划，追加到 user 消息末尾。
+      const userMsgWithBlueprint = userMsg + blueprintOutlineFragment(blueprint);
 
       const result = await chatJson<OutlineResult>({
         system,
-        user: userMsg,
+        user: userMsgWithBlueprint,
         temperature: 0.5,
         maxTokens: 6000,
         model: modelKey,
@@ -115,6 +122,8 @@ export async function POST(req: NextRequest) {
       const subtitle = (result?.subtitle || "").trim() || null;
       const intro = (result?.intro || "").trim();
       const rawOutline = Array.isArray(result?.outline) ? result.outline : [];
+      // L1 蓝图篇幅：brief=5 / standard=8 / deep=12 节上限（缺省 8）。
+      const maxLessons = lessonCountForLength(blueprint?.length);
       const outline = rawOutline
         .filter((o) => o && typeof o.title === "string" && o.title.trim())
         .map((o) => ({
@@ -122,7 +131,7 @@ export async function POST(req: NextRequest) {
           objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
           difficulty: (typeof o.difficulty === "string" ? o.difficulty : "").trim().slice(0, 20),
         }))
-        .slice(0, 8);
+        .slice(0, maxLessons);
       if (outline.length === 0) throw new AppError("大纲生成失败，请调整需求后重试", 502);
 
       const slug = slugify(title) + "-" + Math.random().toString(36).slice(2, 6);
@@ -145,6 +154,7 @@ export async function POST(req: NextRequest) {
             visibility: "private",
             // 检查点模式先停在 outline_draft（等用户确认），否则直接 generating 走后台扇出。
             genStatus: checkpoint ? "outline_draft" : "generating",
+            blueprintJson: blueprint ? serializeBlueprint(blueprint) : null,
             template: template ?? null,
             modelUsed: modelKey,
             qualityTier,

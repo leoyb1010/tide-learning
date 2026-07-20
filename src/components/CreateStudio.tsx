@@ -39,6 +39,7 @@ import { ProgressRing, Spinner, useAutoGoCountdown, useGenPolling, type GenProgr
 import { GenStage, TypewriterText, type GenStageLesson, type GenStageLessonState } from "@/components/GenStage";
 import { CoursewareManager } from "@/components/CoursewareManager";
 import { OutlineCheckpoint } from "@/components/OutlineCheckpoint";
+import { trackLabel } from "@/lib/tracks";
 
 /**
  * 剧场恢复用：由 /create server component 预取的「我正在生成中的课」摘要。
@@ -65,14 +66,14 @@ export interface DraftCheckpoint {
   lessons: { id: string; title: string }[];
 }
 
-// 赛道选项（与 src/lib/tracks.ts 的 key/label 对齐；这里只取造课常用赛道）
+// 赛道选项（只取造课常用赛道；label 从 lib/tracks.ts 单一真源派生，避免两处手抄漂移）。
 const TRACK_OPTIONS: { key: string; label: string }[] = [
-  { key: "ai_skill", label: "AI 技能" },
-  { key: "english_oral", label: "口语实战" },
-  { key: "english_foundation", label: "听说读写全能" },
-  { key: "life", label: "生活实用" },
-  { key: "silver_english", label: "银发口语" },
-];
+  "ai_skill",
+  "english_oral",
+  "english_foundation",
+  "life",
+  "silver_english",
+].map((key) => ({ key, label: trackLabel(key) }));
 
 // 造课首屏「试试这些」灵感 chip（与 iOS 端 CreateView 对齐/本地化）：
 // 点击即填充 prompt，给空输入框一个明确的启动引导，降冷启动门槛。
@@ -176,6 +177,12 @@ export function CreateStudio({
   const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
   // L2 专业模式：开则造课先停在大纲检查点（outline_draft），由用户确认后再扇出逐节生成。
   const [proMode, setProMode] = useState(false);
+  // L1 课程蓝图（专业模式展开）：受众/口吻/篇幅/块偏好/参考资料,透传进生成 prompt + grounding。
+  const [bpAudience, setBpAudience] = useState<string>("");
+  const [bpTone, setBpTone] = useState<string>("");
+  const [bpLength, setBpLength] = useState<string>("");
+  const [bpBlockPrefs, setBpBlockPrefs] = useState<string[]>([]);
+  const [bpReference, setBpReference] = useState<string>("");
   // 大纲检查点数据（generate-course 返回 checkpoint:true 时填充；确认后清空进剧场）。
   const [checkpoint, setCheckpoint] = useState<{ courseId: string; slug: string; title: string; lessons: OutlineLesson[] } | null>(null);
   // P1-1：AI 是否可用（服务端配了可用模型）。默认 true 避免加载态闪禁用；TemplateModelPicker
@@ -226,6 +233,17 @@ export function CreateStudio({
     // 仅挂载时读一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 组装 L1 蓝图对象（专业模式）：空字段省略,全空返回 undefined。
+  function buildBlueprint(): Record<string, unknown> | undefined {
+    const bp: Record<string, unknown> = {};
+    if (bpAudience) bp.audience = bpAudience;
+    if (bpTone) bp.tone = bpTone;
+    if (bpLength) bp.length = bpLength;
+    if (bpBlockPrefs.length) bp.blockPrefs = bpBlockPrefs;
+    if (bpReference.trim()) bp.referenceText = bpReference.trim();
+    return Object.keys(bp).length ? bp : undefined;
+  }
 
   // 打开一份草稿的检查点（横幅「继续编辑」调用）。
   function openDraft(d: DraftCheckpoint) {
@@ -432,7 +450,16 @@ export function CreateStudio({
       const res = await fetch("/api/ai/generate-course", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: q, category: category || undefined, template, model: model || undefined, qualityTier, checkpoint: proMode }),
+        body: JSON.stringify({
+          prompt: q,
+          category: category || undefined,
+          template,
+          model: model || undefined,
+          qualityTier,
+          checkpoint: proMode,
+          // L1 蓝图仅在专业模式下随请求带上（服务端白名单校验，空对象忽略）。
+          blueprint: proMode ? buildBlueprint() : undefined,
+        }),
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
@@ -862,6 +889,26 @@ export function CreateStudio({
                 </span>
               </button>
 
+              {/* L1 课程蓝图（专业模式展开）：受众/口吻/篇幅/块偏好/参考资料。 */}
+              {proMode && (
+                <div className="flex flex-col gap-3 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)]/40 p-3.5">
+                  <BlueprintChips label="受众水平" value={bpAudience} onChange={setBpAudience} options={[["beginner", "零基础"], ["some", "有基础"], ["advanced", "进阶"]]} />
+                  <BlueprintChips label="讲解口吻" value={bpTone} onChange={setBpTone} options={[["textbook", "严谨教科书"], ["coach", "轻松教练"], ["interview", "面试冲刺"]]} />
+                  <BlueprintChips label="课程篇幅" value={bpLength} onChange={setBpLength} options={[["brief", "速览 5 节"], ["standard", "标准 8 节"], ["deep", "深研 12 节"]]} />
+                  <BlueprintMultiChips label="内容偏好" values={bpBlockPrefs} onToggle={(k) => setBpBlockPrefs((prev) => prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k])} options={[["quiz", "多做题"], ["diagram", "多图示"], ["code", "多代码"], ["flashcard", "多背诵卡"]]} />
+                  <div>
+                    <div className="mono mb-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">参考资料 · 让内容有出处</div>
+                    <textarea
+                      value={bpReference}
+                      onChange={(e) => setBpReference(e.target.value.slice(0, 8000))}
+                      rows={3}
+                      placeholder="粘贴你的资料/大纲/要点，AI 会据此生成，减少凭空编造（可留空）"
+                      className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--ink3)]"
+                    />
+                  </div>
+                </div>
+              )}
+
               {/* v3.1：生成视频课件开关。选中后逐节写完块课件，再把课件转成带旁白的视频课件。 */}
               <button
                 type="button"
@@ -1093,6 +1140,64 @@ export function CreateStudio({
    深色蓝图舞台上四站轨道 + 生产位节卡 + 分节进度格，
    即时剧场（前端状态机驱动）用本包裹；恢复剧场共用 GenStage。
    ============================================================ */
+/** 蓝图单选 chip 组（再点已选项取消）。 */
+function BlueprintChips({
+  label, value, onChange, options,
+}: {
+  label: string; value: string; onChange: (v: string) => void; options: [string, string][];
+}) {
+  return (
+    <div>
+      <div className="mono mb-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(([k, txt]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onChange(value === k ? "" : k)}
+            className={`studio-press rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              value === k
+                ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--red-ink)]"
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] hover:border-[var(--border2)]"
+            }`}
+          >
+            {txt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 蓝图多选 chip 组。 */
+function BlueprintMultiChips({
+  label, values, onToggle, options,
+}: {
+  label: string; values: string[]; onToggle: (k: string) => void; options: [string, string][];
+}) {
+  return (
+    <div>
+      <div className="mono mb-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.map(([k, txt]) => (
+          <button
+            key={k}
+            type="button"
+            onClick={() => onToggle(k)}
+            className={`studio-press rounded-full border px-3 py-1.5 text-[12px] font-semibold transition-colors ${
+              values.includes(k)
+                ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--red-ink)]"
+                : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink2)] hover:border-[var(--border2)]"
+            }`}
+          >
+            {txt}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function TheaterPanel({
   source,
   phase,
