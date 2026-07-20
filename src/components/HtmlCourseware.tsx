@@ -229,7 +229,7 @@ export function HtmlCourseware({
           )}
           {pagedReady && (
             <div
-              className="flex items-center rounded-[9px] border border-[var(--border)] bg-[var(--surface-inset)] p-0.5"
+              className="flex items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface-inset)] p-0.5"
               role="tablist"
               aria-label="课件视图"
             >
@@ -259,7 +259,7 @@ export function HtmlCourseware({
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="studio-press grid h-8 w-8 place-items-center rounded-[9px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+            className="studio-press grid h-8 w-8 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
             aria-label={fullscreen ? "退出全屏" : "全屏"}
             title={fullscreen ? "退出全屏" : "全屏"}
           >

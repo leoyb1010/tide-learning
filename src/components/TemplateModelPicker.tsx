@@ -179,7 +179,7 @@ export function TemplateModelPicker({
                   onClick={() => setModel(m.key)}
                   title={m.desc}
                   aria-pressed={active}
-                  className={`studio-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors duration-150 ${
+                  className={`studio-press inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors duration-150 ${
                     active
                       ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--red)]"
                       : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)] hover:border-[var(--border2)] hover:text-[var(--ink)]"
@@ -196,7 +196,7 @@ export function TemplateModelPicker({
                 key={m.key}
                 href="/pricing"
                 title={`${m.desc}（会员专享，点击去订阅）`}
-                className="studio-press inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--border2)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink4)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
+                className="studio-press inline-flex items-center gap-1.5 rounded-full border border-dashed border-[var(--border2)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink4)] transition-colors hover:border-[var(--red)] hover:text-[var(--red)]"
               >
                 <Lock size={12} weight="fill" />
                 {m.label}

@@ -63,7 +63,7 @@ export function AdminUserManager({ isSuperAdmin, currentUserId }: { isSuperAdmin
       </div>
 
       <div className="overflow-x-auto rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
-        <table className="w-full text-[12.5px]">
+        <table className="w-full text-[13px]">
           <thead className="border-b border-[var(--border)] text-left text-[var(--ink4)]">
             <tr>
               <th className="px-3 py-2.5 font-medium">昵称</th>
@@ -168,7 +168,7 @@ function CreateUserForm({ onCreated }: { onCreated: () => void }) {
           {busy ? "创建中…" : "创建"}
         </button>
       </div>
-      <p className="mt-2 text-[11.5px] text-[var(--ink4)]">初始密码由管理员设定并线下告知用户；密码明文不落库，仅存哈希。</p>
+      <p className="mt-2 text-[12px] text-[var(--ink4)]">初始密码由管理员设定并线下告知用户；密码明文不落库，仅存哈希。</p>
     </form>
   );
 }

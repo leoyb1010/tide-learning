@@ -734,7 +734,7 @@ export function CreateStudio({
         >
           <SlidersHorizontal size={16} weight="fill" className="shrink-0 text-[var(--red)]" />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">有一份待确认的大纲：{draftCheckpoint.title}</span>
+            <span className="block truncate text-[14px] font-semibold text-[var(--ink)]">有一份待确认的大纲：{draftCheckpoint.title}</span>
             <span className="block text-[12px] text-[var(--ink3)]">继续编辑并确认后才会逐节生成</span>
           </span>
           <span className="mono shrink-0 text-[12px] font-semibold text-[var(--red-ink)]">继续编辑 →</span>
@@ -817,7 +817,7 @@ export function CreateStudio({
                       key={ex}
                       type="button"
                       onClick={() => setPrompt(ex)}
-                      className="studio-press rounded-full border border-[var(--border)] bg-[var(--surface2)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink3)] transition-all duration-150 hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                      className="studio-press rounded-full border border-[var(--border)] bg-[var(--surface2)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink3)] transition-all duration-150 hover:border-[var(--border2)] hover:text-[var(--ink)]"
                     >
                       {ex}
                     </button>
@@ -836,7 +836,7 @@ export function CreateStudio({
                         key={t.key}
                         type="button"
                         onClick={() => setCategory(active ? "" : t.key)}
-                        className={`studio-press rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-all duration-150 ${
+                        className={`studio-press rounded-full border px-3 py-1.5 text-[13px] font-medium transition-all duration-150 ${
                           active
                             ? "border-[var(--red)] bg-[var(--red-soft)] text-[var(--red)]"
                             : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)] hover:border-[var(--border2)] hover:text-[var(--ink)]"
@@ -872,7 +872,7 @@ export function CreateStudio({
                   <SlidersHorizontal size={16} weight="fill" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-semibold text-[var(--ink)]">专业模式 · 大纲我来定</span>
+                  <span className="block text-[14px] font-semibold text-[var(--ink)]">专业模式 · 大纲我来定</span>
                   <span className="block text-[12px] leading-snug text-[var(--ink3)]">先看大纲，可增删改排序、重拟，满意再逐节生成，不满意不烧整门课的钱</span>
                 </span>
                 <span
@@ -897,7 +897,7 @@ export function CreateStudio({
                   <BlueprintChips label="课程篇幅" value={bpLength} onChange={setBpLength} options={[["brief", "速览 5 节"], ["standard", "标准 8 节"], ["deep", "深研 12 节"]]} />
                   <BlueprintMultiChips label="内容偏好" values={bpBlockPrefs} onToggle={(k) => setBpBlockPrefs((prev) => prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k])} options={[["quiz", "多做题"], ["diagram", "多图示"], ["code", "多代码"], ["flashcard", "多背诵卡"]]} />
                   <div>
-                    <div className="mono mb-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">参考资料 · 让内容有出处</div>
+                    <div className="mono mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">参考资料 · 让内容有出处</div>
                     <textarea
                       value={bpReference}
                       onChange={(e) => setBpReference(e.target.value.slice(0, 8000))}
@@ -929,7 +929,7 @@ export function CreateStudio({
                   <Play size={16} weight="fill" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-semibold text-[var(--ink)]">同时生成视频课件</span>
+                  <span className="block text-[14px] font-semibold text-[var(--ink)]">同时生成视频课件</span>
                   <span className="block text-[12px] leading-snug text-[var(--ink3)]">把每节课件转成带旁白讲解的视频，学习页可切换观看</span>
                 </span>
                 {/* 开关轨道：reduce-motion 下无位移动画也能看清开合（颜色 + 位置双编码） */}
@@ -976,7 +976,7 @@ export function CreateStudio({
                   >
                     <div className="flex items-center gap-1.5">
                       <b.Icon size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
-                      <span className="text-[12.5px] font-semibold text-[var(--ink)]">{b.label}</span>
+                      <span className="text-[13px] font-semibold text-[var(--ink)]">{b.label}</span>
                     </div>
                     <span className="text-[11px] leading-snug text-[var(--ink3)]">{b.hint}</span>
                   </div>
@@ -1042,7 +1042,7 @@ export function CreateStudio({
                 <span className="text-[14px] font-semibold text-[var(--ink)]">
                   {dragActive ? "松开鼠标即可导入" : "点击上传或把文件拖到这里"}
                 </span>
-                <span className="flex flex-wrap items-center justify-center gap-2 text-[11.5px] text-[var(--ink3)]">
+                <span className="flex flex-wrap items-center justify-center gap-2 text-[12px] text-[var(--ink3)]">
                   <span className="inline-flex items-center gap-1">
                     <FilePdf size={13} weight="fill" className="text-[var(--red)]" /> PDF
                   </span>
@@ -1091,7 +1091,7 @@ export function CreateStudio({
                 {aiAvailable ? "把粘贴的资料升维成课" : "AI 维护中"}
                 <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
-              <p className="text-center text-[11.5px] text-[var(--ink3)]">AI 会把长文拆成章节，配上要点与测验，帮你把资料变成能学的课。</p>
+              <p className="text-center text-[12px] text-[var(--ink3)]">AI 会把长文拆成章节，配上要点与测验，帮你把资料变成能学的课。</p>
             </div>
           )}
         </div>
@@ -1148,7 +1148,7 @@ function BlueprintChips({
 }) {
   return (
     <div>
-      <div className="mono mb-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">{label}</div>
+      <div className="mono mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         {options.map(([k, txt]) => (
           <button
@@ -1177,7 +1177,7 @@ function BlueprintMultiChips({
 }) {
   return (
     <div>
-      <div className="mono mb-1.5 text-[10.5px] uppercase tracking-[0.14em] text-[var(--ink4)]">{label}</div>
+      <div className="mono mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">{label}</div>
       <div className="flex flex-wrap gap-1.5">
         {options.map(([k, txt]) => (
           <button
@@ -1305,7 +1305,7 @@ function ShareToMarketInline({ courseId }: { courseId: string }) {
 
   if (status === "shared") {
     return (
-      <span className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--inner-hi)]">
+      <span className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--inner-hi)]">
         <CheckCircle size={16} weight="fill" className="text-[var(--red)]" />
         已在集市
       </span>
@@ -1313,7 +1313,7 @@ function ShareToMarketInline({ courseId }: { courseId: string }) {
   }
   if (status === "pending") {
     return (
-      <span className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink3)] shadow-[var(--inner-hi)]">
+      <span className="inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3.5 text-[14px] font-semibold text-[var(--ink3)] shadow-[var(--inner-hi)]">
         <HourglassMedium size={16} weight="fill" />
         审核中
       </span>
@@ -1325,7 +1325,7 @@ function ShareToMarketInline({ courseId }: { courseId: string }) {
       type="button"
       onClick={share}
       disabled={loading}
-      className="studio-press inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] disabled:opacity-50"
+      className="studio-press inline-flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] disabled:opacity-50"
     >
       <Export size={16} weight="bold" />
       {loading ? "审核中…" : status === "rejected" ? "重新分享" : "分享到集市"}
@@ -1435,7 +1435,7 @@ function DonePanel({
           <div className="text-[16px] font-extrabold text-white">
             {isImport ? "升维报告" : "这门课已就绪"}
           </div>
-          <div className="text-[12.5px] text-white/65">
+          <div className="text-[13px] text-white/65">
             {isImport ? "你的资料已经变成一门可学的课" : "大纲、讲解、测验、伴侣，全部准备好了"}
           </div>
         </div>
@@ -1445,7 +1445,7 @@ function DonePanel({
       {/* 结算归档（moment 3）：飞书落定后，一枚印章盖下「入册」——与复习结算同一归档语言。 */}
       <div className="relative flex items-center gap-2 border-b border-[var(--red-soft-border)] bg-[var(--red-soft)] px-5 py-2.5 sm:px-6">
         <Books size={15} weight="fill" className="shrink-0 text-[var(--red)]" />
-        <span className="text-[12.5px] font-semibold text-[var(--red-ink)]">已放入你的书架</span>
+        <span className="text-[13px] font-semibold text-[var(--red-ink)]">已放入你的书架</span>
         <span className="text-[11px] font-semibold text-[var(--red)]/70">· {isImport ? "资料升维" : "AI 造课"}</span>
         <ArchiveStamp active={!reduce} label="已入册" className="ml-auto" />
       </div>
@@ -1453,7 +1453,7 @@ function DonePanel({
       <div className="p-5 sm:p-6">
       {/* 升维报告：字数 → 结构化 转化句 */}
       {isImport && summary.chars ? (
-        <p className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--ink2)] shadow-[var(--inner-hi)]">
+        <p className="rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] px-4 py-3 text-[14px] leading-relaxed text-[var(--ink2)] shadow-[var(--inner-hi)]">
           你的 <span className="mono font-bold text-[var(--ink)]">{summary.chars.toLocaleString()}</span> 字资料
           <ArrowRight size={13} weight="bold" className="mx-1.5 inline align-middle text-[var(--red)]" />
           <span className="mono font-bold text-[var(--ink)]">{summary.total}</span> 章 ·
@@ -1461,7 +1461,7 @@ function DonePanel({
           <span className="mono font-bold text-[var(--ink)]"> {summary.cards}</span> 要点卡 · 伴侣已读完全文
         </p>
       ) : (
-        <p className="text-[13.5px] font-semibold text-[var(--ink2)]">这门课包含：</p>
+        <p className="text-[14px] font-semibold text-[var(--ink2)]">这门课包含：</p>
       )}
 
       {/* 事实清单：stagger 递延点亮，数字 .num-pop 强调 */}
@@ -1489,14 +1489,14 @@ function DonePanel({
       {/* 部分失败：可重试的章节（--warn 语义，非红信号） */}
       {failed.length > 0 && (
         <div className="mt-4 rounded-[12px] border border-[var(--warn)]/30 bg-[var(--warn-soft)] px-4 py-3">
-          <p className="text-[12.5px] font-semibold text-[var(--ink2)]">
+          <p className="text-[13px] font-semibold text-[var(--ink2)]">
             有 <span className="mono font-bold text-[var(--ink)]">{failed.length}</span> 节暂未写完，可单独重试：
           </p>
           <ul className="mt-2 flex flex-col gap-1.5">
             {failed.map((l) => (
               <li key={l.id} className="flex items-center gap-2">
                 <XCircle size={15} weight="fill" className="shrink-0 text-[var(--warn)]" />
-                <span className="flex-1 truncate text-[12.5px] text-[var(--ink2)]">{l.title}</span>
+                <span className="flex-1 truncate text-[13px] text-[var(--ink2)]">{l.title}</span>
                 <button
                   type="button"
                   onClick={() => onRetry(l.id)}
@@ -1534,7 +1534,7 @@ function DonePanel({
           <button
             type="button"
             onClick={onViewShelf}
-            className="studio-press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+            className="studio-press inline-flex min-h-[44px] flex-1 items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
           >
             <Books size={16} weight="fill" />
             查看我的书架
@@ -1599,7 +1599,7 @@ function GeneratingBanner({
         <button
           type="button"
           onClick={onEnter}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)]"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-3.5 py-2 text-[13px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)]"
         >
           <ArrowUUpLeft size={14} weight="bold" />
           回到剧场
@@ -1715,7 +1715,7 @@ function RecoveryTheater({
         <button
           type="button"
           onClick={onExit}
-          className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+          className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
         >
           <ArrowUUpLeft size={14} weight="bold" />
           返回造课
@@ -1730,7 +1730,7 @@ function RecoveryTheater({
             type="button"
             onClick={pauseGen}
             disabled={pausing}
-            className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--warn)] hover:text-[var(--ink)] disabled:opacity-60"
+            className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--warn)] hover:text-[var(--ink)] disabled:opacity-60"
           >
             {pausing ? <Spinner size={13} /> : <Pause size={14} weight="fill" />}
             暂停
@@ -1822,7 +1822,7 @@ function RecoveryTheater({
                     cancelAutoGo();
                     router.push(startHref);
                   }}
-                  className="studio-press inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                  className="studio-press inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
                 >
                   <Play size={15} weight="fill" />
                   直接开始第一节
@@ -1839,7 +1839,7 @@ function RecoveryTheater({
             {isFailed && (
               <Link
                 href="/me/courses"
-                className="studio-press group mt-4 inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[13.5px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                className="studio-press group mt-4 inline-flex w-full min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3.5 text-[14px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
               >
                 前往我的课程重试
                 <ArrowRight size={15} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />

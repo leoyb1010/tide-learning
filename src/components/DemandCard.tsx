@@ -265,13 +265,13 @@ export function ProposalCard({
         {(audience || demand.authorNickname) && (
           <div className="mb-3 flex flex-wrap items-center gap-1.5">
             {audience && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[11.5px] text-[var(--ink2)]">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[12px] text-[var(--ink2)]">
                 <UsersThree size={13} weight="fill" className="text-[var(--ink4)]" />
                 面向 {audience}
               </span>
             )}
             {demand.authorNickname && (
-              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[11.5px] text-[var(--ink3)]">
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-[var(--surface-inset)] px-2.5 py-1 text-[12px] text-[var(--ink3)]">
                 <Sparkle size={12} weight="fill" className="text-[var(--ink4)]" />
                 {demand.authorNickname} 发起
               </span>
@@ -338,7 +338,7 @@ export function ProposalCard({
             </motion.div>
           </div>
           {/* 进度尾注：阶段 + 点燃百分比，给进度一个语义落点 */}
-          <div className="mono mt-1.5 flex items-center justify-between text-[10.5px] text-[var(--ink4)]">
+          <div className="mono mt-1.5 flex items-center justify-between text-[11px] text-[var(--ink4)]">
             <span>
               {LIFECYCLE[idx]?.label} · {idx + 1}/{LIFECYCLE.length}
             </span>
@@ -372,7 +372,7 @@ export function ProposalCard({
               type="button"
               onClick={() => setOpen((v) => !v)}
               aria-expanded={open}
-              className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+              className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
             >
               <span className="inline-flex items-center gap-1.5">
                 <ListChecks size={15} weight="bold" className="text-[var(--red)]" />
@@ -393,7 +393,7 @@ export function ProposalCard({
                     {points.map((p, i) => (
                       <li
                         key={i}
-                        className="flex gap-2 text-[12.5px] leading-[1.55] text-[var(--ink2)]"
+                        className="flex gap-2 text-[13px] leading-[1.55] text-[var(--ink2)]"
                       >
                         <span
                           className="mono mt-[1px] inline-flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full bg-[var(--red-soft)] text-[10px] font-bold text-[var(--red-ink)]"
@@ -406,11 +406,11 @@ export function ProposalCard({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-[12.5px] leading-[1.6] text-[var(--ink2)]">{pitch}</p>
+                  <p className="text-[13px] leading-[1.6] text-[var(--ink2)]">{pitch}</p>
                 )}
                 <Link
                   href={`/demands/${demand.id}`}
-                  className="mt-2.5 inline-flex min-h-[44px] items-center gap-1 text-[12.5px] font-semibold text-[var(--red-ink)] hover:underline"
+                  className="mt-2.5 inline-flex min-h-[44px] items-center gap-1 text-[13px] font-semibold text-[var(--red-ink)] hover:underline"
                 >
                   查看完整介绍与大纲预览
                   <ArrowRight size={13} weight="bold" />

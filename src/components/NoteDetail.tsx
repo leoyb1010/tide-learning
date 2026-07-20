@@ -118,7 +118,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
                 params={{ noteId: note.id }}
                 triggerLabel="分享笔记"
                 trigger={
-                  <span className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]">
+                  <span className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]">
                     <ShareNetwork size={14} weight="bold" /> 分享
                   </span>
                 }
@@ -127,7 +127,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
               >
                 <PencilSimple size={14} weight="bold" /> 编辑
               </button>
@@ -227,7 +227,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
                 <button
                   type="button"
                   onClick={() => setExpanded((v) => !v)}
-                  className="studio-press mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                  className="studio-press mt-3 inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
                   aria-expanded={expanded}
                 >
                   <CaretDown

@@ -233,7 +233,7 @@ export function RedemptionCodeManager() {
         <p className="text-[13px] text-[var(--ink3)]">无匹配兑换码。</p>
       ) : (
         <div className="overflow-x-auto rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
-          <table className="w-full text-[12.5px]">
+          <table className="w-full text-[13px]">
             <thead className="border-b border-[var(--border)] text-left text-[var(--ink4)]">
               <tr>
                 <th className="px-3 py-2.5 font-medium">兑换码</th>

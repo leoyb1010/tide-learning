@@ -92,7 +92,7 @@ export function GenStage({
           <p className="mono text-[10px] font-bold uppercase tracking-[0.18em]" style={{ color: "rgba(255,255,255,.55)" }}>
             AI PRODUCTION LINE
           </p>
-          <p className="truncate text-[13.5px] font-bold" style={{ color: "var(--ink-on-dark)" }}>
+          <p className="truncate text-[14px] font-bold" style={{ color: "var(--ink-on-dark)" }}>
             {stationIndex >= 4
               ? "已装订成册"
               : source === "import"
@@ -201,14 +201,14 @@ export function GenStage({
             </span>
           </div>
           {caption && (
-            <p className="mt-2.5 text-[11.5px]" style={{ color: "var(--ink-on-dark-3)" }}>
+            <p className="mt-2.5 text-[12px]" style={{ color: "var(--ink-on-dark-3)" }}>
               {caption}
             </p>
           )}
         </div>
       )}
       {total === 0 && caption && (
-        <p className="mt-3 text-[11.5px]" style={{ color: "var(--ink-on-dark-3)" }}>
+        <p className="mt-3 text-[12px]" style={{ color: "var(--ink-on-dark-3)" }}>
           {caption}
         </p>
       )}
@@ -234,7 +234,7 @@ function LessonRow({
   const { state } = lesson;
   return (
     <li
-      className={`gen-row-in flex items-center gap-2.5 rounded-[11px] border px-3 py-2 ${
+      className={`gen-row-in flex items-center gap-2.5 rounded-[12px] border px-3 py-2 ${
         isWriting ? "gen-writing-row" : ""
       }`}
       style={
@@ -307,7 +307,7 @@ function LessonRow({
         </span>
       )}
       {isWriting && (
-        <span className="mono shrink-0 text-[9.5px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--red)" }}>
+        <span className="mono shrink-0 text-[10px] font-bold uppercase tracking-[0.12em]" style={{ color: "var(--red)" }}>
           生产中
         </span>
       )}
@@ -345,7 +345,7 @@ function BlueprintSkeleton({ source, stationIndex }: { source: "generate" | "imp
         {[0, 1, 2, 3].map((i) => (
           <li
             key={i}
-            className="ai-scan flex items-center gap-2.5 rounded-[11px] border px-3 py-2.5"
+            className="ai-scan flex items-center gap-2.5 rounded-[12px] border px-3 py-2.5"
             style={{ borderColor: ROW_BORDER, background: ROW_BG }}
           >
             <span className="h-[15px] w-[15px] shrink-0 rounded-full" style={{ background: "rgba(255,255,255,.1)" }} />

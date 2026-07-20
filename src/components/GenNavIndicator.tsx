@@ -104,7 +104,7 @@ export function GenNavIndicator() {
       onClick={() => track("gen_nav_indicator_click", { count: courses.length })}
       title={title}
       aria-label={title}
-      className="studio-lift mb-2 hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] py-1.5 pl-2 pr-2.5 text-[12.5px] shadow-[var(--card)] transition-colors hover:brightness-[0.98] sm:inline-flex"
+      className="studio-lift mb-2 hidden items-center gap-1.5 whitespace-nowrap rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] py-1.5 pl-2 pr-2.5 text-[13px] shadow-[var(--card)] transition-colors hover:brightness-[0.98] sm:inline-flex"
     >
       <span
         className="grid h-5 w-5 shrink-0 place-items-center rounded-full text-[10px] font-bold text-white"

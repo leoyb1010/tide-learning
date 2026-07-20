@@ -55,7 +55,7 @@ export default async function MyEarningsPage() {
           </span>
           <div>
             <p className="text-[16px] font-bold text-[var(--ink)]">还没有收益</p>
-            <p className="mt-1 max-w-[360px] text-[13.5px] leading-relaxed text-[var(--ink2)]">
+            <p className="mt-1 max-w-[360px] text-[14px] leading-relaxed text-[var(--ink2)]">
               把你造的课上架到集市，别人购买后收益即时入账你的积分。
             </p>
           </div>
@@ -74,10 +74,10 @@ export default async function MyEarningsPage() {
             <span className="absolute left-0 top-5 h-6 w-[3px] rounded-r bg-[var(--red)]" aria-hidden />
             <div className="flex items-center gap-2 text-[var(--ink3)]">
               <TrendUp size={16} weight="fill" className="text-[var(--red)]" />
-              <span className="text-[12.5px] font-semibold tracking-[0.06em]">收益总览</span>
+              <span className="text-[13px] font-semibold tracking-[0.06em]">收益总览</span>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface-inset)]">
+            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)]">
               <SummaryStat value={totalIncome} label="累计收益（积分）" accent />
               <SummaryStat value={totalSales} label="累计销量" />
               <SummaryStat value={courses.length} label="在架课" />
@@ -116,7 +116,7 @@ export default async function MyEarningsPage() {
                       >
                         {c.title}
                       </Link>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-[var(--ink3)]">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink3)]">
                         {/* 价格 */}
                         <span className="inline-flex items-center gap-1">
                           {isFree ? (
@@ -141,7 +141,7 @@ export default async function MyEarningsPage() {
                     {/* 该课收益（入账绿，口径与创作者中心一致） */}
                     <div className="flex shrink-0 items-center justify-between gap-2 sm:flex-col sm:items-end sm:gap-0.5">
                       <span className="mono text-[20px] font-extrabold leading-none text-[var(--ok)]">+{c.income}</span>
-                      <span className="text-[10.5px] uppercase tracking-[0.1em] text-[var(--ink4)]">积分收益</span>
+                      <span className="text-[11px] uppercase tracking-[0.1em] text-[var(--ink4)]">积分收益</span>
                     </div>
                   </li>
                 );

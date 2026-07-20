@@ -250,7 +250,7 @@ export function PostCard({
         <div className="min-w-0 flex-1">
           <Link
             href={`/u/${post.author.id}`}
-            className="truncate text-[13.5px] font-semibold text-[var(--ink)] transition-colors hover:text-[var(--red)]"
+            className="truncate text-[14px] font-semibold text-[var(--ink)] transition-colors hover:text-[var(--red)]"
           >
             {post.author.nickname}
           </Link>
@@ -269,7 +269,7 @@ export function PostCard({
         <p className="mt-3 whitespace-pre-wrap text-[14px] leading-[1.7] text-[var(--ink2)]">{post.content}</p>
       )}
       {isRepost && !post.content && (
-        <p className="mono mt-3 text-[12.5px] text-[var(--ink4)]">转发了这条帖子</p>
+        <p className="mono mt-3 text-[13px] text-[var(--ink4)]">转发了这条帖子</p>
       )}
 
       {/* 图片网格（原创帖自身图片；1-4 张自适应网格） */}
@@ -353,7 +353,7 @@ export function PostCard({
               </button>
             </div>
           ) : (
-            <p className="text-[12.5px] text-[var(--ink3)]">
+            <p className="text-[13px] text-[var(--ink3)]">
               评论为订阅会员权益。
               <Link href="/pricing" className="ml-1 font-semibold text-[var(--red)] underline">
                 订阅后参与讨论
@@ -398,7 +398,7 @@ export function PostCard({
             <button
               onClick={submitRepost}
               disabled={reposting}
-              className="studio-press inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
+              className="studio-press inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
             >
               <ArrowsClockwise size={14} />
               {reposting ? "转发中…" : "转发"}
@@ -508,7 +508,7 @@ function ImageGrid({ images }: { images: string[] }) {
 /** 话题标签胶囊：#xx 红色小胶囊。有 onTag 时点击就地筛选，否则纯展示。 */
 function TopicTags({ tags, onTag }: { tags: string[]; onTag?: (tag: string) => void }) {
   const cls =
-    "mono inline-flex items-center rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--red)]";
+    "mono inline-flex items-center rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-0.5 text-[12px] font-medium text-[var(--red)]";
   return (
     <div className="mt-3 flex flex-wrap gap-1.5">
       {tags.map((t) =>
@@ -532,7 +532,7 @@ function QuotedPost({ origin }: { origin: RepostOriginView }) {
   return (
     <div className="mt-3 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] p-3">
       {deleted ? (
-        <p className="mono text-[12.5px] text-[var(--ink4)]">原帖已删除</p>
+        <p className="mono text-[13px] text-[var(--ink4)]">原帖已删除</p>
       ) : (
         <>
           <Link
@@ -569,7 +569,7 @@ function CommentRow({ comment }: { comment: CommentView }) {
         <div className="flex items-center gap-2">
           <Link
             href={`/u/${comment.author.id}`}
-            className="text-[12.5px] font-semibold text-[var(--ink)] transition-colors hover:text-[var(--red)]"
+            className="text-[13px] font-semibold text-[var(--ink)] transition-colors hover:text-[var(--red)]"
           >
             {comment.author.nickname}
           </Link>
@@ -607,7 +607,7 @@ function ActionButton({
       disabled={disabled}
       aria-pressed={active}
       aria-label={ariaLabel}
-      className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[9px] px-3 py-2.5 text-[12.5px] font-medium transition-colors ${
+      className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[10px] px-3 py-2.5 text-[13px] font-medium transition-colors ${
         active ? activeCls : "text-[var(--ink3)]"
       } ${disabled ? "opacity-40" : "hover:bg-[var(--surface-inset)] hover:text-[var(--ink)]"}`}
     >

@@ -197,7 +197,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
             <div className="mb-1.5 flex items-center justify-between gap-2">
               <FieldLabel plain>昵称</FieldLabel>
               {nameLocked && (
-                <span className="inline-flex items-center gap-1 text-[11.5px] text-[var(--warn)]">
+                <span className="inline-flex items-center gap-1 text-[12px] text-[var(--warn)]">
                   <LockKey size={12} weight="fill" /> 改名冷却中，还需 {cooldownDays} 天
                 </span>
               )}
@@ -211,7 +211,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
               placeholder="2-16 个字"
               aria-label="昵称"
             />
-            <p className="mt-1.5 text-[11.5px] text-[var(--ink4)]">
+            <p className="mt-1.5 text-[12px] text-[var(--ink4)]">
               {nameLocked ? "冷却结束后可再次修改" : "修改后 30 天内不可再改，请谨慎"}
             </p>
           </div>
@@ -230,7 +230,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
               placeholder="日拱一卒，功不唐捐"
               aria-label="座右铭"
             />
-            <p className="mt-1.5 text-[11.5px] text-[var(--ink4)]">右侧学生证会实时预览这句话</p>
+            <p className="mt-1.5 text-[12px] text-[var(--ink4)]">右侧学生证会实时预览这句话</p>
           </div>
         </FieldCard>
 
@@ -361,7 +361,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
             )}
           </button>
           {dirty && !submitting && (
-            <span className="text-[12.5px] text-[var(--ink4)]">有未保存的修改</span>
+            <span className="text-[13px] text-[var(--ink4)]">有未保存的修改</span>
           )}
         </div>
       </div>
@@ -376,7 +376,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
               title="分享学生证"
               shareUrl={`/u/${userId}`}
               triggerLabel="分享学生证"
-              triggerClassName="studio-press inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
+              triggerClassName="studio-press inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
             />
           </div>
           <StudentCardPreview
@@ -392,7 +392,7 @@ export function ProfileForm({ userId, initial, nicknameCooldownDays, card }: Pro
             isSubscriber={card.isSubscriber}
             qrSvg={card.qrSvg}
           />
-          <p className="mt-3 px-1 text-[11.5px] leading-relaxed text-[var(--ink4)]">
+          <p className="mt-3 px-1 text-[12px] leading-relaxed text-[var(--ink4)]">
             扫码或点击「分享学生证」即可把你的主页
             <span className="font-mono"> /u/{userId.slice(0, 6)}… </span>
             分享给同学。
@@ -455,7 +455,7 @@ function FieldLabel({
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-[12.5px] font-medium ${plain ? "text-[var(--ink3)]" : "text-[var(--ink2)]"}`}
+      className={`inline-flex items-center gap-1.5 text-[13px] font-medium ${plain ? "text-[var(--ink3)]" : "text-[var(--ink2)]"}`}
     >
       {icon && <span className="text-[var(--ink4)]">{icon}</span>}
       {children}

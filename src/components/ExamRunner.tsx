@@ -376,7 +376,7 @@ function ExamForm({
           MOCK EXAM · 模拟考场
         </div>
         <h2 className="relative mt-1.5 text-[21px] font-bold text-white">准备考试</h2>
-        <p className="relative mt-1.5 max-w-[440px] text-[13.5px] leading-[1.7] text-[var(--ink-on-dark-2)]">
+        <p className="relative mt-1.5 max-w-[440px] text-[14px] leading-[1.7] text-[var(--ink-on-dark-2)]">
           用你学过的内容，AI 现场命题。挑好范围与难度，进考场一气呵成。
         </p>
       </div>
@@ -402,7 +402,7 @@ function ExamForm({
                       : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)]"
                   }`}
                 >
-                  <div className={`text-[13.5px] font-semibold ${active ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}>
+                  <div className={`text-[14px] font-semibold ${active ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}>
                     {s.label}
                   </div>
                   <div className="mt-0.5 text-[11px] text-[var(--ink4)]">{s.hint}</div>
@@ -456,14 +456,14 @@ function ExamForm({
                               {active && <CheckCircle size={11} weight="fill" />}
                             </span>
                             <span
-                              className={`truncate text-[13.5px] font-semibold ${
+                              className={`truncate text-[14px] font-semibold ${
                                 active ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"
                               }`}
                             >
                               {o.title}
                             </span>
                           </span>
-                          {o.meta && <span className="shrink-0 text-[11.5px] text-[var(--ink4)]">{o.meta}</span>}
+                          {o.meta && <span className="shrink-0 text-[12px] text-[var(--ink4)]">{o.meta}</span>}
                         </button>
                       );
                     })}
@@ -517,7 +517,7 @@ function ExamForm({
                     type="button"
                     onClick={() => setDifficulty(d.v)}
                     aria-pressed={active}
-                    className={`studio-press min-h-[44px] flex-1 rounded-[12px] border text-[13.5px] font-semibold transition-colors ${
+                    className={`studio-press min-h-[44px] flex-1 rounded-[12px] border text-[14px] font-semibold transition-colors ${
                       active
                         ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red-ink)] shadow-[var(--inner-hi)]"
                         : "border-[var(--border)] bg-[var(--surface2)] text-[var(--ink2)] hover:border-[var(--border2)]"
@@ -532,7 +532,7 @@ function ExamForm({
         </div>
 
         {/* 考前速览：本场规格一览，给准备阶段的确定感 */}
-        <div className="mb-6 flex items-center justify-center gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3 text-[12.5px] text-[var(--ink2)] shadow-[var(--inner-hi)]">
+        <div className="mb-6 flex items-center justify-center gap-2 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 py-3 text-[13px] text-[var(--ink2)] shadow-[var(--inner-hi)]">
           <ExamIcon size={14} weight="fill" className="text-[var(--red)]" />
           <span>
             本场 <span className="mono font-bold text-[var(--ink)]">{count}</span> 题
@@ -567,7 +567,7 @@ function ExamForm({
             </>
           )}
         </button>
-        <p className="mt-3 text-center text-[11.5px] text-[var(--ink4)]">AI 依据材料现场命题，约消耗少量积分</p>
+        <p className="mt-3 text-center text-[12px] text-[var(--ink4)]">AI 依据材料现场命题，约消耗少量积分</p>
       </div>
     </motion.div>
   );
@@ -740,7 +740,7 @@ function ExamTaking({
                         {glyph}
                       </span>
                       <span
-                        className={`text-[14.5px] leading-[1.6] ${selected ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}
+                        className={`text-[15px] leading-[1.6] ${selected ? "text-[var(--red-ink)]" : "text-[var(--ink2)]"}`}
                       >
                         {opt.label}
                       </span>
@@ -908,7 +908,7 @@ function ExamReport({ report, examId, onRetake }: { report: Report; examId: stri
             </h2>
             {passed && <ArchiveStamp active={!reduce} label="已通过" className="!border-white/80 !text-white" />}
           </div>
-          <p className="relative mt-1.5 max-w-[440px] text-[13.5px] leading-[1.7] text-[var(--ink-on-dark-2)]">
+          <p className="relative mt-1.5 max-w-[440px] text-[14px] leading-[1.7] text-[var(--ink-on-dark-2)]">
             {report.examTitle} · 共 {report.review.length} 题 ·{" "}
             <span className="mono font-semibold text-white">
               {report.score}/{report.total}
@@ -958,7 +958,7 @@ function ExamReport({ report, examId, onRetake }: { report: Report; examId: stri
               }
             />
           )}
-          {cardMsg && <p className="w-full text-center text-[12.5px] text-[var(--ink3)]">{cardMsg}</p>}
+          {cardMsg && <p className="w-full text-center text-[13px] text-[var(--ink3)]">{cardMsg}</p>}
         </div>
       </motion.div>
 
@@ -1072,7 +1072,7 @@ function ReviewCardItem({ q, index, order }: { q: ReviewQuestion; index: number;
         </div>
       </div>
 
-      <div className="space-y-2 pl-[34px] text-[13.5px] leading-[1.7]">
+      <div className="space-y-2 pl-[34px] text-[14px] leading-[1.7]">
         {q.type === "short" ? (
           <>
             <div className="rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2 text-[var(--ink2)]">
@@ -1120,7 +1120,7 @@ function ReviewCardItem({ q, index, order }: { q: ReviewQuestion; index: number;
         {q.sourceRef && (
           <a
             href={`/courses?q=${encodeURIComponent(q.sourceRef)}`}
-            className="studio-press inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[var(--info-soft)] bg-[var(--info-soft)] px-3 py-1.5 text-[11.5px] font-semibold text-[var(--info)] transition-colors hover:border-[var(--info)]"
+            className="studio-press inline-flex min-h-[32px] items-center gap-1.5 rounded-full border border-[var(--info-soft)] bg-[var(--info-soft)] px-3 py-1.5 text-[12px] font-semibold text-[var(--info)] transition-colors hover:border-[var(--info)]"
             title={`回到原处：${q.sourceRef}`}
           >
             <BookOpen size={13} weight="fill" />

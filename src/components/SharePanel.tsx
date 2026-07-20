@@ -363,14 +363,14 @@ function SharePanelModal({
             </div>
 
             {/* 深/浅主题切换：两种分享卡都能出 */}
-            <div className="mb-3 flex items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface-inset)] p-1">
+            <div className="mb-3 flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface-inset)] p-1">
               {(["dark", "light"] as const).map((t) => (
                 <button
                   key={t}
                   type="button"
                   onClick={() => setTheme(t)}
                   aria-pressed={theme === t}
-                  className={`flex-1 rounded-[8px] px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${
+                  className={`flex-1 rounded-[8px] px-3 py-1.5 text-[13px] font-semibold transition-colors ${
                     theme === t
                       ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
                       : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -482,7 +482,7 @@ function ActionButton({
       onClick={onClick}
       disabled={disabled || busy}
       aria-label={idleLabel}
-      className={`studio-press group inline-flex h-11 w-full items-center justify-center gap-2 rounded-[13px] border text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50 disabled:cursor-not-allowed disabled:opacity-40 ${
+      className={`studio-press group inline-flex h-11 w-full items-center justify-center gap-2 rounded-[14px] border text-[14px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50 disabled:cursor-not-allowed disabled:opacity-40 ${
         done
           ? "border-[var(--ok)]/40 bg-[var(--ok-soft)] text-[var(--ok)]"
           : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink)] hover:border-[var(--border2)] hover:bg-[var(--surface-inset)]"

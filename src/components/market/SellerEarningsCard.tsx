@@ -41,7 +41,7 @@ export function SellerEarningsCard({ earnings }: { earnings: SellerEarnings }) {
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 pl-1">
         <span className="flex items-center gap-1.5 text-[var(--ink3)]">
           <TrendUp size={15} weight="fill" className="text-[var(--red)]" />
-          <span className="text-[12.5px] font-semibold tracking-[0.04em]">我的集市收益</span>
+          <span className="text-[13px] font-semibold tracking-[0.04em]">我的集市收益</span>
         </span>
 
         <span className="flex items-center gap-3.5 text-[12px] text-[var(--ink3)]">
@@ -98,7 +98,7 @@ export function SellerEarningsCard({ earnings }: { earnings: SellerEarnings }) {
                   >
                     <Link
                       href={`/market/${c.slug}`}
-                      className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-[var(--ink2)] transition-colors hover:text-[var(--red)]"
+                      className="min-w-0 flex-1 truncate text-[13px] font-medium text-[var(--ink2)] transition-colors hover:text-[var(--red)]"
                       title={c.title}
                     >
                       {c.title}

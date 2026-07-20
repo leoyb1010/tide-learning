@@ -10,7 +10,7 @@ export default function Loading() {
       <div className="flex flex-col gap-2">
         <div className="skeleton h-3 w-28" />
         <div className="flex items-center gap-2.5">
-          <div className="skeleton h-9 w-9 rounded-[11px]" />
+          <div className="skeleton h-9 w-9 rounded-[12px]" />
           <div className="skeleton h-7 w-40" />
         </div>
         <div className="skeleton h-4 w-2/3 max-w-[420px]" />
@@ -36,7 +36,7 @@ export default function Loading() {
       {/* 排序行 */}
       <div className="flex items-center justify-between">
         <div className="skeleton h-4 w-28" />
-        <div className="skeleton h-9 w-56 rounded-[11px]" />
+        <div className="skeleton h-9 w-56 rounded-[12px]" />
       </div>
 
       {/* 橱窗商品网格 */}

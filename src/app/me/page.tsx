@@ -143,7 +143,7 @@ export default async function MePage() {
                 title="分享学生证"
                 shareUrl={`/u/${user.id}`}
                 triggerLabel="分享学生证"
-                triggerClassName="group studio-press inline-flex h-7 w-7 items-center justify-center rounded-[9px] border border-[var(--hairline-on-dark)] bg-white/10 text-[var(--ink-on-dark-2)] backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-[var(--ink-on-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+                triggerClassName="group studio-press inline-flex h-7 w-7 items-center justify-center rounded-[10px] border border-[var(--hairline-on-dark)] bg-white/10 text-[var(--ink-on-dark-2)] backdrop-blur-sm transition-colors hover:bg-white/20 hover:text-[var(--ink-on-dark)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
               />
             }
           />
@@ -237,7 +237,7 @@ export default async function MePage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-[14px] font-bold text-[var(--ink)]">{r.course.title}</p>
-                          <p className="mt-0.5 truncate text-[11.5px] text-[var(--ink3)]">{r.lesson.title}</p>
+                          <p className="mt-0.5 truncate text-[12px] text-[var(--ink3)]">{r.lesson.title}</p>
                         </div>
                         {done ? (
                           <span className="mono shrink-0 rounded-full bg-[var(--ok-soft)] px-2 py-0.5 text-[10px] font-bold text-[var(--ok)]">已学完</span>
@@ -337,7 +337,7 @@ export default async function MePage() {
             kind="week-report"
             title="学习周报"
             triggerLabel="生成学习周报"
-            triggerClassName="studio-press inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[12.5px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
+            triggerClassName="studio-press inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--red)]/50"
           />
         </div>
 
@@ -533,7 +533,7 @@ function OverviewStat({
   accent?: boolean;
 }) {
   return (
-    <div className="studio-lift flex flex-col items-center gap-1 rounded-[13px] border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-center shadow-[var(--card),var(--inner-hi)]">
+    <div className="studio-lift flex flex-col items-center gap-1 rounded-[14px] border border-[var(--border)] bg-[var(--surface)] px-2 py-3 text-center shadow-[var(--card),var(--inner-hi)]">
       <span className={accent ? "text-[var(--red)]" : "text-[var(--ink3)]"}>{icon}</span>
       <span className={`mono text-[17px] font-extrabold leading-none ${accent ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>
         {value}

@@ -246,7 +246,7 @@ export default async function PricingPage({
 
 function TrustItem({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <span className="flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--ink2)]">
+    <span className="flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink2)]">
       {icon}
       {text}
     </span>

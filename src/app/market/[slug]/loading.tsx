@@ -107,7 +107,7 @@ export default function Loading() {
               </div>
             </div>
             {/* 店铺经营数据 3 格 */}
-            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface-inset)]">
+            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)]">
               {Array.from({ length: 3 }).map((_, i) => (
                 <div key={i} className="flex flex-col items-center gap-1.5 px-2 py-3" style={{ "--i": i } as React.CSSProperties}>
                   <div className="skeleton h-4 w-8" />

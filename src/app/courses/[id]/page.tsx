@@ -180,12 +180,12 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               <p className="text-[16px] leading-[1.6] text-[var(--ink)]">{course.subtitle}</p>
             )}
             {course.description && (
-              <p className="text-[14.5px] leading-[1.78] text-[var(--ink2)]">{course.description}</p>
+              <p className="text-[15px] leading-[1.78] text-[var(--ink2)]">{course.description}</p>
             )}
 
             {/* 供给/审核署名（次要，弱化） */}
             {(course.contributorName || course.reviewerName) && (
-              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[12.5px] text-[var(--ink3)]">
+              <div className="flex flex-wrap gap-x-5 gap-y-1 text-[13px] text-[var(--ink3)]">
                 {course.contributorName && <span>内容供给：{course.contributorName}</span>}
                 {course.reviewerName && <span>审核人：{course.reviewerName}</span>}
               </div>
@@ -343,7 +343,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
 
             {/* 订阅门：有说服力的三点价值，而非干巴巴一句话 */}
             {!hasAccess && (
-              <ul className="mt-4 space-y-2 text-[12.5px] leading-[1.5] text-[var(--ink2)]">
+              <ul className="mt-4 space-y-2 text-[13px] leading-[1.5] text-[var(--ink2)]">
                 <li className="flex items-start gap-2">
                   <Check size={14} weight="bold" className="mt-0.5 shrink-0 text-[var(--ok)]" />
                   <span>订阅即解锁本赛道全部课程，随更新持续获得新内容</span>
@@ -383,7 +383,7 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               <span className="h-2.5 w-2.5 rounded-full bg-[var(--red)]" style={{ animation: "recPulse 2s ease-in-out infinite" }} />
               <span className="text-[13px] font-bold text-[var(--ink)]">持续更新中</span>
             </div>
-            <p className="mt-2 text-[12.5px] leading-[1.7] text-[var(--ink2)]">
+            <p className="mt-2 text-[13px] leading-[1.7] text-[var(--ink2)]">
               {course.updateCadence ? `${course.updateCadence}，` : "每周三新增 1-2 节，"}持续为这门课添加新内容。你的笔记与截帧永久保存，随课程一起成长。
             </p>
           </div>
@@ -427,7 +427,7 @@ function HeaderStat({ icon, value, unit, label }: { icon: React.ReactNode; value
         {value}
         {unit && <span className="ml-0.5 text-[12px] font-semibold text-[var(--ink3)]">{unit}</span>}
       </div>
-      <div className="text-[11.5px] text-[var(--ink4)]">{label}</div>
+      <div className="text-[12px] text-[var(--ink4)]">{label}</div>
     </div>
   );
 }

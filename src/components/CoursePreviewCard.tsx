@@ -158,12 +158,12 @@ function PreviewOverlay({
           {/* 评分 + 作者 一行 */}
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
             <RatingStars score={rating.score} count={rating.count} placeholder={rating.isPlaceholder} size={14} />
-            <span className="text-[12.5px] text-[var(--ink3)]">{author}</span>
+            <span className="text-[13px] text-[var(--ink3)]">{author}</span>
           </div>
 
           {/* 简介 */}
           {(course.subtitle || track?.blurb) && (
-            <p className="mt-2.5 text-[13.5px] leading-[1.7] text-[var(--ink2)]">
+            <p className="mt-2.5 text-[14px] leading-[1.7] text-[var(--ink2)]">
               {course.subtitle || track?.blurb}
             </p>
           )}
@@ -186,7 +186,7 @@ function PreviewOverlay({
           </ul>
 
           {course.freeLessonsCount > 0 && (
-            <div className="mt-3 flex items-center gap-1.5 text-[12.5px] font-medium text-[var(--ink2)]">
+            <div className="mt-3 flex items-center gap-1.5 text-[13px] font-medium text-[var(--ink2)]">
               <PlayCircle size={15} weight="fill" className="text-[var(--red-active)]" />
               {course.freeLessonsCount} 节免费试学，先看后订
             </div>
@@ -198,7 +198,7 @@ function PreviewOverlay({
               href={detailHref}
               data-autofocus
               onClick={onClose}
-              className="cta-glow group inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[13px] bg-[var(--red)] text-[14px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
+              className="cta-glow group inline-flex h-11 w-full items-center justify-center gap-1.5 rounded-[14px] bg-[var(--red)] text-[14px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
             >
               进入学习
               <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
@@ -206,7 +206,7 @@ function PreviewOverlay({
             <button
               type="button"
               onClick={onClose}
-              className="studio-press inline-flex h-10 w-full items-center justify-center rounded-[13px] text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
+              className="studio-press inline-flex h-10 w-full items-center justify-center rounded-[14px] text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
             >
               先看看别的
             </button>
@@ -237,7 +237,7 @@ function Metric({ icon, value, label }: { icon: React.ReactNode; value: string; 
     <div className="flex flex-col items-center gap-0.5">
       <span className="text-[var(--ink3)]">{icon}</span>
       <span className="mono text-[13px] font-bold leading-none text-[var(--ink)]">{value}</span>
-      <span className="text-[10.5px] text-[var(--ink4)]">{label}</span>
+      <span className="text-[11px] text-[var(--ink4)]">{label}</span>
     </div>
   );
 }

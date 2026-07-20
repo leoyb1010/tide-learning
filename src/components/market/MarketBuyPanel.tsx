@@ -208,12 +208,12 @@ export function MarketBuyPanel({
         <div className="flex flex-col gap-4">
           {/* 商品摘要 */}
           <div className="flex items-center gap-3 rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)] px-3.5 py-3 shadow-[var(--inner-hi)]">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[11px] bg-[var(--red-soft)]">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-[12px] bg-[var(--red-soft)]">
               <ShoppingBagOpen size={20} weight="fill" className="text-[var(--red)]" />
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[14px] font-bold text-[var(--ink)]">{title}</p>
-              <p className="mt-0.5 flex items-center gap-1 text-[12.5px] text-[var(--ink3)]">
+              <p className="mt-0.5 flex items-center gap-1 text-[13px] text-[var(--ink3)]">
                 <Coins size={13} weight="fill" className="text-[var(--red)]" />
                 售价 <span className="mono font-bold text-[var(--red)]">{price.amount}</span> 积分
               </p>
@@ -266,7 +266,7 @@ export function MarketBuyPanel({
             </button>
           )}
 
-          <p className="text-center text-[11.5px] leading-[1.5] text-[var(--ink4)]">
+          <p className="text-center text-[12px] leading-[1.5] text-[var(--ink4)]">
             购买后课程永久进入你的书架，作者获得收益分成。
           </p>
         </div>

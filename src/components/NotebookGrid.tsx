@@ -221,7 +221,7 @@ export default function NotebookGrid() {
               type="button"
               onClick={() => setOpen(false)}
               disabled={saving}
-              className="studio-press rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-45"
+              className="studio-press rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)] disabled:opacity-45"
             >
               取消
             </button>

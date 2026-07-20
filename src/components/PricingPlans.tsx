@@ -187,12 +187,12 @@ export function PricingPlans({
                 if (e.key === "Enter") validate();
               }}
               placeholder="输入优惠券码"
-              className="mono flex-1 rounded-[11px] border border-[var(--border2)] bg-[var(--surface)] px-3 py-2.5 text-[13px] uppercase tracking-[0.06em] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)]"
+              className="mono flex-1 rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] px-3 py-2.5 text-[13px] uppercase tracking-[0.06em] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--red)]"
             />
             {preview ? (
               <button
                 onClick={clear}
-                className="studio-press rounded-[11px] border border-[var(--border2)] bg-[var(--surface)] px-4 py-2.5 text-[13px] text-[var(--ink3)] transition-colors hover:text-[var(--red)]"
+                className="studio-press rounded-[12px] border border-[var(--border2)] bg-[var(--surface)] px-4 py-2.5 text-[13px] text-[var(--ink3)] transition-colors hover:text-[var(--red)]"
               >
                 清除
               </button>
@@ -200,7 +200,7 @@ export function PricingPlans({
               <button
                 onClick={validate}
                 disabled={checking || !code.trim()}
-                className="studio-press rounded-[11px] bg-[var(--ink)] px-5 py-2.5 text-[13px] font-bold text-[var(--surface)] transition-all hover:brightness-110 disabled:opacity-45"
+                className="studio-press rounded-[12px] bg-[var(--ink)] px-5 py-2.5 text-[13px] font-bold text-[var(--surface)] transition-all hover:brightness-110 disabled:opacity-45"
               >
                 {checking ? "校验中…" : "应用"}
               </button>
@@ -212,7 +212,7 @@ export function PricingPlans({
             </p>
           )}
           {preview && (
-            <p className="mt-2.5 flex items-center gap-1.5 rounded-[9px] bg-[var(--ok-soft)] px-3 py-2 text-[12px] leading-[1.5] text-[var(--ok)]">
+            <p className="mt-2.5 flex items-center gap-1.5 rounded-[10px] bg-[var(--ok-soft)] px-3 py-2 text-[12px] leading-[1.5] text-[var(--ok)]">
               <CheckCircle size={15} weight="fill" className="shrink-0" />
               <span>
                 已应用「{preview.code}」，立减 <span className="mono">¥{yuan(preview.discountCents)}</span>，

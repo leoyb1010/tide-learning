@@ -64,7 +64,7 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
 
         <div className="mt-4 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3.5">
-            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[13px] border border-[var(--border)] bg-[var(--surface2)] text-[22px]">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] text-[22px]">
               {notebook.icon ? (
                 <span aria-hidden>{notebook.icon}</span>
               ) : (

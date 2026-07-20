@@ -668,7 +668,7 @@ export function Player({
             </div>
 
             <div className="mt-6 flex items-center justify-end gap-2">
-              <button onClick={() => setFocusStage("idle")} className="studio-press rounded-[11px] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)]">
+              <button onClick={() => setFocusStage("idle")} className="studio-press rounded-[12px] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink3)] transition-colors hover:text-[var(--ink)]">
                 取消
               </button>
               <button onClick={enterFocus} className="studio-press cta-glow inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-5 py-2.5 text-[14px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]">
@@ -700,23 +700,23 @@ export function Player({
                 <span className="mono text-[15px] font-bold tabular-nums">{mmss(remainingSec)}</span>
               </div>
               {focusGoal && (
-                <div className="min-w-0 flex-1 truncate rounded-full bg-black/35 px-3 py-1.5 text-[12.5px] text-white/85 backdrop-blur-sm">
+                <div className="min-w-0 flex-1 truncate rounded-full bg-black/35 px-3 py-1.5 text-[13px] text-white/85 backdrop-blur-sm">
                   <Target size={12} weight="fill" className="mr-1 inline text-[var(--red)]" />
                   {focusGoal}
                 </div>
               )}
               <div className="flex-1" />
               {onBreak && (
-                <button onClick={restartPomodoro} className="studio-press inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-[12.5px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/25">
+                <button onClick={restartPomodoro} className="studio-press inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/25">
                   再来一颗
                 </button>
               )}
               {isLoggedIn && sessionId && (
-                <button onClick={() => exitFocus(true)} className="studio-press inline-flex items-center gap-1.5 rounded-full bg-[var(--red)] px-3.5 py-1.5 text-[12.5px] font-semibold text-white backdrop-blur-sm transition-all hover:brightness-105" aria-label="退出并生成AI小结">
+                <button onClick={() => exitFocus(true)} className="studio-press inline-flex items-center gap-1.5 rounded-full bg-[var(--red)] px-3.5 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm transition-all hover:brightness-105" aria-label="退出并生成AI小结">
                   <Sparkle size={13} weight="fill" /> 离席 · AI 小结
                 </button>
               )}
-              <button onClick={() => exitFocus(false)} className="studio-press inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-[12.5px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/25" aria-label="退出专注">
+              <button onClick={() => exitFocus(false)} className="studio-press inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3.5 py-1.5 text-[13px] font-semibold text-white backdrop-blur-sm transition-colors hover:bg-white/25" aria-label="退出专注">
                 <X size={13} weight="bold" /> 退出专注
               </button>
             </div>
@@ -909,7 +909,7 @@ export function Player({
                           type="button"
                           onClick={() => setBlockLayout("slides")}
                           aria-pressed={blockLayout === "slides"}
-                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3.5 transition-colors ${
+                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 transition-colors ${
                             blockLayout === "slides"
                               ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
                               : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -922,7 +922,7 @@ export function Player({
                           type="button"
                           onClick={() => setBlockLayout("scroll")}
                           aria-pressed={blockLayout === "scroll"}
-                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[9px] px-3.5 transition-colors ${
+                          className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 whitespace-nowrap rounded-[10px] px-3.5 transition-colors ${
                             blockLayout === "scroll"
                               ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
                               : "text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -1042,7 +1042,7 @@ export function Player({
                   <Cards size={18} weight="fill" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[13.5px] font-semibold text-[var(--ink)]">
+                  <span className="block text-[14px] font-semibold text-[var(--ink)]">
                     顺手复习 {dueReviewCount} 张到期卡
                   </span>
                   <span className="block text-[12px] text-[var(--ink3)]">趁热复习，记得更牢</span>
@@ -1068,13 +1068,13 @@ export function Player({
                 <div className="inline-flex rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] p-1 text-[13px] font-semibold">
                   <button
                     onClick={() => setPanelTab("notes")}
-                    className={`whitespace-nowrap rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "notes" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
+                    className={`whitespace-nowrap rounded-[10px] px-4 py-1.5 transition-colors ${panelTab === "notes" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
                   >
                     <span className="whitespace-nowrap">笔记</span>
                   </button>
                   <button
                     onClick={() => setPanelTab("companion")}
-                    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[9px] px-4 py-1.5 transition-colors ${panelTab === "companion" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
+                    className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-[10px] px-4 py-1.5 transition-colors ${panelTab === "companion" ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]" : "text-[var(--ink3)] hover:text-[var(--ink)]"}`}
                   >
                     <Sparkle size={13} weight={panelTab === "companion" ? "fill" : "regular"} className="shrink-0 text-[var(--red)]" />
                     <span className="whitespace-nowrap">AI 伴侣</span>
@@ -1121,7 +1121,7 @@ function VideoGeneratingPlaceholder() {
           </span>
           <div>
             <p className="text-[15px] font-semibold text-white">视频课件生成中</p>
-            <p className="mt-1 text-[12.5px] text-white/60">AI 正在把这节课件转成带旁白的视频，稍后回来查看</p>
+            <p className="mt-1 text-[13px] text-white/60">AI 正在把这节课件转成带旁白的视频，稍后回来查看</p>
           </div>
         </div>
       </div>

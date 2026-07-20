@@ -39,7 +39,7 @@ export function MarketSortTabs() {
     <div
       role="tablist"
       aria-label="集市排序"
-      className={`inline-flex items-center gap-1 rounded-[13px] border border-[var(--border)] bg-[var(--surface2)] p-1 shadow-[var(--card),var(--inner-hi)] ${pending ? "opacity-70" : ""}`}
+      className={`inline-flex items-center gap-1 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-1 shadow-[var(--card),var(--inner-hi)] ${pending ? "opacity-70" : ""}`}
     >
       {MARKET_SORTS.map((s) => {
         const Icon = ICONS[s.key];

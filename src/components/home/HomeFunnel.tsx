@@ -351,7 +351,7 @@ function CourseDrawer({ courses, motionOk }: { courses: FeaturedCourse[]; motion
         }}
       >
         <span
-          className="flex h-[44px] w-[44px] items-center justify-center rounded-[13px]"
+          className="flex h-[44px] w-[44px] items-center justify-center rounded-[14px]"
           style={{ background: "var(--red-soft)", color: "var(--red)" }}
         >
           <Sparkle size={24} weight="fill" />

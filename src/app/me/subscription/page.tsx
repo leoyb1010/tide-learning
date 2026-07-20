@@ -81,7 +81,7 @@ export default async function SubscriptionPage() {
                 />
                 <div className="relative flex items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
-                    <span className="grid h-9 w-9 place-items-center rounded-[11px] bg-white/12 text-[var(--red)] ring-1 ring-white/10">
+                    <span className="grid h-9 w-9 place-items-center rounded-[12px] bg-white/12 text-[var(--red)] ring-1 ring-white/10">
                       <CrownSimple size={18} weight="fill" />
                     </span>
                     <div>
@@ -156,7 +156,7 @@ export default async function SubscriptionPage() {
               </div>
               <Link
                 href="/pricing"
-                className="cta-glow studio-press inline-flex items-center gap-2 rounded-[13px] bg-[var(--red)] px-6 py-3 text-[14px] font-bold text-white transition-all hover:brightness-105"
+                className="cta-glow studio-press inline-flex items-center gap-2 rounded-[14px] bg-[var(--red)] px-6 py-3 text-[14px] font-bold text-white transition-all hover:brightness-105"
               >
                 <Sparkle size={16} weight="fill" />
                 查看订阅方案
@@ -167,7 +167,7 @@ export default async function SubscriptionPage() {
       </TidalReveal>
 
       {/* 停订承诺：用 info 语义色柔性提示，而非灰底 */}
-      <p className="flex items-start gap-2 rounded-[13px] border border-[var(--info-soft)] bg-[var(--info-soft)] px-4 py-3 text-[13px] leading-[1.6] text-[var(--info)]">
+      <p className="flex items-start gap-2 rounded-[14px] border border-[var(--info-soft)] bg-[var(--info-soft)] px-4 py-3 text-[13px] leading-[1.6] text-[var(--info)]">
         <ShieldCheck size={16} weight="fill" className="mt-0.5 shrink-0" />
         取消订阅后：课程锁定，但笔记永久保留、可继续查看和导出。这是我们的承诺。
       </p>
@@ -183,7 +183,7 @@ export default async function SubscriptionPage() {
         </h2>
         {orders.length === 0 ? (
           <div className="flex flex-col items-center gap-2 rounded-[14px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-10 text-center">
-            <span className="grid h-11 w-11 place-items-center rounded-[13px] bg-[var(--surface-inset)] text-[var(--ink4)]">
+            <span className="grid h-11 w-11 place-items-center rounded-[14px] bg-[var(--surface-inset)] text-[var(--ink4)]">
               <Receipt size={20} weight="light" />
             </span>
             <p className="text-[13px] text-[var(--ink3)]">暂无订单，订阅后账单会出现在这里</p>

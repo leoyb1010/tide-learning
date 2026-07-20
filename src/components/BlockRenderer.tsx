@@ -301,7 +301,7 @@ function CodeBlock({ lang, code, explanation }: { lang: string; code: string; ex
         <code className="mono text-[13px] leading-relaxed text-[var(--ink)]">{code}</code>
       </pre>
       {explanation && (
-        <p className="border-t border-[var(--border)] px-4 py-3 text-[13.5px] leading-relaxed text-[var(--ink2)]">
+        <p className="border-t border-[var(--border)] px-4 py-3 text-[14px] leading-relaxed text-[var(--ink2)]">
           {explanation}
         </p>
       )}
@@ -377,7 +377,7 @@ function QuizBlock({
             <p className={`text-[14px] font-semibold ${correct ? "text-[var(--ok)]" : "text-[var(--red-ink)]"}`}>
               {correct ? "回答正确" : "回答错误"}
             </p>
-            {explain && <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--ink2)]">{explain}</p>}
+            {explain && <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--ink2)]">{explain}</p>}
           </div>
         </div>
       )}
@@ -496,7 +496,7 @@ function ObjectivesBlock({ items }: { items: string[] }) {
         {items.map((it, i) => (
           <li
             key={i}
-            className="flex items-start gap-3 text-[14.5px] leading-relaxed text-[var(--ink)]"
+            className="flex items-start gap-3 text-[15px] leading-relaxed text-[var(--ink)]"
             style={{ "--i": i } as CSSProperties}
           >
             <CheckCircle size={18} weight="fill" className="mt-0.5 shrink-0 text-[var(--ok)]" />
@@ -667,9 +667,9 @@ function StepsBlock({ steps }: { steps: { title: string; detail?: string }[] }) 
                 className={`steps-body flex-1 ${last ? "pb-0" : "pb-5"}`}
                 style={{ "--i": i } as CSSProperties}
               >
-                <p className="text-[14.5px] font-semibold leading-snug text-[var(--ink)]">{s.title}</p>
+                <p className="text-[15px] font-semibold leading-snug text-[var(--ink)]">{s.title}</p>
                 {s.detail && (
-                  <p className="mt-1 text-[13.5px] leading-relaxed text-[var(--ink2)]">{s.detail}</p>
+                  <p className="mt-1 text-[14px] leading-relaxed text-[var(--ink2)]">{s.detail}</p>
                 )}
               </div>
             </li>
@@ -743,13 +743,13 @@ function CompareColumn({
         <span style={{ color: ink }}>
           {isWrong ? <XCircle size={17} weight="fill" /> : <CheckCircle size={17} weight="fill" />}
         </span>
-        <p className="text-[13.5px] font-semibold" style={{ color: ink }}>
+        <p className="text-[14px] font-semibold" style={{ color: ink }}>
           {heading || (isWrong ? "常见误区" : "正确做法")}
         </p>
       </div>
       <ul className="flex flex-col gap-2">
         {items.map((it, i) => (
-          <li key={i} className="flex items-start gap-2 text-[13.5px] leading-relaxed text-[var(--ink)]">
+          <li key={i} className="flex items-start gap-2 text-[14px] leading-relaxed text-[var(--ink)]">
             <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: dot }} />
             <span className="flex-1">{it}</span>
           </li>
@@ -767,7 +767,7 @@ function ExampleBlock({ markdown }: { markdown: string }) {
         <Quotes size={12} weight="fill" /> 例
       </span>
       <div
-        className="tide-md prose-body text-[14.5px] text-[var(--ink)]"
+        className="tide-md prose-body text-[15px] text-[var(--ink)]"
         dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
       />
     </section>
@@ -854,14 +854,14 @@ function SummaryBlock({ markdown, next }: { markdown: string; next?: string }) {
           <h3 className="text-[15px] font-semibold text-[var(--ink)]">本节小结</h3>
         </div>
         <div
-          className="tide-md prose-body text-[14.5px] text-[var(--ink)]"
+          className="tide-md prose-body text-[15px] text-[var(--ink)]"
           dangerouslySetInnerHTML={{ __html: renderMarkdown(markdown) }}
         />
       </div>
       {next && (
         <a
           href="#next-lesson"
-          className="group flex items-center gap-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 text-[13.5px] transition-colors hover:bg-[var(--red-soft)] sm:px-6"
+          className="group flex items-center gap-2.5 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-3.5 text-[14px] transition-colors hover:bg-[var(--red-soft)] sm:px-6"
         >
           <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--ink3)]">
             <ArrowRight size={12} weight="bold" className="text-[var(--red-ink)]" /> 下一节

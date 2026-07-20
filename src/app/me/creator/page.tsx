@@ -55,7 +55,7 @@ export default async function CreatorCenterPage() {
           </div>
           <Link
             href="/create"
-            className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[var(--red)] px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 hover:brightness-105 active:translate-y-px sm:inline-flex"
+            className="hidden shrink-0 items-center gap-1.5 rounded-full bg-[var(--red)] px-4 py-2.5 text-[14px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(252,1,26,0.5)] transition-all duration-200 hover:brightness-105 active:translate-y-px sm:inline-flex"
           >
             <Sparkle size={15} weight="fill" />
             再造一门课
@@ -71,7 +71,7 @@ export default async function CreatorCenterPage() {
           </span>
           <div>
             <p className="text-[16px] font-bold text-[var(--ink)]">还没有在架的课</p>
-            <p className="mt-1 max-w-[360px] text-[13.5px] leading-relaxed text-[var(--ink2)]">
+            <p className="mt-1 max-w-[360px] text-[14px] leading-relaxed text-[var(--ink2)]">
               把你造的课分享到集市并定价，就能开始赚积分。别人买你的付费课，你可得售价的 70%。
             </p>
           </div>
@@ -99,10 +99,10 @@ export default async function CreatorCenterPage() {
             <span className="absolute left-0 top-5 h-6 w-[3px] rounded-r bg-[var(--red)]" aria-hidden />
             <div className="flex items-center gap-2 text-[var(--ink3)]">
               <TrendUp size={16} weight="fill" className="text-[var(--red)]" />
-              <span className="text-[12.5px] font-semibold tracking-[0.06em]">收入总览</span>
+              <span className="text-[13px] font-semibold tracking-[0.06em]">收入总览</span>
             </div>
 
-            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface-inset)]">
+            <div className="mt-4 grid grid-cols-3 divide-x divide-[var(--border)] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface-inset)]">
               <OverviewStat
                 value={totalIncome}
                 label="累计收益"
@@ -151,7 +151,7 @@ export default async function CreatorCenterPage() {
                       >
                         {c.title}
                       </Link>
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-[var(--ink3)]">
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-[var(--ink3)]">
                         {/* 定价 */}
                         <span className="inline-flex items-center gap-1">
                           {isFree ? (
@@ -186,7 +186,7 @@ export default async function CreatorCenterPage() {
                     {/* 该课收益（成就信号，绿色入账口径与集市收益卡一致） */}
                     <div className="flex shrink-0 items-center justify-between gap-2 sm:flex-col sm:items-end sm:gap-0.5">
                       <span className="mono text-[20px] font-extrabold leading-none text-[var(--ok)]">+{c.incomeCredits}</span>
-                      <span className="text-[10.5px] uppercase tracking-[0.1em] text-[var(--ink4)]">积分收益</span>
+                      <span className="text-[11px] uppercase tracking-[0.1em] text-[var(--ink4)]">积分收益</span>
                     </div>
                   </li>
                 );
@@ -209,15 +209,15 @@ export default async function CreatorCenterPage() {
             {recentSales.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-2 rounded-[16px] border border-dashed border-[var(--border2)] bg-[var(--surface)] px-6 py-10 text-center">
                 <Package size={22} weight="regular" className="text-[var(--ink4)]" />
-                <p className="text-[13.5px] font-semibold text-[var(--ink2)]">还没有成交记录</p>
-                <p className="text-[12.5px] text-[var(--ink3)]">有人买你的付费课或拿走免费课后，这里会出现入账流水。</p>
+                <p className="text-[14px] font-semibold text-[var(--ink2)]">还没有成交记录</p>
+                <p className="text-[13px] text-[var(--ink3)]">有人买你的付费课或拿走免费课后，这里会出现入账流水。</p>
               </div>
             ) : (
               <ul className="flex flex-col divide-y divide-[var(--border)] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
                 {recentSales.map((s) => (
                   <li key={s.id} className="flex items-center justify-between gap-3 px-4 py-3">
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <span className="truncate text-[13.5px] font-semibold text-[var(--ink)]">
+                      <span className="truncate text-[14px] font-semibold text-[var(--ink)]">
                         {s.reason ?? (s.courseTitle ? `售出《${s.courseTitle}》` : "售课收益")}
                       </span>
                       <span className="mono text-[11px] text-[var(--ink4)]">{relativeTime(s.createdAt)}</span>

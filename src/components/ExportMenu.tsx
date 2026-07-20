@@ -94,7 +94,7 @@ export function ExportMenu({
   }
 
   const triggerCls = compact
-    ? "studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[11px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] sm:min-h-0"
+    ? "studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] sm:min-h-0"
     : "studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]";
 
   return (
@@ -126,7 +126,7 @@ export function ExportMenu({
           role="menu"
           aria-label="选择导出格式"
           style={{ zIndex: "var(--z-dropdown)" }}
-          className="studio-rise absolute right-0 mt-1.5 w-[236px] overflow-hidden rounded-[13px] border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--lift)]"
+          className="studio-rise absolute right-0 mt-1.5 w-[236px] overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-[var(--lift)]"
         >
           <div className="mono px-2 pb-1 pt-1 text-[10px] uppercase tracking-[0.12em] text-[var(--ink4)]">
             导出为
@@ -139,7 +139,7 @@ export function ExportMenu({
               onClick={() => run(key)}
               className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-inset)]"
             >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[9px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)]">
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)]">
                 <Icon size={16} weight="regular" />
               </span>
               <span className="min-w-0">

@@ -280,7 +280,7 @@ function EntryPill({
   return (
     <Link
       href={href}
-      className="studio-press group inline-flex min-h-[44px] items-center gap-2 rounded-[13px] border px-3.5 py-2 transition-colors"
+      className="studio-press group inline-flex min-h-[44px] items-center gap-2 rounded-[14px] border px-3.5 py-2 transition-colors"
       style={{
         borderColor: accent
           ? "color-mix(in srgb, var(--red) 32%, var(--scene-hairline))"
@@ -290,7 +290,7 @@ function EntryPill({
       }}
     >
       <span
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-[9px]"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-[10px]"
         style={{
           background: accent ? "var(--red)" : "var(--scene-card-2)",
           color: accent ? "#fff" : "var(--scene-ink-2)",
@@ -305,7 +305,7 @@ function EntryPill({
         >
           {label}
         </span>
-        <span className="mono text-[9.5px] uppercase tracking-[0.1em] text-[var(--scene-ink-3)]">
+        <span className="mono text-[10px] uppercase tracking-[0.1em] text-[var(--scene-ink-3)]">
           {hint}
         </span>
       </span>
@@ -342,12 +342,12 @@ function AmbientDesks({ px, py }: { px: MotionValue<number>; py: MotionValue<num
         style={{ x: x1, y: y1, ...cardStyle, animation: "floatY 7s ease-in-out infinite" }}
       >
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
             <Sparkle size={15} weight="fill" />
           </span>
           <div className="min-w-0">
             <p className="mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 刚刚</p>
-            <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
+            <p className="text-[12px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
               一句话造好了《手机挂号无忧课》
             </p>
           </div>
@@ -360,12 +360,12 @@ function AmbientDesks({ px, py }: { px: MotionValue<number>; py: MotionValue<num
         style={{ x: x2, y: y2, ...cardStyle, animation: "floatY 8.5s ease-in-out 1.2s infinite" }}
       >
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: "var(--info-soft)", color: "var(--info)" }}>
             <FileArrowUp size={15} weight="fill" />
           </span>
           <div className="min-w-0">
             <p className="mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 2 分钟前</p>
-            <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
+            <p className="text-[12px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
               把一篇长文导入,升维成了 6 节课
             </p>
           </div>
@@ -378,12 +378,12 @@ function AmbientDesks({ px, py }: { px: MotionValue<number>; py: MotionValue<num
         style={{ x: x3, y: y3, ...cardStyle, animation: "floatY 9.5s ease-in-out 2.4s infinite" }}
       >
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
+          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[10px]" style={{ background: "var(--red-soft)", color: "var(--red)" }}>
             <Flame size={15} weight="fill" />
           </span>
           <div className="min-w-0">
             <p className="mono text-[9px] uppercase tracking-[0.1em]" style={{ color: "var(--scene-ink-3)" }}>邻座 · 此刻</p>
-            <p className="text-[11.5px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
+            <p className="text-[12px] font-semibold leading-snug" style={{ color: "var(--scene-ink)" }}>
               连学 <span className="mono text-[var(--red)]">28</span> 天,今晚也亮着灯
             </p>
           </div>

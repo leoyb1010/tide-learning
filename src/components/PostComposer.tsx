@@ -185,7 +185,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
             <button
               key={t.key}
               onClick={() => setType(t.key)}
-              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[12.5px] font-semibold transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-colors ${
                 active
                   ? "bg-[var(--red-soft)] text-[var(--red)] border border-[var(--red-soft-border)]"
                   : "border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
@@ -239,7 +239,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
           {tags.map((t) => (
             <span
               key={t}
-              className="mono inline-flex items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--red)]"
+              className="mono inline-flex items-center gap-1 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-2.5 py-0.5 text-[12px] font-medium text-[var(--red)]"
             >
               #{t}
               <button onClick={() => removeTag(t)} title={`移除话题 ${t}`} aria-label={`移除话题 ${t}`} className="studio-press">
@@ -256,12 +256,12 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
         <button
           onClick={() => fileRef.current?.click()}
           disabled={images.length >= MAX_IMAGES}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-medium text-[var(--ink3)] transition-colors hover:text-[var(--ink)] disabled:opacity-40"
         >
           <ImageSquare size={15} />
           图片 <span className="mono text-[var(--ink4)]">{images.length}/{MAX_IMAGES}</span>
         </button>
-        <div className="inline-flex flex-1 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[12.5px] focus-within:border-[var(--ink3)]">
+        <div className="inline-flex flex-1 items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] focus-within:border-[var(--ink3)]">
           <Hash size={14} className="shrink-0 text-[var(--ink4)]" />
           <input
             value={tagInput}
@@ -279,7 +279,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
       {/* 审核结果提示 */}
       {result && (
         <div
-          className={`mt-2 rounded-[10px] px-3 py-2 text-[12.5px] ${
+          className={`mt-2 rounded-[10px] px-3 py-2 text-[13px] ${
             result.status === "pending"
               ? "border border-[var(--border)] bg-[var(--surface-inset)] text-[var(--ink2)]"
               : "border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
@@ -298,7 +298,7 @@ export function PostComposer({ onPosted }: { onPosted?: () => void }) {
           onClick={submit}
           disabled={!canSubmit}
           aria-busy={loading}
-          className="studio-press inline-flex items-center gap-1.5 rounded-[11px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
+          className="studio-press inline-flex items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2 text-[13px] font-bold text-white transition-all hover:brightness-105 disabled:opacity-50"
         >
           {loading ? (
             <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/60 border-t-transparent" aria-hidden />
