@@ -378,7 +378,7 @@ export function CreateStudio({
         firstLessonId: outline[0].id,
       });
 
-      // 大纲逐条浮现（.outline-write-in 由渲染层按 index 递延）
+      // 大纲逐条浮现（GenStage 内 .gen-row-in 按 index 递延）
       const initial = outline.map((l) => ({ id: l.id, title: l.title, state: "pending" as LessonState }));
       setLessons(initial);
       await delay(360);

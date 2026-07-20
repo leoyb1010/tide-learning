@@ -43,6 +43,7 @@ async function StudyDeskHome({ user }: { user: User }) {
     weeklyReport,
     shelfCount,
     recommendedRaw,
+    activeLearners,
   ] = await Promise.all([
       // 连续天数
       prisma.streak.findUnique({ where: { userId } }),
@@ -78,6 +79,13 @@ async function StudyDeskHome({ user }: { user: User }) {
       // 问题⑥：为你推荐——平台课程库「精选优先 + 学习人数」排序（复用 listCourses recommended），
       // 取一批，render 前再剔除「正在学的」，避免推荐用户已在进行中的课。
       listCourses({ sort: "recommended" }),
+      // 「此刻在学」真实口径（与首页 page.tsx 完全一致）：最近 5 分钟真实写入学习进度的去重用户，
+      // 不再按当日哈希伪造。诚实性修复（2026-07-20）。
+      prisma.learningProgress.findMany({
+        where: { lastPlayedAt: { gte: new Date(Date.now() - 5 * 60 * 1000) } },
+        distinct: ["userId"],
+        select: { userId: true },
+      }),
     ]);
 
   // —— 派生：问候 + 今日状态 ——
@@ -127,8 +135,9 @@ async function StudyDeskHome({ user }: { user: User }) {
     myCourseCount,
   });
 
-  // —— 自习室在线人数（静态数，按当日稳定伪随机，避免 hydration 抖动）——
-  const onlineCount = deriveOnlineCount(today);
+  // —— 自习室「此刻在学」真实人数（最近 5 分钟去重活跃学习者，与首页同口径）——
+  // 下限 1：看这块的你此刻就在自习室，真实不为零，也避免「0 人在自习」的尴尬空态。
+  const onlineCount = Math.max(1, activeLearners.length);
 
   // 进入专注：有续学则回到该课，否则去个人页
   const focusHref = resume ? `/courses/${resume.courseSlug}/learn/${resume.lessonId}` : "/me";
@@ -213,13 +222,6 @@ function buildAdvice(o: {
   if (!o.litToday) return `今天还没点亮。${body}，10 分钟就够。`;
   if (o.streakCount >= 3) return `连续 ${o.streakCount} 天，状态在线。${body}，保持节奏。`;
   return `今天已点亮，${body}。`;
-}
-
-/** 在线人数：按「当日」派生一个稳定的四位数（1,2xx 量级），保证 SSR/hydration 一致。 */
-function deriveOnlineCount(dayKey: string): number {
-  let h = 0;
-  for (let i = 0; i < dayKey.length; i++) h = (h * 31 + dayKey.charCodeAt(i)) >>> 0;
-  return 1180 + (h % 140); // 1180–1319
 }
 
 /* 底部一小节「书架上新」——降权展示最新更新日志 */

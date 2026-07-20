@@ -1596,17 +1596,9 @@ body::before {
   transform: translateX(-120%);
   animation: aiScanSweep 1.8s var(--ease-out-expo) infinite;
 }
-/* 大纲逐条浮现（升级版）：不只淡入，带一道从左推入 + 轻过冲的落定，让每一节像被「写下」 */
-@keyframes outlineWriteIn {
-  0%   { opacity: 0; transform: translateY(8px) translateX(-6px); }
-  70%  { opacity: 1; transform: translateY(0) translateX(2px); }
-  100% { opacity: 1; transform: none; }
-}
-.outline-write-in { animation: outlineWriteIn .42s var(--ease-tide) both; }
 @media (prefers-reduced-motion: reduce) {
   .ai-core, .ai-core::after, .ai-core-spark, .ai-think-dot { animation: none !important; }
   .ai-scan::after { animation: none !important; display: none !important; }
-  .outline-write-in { animation: none !important; }
 }
 
 /* ============================================================

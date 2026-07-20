@@ -131,7 +131,8 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
               </span>
             </div>
             <span className="mono absolute bottom-4 left-4 rounded-full bg-black/35 px-3 py-1 text-[11px] font-medium text-white backdrop-blur-sm ring-1 ring-white/10">
-              预告 · 02:30
+              {/* 通用预告片，各课共用同一段素材，故不再伪造「02:30」这一每课无意义的固定时长（2026-07-20 诚实性修复）。 */}
+              通用预告
             </span>
           </div>
 
