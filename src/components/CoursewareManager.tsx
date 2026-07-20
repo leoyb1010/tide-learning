@@ -14,11 +14,12 @@
 
 import { useState, useEffect } from "react";
 import {
-  Palette, PencilSimple, ClockCounterClockwise, Sparkle, ArrowClockwise, Check,
+  Palette, PencilSimple, ClockCounterClockwise, Sparkle, ArrowClockwise, Check, ListBullets,
 } from "@phosphor-icons/react";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/GenProgress";
+import { BlockEditor } from "@/components/BlockEditor";
 import { track } from "@/lib/analytics-client";
 
 /** 换肤可选的艺术方向（key 与服务端 ART_DIRECTIONS 一致；此处只需 key+label，避免打包服务端 token 数据）。 */
@@ -67,6 +68,7 @@ export function CoursewareManager({
   const [themeBusy, setThemeBusy] = useState<string | null>(null); // 正在切换的 artKey
   const [rewriteFor, setRewriteFor] = useState<ManagerLesson | null>(null);
   const [historyFor, setHistoryFor] = useState<ManagerLesson | null>(null);
+  const [editFor, setEditFor] = useState<ManagerLesson | null>(null);
 
   async function switchSkin(key: string) {
     if (themeBusy || key === artKey) return;
@@ -138,6 +140,13 @@ export function CoursewareManager({
             <span className="flex-1 truncate text-[12.5px] text-[var(--ink2)]">{l.title}</span>
             <button
               type="button"
+              onClick={() => setEditFor(l)}
+              className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+            >
+              <ListBullets size={12} weight="bold" /> 编辑
+            </button>
+            <button
+              type="button"
               onClick={() => setRewriteFor(l)}
               className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)]"
             >
@@ -154,6 +163,7 @@ export function CoursewareManager({
         ))}
       </ul>
 
+      {editFor && <BlockEditor lessonId={editFor.id} lessonTitle={editFor.title} onClose={() => setEditFor(null)} />}
       {rewriteFor && (
         <RewriteDialog
           courseId={courseId}
