@@ -378,12 +378,15 @@ body.ct-paged .deck>section[data-steps] [data-stagger]:not(.in)>*.frag-in{opacit
 .pg-brief .ct-fit{max-width:640px;margin-left:auto;margin-right:auto}
 .pg-brief .body{font-size:clamp(17.5px,2.4vw,21px);line-height:1.8}
 .pg-brief .h-title{font-size:clamp(22px,3.8vw,30px)}
-/* —— 入场动效（GPU 安全：只动 transform/opacity）—— */
-[data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ct-ease),transform .7s var(--ct-ease)}
-[data-reveal].m-fade{transform:none}
-[data-reveal].m-scale{transform:scale(.96)}
+/* —— 入场动效（GPU 安全：只动 transform/opacity）——
+   永不空白底线(2026-07-20)：一切「藏内容等 JS 揭示」的初始态全部挂在 .ct-js 下——
+   该类由运行时脚本**首行**加到 <html> 上。脚本因任何原因(CSP/引擎差异/未来回归)没跑时,
+   没有 ct-js → 内容以完整可读文档呈现。宁可没动画,绝不白屏。 */
+.ct-js [data-reveal]{opacity:0;transform:translateY(22px);transition:opacity .7s var(--ct-ease),transform .7s var(--ct-ease)}
+.ct-js [data-reveal].m-fade{transform:none}
+.ct-js [data-reveal].m-scale{transform:scale(.96)}
 [data-reveal].in{opacity:1;transform:none}
-[data-stagger]>*{opacity:0;transform:translateY(14px);transition:opacity .55s var(--ct-ease),transform .55s var(--ct-ease)}
+.ct-js [data-stagger]>*{opacity:0;transform:translateY(14px);transition:opacity .55s var(--ct-ease),transform .55s var(--ct-ease)}
 [data-stagger].in>*{opacity:1;transform:none}
 [data-stagger].in>*{transition-delay:calc(var(--i,0) * 80ms)}
 @media (prefers-reduced-motion: reduce){
@@ -442,6 +445,9 @@ body.ct-paged .ct-pager{display:flex}
 
 const RUNTIME_SCRIPT = `
 (function(){
+  // 永不空白底线：首行声明「JS 已在跑」——所有隐藏初始态(.ct-js [data-reveal] 等)据此挂载;
+  // 本脚本被拦/没跑时无此类,内容以完整可读文档呈现(见 baseCss 入场动效段)。
+  document.documentElement.classList.add('ct-js');
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var secs = Array.prototype.slice.call(document.querySelectorAll('main.deck > section'));
   var mode = 'paged'; // 默认翻页；父页可发 {type:'ct-mode', mode:'scroll'} 切竖向长滚动

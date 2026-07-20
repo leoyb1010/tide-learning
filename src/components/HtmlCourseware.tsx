@@ -269,7 +269,11 @@ export function HtmlCourseware({
       </div>
       <iframe
         ref={iframeRef}
-        srcDoc={srcdocHtml}
+        // 空白根因根治(2026-07-20)：有 lessonId 时改用「独立同源文档」路由承载（网络 scheme 文档
+        // **不继承父页 CSP**，由该响应自带 CSP 头独立约束）——彻底铲除 srcdoc 继承父页 CSP 带来的
+        // nonce 错配类空白（Next 软导航下 RSC 新 nonce ≠ 文档 CSP 旧 nonce，公网双引擎已实锤）。
+        // 无 lessonId 的独立/测试渲染场景仍走 srcDoc + nonce 注入兜底。
+        {...(lessonId ? { src: `/api/lessons/${lessonId}/courseware` } : { srcDoc: srcdocHtml })}
         // 安全核心：只给 allow-scripts；绝不给 allow-same-origin / allow-top-navigation / allow-popups / allow-forms。
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"

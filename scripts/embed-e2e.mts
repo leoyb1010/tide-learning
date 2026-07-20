@@ -88,6 +88,50 @@ async function main() {
         failures.push("learn:iframe 内「下一页」不可点");
       });
       if (!(await progressReq)) failures.push("learn:翻页后未发出 POST /api/progress(D1 断流)");
+
+      // —— 4:软导航进入(2026-07-20 空白根因的用户真实路径,必测!)——
+      // 此前全部断言都是 URL 直达(整页加载),软导航下的 CSP/nonce 错配类空白全绿漏网:
+      // 用户点着链接进课件页(Next 软导航)才是真实路径。从课程详情页点 learn 链接进入,
+      // 断言 iframe 内首屏文字真实可见(computed opacity ≠ 0),而不只是 innerText 非空。
+      const sp = await ctx.newPage();
+      await sp.goto(`${BASE}/courses/${course.slug}`, { waitUntil: "domcontentloaded" });
+      await sp.waitForTimeout(1500);
+      // 找第一个「可见」的 learn 链接(首个可能藏在折叠/浮层里点不了)
+      let softOk = false;
+      const learnLinks = sp.locator(`a[href*="/learn/"]`);
+      const linkCount = await learnLinks.count();
+      for (let i = 0; i < linkCount && !softOk; i++) {
+        const l = learnLinks.nth(i);
+        if (!(await l.isVisible().catch(() => false))) continue;
+        softOk = await l
+          .scrollIntoViewIfNeeded()
+          .then(() => l.click())
+          .then(() => sp.waitForURL(/\/learn\//, { timeout: 15_000 }))
+          .then(() => true)
+          .catch(() => false);
+      }
+      if (!softOk) {
+        failures.push("softnav:详情页无可点 learn 链接或跳转失败");
+      } else {
+        await sp.waitForTimeout(3500);
+        const sframe = sp.frames().find((f) => f !== sp.mainFrame());
+        if (!sframe) {
+          failures.push("softnav:learn 页无课件 iframe");
+        } else {
+          const visible = await sframe
+            .evaluate(() => {
+              const els = [...document.querySelectorAll("h1, .lead, .q, .body, [data-reveal]")];
+              // 至少一个内容元素:有文字且 computed opacity 不为 0(揭示已执行或底线生效)
+              return els.some((e) => {
+                const t = (e as HTMLElement).innerText?.trim();
+                return !!t && getComputedStyle(e).opacity !== "0";
+              });
+            })
+            .catch(() => false);
+          if (!visible) failures.push("softnav:软导航进入后 iframe 无可见文字(CSP/nonce 错配类空白回归!)");
+        }
+      }
+      await sp.close();
       await ctx.close();
     }
   } finally {
@@ -100,7 +144,7 @@ async function main() {
     for (const f of failures) console.error("  ✗ " + f);
     process.exit(1);
   }
-  console.log("嵌入层 E2E:3/3 通过(ct-ready 握手 / iframe 首屏文字 / 翻页进度上报)");
+  console.log("嵌入层 E2E:4/4 通过(ct-ready 握手 / iframe 首屏文字 / 翻页进度上报 / 软导航进入可见)");
 }
 
 main();
