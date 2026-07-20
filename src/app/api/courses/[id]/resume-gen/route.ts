@@ -29,7 +29,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 限流 + 权益闸门 + 余额预检（与首次造课 generate-course 完全一致，避免续造成为绕过门槛的口子）。
     // 此前无限流、且 assertCanSpend 未传 scene（门槛仅 1 分）——余额 1 分即可续造整门课欠账。
-    assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
+    // 独立作用域（2026-07-20 修复）：续造是给「已存在的课」补空节,不该吃掉当天的新造课名额
+    // （此前共用 ai_gen_course 5/天,续两次课当天就不能再造新课）。
+    assertUserRateLimit(user.id, "ai_gen_resume", 20, 86_400_000);
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
 

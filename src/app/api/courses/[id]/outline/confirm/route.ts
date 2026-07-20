@@ -23,8 +23,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const { id } = await params;
     const user = await requireUser();
 
-    // 权益 + 限流（与首次造课/续造一致：确认=真正开始花钱的那一步）。
-    assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
+    // 权益 + 限流。独立作用域（2026-07-20 修复）：确认是「已获准的那次造课」的第二步，
+    // 此前与 generate-course 共用 ai_gen_course 5/天——专业模式一门课吃 2 次配额，两门即锁死。
+    assertUserRateLimit(user.id, "ai_outline_confirm", 20, 86_400_000);
     const snapshot = await resolveEntitlement(user.id);
     if (!snapshot.canUseLLM) throw new AppError("AI 功能需订阅后使用", 402);
 

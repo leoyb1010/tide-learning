@@ -49,8 +49,9 @@ export async function POST(req: NextRequest) {
       return fail("已有生成任务进行中，请稍后再试", 409);
     }
     try {
-      // 高成本 AI：按用户限流，每天 5 门
-      assertUserRateLimit(user.id, "ai_gen_course", 5, 86_400_000);
+      // 高成本 AI：按用户限流，每天 10 门（真实成本由积分门兜底；此前 5/天 且与
+      // confirm/regenerate/resume 共用作用域——专业模式一门课吃 2-3 次,两门即锁死,已拆分）。
+      assertUserRateLimit(user.id, "ai_gen_course", 10, 86_400_000);
 
       const body = (await req.json().catch(() => null)) as {
         prompt?: string;
