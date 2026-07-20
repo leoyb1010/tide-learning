@@ -11,6 +11,8 @@ export const dynamic = "force-dynamic";
 
 /** running job 心跳超时阈值：超过 15 分钟无心跳视为 stale（进程重启杀死 after() 遗留），允许续造。 */
 const GEN_JOB_STALE_MS = 15 * 60_000;
+/** 节级 claim TTL：与 course-gen.ts 的 CLAIM_TTL_MS 对齐（10 分钟）。超此视为死锁可复位，未超视为仍新鲜。 */
+const CLAIM_TTL_MS = 10 * 60_000;
 
 /**
  * POST /api/courses/:id/resume-gen —— 断点续造入口。
@@ -89,9 +91,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     // 释放遗留 claim：上一轮若在 claim 后、写库前被硬杀（如 serverless 超时），
     // 空节会卡在 genClaimedAt 非空且 blocksJson=null，generateLessonCore 的原子 claim 将永远抢不到。
-    // 此处（已确认无 running job）把本课所有空节的 claim 复位，保证续造能重新认领。
+    // 只复位「null 或已超 TTL」的 claim——不动仍新鲜的 claim。
+    // 关键（2026-07-20 审计 Medium 修复）：paused→resume 时旧后台流水可能还在跑某一节（协作式暂停
+    // 要到下一节边界才停），该节 claim 是新鲜的。若无差别复位，新流水会重认领同一节 → 重复生成+重复扣费。
+    // 保留新鲜 claim 后，新流水的原子 claim 抢不到该节（跳过），由仍在跑的旧流水把它写完，双流水经原子
+    // claim 安全并存（与 generate-course after() + 前端 writeLessons 双流水同机制）。失败/积分截停的课其
+    // 空节 genClaimedAt 本就为 null（异常路径已释放/从未认领），此改动不影响其快速续造。
+    const staleClaimBefore = new Date(Date.now() - CLAIM_TTL_MS);
     await prisma.lesson.updateMany({
-      where: { courseId: course.id, blocksJson: null },
+      where: {
+        courseId: course.id,
+        blocksJson: null,
+        OR: [{ genClaimedAt: null }, { genClaimedAt: { lt: staleClaimBefore } }],
+      },
       data: { genClaimedAt: null },
     });
 

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { resolveCourseDesign, serializeCourseDesign, getArtDirection, ART_DIRECTIONS } from "@/lib/ai/courseware-design";
+import { resolveCourseDesign, serializeCourseDesign, getArtDirection } from "@/lib/ai/courseware-design";
 import { resolveCoursewareMode } from "@/lib/ai/courseware-catalog";
 import { renderAndStoreLessonHtml } from "@/lib/ai/courseware-gen";
 

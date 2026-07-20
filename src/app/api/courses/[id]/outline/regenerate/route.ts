@@ -14,7 +14,6 @@ export const dynamic = "force-dynamic";
 interface OutlineItem {
   title: string;
   objective: string;
-  difficulty: string;
 }
 interface OutlineResult {
   title: string;

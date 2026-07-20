@@ -42,6 +42,10 @@ export async function POST(req: NextRequest) {
       spendScene: "generate_lesson",
     });
 
+    // 越权铁律：显式归属校验前置于任何状态回显（requireLessonGenAccess 对会员不校归属，仅靠内核 403 兜底，
+    // 但下方 409「尚未生成」会先于内核暴露他人课节的存在/状态——故在此显式挡住，闭合信息回显口子）。
+    if (target && target.course?.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
+
     // 重造的前提是本节已有内容（对空节应走首次生成 generate-lesson，而非 regen）。
     if (target && !target.blocksJson) return fail("本节尚未生成，请先生成再重造", 409);
 

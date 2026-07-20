@@ -31,11 +31,12 @@ export interface GenProgress {
 }
 
 /**
- * 轮询终态：ready（全部就绪）/ failed（后台整体失败）/ paused（用户主动暂停，L3 可控造课）。
- * 三者都停止轮询——failed/paused 是「已停下、可续造」的终态，由 resume-gen 续跑后重新起轮询。
+ * 轮询终态（无后台进度、停止轮询）：ready（就绪）/ failed（整体失败）/ paused（用户暂停）/
+ * outline_draft（大纲待确认，扇出尚未开始，L2 可控造课）。
+ * failed/paused/outline_draft 都是「已停下、待用户操作」的态：resume-gen / outline confirm 后重新起轮询。
  */
 export function isTerminalGenStatus(s: string | null | undefined): boolean {
-  return s === "ready" || s === "failed" || s === "paused";
+  return s === "ready" || s === "failed" || s === "paused" || s === "outline_draft";
 }
 
 /* ============================================================

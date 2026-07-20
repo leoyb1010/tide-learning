@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium, Play, Coins } from "@phosphor-icons/react/dist/ssr";
+import { Sparkle, FilePlus, Plus, CircleNotch, Storefront, GraduationCap, HourglassMedium, Play, Coins, ArrowRight } from "@phosphor-icons/react/dist/ssr";
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { getAuthorEarnings } from "@/lib/credit-trade";
@@ -314,6 +314,15 @@ export default async function MyCoursesPage() {
                       courseTitle={c.title}
                       courseSubtitle={c.subtitle}
                     />
+                  ) : c.isDraft ? (
+                    // 大纲待确认（L2）：不轮询进度，直接给「去确认大纲」深链，回 /create 打开该草稿的检查点。
+                    <Link
+                      href={`/create?draft=${c.id}`}
+                      className="studio-press inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)]"
+                    >
+                      去确认大纲
+                      <ArrowRight size={13} weight="bold" />
+                    </Link>
                   ) : (
                     <CourseGenControls
                       courseId={c.id}

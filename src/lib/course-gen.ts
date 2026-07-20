@@ -229,6 +229,10 @@ export async function writeLessonBlocks(opts: {
       htmlJson: null,
       renderEngine: null,
       renderSourceHash: null,
+      // 写成即释放认领标记：首次生成本就靠 blocksJson 非空短路（此处清 null 无害），
+      // regen 目标 blocksJson 非空、认领仅靠 genClaimedAt，不清就会被 10 分钟 TTL 锁死
+      // → 同一节 10 分钟内二次改写会静默 no-op 且假报成功（2026-07-20 审计 High 修复）。
+      genClaimedAt: null,
     },
   });
 
@@ -714,9 +718,11 @@ export async function generateLessonCore(
     };
   } catch (e) {
     // 释放 claim：把认领标记复位为 null，让本节可被 resume-gen 后台重取（不吞原异常）。
+    // regen 目标 blocksJson 非空，若仍带 blocksJson:null 过滤则匹配 0 行 → 崩后被锁死 10 分钟；
+    // 故 regen 只按 id 释放（2026-07-20 审计 High 修复）。
     try {
       await prisma.lesson.updateMany({
-        where: { id: lessonId, blocksJson: null },
+        where: { id: lessonId, ...(isRegen ? {} : { blocksJson: null }) },
         data: { genClaimedAt: null },
       });
     } catch {

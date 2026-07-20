@@ -20,7 +20,7 @@ export interface ShelfCourse {
   coverSrc: string; // 真实封面图路径
   // —— 生成态（仅自造/导入课有意义；官方/淘来课恒为 ready）——
   // 让书架也能展示「生成中」的课（与 /me/courses 一致），生成完自动变就绪。
-  genStatus: string; // generating / ready / failed（其它/官方课 → ready）
+  genStatus: string; // generating / ready / failed / paused / outline_draft（其它/官方课 → ready）
   genDone: number; // 已生成节数（blocksJson 非空），生成态进度分子
 }
 

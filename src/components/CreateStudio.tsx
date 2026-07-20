@@ -54,6 +54,17 @@ export interface GeneratingCourse {
   firstLessonId: string | null;
 }
 
+/**
+ * L2 大纲检查点恢复：由 /create server component 预取的「最近一份未确认大纲草稿」。
+ * 用户离开检查点后回到 /create，用它把检查点重新打开（否则 outline_draft 无客户端入口）。
+ */
+export interface DraftCheckpoint {
+  courseId: string;
+  slug: string;
+  title: string;
+  lessons: { id: string; title: string }[];
+}
+
 // 赛道选项（与 src/lib/tracks.ts 的 key/label 对齐；这里只取造课常用赛道）
 const TRACK_OPTIONS: { key: string; label: string }[] = [
   { key: "ai_skill", label: "AI 技能" },
@@ -135,10 +146,13 @@ function delay(ms: number) {
 export function CreateStudio({
   canUseLLM,
   generatingCourses = [],
+  draftCheckpoint = null,
 }: {
   canUseLLM: boolean;
   /** 服务端预取的「生成中的课」，用于剧场恢复（生产中横幅 + 回到剧场）。 */
   generatingCourses?: GeneratingCourse[];
+  /** L2 服务端预取的「未确认大纲草稿」，用于回到 /create 时重开检查点。 */
+  draftCheckpoint?: DraftCheckpoint | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -197,6 +211,27 @@ export function CreateStudio({
     // 仅在挂载时读一次；searchParams 引用稳定
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // L2 大纲检查点恢复：?draft=<courseId> 且匹配预取的草稿 → 直接打开检查点（从「我的课·去确认大纲」深链进入）。
+  useEffect(() => {
+    if (draftCheckpoint && searchParams.get("draft") === draftCheckpoint.courseId) {
+      setCheckpoint({
+        courseId: draftCheckpoint.courseId,
+        slug: draftCheckpoint.slug,
+        title: draftCheckpoint.title,
+        lessons: draftCheckpoint.lessons.map((l) => ({ id: l.id, title: l.title })),
+      });
+      setPhase("checkpoint");
+    }
+    // 仅挂载时读一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 打开一份草稿的检查点（横幅「继续编辑」调用）。
+  function openDraft(d: DraftCheckpoint) {
+    setCheckpoint({ courseId: d.courseId, slug: d.slug, title: d.title, lessons: d.lessons.map((l) => ({ id: l.id, title: l.title })) });
+    setPhase("checkpoint");
+  }
 
   // 未订阅时的统一提示
   const gate = () => {
@@ -661,6 +696,22 @@ export function CreateStudio({
             />
           ))}
         </div>
+      )}
+
+      {/* —— L2 未确认大纲草稿横幅：回到 /create 时可一键重开检查点，继续编辑/确认（否则草稿是死角） —— */}
+      {!inTheater && draftCheckpoint && (
+        <button
+          type="button"
+          onClick={() => openDraft(draftCheckpoint)}
+          className="studio-press mb-5 flex w-full items-center gap-3 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-left transition-colors hover:border-[var(--red)]"
+        >
+          <SlidersHorizontal size={16} weight="fill" className="shrink-0 text-[var(--red)]" />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[13.5px] font-semibold text-[var(--ink)]">有一份待确认的大纲：{draftCheckpoint.title}</span>
+            <span className="block text-[12px] text-[var(--ink3)]">继续编辑并确认后才会逐节生成</span>
+          </span>
+          <span className="mono shrink-0 text-[12px] font-semibold text-[var(--red-ink)]">继续编辑 →</span>
+        </button>
       )}
 
       {/* —— 顶部大标题 —— */}
@@ -1420,6 +1471,8 @@ function GeneratingBanner({
   const done = progress?.done ?? course.done;
   const ready = progress?.genStatus === "ready";
   const failed = progress?.genStatus === "failed";
+  const paused = progress?.genStatus === "paused"; // L3：暂停态不显示转圈/「会继续生成」
+  const inProgress = !ready && !failed && !paused;
 
   return (
     <div className="studio-rise flex items-center gap-3.5 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 shadow-[var(--card)]">
@@ -1427,14 +1480,14 @@ function GeneratingBanner({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5">
           <span className="mono text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--red-ink)]">
-            {ready ? "已就绪" : failed ? "部分待续" : "生产中"}
+            {ready ? "已就绪" : failed ? "部分待续" : paused ? "已暂停" : "生产中"}
           </span>
-          {!ready && !failed && <Spinner size={11} />}
+          {inProgress && <Spinner size={11} />}
         </div>
         <p className="mt-0.5 truncate text-[14px] font-bold text-[var(--ink)]">{course.title}</p>
         <p className="mono mt-0.5 text-[11px] text-[var(--ink3)]">
           {course.isImport ? "升维" : "生成"}进度 <span className="font-semibold text-[var(--ink2)]">{done}</span>/{total} 节
-          {!ready && !failed ? " · 关闭页面也会继续生成" : ""}
+          {inProgress ? " · 关闭页面也会继续生成" : paused ? " · 已暂停，可回剧场继续" : ""}
         </p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5">
