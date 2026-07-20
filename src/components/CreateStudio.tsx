@@ -234,6 +234,25 @@ export function CreateStudio({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // AI 可用性探测：模板/模型选择器已迁进专业模式面板（默认不挂载），故不能再靠它上报可用性。
+  // 这里独立探一次 /api/ai/models：defaultModel 为空=服务端未配可用模型 → 禁用生成 CTA + 显示维护横幅，
+  // 避免用户填完表单点生成才收到 503。
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/ai/models")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!alive || !j?.ok) return;
+        setAiAvailable(Boolean(j.data?.defaultModel));
+      })
+      .catch(() => {
+        /* 网络异常不误判为不可用，保持默认 true */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   // 组装 L1 蓝图对象（专业模式）：空字段省略,全空返回 undefined。
   function buildBlueprint(): Record<string, unknown> | undefined {
     const bp: Record<string, unknown> = {};
@@ -849,10 +868,8 @@ export function CreateStudio({
                 </div>
               </div>
 
-              {/* v3.2：课件模板 + 生成模型选择 */}
-              <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
-
-              {/* L2 专业模式开关：开启后先给你一份可增删改排序的大纲，确认后才逐节生成（可控造课）。 */}
+              {/* L2 专业模式开关：展开高级设置（模板/模型/质量 + 受众口吻篇幅 + 参考资料），
+                  并走「先确认大纲再逐节生成」的可控造课流程。默认关 → 一句话直接生成，极简。 */}
               <button
                 type="button"
                 role="switch"
@@ -872,8 +889,8 @@ export function CreateStudio({
                   <SlidersHorizontal size={16} weight="fill" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[14px] font-semibold text-[var(--ink)]">专业模式 · 大纲我来定</span>
-                  <span className="block text-[12px] leading-snug text-[var(--ink3)]">先看大纲，可增删改排序、重拟，满意再逐节生成，不满意不烧整门课的钱</span>
+                  <span className="block text-[14px] font-semibold text-[var(--ink)]">专业模式 · 自己掌控</span>
+                  <span className="block text-[12px] leading-snug text-[var(--ink3)]">选课件模板与模型、定制受众口吻，先看大纲满意再逐节生成，不满意不烧整门课的钱</span>
                 </span>
                 <span
                   className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
@@ -905,6 +922,11 @@ export function CreateStudio({
                       placeholder="粘贴你的资料/大纲/要点，AI 会据此生成，减少凭空编造（可留空）"
                       className="w-full rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-[13px] outline-none focus:border-[var(--ink3)]"
                     />
+                  </div>
+
+                  {/* 呈现设置：课件模板 + 生成模型 + 质量档（v3.2；由默认流程迁入专业模式，默认关时用经典模板+默认模型+标准档）。 */}
+                  <div className="border-t border-[var(--red-soft-border)] pt-3">
+                    <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
                   </div>
                 </div>
               )}
