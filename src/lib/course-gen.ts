@@ -5,7 +5,8 @@ import { track } from "./analytics";
 import { validateBlocks, type Block } from "./blocks";
 import { simpleOutlinePrompt, lessonVoiceLine, lessonRecipeBlock, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
 import { getTemplate, templateHardRequirement, checkTemplateAdherence } from "./ai/templates";
-import { resolveCourseDesign, serializeCourseDesign } from "./ai/courseware-design";
+import { resolveCourseDesign, serializeCourseDesign, designJsonFromBrief } from "./ai/courseware-design";
+import { generateDesignBrief } from "./ai/generate-design-brief";
 import { resolveCoursewareMode } from "./ai/courseware-catalog";
 import { renderAndStoreLessonHtml, createCoursewareBudget } from "./ai/courseware-gen";
 import { selectBespokeModel } from "./ai/models";
@@ -1040,17 +1041,21 @@ export async function renderCourseHtmlBestEffort(courseId: string): Promise<void
   try {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, qualityTier: true },
+      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, qualityTier: true, origin: true },
     });
     if (!course) return;
     const design = resolveCourseDesign(course);
-    if (!course.designJson) {
+    // 惰性写回固定皮肤：仅非 AI 课做（锁定其种子皮肤）。
+    // v5：AI 课的 designJson 应由 ensureDesignBrief 写 v2 brief;若 brief 尚未生成/失败,保持 null
+    // 而非固化成固定 artKey——否则续造/重渲永远补不回专属皮肤（修 review #3）。null 时按种子确定性
+    // 派生固定皮肤渲染（不漂移），下次后台流水会再试补 brief。
+    if (!course.designJson && course.origin !== "ai_generated") {
       await prisma.course
         .update({ where: { id: courseId }, data: { designJson: serializeCourseDesign(design) } })
         .catch(() => {});
     }
     // 款式（内容类型→呈现风格）：整门课解析一次，各节共用，保证同一门课款式一致、课与课之间分化。
-    const mode = resolveCoursewareMode({ title: course.title, template: course.template, artKey: design.art.key });
+    const mode = resolveCoursewareMode({ title: course.title, template: course.template, artKey: design.art.key, layout: design.art.layout });
     const lessons = await prisma.lesson.findMany({
       where: { courseId, blocksJson: { not: null } },
       orderBy: { sortOrder: "asc" },
@@ -1106,8 +1111,57 @@ export async function renderCourseHtmlBestEffort(courseId: string): Promise<void
  * 全部处理完：若已无空节 → course.genStatus=ready + job done；否则 → genStatus=failed + job failed。
  * 谨慎：not 抛错——after() 内绝不能让异常冒泡（会静默丢失且可能污染响应后进程）。
  */
+/**
+ * v5：确保本课有专属设计 brief（在后台生成流水里做，不占用户同步造课响应）。
+ * 幂等：仅当 ai_generated 且 designJson 尚为空才生成；原子写(where designJson=null)防并发双写。
+ * 失败静默降级(designJson 保持 null → 渲染回落固定皮肤种子挑选，且下次续造/重渲会再试)。
+ * 因在后台每次运行都会尝试，故断点续造/重拟大纲后确认都能补齐或按最新大纲刷新（修 review #3/#5/#8）。
+ * 埋点记录成败与关键维度，让「特性是否真的在生效、失败率多少」可观测（修 review #7/#9）。
+ */
+export async function ensureDesignBrief(courseId: string, userId: string): Promise<void> {
+  try {
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, title: true, subtitle: true, category: true, origin: true, designJson: true },
+    });
+    if (!course || course.origin !== "ai_generated" || course.designJson) return;
+    const lessons = await prisma.lesson.findMany({
+      where: { courseId },
+      orderBy: { sortOrder: "asc" },
+      select: { title: true },
+      take: 8,
+    });
+    const brief = await generateDesignBrief({
+      title: course.title,
+      subtitle: course.subtitle,
+      category: course.category,
+      outline: lessons.map((l) => l.title),
+      userId,
+    });
+    if (!brief) {
+      await track({ eventName: "ai_design_brief", userId, properties: { courseId, ok: false } }).catch(() => {});
+      return;
+    }
+    // 原子条件写：仅当仍为 null 才落库，避免并发后台流水双写。
+    await prisma.course.updateMany({
+      where: { id: courseId, designJson: null },
+      data: { designJson: designJsonFromBrief(brief) },
+    });
+    await track({
+      eventName: "ai_design_brief",
+      userId,
+      properties: { courseId, ok: true, hue: brief.accentHue, substrate: brief.substrate, layout: brief.layout, motion: brief.motionSig },
+    }).catch(() => {});
+  } catch (e) {
+    console.error("[course-gen] ensureDesignBrief failed:", courseId, e);
+  }
+}
+
 export async function runCourseGenBackground(courseId: string, userId: string): Promise<void> {
   try {
+    // v5：先补齐本课专属设计 brief（幂等、失败降级），须在任何节渲染前完成，使 HTML 用上合成皮肤。
+    await ensureDesignBrief(courseId, userId);
+
     // 只取还没生成的空节，按顺序生成
     const pending = await prisma.lesson.findMany({
       where: { courseId, blocksJson: null },

@@ -135,6 +135,10 @@ export async function POST(req: NextRequest) {
         .slice(0, maxLessons);
       if (outline.length === 0) throw new AppError("大纲生成失败，请调整需求后重试", 502);
 
+      // v5 专属视觉：本课设计 brief 不在此同步生成（避免给用户点「生成课程」再叠加一次 LLM 阻塞，
+      // review #5）。designJson 先留空,由后台 runCourseGenBackground 的 ensureDesignBrief 在渲染前补齐
+      // （失败降级固定皮肤;续造/重拟大纲后确认会再试/按新大纲刷新）。
+
       const slug = slugify(title) + "-" + Math.random().toString(36).slice(2, 6);
 
       // —— 事务落库：Course + N 个空 Lesson + GenerationJob ——
@@ -156,6 +160,7 @@ export async function POST(req: NextRequest) {
             // 检查点模式先停在 outline_draft（等用户确认），否则直接 generating 走后台扇出。
             genStatus: checkpoint ? "outline_draft" : "generating",
             blueprintJson: blueprint ? serializeBlueprint(blueprint) : null,
+            // designJson 留空：由后台 ensureDesignBrief 生成本课专属 brief 后写入（v5，见上）。
             template: template ?? null,
             modelUsed: modelKey,
             qualityTier,

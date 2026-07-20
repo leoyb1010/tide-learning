@@ -27,7 +27,7 @@ import {
 } from "./courseware-html";
 import { ensureHighlighter } from "./courseware-highlight";
 
-const HTML_RENDER_VERSION = "v4.5.0"; // v4.5 视觉基因：皮肤获得版式基因+动效签名+全页母题+浅色底拉开——不再只是换色
+const HTML_RENDER_VERSION = "v5.0.0"; // v5 设计token生成：LLM为每课生成专属brief→OKLCH合成达标配色,每门课独一无二视觉
 const HTML_CLAIM_TTL_MS = 10 * 60_000;
 const DEFAULT_PREMIUM_LESSON_BUDGET = 6;
 
@@ -82,7 +82,7 @@ async function synthesizeViaLLM(
 ): Promise<string | null> {
   if (!isLLMConfigured()) return null;
   const a = design.art;
-  const mode = resolveCoursewareMode({ title, artKey: design.art.key });
+  const mode = resolveCoursewareMode({ title, artKey: design.art.key, layout: design.art.layout });
   const system =
     "你是获奖级前端设计工程师，为一节自学课件产出一整页自包含 HTML（内联 CSS + 可选内联 JS）。\n" +
     "【硬性安全约束，违反即废弃】\n" +
@@ -305,10 +305,12 @@ export async function generateLessonHtml(
   if (course.authorUserId !== userId) throw new Error("无权操作该课程");
 
   const design = resolveCourseDesign(course);
-  if (!course.designJson) {
+  // v5：仅非 AI 课惰性固化种子皮肤；AI 课的 designJson 由 ensureDesignBrief 写 v2 brief,
+  // 未生成时保持 null 以便后台补齐,不固化成固定 artKey（修 review #3）。
+  if (!course.designJson && course.origin !== "ai_generated") {
     await prisma.course.update({ where: { id: course.id }, data: { designJson: serializeCourseDesign(design) } }).catch(() => {});
   }
-  const mode = resolveCoursewareMode({ title: course.title, template: course.template, artKey: design.art.key });
+  const mode = resolveCoursewareMode({ title: course.title, template: course.template, artKey: design.art.key, layout: design.art.layout });
   return renderAndStoreLessonHtml(course.id, lesson, design, mode, {
     enhance: Boolean(opts.enhance),
     userId,

@@ -8,7 +8,13 @@
  *
  * 纯数据 + 纯函数：无 IO、无 "use client"、无随机源（用可复现种子），可 server/client/测试复用。
  * 关键：艺术方向之间**不混用**（一致性锁），保证一门课内不风格漂移；不同课/不同赛道天然分化。
+ *
+ * v5：新增「合成皮肤」——LLM 为每门课生成 DesignBrief，synthesizeArtDirection 用 OKLCH 确定性合成一整套
+ * 达标配色（见 design-brief.ts）。12 套固定皮肤降级为 brief 生成失败时的种子兜底。
  */
+
+// design-brief 只 `import type` 本文件的 ArtDirection（类型擦除，无运行时环）→ 无循环依赖。
+import { synthesizeArtDirection, sanitizeBrief, type DesignBrief } from "./design-brief";
 
 /** 一套艺术方向 = 一整组 design token（配色/字体/圆角/纹理/动效基调）。iframe 内自包含，故用固定方案，不跟随全站亮暗。 */
 export interface ArtDirection {
@@ -391,6 +397,11 @@ export interface CourseDesign {
   motion: number;
   /** 视觉密度 1-10：影响留白与每屏信息量。 */
   density: number;
+  /**
+   * v5：本课专属设计 brief（LLM 生成、平台合成 art 的配方）。存在即代表 art 是「合成皮肤」而非 12 套固定之一。
+   * 序列化时以 brief 为准（v2 designJson）；用户手动换固定皮肤（theme route）会清掉它降级为 artKey 格式。
+   */
+  brief?: DesignBrief;
 }
 
 /**
@@ -436,7 +447,28 @@ export function resolveCourseDesign(course: {
   // 已落库的设计系统直接用（造课时可由更强逻辑/LLM 生成后持久化）。
   if (course.designJson) {
     try {
-      const parsed = JSON.parse(course.designJson) as { artKey?: string; variance?: number; motion?: number; density?: number };
+      const parsed = JSON.parse(course.designJson) as {
+        v?: number;
+        brief?: unknown;
+        artKey?: string;
+        variance?: number;
+        motion?: number;
+        density?: number;
+      };
+      // v5：v2 designJson 携带专属 brief → 平台合成 art（最高优先级，这是「本课独一无二」的观感）。
+      // brief 经 sanitizeBrief 钳到合法词表，synthesizeArtDirection 纯函数确定性出全套达标配色。
+      if (parsed.v === 2 && parsed.brief) {
+        const brief = sanitizeBrief(parsed.brief);
+        const k = knobsFor(course.category);
+        return {
+          art: synthesizeArtDirection(brief),
+          brief,
+          variance: clampKnob(parsed.variance ?? jitterKnob("variance", course.id, k.variance)),
+          motion: clampKnob(parsed.motion ?? jitterKnob("motion", course.id, k.motion)),
+          density: clampKnob(parsed.density ?? jitterKnob("density", course.id, k.density)),
+        };
+      }
+      // 传统 artKey 格式：命中 12 套固定皮肤之一（用户手动换肤 / 旧课 / 降级课走这里）。
       const art = parsed.artKey ? ART_BY_KEY.get(parsed.artKey) : undefined;
       if (art) {
         const k = knobsFor(course.category);
@@ -483,9 +515,21 @@ function clampKnob(n: number): number {
   return Math.max(1, Math.min(10, Math.round(n)));
 }
 
-/** 序列化设计系统为可落库的 designJson（造课时持久化，之后渲染直接读，稳定不漂移）。 */
+/**
+ * 序列化设计系统为可落库的 designJson（造课时持久化，之后渲染直接读，稳定不漂移）。
+ * v5：携 brief 的合成皮肤存 v2 格式（{v:2,brief,旋钮}），改进合成算法后重渲即升级所有旧课；
+ * 无 brief（固定皮肤/用户换肤/降级）存传统 artKey 格式。
+ */
 export function serializeCourseDesign(d: CourseDesign): string {
+  if (d.brief) {
+    return JSON.stringify({ v: 2, brief: d.brief, variance: d.variance, motion: d.motion, density: d.density });
+  }
   return JSON.stringify({ artKey: d.art.key, variance: d.variance, motion: d.motion, density: d.density });
+}
+
+/** 由 LLM 生成的 brief 直接构造可落库的 v2 designJson（造课出口用；旋钮留空,渲染时按赛道补）。 */
+export function designJsonFromBrief(brief: DesignBrief): string {
+  return JSON.stringify({ v: 2, brief: sanitizeBrief(brief) });
 }
 
 /** 取某艺术方向（未知 → 第一个）。供 UI/报表引用。 */

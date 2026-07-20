@@ -5,7 +5,7 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertCanSpend } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { getGenJob, initGenJob, renderCourseHtmlBestEffort, runCourseGenBackground } from "@/lib/course-gen";
+import { getGenJob, initGenJob, renderCourseHtmlBestEffort, runCourseGenBackground, ensureDesignBrief } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +64,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // 此处 genStatus 只可能是 generating/failed/paused（上面已排除其它），一律收敛为 ready。
       // 根因修复(2026-07-20)：收敛前补渲 HTML 课件（幂等，已渲过的节被源哈希短路）——
       // 此前该捷径只置 ready，经此路收尾的课整课无 htmlJson，永远回落旧版块课件。
+      // v5：补渲前先确保专属 brief（已完成但 brief 曾失败的课，经此续造路径补齐，review #3）。
+      await ensureDesignBrief(course.id, user.id);
       await renderCourseHtmlBestEffort(course.id);
       await prisma.course.update({ where: { id: course.id }, data: { genStatus: "ready" } });
       return ok({ resumed: false, remaining: 0, genStatus: "ready" });

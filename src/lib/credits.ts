@@ -30,6 +30,7 @@ const SCENE_WEIGHT = {
   note_summary: 0.8,
   companion: 0.5, // 伴侣问答低价，鼓励多问
   search_expand: 0.2,
+  generate_design_brief: 0.2, // v5 造课时一次小调用生成课级设计 brief（~1k token，便宜模型），低权重
 } as const;
 
 /** 记账场景：SCENE_WEIGHT 的键集合。新增出口须先在 SCENE_WEIGHT 补键，否则 call site 报错。 */
@@ -52,6 +53,7 @@ const SCENE_TYPICAL_TOKENS: Record<Scene, number> = {
   note_summary: 3000,
   companion: 2000,
   search_expand: 1000,
+  generate_design_brief: 400, // v5 设计 brief：极短 JSON 输出
 };
 
 /**

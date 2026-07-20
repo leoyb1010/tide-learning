@@ -20,6 +20,31 @@ function pick(seed: number, mod: number): number {
   return seed % mod;
 }
 
+// 母题家族键的全集（switch 认得的 key）。
+const MOTIF_KEYS = new Set([
+  "editorial_paper", "dark_tech", "blueprint", "soft_structure", "scoreboard",
+  "cinematic_neon", "dev_terminal", "academic_lecture", "magazine_bold",
+  "zen_mono", "journal_washi", "storybook",
+]);
+
+/**
+ * v5：合成皮肤 key="generated" 不在 switch 里，会全落 default 同一张母题。
+ * 据版式基因 layout 把它映射到一套气质相符的母题家族，让「本课专属」的母题形状也跟着版式走
+ * （颜色仍取自本课合成调色板）。已知固定皮肤原样返回。
+ */
+export function motifFamily(art: ArtDirection): string {
+  if (MOTIF_KEYS.has(art.key)) return art.key;
+  const dark = art.substrate === "dark";
+  switch (art.layout) {
+    case "editorial": return "editorial_paper";
+    case "terminal": return dark ? "dev_terminal" : "blueprint";
+    case "magazine": return "magazine_bold";
+    case "zen": return "zen_mono";
+    case "soft":
+    default: return dark ? "cinematic_neon" : "soft_structure";
+  }
+}
+
 /**
  * Hero 页背景母题：铺满 section 底层的大幅签名图形（每方向独有）。
  * 返回一个绝对定位、pointer-events:none 的 <div>，内含一张 preserveAspectRatio=slice 的 SVG。
@@ -33,7 +58,7 @@ export function heroMotif(art: ArtDirection, seed: number): string {
   const v = pick(seed, 2);
   let inner = "";
 
-  switch (art.key) {
+  switch (motifFamily(art)) {
     case "editorial_paper":
       // 刊头细双线 + 印刷体星花，右上角一枚大号镂空序号感的圆弧。
       inner =
@@ -190,7 +215,7 @@ export function heroMotif(art: ArtDirection, seed: number): string {
 export function cornerMotif(art: ArtDirection): string {
   const a = art.accent;
   let inner: string;
-  switch (art.key) {
+  switch (motifFamily(art)) {
     case "dark_tech":
       inner = `<g stroke="${a}" stroke-opacity=".5" fill="none"><path d="M4 20 L20 20 L20 4"/><circle cx="20" cy="20" r="2.5" fill="${a}"/></g>`;
       break;
