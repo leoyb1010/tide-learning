@@ -42,8 +42,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // 整课扇出成本仍由 runCourseGenBackground 的逐节积分门按累计预估兜住。
     await assertCanSpend(user.id, "generate_course", course.modelUsed ?? undefined);
 
-    // 只有 generating / failed 的课可续造（ready 无需续、其它态非造课课程）
-    if (course.genStatus !== "generating" && course.genStatus !== "failed") {
+    // 只有 generating / failed / paused 的课可续造（ready 无需续、其它态非造课课程）。
+    // paused 是 L3 用户主动暂停（可控造课），续造入口与 failed 同路：复位 generating + 重跑后台。
+    if (
+      course.genStatus !== "generating" &&
+      course.genStatus !== "failed" &&
+      course.genStatus !== "paused"
+    ) {
       return fail("该课程无需续造", 409);
     }
 
@@ -52,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       where: { courseId: course.id, blocksJson: null },
     });
     if (remaining === 0) {
-      // 此处 genStatus 只可能是 generating/failed（上面已排除其它），一律收敛为 ready。
+      // 此处 genStatus 只可能是 generating/failed/paused（上面已排除其它），一律收敛为 ready。
       // 根因修复(2026-07-20)：收敛前补渲 HTML 课件（幂等，已渲过的节被源哈希短路）——
       // 此前该捷径只置 ready，经此路收尾的课整课无 htmlJson，永远回落旧版块课件。
       await renderCourseHtmlBestEffort(course.id);

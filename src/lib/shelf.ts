@@ -101,9 +101,14 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
     const agg = byCourse.get(c.id);
     const total = c._count.lessons;
     const genDone = c.lessons.length; // blocksJson 非空的节数（上面 where 已过滤）
-    // 生成态归一：显式 generating/failed 照旧；无显式态但仍有空节视为生成中；否则就绪。
+    // 生成态归一：显式 generating/failed/paused/outline_draft 照旧透传（后两者为 L2/L3 可控造课新态，
+    // Web 端据此渲染「待确认大纲」「已暂停」而非误显转圈；iOS 不解码 genStatus，透传新值解码安全）；
+    // 无显式态但仍有空节视为生成中；否则就绪。
     const genStatus =
-      c.genStatus === "generating" || c.genStatus === "failed"
+      c.genStatus === "generating" ||
+      c.genStatus === "failed" ||
+      c.genStatus === "paused" ||
+      c.genStatus === "outline_draft"
         ? c.genStatus
         : genDone < total
         ? "generating"

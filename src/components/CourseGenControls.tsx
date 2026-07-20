@@ -4,7 +4,8 @@
  * CourseGenControls —— /me/courses 课卡的生成态操作区（client）。
  *
  * 生成中(genStatus=generating)：环形进度(done/total) + 「查看进度」直达 /create（回到剧场）。
- * 失败(genStatus=failed)：环形进度 + 「继续生成」按钮（调 POST resume-gen，从第一个未完成节续跑）。
+ * 失败(genStatus=failed) / 已暂停(genStatus=paused，L3 可控造课)：环形进度 + 「继续生成」按钮
+ *   （调 POST resume-gen，从第一个未完成节续跑）。paused 与 failed 同为「已停下、可续造」终态，只是文案不同。
  *
  * 环形进度自身轻量轮询（复用 useGenPolling：仅页面可见时每 3s，ready 停），
  * 让「我的课」列表里的进度环随后台推进实时更新，无需刷新页面。
@@ -27,18 +28,19 @@ export function CourseGenControls({
   courseId: string;
   initialTotal: number;
   initialDone: number;
-  /** 服务端算出的初始态：generating / failed（ready 不渲染本组件） */
-  initialStatus: "generating" | "failed";
+  /** 服务端算出的初始态：generating / failed / paused（ready 不渲染本组件） */
+  initialStatus: "generating" | "failed" | "paused";
 }) {
   const { toast } = useToast();
   const [resuming, setResuming] = useState(false);
-  // 本地态：resume 成功后立刻从 failed 切到 generating（不必等服务端下一拍）。
+  // 本地态：resume 成功后立刻从 failed/paused 切到 generating（不必等服务端下一拍）。
   const [statusOverride, setStatusOverride] = useState<"generating" | "failed" | null>(null);
 
   const { progress } = useGenPolling(courseId);
   const total = progress?.total ?? initialTotal;
   const done = progress?.done ?? initialDone;
-  const liveStatus = (progress?.genStatus as "generating" | "failed" | "ready" | undefined) ?? undefined;
+  const liveStatus =
+    (progress?.genStatus as "generating" | "failed" | "ready" | "paused" | undefined) ?? undefined;
   // 优先服务端最新态 → 本地乐观态 → 初始态。
   const status = liveStatus ?? statusOverride ?? initialStatus;
 
@@ -71,12 +73,13 @@ export function CourseGenControls({
     );
   }
 
-  const isFailed = status === "failed";
+  // failed / paused 同为「已停下、可续造」终态：都渲染「继续生成」按钮（文案随态而变）。
+  const canResume = status === "failed" || status === "paused";
 
   return (
     <div className="flex items-center gap-2.5">
       <ProgressRing done={done} total={total} size={38} stroke={4} />
-      {isFailed ? (
+      {canResume ? (
         <button
           type="button"
           onClick={onResume}
@@ -84,7 +87,7 @@ export function CourseGenControls({
           className="studio-press inline-flex items-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 py-1.5 text-[12.5px] font-semibold text-white transition-colors duration-150 hover:bg-[var(--red-hover)] disabled:opacity-60"
         >
           {resuming ? <Spinner size={12} /> : <ArrowClockwise size={13} weight="bold" />}
-          {resuming ? "续跑中" : "继续生成"}
+          {resuming ? "续跑中" : status === "paused" ? "继续生产" : "继续生成"}
         </button>
       ) : (
         <Link

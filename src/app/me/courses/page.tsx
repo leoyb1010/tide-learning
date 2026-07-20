@@ -102,10 +102,20 @@ export default async function MyCoursesPage() {
     const pending = c.lessons.filter((l) => !l.blocksJson).length;
     // 已生成节数（进度环分子）：blocksJson 非空即已生成。
     const genDone = c.lessons.filter((l) => l.blocksJson != null).length;
-    const isGenerating = c.genStatus === "generating" || (c.genStatus !== "ready" && c.genStatus !== "failed" && pending > 0);
+    // L2/L3 可控造课新增态：outline_draft(待确认大纲) / paused(用户暂停) 都不是「进行中转圈」，
+    // 单列出来，避免被 isGenerating 的兜底分支误当成生成中而永久转圈。
+    const isPaused = c.genStatus === "paused";
+    const isDraft = c.genStatus === "outline_draft";
+    const isGenerating =
+      c.genStatus === "generating" ||
+      (c.genStatus !== "ready" &&
+        c.genStatus !== "failed" &&
+        c.genStatus !== "paused" &&
+        c.genStatus !== "outline_draft" &&
+        pending > 0);
     const isFailed = c.genStatus === "failed";
-    // 尚未就绪（生成中或失败）——决定是否禁用分享 / 显示生成态控件。
-    const notReady = isGenerating || isFailed;
+    // 尚未就绪（生成中 / 失败 / 暂停 / 待确认大纲）——决定是否禁用分享 / 显示生成态控件。
+    const notReady = isGenerating || isFailed || isPaused || isDraft;
     const done = completedMap.get(c.id) ?? 0;
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     // v3.1 视频课件进度：ready/生成中(pending|generating) 的节数（用户勾选生成视频课件后可见）。
@@ -119,6 +129,8 @@ export default async function MyCoursesPage() {
       genDone,
       isGenerating,
       isFailed,
+      isPaused,
+      isDraft,
       notReady,
       done,
       pct,
@@ -212,6 +224,14 @@ export default async function MyCoursesPage() {
                       <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--warn)] backdrop-blur-sm">
                         待续 {c.genDone}/{c.total}
                       </div>
+                    ) : c.isPaused ? (
+                      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--warn)] backdrop-blur-sm">
+                        已暂停 {c.genDone}/{c.total}
+                      </div>
+                    ) : c.isDraft ? (
+                      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--red)] backdrop-blur-sm">
+                        待确认大纲
+                      </div>
                     ) : (
                       <div className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
                         就绪 · {c.total} 节
@@ -299,7 +319,7 @@ export default async function MyCoursesPage() {
                       courseId={c.id}
                       initialTotal={c.total}
                       initialDone={c.genDone}
-                      initialStatus={c.isFailed ? "failed" : "generating"}
+                      initialStatus={c.isFailed ? "failed" : c.isPaused ? "paused" : "generating"}
                     />
                   )}
                 </div>
