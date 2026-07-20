@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { freeCourseGenRemaining } from "@/lib/ai-guard";
 import { prisma } from "@/lib/db";
-import type { GeneratingCourse } from "@/components/CreateStudio";
+import type { GeneratingCourse, DraftCheckpoint } from "@/components/CreateStudio";
 
 export const metadata = { title: "AI 造课" };
 
@@ -83,11 +83,23 @@ export default async function CreatePage() {
     firstLessonId: c.lessons[0]?.id ?? null,
   }));
 
+  // —— L2 大纲检查点恢复：把「最近一份未确认的大纲草稿」透给客户端 ——
+  // 专业模式造课停在 outline_draft，用户若离开/刷新，回到 /create 用它把检查点重新打开
+  // （否则草稿会成为无客户端可达的死角，/outline* 系列接口没有入口）。
+  const draftRow = await prisma.course.findFirst({
+    where: { authorUserId: user.id, genStatus: "outline_draft", origin: "ai_generated" },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, slug: true, title: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
+  });
+  const draftCheckpoint: DraftCheckpoint | null = draftRow
+    ? { courseId: draftRow.id, slug: draftRow.slug, title: draftRow.title, lessons: draftRow.lessons.map((l) => ({ id: l.id, title: l.title })) }
+    : null;
+
   return (
     <div className="mx-auto flex min-h-[calc(100vh-160px)] w-full max-w-[1040px] flex-col justify-center py-8 sm:py-12">
       {/* CreateStudio 用 useSearchParams 读 ?prompt，Next15 需 Suspense 边界 */}
       <Suspense fallback={null}>
-        <CreateStudio canUseLLM={canCreate} generatingCourses={generatingCourses} />
+        <CreateStudio canUseLLM={canCreate} generatingCourses={generatingCourses} draftCheckpoint={draftCheckpoint} />
       </Suspense>
     </div>
   );

@@ -373,11 +373,19 @@ function ShelfCard({
   const tint = tintFor(course.category);
   // 自造/导入课可分享与删除（去管理页）；其余（在学/淘的/已完成）不给这两个操作。
   const owned = cat === "ai_created" || cat === "imported";
-  // 生成态：generating（生成中）/ failed（部分待续）→ 卡上标「生成中/待续」，主操作转「查看进度」。
+  // 生成态：generating（生成中）/ failed（部分待续）/ paused（已暂停）/ outline_draft（待确认大纲，L2/L3 可控造课）
+  // → 卡上标状态，主操作转「查看进度」。
   const generating = course.genStatus === "generating";
   const genFailed = course.genStatus === "failed";
-  const notReady = generating || genFailed;
+  const genPaused = course.genStatus === "paused";
+  const genDraft = course.genStatus === "outline_draft";
+  const notReady = generating || genFailed || genPaused || genDraft;
   const genPct = course.lessonsCount > 0 ? Math.round((course.genDone / course.lessonsCount) * 100) : 0;
+  // 生成态文案（旗标 / 悬浮行 / 主操作按钮），四态区分。
+  const genCount = `${course.genDone}/${course.lessonsCount}`;
+  const genFlagText = generating ? `生成中 ${genCount}` : genDraft ? "待确认大纲" : genPaused ? `已暂停 ${genCount}` : `待续 ${genCount}`;
+  const genLineText = generating ? `生成中 · ${genCount} 节` : genDraft ? "待确认大纲" : genPaused ? `已暂停 · ${genCount} 节` : `待续 · ${genCount} 节`;
+  const genActionText = generating ? "查看进度" : genDraft ? "确认大纲" : genPaused ? "继续生产" : "继续生成";
 
   return (
     <div className="shelf-card group/card relative" style={{ "--i": index } as CSSProperties}>
@@ -410,7 +418,7 @@ function ShelfCard({
           {notReady ? (
             <span className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-black/40 px-2 py-0.5 text-[9.5px] font-bold text-white backdrop-blur-sm">
               {generating && <CircleNotch size={9} weight="bold" className="animate-spin" />}
-              {generating ? `生成中 ${course.genDone}/${course.lessonsCount}` : `待续 ${course.genDone}/${course.lessonsCount}`}
+              {genFlagText}
             </span>
           ) : (
             course.progress >= 100 && (
@@ -454,11 +462,7 @@ function ShelfCard({
             <div className="min-w-0 flex-1">
               <p className="truncate text-[12px] font-semibold text-[var(--ink)]">{course.title}</p>
               <p className="mono text-[10px] text-[var(--ink4)]">
-                {notReady
-                  ? generating
-                    ? `生成中 · ${course.genDone}/${course.lessonsCount} 节`
-                    : `待续 · ${course.genDone}/${course.lessonsCount} 节`
-                  : `${course.categoryLabel} · ${course.lessonsCount} 节`}
+                {notReady ? genLineText : `${course.categoryLabel} · ${course.lessonsCount} 节`}
               </p>
             </div>
           </div>
@@ -470,7 +474,7 @@ function ShelfCard({
               className="studio-press inline-flex h-11 items-center justify-center gap-1.5 rounded-[10px] bg-[var(--red)] px-3 text-[12.5px] font-bold text-white transition-colors hover:bg-[var(--red-hover)]"
             >
               {generating ? <CircleNotch size={14} weight="bold" className="animate-spin" /> : <ArrowClockwise size={14} weight="bold" />}
-              {generating ? "查看进度" : "继续生成"}
+              {genActionText}
             </Link>
           ) : (
             <Link

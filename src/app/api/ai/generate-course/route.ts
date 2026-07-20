@@ -57,7 +57,11 @@ export async function POST(req: NextRequest) {
         template?: string;
         model?: string;
         qualityTier?: string;
+        /** L2 可控造课：专业模式下先停在大纲检查点（outline_draft），由用户确认后再扇出逐节生成。 */
+        checkpoint?: boolean;
       } | null;
+      // 专业模式大纲检查点：置真则大纲落库后停在 outline_draft，不自动扇出（等 /outline/confirm）。
+      const checkpoint = body?.checkpoint === true;
       const prompt = body?.prompt?.trim();
       if (!prompt) return fail("请描述你想学的内容");
       if (prompt.length < 4) return fail("需求太短，请多说几个字（至少 4 字）");
@@ -139,7 +143,8 @@ export async function POST(req: NextRequest) {
             authorUserId: user.id,
             ownerId: user.id,
             visibility: "private",
-            genStatus: "generating",
+            // 检查点模式先停在 outline_draft（等用户确认），否则直接 generating 走后台扇出。
+            genStatus: checkpoint ? "outline_draft" : "generating",
             template: template ?? null,
             modelUsed: modelKey,
             qualityTier,
@@ -192,11 +197,25 @@ export async function POST(req: NextRequest) {
         properties: { courseId: created.course.id, category, lessons: created.lessons.length, qualityTier },
       });
 
+      const courseId = created.course.id;
+      const total = created.lessons.length;
+
+      // —— L2 检查点模式：大纲已落库为 outline_draft，不建 job、不扇出，直接把大纲交给前端确认 ——
+      // 用户在大纲检查点增删改排序后调 /outline/confirm 才真正开始逐节生成。
+      if (checkpoint) {
+        return ok({
+          courseId,
+          slug: created.course.slug,
+          title: created.course.title,
+          checkpoint: true,
+          genStatus: "outline_draft",
+          lessons: created.lessons,
+        });
+      }
+
       // —— v3.0 服务端后台续跑：大纲已落库，逐节生成交给 after() 在响应返回后接管 ——
       // 建课级进度 job（course_gen，一课一条，记 total/done/failed/currentLessonId），
       // 再注册后台任务：关页面/刷新也不影响，前端凭 gen-progress 轮询恢复进度。
-      const courseId = created.course.id;
-      const total = created.lessons.length;
       await initGenJob(courseId, user.id, total, { prompt, category });
       after(async () => {
         // after() 内部绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。

@@ -68,8 +68,7 @@ export function ImmersiveStudyRoom(data: ImmersiveData) {
     };
   }, []);
 
-  // 响应式布局全部由 CSS media query 处理，避免 hydration 后写 isMobile 导致首屏整树重绘。
-  const isMobile = false;
+  // 响应式布局全部由 CSS media query 处理（不再下发恒 false 的 isMobile 到 context，避免误导）。
   const immersive = motionOk;
 
   // 鼠标视差：仅沉浸态挂监听。归一化到 -1..1（视口中心为 0）。
@@ -90,7 +89,7 @@ export function ImmersiveStudyRoom(data: ImmersiveData) {
     return () => window.removeEventListener("pointermove", onMove);
   }, [immersive, rawX, rawY]);
 
-  const env: StudyRoomEnv = { px, py, motionOk, isMobile, immersive };
+  const env: StudyRoomEnv = { px, py, motionOk, immersive };
 
   return (
     <StudyRoomProvider value={env}>

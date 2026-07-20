@@ -26,8 +26,17 @@ export interface GenProgress {
   done: number;
   failed: number;
   currentLessonId: string | null;
-  genStatus: string | null; // generating / ready / failed
+  genStatus: string | null; // generating / ready / failed / paused（L3 可控造课）
   lessons: { id: string; title: string; ready: boolean }[];
+}
+
+/**
+ * 轮询终态（无后台进度、停止轮询）：ready（就绪）/ failed（整体失败）/ paused（用户暂停）/
+ * outline_draft（大纲待确认，扇出尚未开始，L2 可控造课）。
+ * failed/paused/outline_draft 都是「已停下、待用户操作」的态：resume-gen / outline confirm 后重新起轮询。
+ */
+export function isTerminalGenStatus(s: string | null | undefined): boolean {
+  return s === "ready" || s === "failed" || s === "paused" || s === "outline_draft";
 }
 
 /* ============================================================
@@ -169,8 +178,8 @@ export function useGenPolling(
       const p = j.data as GenProgress;
       setProgress(p);
       setError(false);
-      // 终态：ready（全部就绪）或 failed（后台整体失败），停止轮询。
-      if (p.genStatus === "ready" || p.genStatus === "failed") {
+      // 终态：ready / failed / paused，停止轮询。
+      if (isTerminalGenStatus(p.genStatus)) {
         stoppedRef.current = true;
         if (p.genStatus === "ready" && !firedReadyRef.current) {
           firedReadyRef.current = true;
@@ -208,7 +217,7 @@ export function useGenPolling(
       }
       const p = await fetchOnce();
       if (cancelled) return;
-      if (p && (p.genStatus === "ready" || p.genStatus === "failed")) return; // 终态，不再排期
+      if (p && isTerminalGenStatus(p.genStatus)) return; // 终态，不再排期
       schedule();
     };
 
@@ -216,7 +225,7 @@ export function useGenPolling(
     (async () => {
       const p = await fetchOnce();
       if (cancelled) return;
-      if (p && (p.genStatus === "ready" || p.genStatus === "failed")) return;
+      if (p && isTerminalGenStatus(p.genStatus)) return;
       schedule();
     })();
 

@@ -4,8 +4,6 @@ import {
   motion,
   AnimatePresence,
   useMotionValue,
-  useSpring,
-  useTransform,
   useReducedMotion,
   useInView,
   type Variants,
@@ -119,34 +117,6 @@ export function Spotlight({ children, className }: { children: ReactNode; classN
   );
 }
 
-/** 数字滚动（进入视图时从 0 弹到目标）。 */
-export function CountUp({ value, suffix = "", className }: { value: number; suffix?: string; className?: string }) {
-  const mv = useMotionValue(0);
-  const rounded = useTransform(mv, (v) => Math.round(v).toLocaleString());
-  return (
-    <motion.span
-      className={className}
-      onViewportEnter={() => {
-        const controls = { current: 0 };
-        const start = performance.now();
-        const dur = 1100;
-        const tick = (t: number) => {
-          const p = Math.min((t - start) / dur, 1);
-          const eased = 1 - Math.pow(1 - p, 3);
-          mv.set(value * eased);
-          controls.current = eased;
-          if (p < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-      }}
-      viewport={{ once: true }}
-    >
-      <motion.span>{rounded}</motion.span>
-      {suffix}
-    </motion.span>
-  );
-}
-
 /* ============================================================
    Tide Motion 2.0 新原语
    ============================================================ */
@@ -234,33 +204,6 @@ export function FlipCounter({ value, className }: { value: number; className?: s
   );
 }
 
-/** 磁吸按钮：向光标轻微牵引（触屏禁用）。 */
-export function Magnetic({ children, strength = 0.3, className }: { children: ReactNode; strength?: number; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const x = useMotionValue(0);
-  const y = useMotionValue(0);
-  const sx = useSpring(x, { ...SPRING_TIDE, mass: 0.4 });
-  const sy = useSpring(y, { ...SPRING_TIDE, mass: 0.4 });
-
-  function onMove(e: React.MouseEvent<HTMLDivElement>) {
-    const el = ref.current;
-    if (!el) return;
-    if (window.matchMedia("(pointer: coarse)").matches) return; // 触屏禁用
-    const r = el.getBoundingClientRect();
-    // 超大屏减弱牵引
-    const s = window.innerWidth >= 1920 ? strength * 0.5 : strength;
-    x.set((e.clientX - (r.left + r.width / 2)) * s);
-    y.set((e.clientY - (r.top + r.height / 2)) * s);
-  }
-  function reset() { x.set(0); y.set(0); }
-
-  return (
-    <motion.div ref={ref} onMouseMove={onMove} onMouseLeave={reset} style={{ x: sx, y: sy }} className={`hover-only ${className ?? ""}`}>
-      {children}
-    </motion.div>
-  );
-}
-
 /** 可拖拽 bottom sheet（移动端笔记面板 / Paywall），三档 snap + 甩出关闭。 */
 export function SheetDrag({
   children, open, onClose, className,
@@ -291,23 +234,6 @@ export function SheetDrag({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
-  );
-}
-
-/** 路由/内容转场包裹：涨潮进 / 退潮出。 */
-export function PageTide({ children, keyId }: { children: ReactNode; keyId: string }) {
-  return (
-    <AnimatePresence mode="wait">
-      <motion.div
-        key={keyId}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0.6, y: -8 }}
-        transition={{ duration: 0.42, ease: EASE }}
-      >
-        {children}
-      </motion.div>
     </AnimatePresence>
   );
 }

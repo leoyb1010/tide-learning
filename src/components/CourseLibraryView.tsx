@@ -5,9 +5,10 @@ import type { CourseCardData } from "./CourseCard";
 /* ============================================================
    课程库 · 网格视图外壳（client）
    v4.0：书架视图挪去书桌，课程库回归纯网格。
-   移除了网格/书架视图切换器与 shelf 分支（不再 import CourseShelf）——
-   本组件只做一件事：顶部课程计数 + server page 渲染好的网格（作为 grid prop 传入）。
-   CourseShelf 组件本身保留（书桌书架能力沿用同一套书脊视觉），仅课程库不再引用它。
+   移除了网格/书架视图切换器与 shelf 分支——本组件只做一件事：
+   顶部课程计数 + server page 渲染好的网格（作为 grid prop 传入）。
+   （原 CourseShelf 书脊视图组件与其 .shelf-row/.book-spine CSS 已于 2026-07-20 删除；
+    书桌书架是另一套独立的 .shelf-card 封面卡瀑布，不共用书脊视觉。）
    边界：grid 卡片在 server page 已渲染好，本组件不引任何 server 链。
    ============================================================ */
 

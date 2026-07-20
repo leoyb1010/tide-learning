@@ -20,9 +20,7 @@ export interface StudyRoomEnv {
   py: MotionValue<number>;
   /** 是否允许沉浸动效（!reduce-motion）。false → 静态分层海报。 */
   motionOk: boolean;
-  /** 是否移动端（<768px）。true → 纵向分幕淡入，砍鼠标视差与激进 3D。 */
-  isMobile: boolean;
-  /** 沉浸 3D 是否可用（motionOk && !isMobile）。便捷派生标志。 */
+  /** 沉浸 3D 是否可用（当前等价 motionOk；移动端适配全部走 CSS media query，不再下发 isMobile 标志）。 */
   immersive: boolean;
 }
 

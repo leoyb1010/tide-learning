@@ -19,7 +19,8 @@ type ButtonProps = {
 
 const VARIANTS: Record<string, string> = {
   primary:
-    "bg-accent-600 text-white hover:bg-accent-700 shadow-[0_1px_2px_rgba(13,51,45,0.18)]",
+    // 阴影用中性墨色（此前为深绿 rgba(13,51,45) 残留——红按钮配绿阴影，2026-07-20 诚实性/一致性修复）。
+    "bg-accent-600 text-white hover:bg-accent-700 shadow-[0_1px_2px_rgba(20,18,17,0.18)]",
   secondary:
     "bg-paper-raised text-ink-950 ring-1 ring-inset ring-ink-200 hover:ring-accent-400 hover:text-accent-700",
   ghost: "bg-transparent text-accent-700 hover:bg-accent-50",
