@@ -14,7 +14,7 @@ export interface MarketStall {
   category: string;
   coverColor: string;
   coverSrc: string;
-  origin: string; // ai_generated / user_imported / official
+  origin: string; // ai_generated / user_imported / user_created / official
   /** 拿走数（= 有该课学习记录的去重用户数，排除作者本人，来自数据层）。 */
   collectCount: number;
   /** 累计学习人数（Course.learnersCount 真值，交易气息补充信号）。 */

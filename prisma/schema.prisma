@@ -24,62 +24,65 @@ model User {
   updatedAt    DateTime  @updatedAt
   deletedAt    DateTime?
 
-  profile        UserProfile?
-  sessions       Session[]
-  progress       LearningProgress[]
-  notes          Note[]
-  demands        Demand[]
-  votes          DemandVote[]
-  orders         Order[]
-  subscriptions  Subscription[]
-  entitlements   Entitlement[]
-  events         AnalyticsEvent[]
-  comments       Comment[]
-  demandFollows  DemandFollow[]
-  streak         Streak?
-  streakDays     StreakDay[]
-  achievements   UserAchievement[]
-  passwordResets PasswordReset[]
-  importedSources ImportedSource[]
-  generationJobs GenerationJob[]
-  chatThreads    ChatThread[]
-  reviewCards    ReviewCard[]
-  notebooks      Notebook[]
-  posts          Post[]
-  postLikes      PostLike[]
-  focusSessions  FocusSession[]
-  creditAccount  CreditAccount?
-  creditLedger   CreditLedger[]
-  llmUsage       LlmUsage[]
-  postComments   PostComment[]
-  exams          Exam[]
-  examAttempts   ExamAttempt[]
-  examMistakes   ExamMistake[]
-  notifications  Notification[]
-  devices        Device[]
-  courseReviews  CourseReview[]
-  coursePurchases CoursePurchase[]
-  inviteCode     InviteCode?       @relation("InviteCodeOwner")
-  referralsMade  Referral[]        @relation("ReferralInviter")
-  referralReceived Referral?       @relation("ReferralInvitee")
-  redemptions    RedemptionRecord[]
-  createdRedemptionCodes RedemptionCode[] @relation("RedemptionCodeCreator")
+  profile                UserProfile?
+  sessions               Session[]
+  progress               LearningProgress[]
+  notes                  Note[]
+  demands                Demand[]
+  votes                  DemandVote[]
+  orders                 Order[]
+  subscriptions          Subscription[]
+  entitlements           Entitlement[]
+  events                 AnalyticsEvent[]
+  comments               Comment[]
+  demandFollows          DemandFollow[]
+  streak                 Streak?
+  streakDays             StreakDay[]
+  achievements           UserAchievement[]
+  passwordResets         PasswordReset[]
+  importedSources        ImportedSource[]
+  generationJobs         GenerationJob[]
+  chatThreads            ChatThread[]
+  reviewCards            ReviewCard[]
+  notebooks              Notebook[]
+  posts                  Post[]
+  postLikes              PostLike[]
+  focusSessions          FocusSession[]
+  creditAccount          CreditAccount?
+  creditLedger           CreditLedger[]
+  llmUsage               LlmUsage[]
+  postComments           PostComment[]
+  exams                  Exam[]
+  examAttempts           ExamAttempt[]
+  examMistakes           ExamMistake[]
+  notifications          Notification[]
+  devices                Device[]
+  courseReviews          CourseReview[]
+  coursePurchases        CoursePurchase[]
+  inviteCode             InviteCode?        @relation("InviteCodeOwner")
+  referralsMade          Referral[]         @relation("ReferralInviter")
+  referralReceived       Referral?          @relation("ReferralInvitee")
+  redemptions            RedemptionRecord[]
+  createdRedemptionCodes RedemptionCode[]   @relation("RedemptionCodeCreator")
+  assets                 Asset[]
+  creatorTemplates       Template[]
+  creatorThemes          Theme[]
 
   @@index([role])
 }
 
 model UserProfile {
-  userId                  String  @id
-  user                    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId                  String    @id
+  user                    User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   birthYear               Int?
   ageBand                 String? // 18-24 / 22-40 / 35-45 / 45-65
   learningGoal            String?
-  preferredMode           String  @default("standard") // standard / elder
-  fontScale               Float   @default(1.0)
-  notificationPreferences String  @default("{}")
+  preferredMode           String    @default("standard") // standard / elder
+  fontScale               Float     @default(1.0)
+  notificationPreferences String    @default("{}")
   motto                   String? // v2.3：学生证个性格言
   bio                     String? // v3.0：学习心得，个人主页展示
-  showProfile             String  @default("{}") // v3.0：个人主页展示开关 JSON {stats,badges,posts}
+  showProfile             String    @default("{}") // v3.0：个人主页展示开关 JSON {stats,badges,posts}
   nicknameChangedAt       DateTime? // v3.0：改名冷却（30 天）
 }
 
@@ -108,104 +111,171 @@ model PasswordReset {
 
 // ---------- §9.2 课程 ----------
 model Course {
-  id               String    @id @default(cuid())
-  slug             String    @unique
-  title            String
-  subtitle         String?
-  description      String?
-  category         String // 赛道/内容板块 key（见 src/lib/tracks.ts）
-  level            String // L1 / L2 / L3
-  status           String    @default("draft") // draft / beta / published / archived
-  coverColor       String    @default("tide") // 用渐变色替代封面图，避免二进制资源
-  ownerId          String?
+  id                       String    @id @default(cuid())
+  slug                     String    @unique
+  title                    String
+  subtitle                 String?
+  description              String?
+  category                 String // 赛道/内容板块 key（见 src/lib/tracks.ts）
+  level                    String // L1 / L2 / L3
+  status                   String    @default("draft") // draft / beta / published / archived
+  coverColor               String    @default("tide") // 用渐变色替代封面图，避免二进制资源
+  ownerId                  String?
   // —— AI 自习室：课程来源与归属 ——
-  origin           String    @default("official") // official / ai_generated / user_imported
-  authorUserId     String?   // AI生成课/导入课的归属用户；官方课为 null
-  visibility       String    @default("public")   // public / private / unlisted
+  origin                   String    @default("official") // official / ai_generated / user_imported / user_created
+  authorUserId             String? // AI生成课/导入课的归属用户；官方课为 null
+  visibility               String    @default("public") // public / private / unlisted
   // —— 课程集市：分享到社区的审核状态 ——
-  sharedStatus     String    @default("private")  // private / pending / shared / rejected
+  sharedStatus             String    @default("private") // private / pending / shared / rejected
   // —— 课程集市：定价（S4 交易闭环 §问题⑪）——
   // priceCredits: 上架集市时作者设定的售价（积分）。null 或 0 = 免费 fork（保持原免费拿走语义）；
   //   >0 = 付费课，买家扣积分、作者入账（走 CreditLedger course_purchase / course_sale_income）。
   //   用「null=免费」而非独立 isPaid 布尔：单字段即可表达「免费 / N 积分」，少一个可能与价格打架的冗余源。
   //   派生的 isPaid（priceCredits>0）在 view 层算，不落库，避免两个真值源不一致。
-  priceCredits     Int?      // 集市售价（积分）；null/0=免费，>0=付费
-  salesCount       Int       @default(0) // 累计成交数（付费被购买次数；免费拿走不计入，销量口径 = 真实成交）
-  genStatus        String?   // 生成态：generating / ready / failed（仅 AI/import 课）
-  template         String?   // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
-  modelUsed        String?   // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
-  qualityTier      String    @default("standard") // v3.4 standard=确定性 / premium=优先 bespoke 精修
-  blueprintJson    String?   // L1 课程蓝图（专业模式）：{audience,tone,length,blockPrefs[],referenceText}，透传进大纲/逐节 prompt 定制 + grounding
-  premiumRenderCount Int     @default(0) // 成功命中 bespoke 的章节数
-  deterministicRenderCount Int @default(0) // 确定性渲染或回落的章节数
-  designJson       String?   // v3.3 课级设计系统（艺术方向 + 配色/字体 token + 动效旋钮）JSON，供 HTML 课件生成注入（见 src/lib/ai/courseware-design.ts）
-  sourceDemandId   String?   // 由某共创需求生成（闭环追溯）
-  instructorName   String?
-  reviewerName     String? // 健康/财务/防诈骗类必填
-  disclaimer       String? // 免责声明
-  contributorName  String? // 内容供给方/主讲（融合：弱化单一主讲依赖）
-  revenueSharePct  Int? // 主讲分成比例，成本核算（有道痛点：主讲要 50-60%）
-  updateCadence    String? // 每周更新 / 按题季 等
-  totalDurationSec Int       @default(0)
-  learnersCount    Int       @default(0)
-  isFeatured       Boolean   @default(false)
-  publishedAt      DateTime?
-  lastUpdatedAt    DateTime  @default(now())
-  createdAt        DateTime  @default(now())
+  priceCredits             Int? // 集市售价（积分）；null/0=免费，>0=付费
+  salesCount               Int       @default(0) // 累计成交数（付费被购买次数；免费拿走不计入，销量口径 = 真实成交）
+  genStatus                String? // 生成态：generating / ready / failed（仅 AI/import 课）
+  template                 String? // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
+  modelUsed                String? // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
+  qualityTier              String    @default("standard") // v3.4 standard=确定性 / premium=优先 bespoke 精修
+  blueprintJson            String? // L1 课程蓝图（专业模式）：{audience,tone,length,blockPrefs[],referenceText}，透传进大纲/逐节 prompt 定制 + grounding
+  contentBriefJson         String? // v6 内容总纲：保留用户原始需求、课程承诺、范围边界与成果任务，逐节作者始终据此写作
+  customTemplateId         String? // 创作者保存/复用的课程结构模板（软引用 Template.id）
+  customThemeId            String? // 创作者显式应用的自定义皮肤（软引用 Theme.id）
+  navigationMode           String    @default("linear") // linear / graph；graph 时 LessonEdge 为导航真值
+  premiumRenderCount       Int       @default(0) // 成功命中 bespoke 的章节数
+  deterministicRenderCount Int       @default(0) // 确定性渲染或回落的章节数
+  designJson               String? // v3.3 课级设计系统（艺术方向 + 配色/字体 token + 动效旋钮）JSON，供 HTML 课件生成注入（见 src/lib/ai/courseware-design.ts）
+  sourceDemandId           String? // 由某共创需求生成（闭环追溯）
+  instructorName           String?
+  reviewerName             String? // 健康/财务/防诈骗类必填
+  disclaimer               String? // 免责声明
+  contributorName          String? // 内容供给方/主讲（融合：弱化单一主讲依赖）
+  revenueSharePct          Int? // 主讲分成比例，成本核算（有道痛点：主讲要 50-60%）
+  updateCadence            String? // 每周更新 / 按题季 等
+  totalDurationSec         Int       @default(0)
+  learnersCount            Int       @default(0)
+  isFeatured               Boolean   @default(false)
+  publishedAt              DateTime?
+  lastUpdatedAt            DateTime  @default(now())
+  createdAt                DateTime  @default(now())
 
-  lessons    Lesson[]
-  updateLogs CourseUpdateLog[]
-  progress   LearningProgress[]
-  notes      Note[]
-  calendar   ContentCalendar[]
-  reviews    CourseReview[]
-  purchases  CoursePurchase[]
+  lessons     Lesson[]
+  updateLogs  CourseUpdateLog[]
+  progress    LearningProgress[]
+  notes       Note[]
+  calendar    ContentCalendar[]
+  reviews     CourseReview[]
+  purchases   CoursePurchase[]
+  lessonEdges LessonEdge[]
 
   @@index([sharedStatus, lastUpdatedAt]) // 课程集市列表：按分享状态过滤 + 时间排序
   @@index([authorUserId]) // 「我造/我导入的课」列表 + 用户删除时按作者反查（authorUserId 为软 FK，无级联，查询侧用索引兜住）
 }
 
 model Lesson {
-  id            String    @id @default(cuid())
-  courseId      String
-  course        Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  title         String
-  summary       String?
-  sortOrder     Int       @default(0)
-  contentType   String    @default("video") // video / article / mixed / live / ai_block / ai_html
-  videoAssetId  String?   @unique // 一个受控资产只绑一个章节，避免共享 asset 造成鉴权语义歧义
-  videoUrl      String? // 仅免费章节可用的公开媒体 URL；付费章节必须使用 videoAssetId
-  articleMd     String?
-  blocksJson    String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）；也是 ai_html 课的内容层真值源 + 兜底
-  htmlJson      String? // ai_html 类型：AI 生成的自包含沙箱 HTML 课件渲染契约 {renderMode, contractVersion, html, hasScript, checksum}（见 src/lib/ai/courseware-html.ts）
-  htmlGenClaimedAt DateTime? // HTML 课件生成并发所有权占位（对齐 genClaimedAt 语义）
-  renderEngine  String? // v3.4 llm / deterministic，供命中率与回落排障
+  id                 String    @id @default(cuid())
+  courseId           String
+  course             Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  title              String
+  summary            String?
+  sortOrder          Int       @default(0)
+  contentType        String    @default("video") // video / article / mixed / live / ai_block / ai_html
+  videoAssetId       String?   @unique // 一个受控资产只绑一个章节，避免共享 asset 造成鉴权语义歧义
+  videoUrl           String? // 仅免费章节可用的公开媒体 URL；付费章节必须使用 videoAssetId
+  articleMd          String?
+  blocksJson         String? // ai_block 类型：结构化块课件 {version, blocks[]}（见 src/lib/blocks.ts）；也是 ai_html 课的内容层真值源 + 兜底
+  htmlJson           String? // ai_html 类型：AI 生成的自包含沙箱 HTML 课件渲染契约 {renderMode, contractVersion, html, hasScript, checksum}（见 src/lib/ai/courseware-html.ts）
+  designJson         String? // v6 单节原创设计系统：设计 Agent 产出的已校验 OKLCH token / 构图 / 母题 / 动效，表现层可重建
+  htmlGenClaimedAt   DateTime? // HTML 课件生成并发所有权占位（对齐 genClaimedAt 语义）
+  renderEngine       String? // v3.4 llm / deterministic，供命中率与回落排障
   renderRejectReason String? // bespoke 被拒/预算/超时等原因（截断的人类可读摘要）
-  renderSourceHash String? // blocks+design+mode+渲染版本校验和；相同输入直接复用
-  renderDurationMs Int? // 本次 HTML 生成耗时
-  genClaimedAt  DateTime? // 造课并发所有权占位：generateLessonCore 生成前原子 claim，防两条流水双写双扣（见 src/lib/course-gen.ts）
+  renderSourceHash   String? // blocks+design+mode+渲染版本校验和；相同输入直接复用
+  renderDurationMs   Int? // 本次 HTML 生成耗时
+  genClaimedAt       DateTime? // 造课并发所有权占位：generateLessonCore 生成前原子 claim，防两条流水双写双扣（见 src/lib/course-gen.ts）
   // —— 视频课件生成（v3.1）：把块课件转成带旁白/字幕的视频。留接口，模型后补 ——
   // null=未发起 / pending=已排队 / generating=生成中 / ready=已就绪(videoAssetId 指向占位或真实资源) / failed=失败可重试
-  videoGenStatus  String? // 视频课件生成态（复用 videoAssetId 承载产物引用）
-  videoScriptJson String? // 由 blocks 组织出的视频脚本 {version, scenes:[{narration, caption, ...}]}（生成前落库，供真实模型消费）
-  videoGenClaimedAt DateTime? // 视频生成并发所有权占位：generateLessonVideo 生成前原子 claim，防两条流水双写（对齐 genClaimedAt 语义）
-  videoDurationSec Int? // v3.1 视频课件时长（秒）：与图文阅读语义的 durationSec 隔离，生成视频后写此字段，不污染块课共享的 durationSec
-  durationSec   Int       @default(0)
-  isFree        Boolean   @default(false)
-  liveStartAt   DateTime? // 直播小班课开播时间（融合：有道口语小班课）
-  liveSeatLimit Int? // 小班名额上限
-  status        String    @default("published")
-  publishedAt   DateTime?
-  createdAt     DateTime  @default(now())
-  qualityJson   String? // 蓝图 C2：本节质量档案 {score, flags, passed, adherence, regen, safety, visual}（生成/渲染时写入，供质量看板与重生成闭环）
+  videoGenStatus     String? // 视频课件生成态（复用 videoAssetId 承载产物引用）
+  videoScriptJson    String? // 由 blocks 组织出的视频脚本 {version, scenes:[{narration, caption, ...}]}（生成前落库，供真实模型消费）
+  videoGenClaimedAt  DateTime? // 视频生成并发所有权占位：generateLessonVideo 生成前原子 claim，防两条流水双写（对齐 genClaimedAt 语义）
+  videoDurationSec   Int? // v3.1 视频课件时长（秒）：与图文阅读语义的 durationSec 隔离，生成视频后写此字段，不污染块课共享的 durationSec
+  durationSec        Int       @default(0)
+  isFree             Boolean   @default(false)
+  liveStartAt        DateTime? // 直播小班课开播时间（融合：有道口语小班课）
+  liveSeatLimit      Int? // 小班名额上限
+  status             String    @default("published")
+  publishedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  qualityJson        String? // 蓝图 C2：本节质量档案 {score, flags, passed, adherence, regen, safety, visual}（生成/渲染时写入，供质量看板与重生成闭环）
 
-  progress    LearningProgress[]
-  notes       Note[]
-  subtitles   Subtitle[]
-  revisions   LessonRevision[]
-  quizResults LessonQuizResult[]
+  progress      LearningProgress[]
+  notes         Note[]
+  subtitles     Subtitle[]
+  revisions     LessonRevision[]
+  quizResults   LessonQuizResult[]
+  outgoingEdges LessonEdge[]       @relation("LessonEdgeFrom")
+  incomingEdges LessonEdge[]       @relation("LessonEdgeTo")
 
   @@index([courseId, sortOrder])
+}
+
+// v6 创作者课程结构模板。内置 COURSE_TEMPLATES 仅作历史兼容，新建模板与市场模板以此表为真值。
+model Template {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  structureJson  String // {v,course,lessons:[{title,summary,blockTypes[]}]}
+  sourceCourseId String?
+  visibility     String   @default("private") // private / public
+  status         String   @default("draft") // draft / published / archived
+  usageCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([ownerId, updatedAt])
+  @@index([visibility, status, updatedAt])
+}
+
+// v6 创作者自定义皮肤。tokensJson 必须通过 LessonCreativeDesign 安全/对比度闸门。
+model Theme {
+  id             String   @id @default(cuid())
+  slug           String   @unique
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String
+  description    String?
+  tokensJson     String
+  sourceLessonId String?
+  visibility     String   @default("private") // private / public
+  status         String   @default("draft") // draft / published / archived
+  usageCount     Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([ownerId, updatedAt])
+  @@index([visibility, status, updatedAt])
+}
+
+// v6 非线性课程导航。sortOrder 仍是编辑/无障碍回退顺序；graph 模式以边为导航真值。
+model LessonEdge {
+  id            String   @id @default(cuid())
+  courseId      String
+  course        Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  fromLessonId  String
+  fromLesson    Lesson   @relation("LessonEdgeFrom", fields: [fromLessonId], references: [id], onDelete: Cascade)
+  toLessonId    String
+  toLesson      Lesson   @relation("LessonEdgeTo", fields: [toLessonId], references: [id], onDelete: Cascade)
+  label         String?
+  conditionJson String? // {type:"always"|"quiz",blockId?,answerIndex?}
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  @@unique([fromLessonId, toLessonId, label])
+  @@index([courseId, fromLessonId, sortOrder])
+  @@index([toLessonId])
 }
 
 // 蓝图 S1：轻版本化——重生成/重渲染前把旧内容存档（保留最近 3 版），给「后悔药」不做完整 VCS。
@@ -269,18 +339,18 @@ model CourseUpdateLog {
 
 // ---------- §9.3 学习进度 ----------
 model LearningProgress {
-  id           String    @id @default(cuid())
-  userId       String
-  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  courseId     String
-  course       Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessonId     String
-  lesson       Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  progressSec  Int       @default(0) // 视频/模拟播放的秒数进度（时间轴锚点）
-  lastSlideIndex Int?    // 翻页课件「已读到第几页」(1-indexed)：与 progressSec 的秒数语义隔离，两个视图的续读锚点互不覆盖
-  completedAt  DateTime?
-  lastPlayedAt DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  courseId       String
+  course         Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessonId       String
+  lesson         Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  progressSec    Int       @default(0) // 视频/模拟播放的秒数进度（时间轴锚点）
+  lastSlideIndex Int? // 翻页课件「已读到第几页」(1-indexed)：与 progressSec 的秒数语义隔离，两个视图的续读锚点互不覆盖
+  completedAt    DateTime?
+  lastPlayedAt   DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([userId, lessonId])
 }
@@ -318,7 +388,7 @@ model CoursePurchase {
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   courseId     String
   course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  priceCredits Int      // 购买当时价格快照：付费=售价，免费拿走=0
+  priceCredits Int // 购买当时价格快照：付费=售价，免费拿走=0
   createdAt    DateTime @default(now())
 
   @@unique([userId, courseId]) // 一人一课一条：天然幂等 + 所有权真值源
@@ -550,20 +620,20 @@ model CouponRedemption {
 model RedemptionCode {
   id          String    @id @default(cuid())
   code        String    @unique // 兑换码明文（生成时分组格式，如 TIDE-XXXX-XXXX-XXXX）
-  batchId     String    // 批次号：一次批量生成共用，便于按批作废/统计
-  type        String    // credits（发积分）/ membership（发会员天数）
-  value       Int       // credits: 积分数；membership: 会员天数
-  planId      String?   // membership 类可选指定 plan（空则用默认全站会员发放逻辑）
+  batchId     String // 批次号：一次批量生成共用，便于按批作废/统计
+  type        String // credits（发积分）/ membership（发会员天数）
+  value       Int // credits: 积分数；membership: 会员天数
+  planId      String? // membership 类可选指定 plan（空则用默认全站会员发放逻辑）
   maxUses     Int       @default(1) // 可被兑换次数（1=一次性单人；>1=多人共用码）
   usedCount   Int       @default(0)
   status      String    @default("active") // active / disabled（作废）
-  note        String?   // 备注（活动名等）
+  note        String? // 备注（活动名等）
   expiresAt   DateTime?
-  createdById String?   // 生成的管理员
+  createdById String? // 生成的管理员
   createdBy   User?     @relation("RedemptionCodeCreator", fields: [createdById], references: [id])
   createdAt   DateTime  @default(now())
 
-  records     RedemptionRecord[]
+  records RedemptionRecord[]
 
   @@index([batchId])
   @@index([status, expiresAt])
@@ -571,14 +641,14 @@ model RedemptionCode {
 
 // 核销记录：谁在何时兑了哪张码得到什么。(codeId,userId) 唯一 —— 同一人对同一码只兑一次（防重放）。
 model RedemptionRecord {
-  id           String   @id @default(cuid())
+  id           String         @id @default(cuid())
   codeId       String
   code         RedemptionCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
   userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  grantedType  String   // credits / membership（快照，便于审计）
-  grantedValue Int      // 实发积分数 / 会员天数
-  createdAt    DateTime @default(now())
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantedType  String // credits / membership（快照，便于审计）
+  grantedValue Int // 实发积分数 / 会员天数
+  createdAt    DateTime       @default(now())
 
   @@unique([codeId, userId])
   @@index([userId])
@@ -592,12 +662,12 @@ model InviteCode {
   code      String   @unique
   createdAt DateTime @default(now())
 
-  inviter   User      @relation("InviteCodeOwner", fields: [inviterId], references: [id], onDelete: Cascade)
+  inviter   User       @relation("InviteCodeOwner", fields: [inviterId], references: [id], onDelete: Cascade)
   referrals Referral[]
 }
 
 model Referral {
-  id           String    @id @default(cuid())
+  id           String     @id @default(cuid())
   inviteCodeId String
   inviteCode   InviteCode @relation(fields: [inviteCodeId], references: [id], onDelete: Cascade)
   inviterId    String
@@ -612,23 +682,23 @@ model Referral {
 }
 
 model Order {
-  id              String    @id @default(cuid())
+  id              String        @id @default(cuid())
   userId          String
-  user            User      @relation(fields: [userId], references: [id])
+  user            User          @relation(fields: [userId], references: [id])
   planId          String
-  plan            Plan      @relation(fields: [planId], references: [id])
+  plan            Plan          @relation(fields: [planId], references: [id])
   channel         String // web_wechat / web_alipay / stripe / apple_iap / google_play
   amountCents     Int
-  currency        String    @default("CNY")
-  status          String    @default("pending") // pending / paid / refunded / failed
-  externalOrderId String?   @unique // 渠道订单号：唯一，webhook 据此精确定位订单，杜绝重复激活
+  currency        String        @default("CNY")
+  status          String        @default("pending") // pending / paid / refunded / failed
+  externalOrderId String?       @unique // 渠道订单号：唯一，webhook 据此精确定位订单，杜绝重复激活
   couponId        String?
-  coupon          Coupon?   @relation(fields: [couponId], references: [id])
-  discountCents   Int       @default(0)
+  coupon          Coupon?       @relation(fields: [couponId], references: [id])
+  discountCents   Int           @default(0)
   // 支付成功后记录本单激活/续期的订阅：退款时据此精确撤销「这一笔」而非该 plan 下全部订阅
   subscriptionId  String?
   subscription    Subscription? @relation(fields: [subscriptionId], references: [id])
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime      @default(now())
   paidAt          DateTime?
 
   @@index([userId, status, createdAt])
@@ -678,16 +748,16 @@ model Entitlement {
 }
 
 model PaymentWebhookLog {
-  id           String    @id @default(cuid())
-  channel      String
-  eventType    String
-  externalId   String
-  payloadJson  String
-  processedAt  DateTime?
+  id                  String    @id @default(cuid())
+  channel             String
+  eventType           String
+  externalId          String
+  payloadJson         String
+  processedAt         DateTime?
   processingStartedAt DateTime?
-  status       String    @default("received") // received / processed / duplicate / error
-  errorMessage String?
-  createdAt    DateTime  @default(now())
+  status              String    @default("received") // received / processed / duplicate / error
+  errorMessage        String?
+  createdAt           DateTime  @default(now())
 
   @@unique([channel, externalId])
 }
@@ -839,33 +909,50 @@ model ImportedSource {
   id                String   @id @default(cuid())
   userId            String
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  kind              String   // paste_text / pdf / url / video(留接口)
+  kind              String // paste_text / pdf / url / video(留接口)
   title             String?
-  rawText           String?  // 提取出的纯文本（MVP：粘贴文本）
+  rawText           String? // 提取出的纯文本（MVP：粘贴文本）
   sourceUrl         String?
-  assetId           String?  // pdf/video 走 upload 路由的占位 assetId
+  assetId           String? // pdf/video 走 upload 路由的占位 assetId
   charCount         Int      @default(0)
   parseStatus       String   @default("pending") // pending / parsed / failed
-  generatedCourseId String?  // 结构化成功后产出的 Course.id
+  generatedCourseId String? // 结构化成功后产出的 Course.id
   createdAt         DateTime @default(now())
 
   @@index([userId, createdAt])
 }
 
+// 创作者素材库：文件落私有目录，读取始终经过用户鉴权；同一素材可跨课程复用。
+model Asset {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String // image / video / pdf / presentation
+  fileName    String
+  mimeType    String
+  size        Int
+  storagePath String   @unique
+  sha256      String
+  createdAt   DateTime @default(now())
+
+  @@index([userId, kind, createdAt])
+  @@index([userId, fileName])
+}
+
 // 引擎A/B 共用：AI 生成任务（状态记录 + 幂等 + 成本埋点，MVP 同步执行不做真队列）
 model GenerationJob {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type             String   // course_outline / course_lesson / import_structure
-  status           String   @default("queued") // queued / running / done / failed
-  inputJson        String   @default("{}")
-  resultRef        String?  // 产出的 courseId / lessonId
-  promptTokens     Int      @default(0)
-  completionTokens Int      @default(0)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type             String // course_outline / course_lesson / import_structure
+  status           String    @default("queued") // queued / running / done / failed
+  inputJson        String    @default("{}")
+  resultRef        String? // 产出的 courseId / lessonId
+  promptTokens     Int       @default(0)
+  completionTokens Int       @default(0)
   errorMessage     String?
-  attempts         Int      @default(0)
-  createdAt        DateTime @default(now())
+  attempts         Int       @default(0)
+  createdAt        DateTime  @default(now())
   finishedAt       DateTime?
 
   @@index([userId, status])
@@ -876,7 +963,7 @@ model ChatThread {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scope     String   // lesson:<id> / course:<id> / studio
+  scope     String // lesson:<id> / course:<id> / studio
   courseId  String?
   lessonId  String?
   title     String?
@@ -892,7 +979,7 @@ model ChatMessage {
   id            String     @id @default(cuid())
   threadId      String
   thread        ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
-  role          String     // user / assistant
+  role          String // user / assistant
   contentMd     String
   citationsJson String     @default("[]") // 引用的笔记/字幕/块锚点，前端可跳转
   createdAt     DateTime   @default(now())
@@ -905,7 +992,7 @@ model ReviewCard {
   id           String   @id @default(cuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  noteId       String?  // 来源笔记（可空：AI 生成卡）
+  noteId       String? // 来源笔记（可空：AI 生成卡）
   courseId     String?
   front        String
   back         String
@@ -918,12 +1005,12 @@ model ReviewCard {
   // 存量卡这些列为 NULL/0 → 首次评分时按「新卡」冷启动（见 lib/srs reconstructCard）。
   stability     Float? // 记忆稳定度（天）
   difficulty    Float? // 卡片难度（1-10）
-  state         Int      @default(0) // 0=New 1=Learning 2=Review 3=Relearning
-  reps          Int      @default(0) // 累计复习次数
-  lapses        Int      @default(0) // 累计遗忘次数
-  elapsedDays   Int      @default(0) // 上次复习到本次的实际间隔
-  scheduledDays Int      @default(0) // 排程间隔
-  learningSteps Int      @default(0) // 学习/再学习步数
+  state         Int       @default(0) // 0=New 1=Learning 2=Review 3=Relearning
+  reps          Int       @default(0) // 累计复习次数
+  lapses        Int       @default(0) // 累计遗忘次数
+  elapsedDays   Int       @default(0) // 上次复习到本次的实际间隔
+  scheduledDays Int       @default(0) // 排程间隔
+  learningSteps Int       @default(0) // 学习/再学习步数
   lastReview    DateTime? // 上次复习时刻
 
   @@index([userId, dueAt])
@@ -940,7 +1027,7 @@ model Notebook {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title       String
   description String?
-  icon        String?  // emoji 或图标 key
+  icon        String? // emoji 或图标 key
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -955,8 +1042,8 @@ model NotebookEntry {
   id         String   @id @default(cuid())
   notebookId String
   notebook   Notebook @relation(fields: [notebookId], references: [id], onDelete: Cascade)
-  kind       String   // note / source / card / insight
-  refId      String?  // 关联的 Note/ImportedSource/ReviewCard id
+  kind       String // note / source / card / insight
+  refId      String? // 关联的 Note/ImportedSource/ReviewCard id
   title      String?
   contentMd  String?
   sortOrder  Int      @default(0)
@@ -970,7 +1057,7 @@ model Post {
   id           String   @id @default(cuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type         String   // insight(学习心得) / checkin(打卡) / question(求助)
+  type         String // insight(学习心得) / checkin(打卡) / question(求助)
   content      String
   refJson      String   @default("{}") // 引用的笔记/成就/streak 卡片数据
   images       String   @default("[]") // JSON 字符串数组：1-4 张图片 url（SQLite 无原生数组）
@@ -980,7 +1067,7 @@ model Post {
   likeCount    Int      @default(0)
   commentCount Int      @default(0) // 评论数（发评论时 +1，与 PostComment 同事务维护）
   repostCount  Int      @default(0) // 转发数（被转发时 +1）
-  repostOfId   String?  // 转发指向的原帖 id（null=原创帖）
+  repostOfId   String? // 转发指向的原帖 id（null=原创帖）
   repostOf     Post?    @relation("PostRepost", fields: [repostOfId], references: [id], onDelete: SetNull)
   reposts      Post[]   @relation("PostRepost")
   createdAt    DateTime @default(now())
@@ -1006,45 +1093,49 @@ model PostLike {
 
 // §9 专注会话（入席仪式）
 model FocusSession {
-  id         String    @id @default(cuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  lessonId   String?
-  courseId   String?
-  goal       String?   // 本次专注目标
-  startAt    DateTime  @default(now())
-  endAt      DateTime?
-  minutes    Int       @default(0)
-  summary    String?   // 离席 AI 小结
-  createdAt  DateTime  @default(now())
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lessonId  String?
+  courseId  String?
+  goal      String? // 本次专注目标
+  startAt   DateTime  @default(now())
+  endAt     DateTime?
+  minutes   Int       @default(0)
+  summary   String? // 离席 AI 小结
+  createdAt DateTime  @default(now())
 
   @@index([userId, startAt])
 }
 
 // ==================== v2.3 积分经济系统 ====================
 
-/** 积分账户：每用户一个，balance 由 CreditLedger 流水派生（写时同步更新）。 */
+/**
+ * 积分账户：每用户一个，balance 由 CreditLedger 流水派生（写时同步更新）。
+ */
 model CreditAccount {
   userId          String   @id
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   balance         Int      @default(0) // 当前余额（积分）
   totalEarned     Int      @default(0) // 累计入账（统计用）
   totalSpent      Int      @default(0) // 累计消耗（统计用）
-  monthlyGrantKey String?  // 上次月度赠送的月份 key "2026-07"，防重复发放
+  monthlyGrantKey String? // 上次月度赠送的月份 key "2026-07"，防重复发放
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
 
-/** 积分流水（不可变，审计与对账的根）。 */
+/**
+ * 积分流水（不可变，审计与对账的根）。
+ */
 model CreditLedger {
   id           String   @id @default(cuid())
   userId       String
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  delta        Int      // 正=入账 负=消耗
-  type         String   // monthly_grant / recharge / share_reward / llm_spend / admin_adjust；signup_bonus 仅为历史兼容
-  refId        String?  // 关联 Order/LlmUsage/CourseAccessRequest id
-  reason       String?  // 展示文案 / admin 调账备注
-  balanceAfter Int      // 记账后余额快照（对账用）
+  delta        Int // 正=入账 负=消耗
+  type         String // monthly_grant / recharge / share_reward / llm_spend / admin_adjust；signup_bonus 仅为历史兼容
+  refId        String? // 关联 Order/LlmUsage/CourseAccessRequest id
+  reason       String? // 展示文案 / admin 调账备注
+  balanceAfter Int // 记账后余额快照（对账用）
   createdAt    DateTime @default(now())
 
   @@index([userId, createdAt])
@@ -1053,12 +1144,14 @@ model CreditLedger {
   @@index([type, refId])
 }
 
-/** LLM Token 用量原始记录（积分折算依据）。 */
+/**
+ * LLM Token 用量原始记录（积分折算依据）。
+ */
 model LlmUsage {
   id               String   @id @default(cuid())
   userId           String
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  scene            String   // generate_course / generate_lesson / companion / note_transform / note_summary / import_source / generate_exam / search_expand
+  scene            String // generate_course / generate_lesson / companion / note_transform / note_summary / import_source / generate_exam / search_expand
   promptTokens     Int      @default(0)
   completionTokens Int      @default(0)
   totalTokens      Int      @default(0)
@@ -1069,7 +1162,9 @@ model LlmUsage {
   @@index([scene])
 }
 
-/** 角色权限矩阵（从代码常量 ROLE_PERMISSIONS 升级为 DB，admin 可调，代码保留默认兜底）。 */
+/**
+ * 角色权限矩阵（从代码常量 ROLE_PERMISSIONS 升级为 DB，admin 可调，代码保留默认兜底）。
+ */
 model RolePermission {
   role       String
   permission String
@@ -1083,16 +1178,18 @@ model RolePermission {
 
 // ==================== v2.3 §1 课程集市（课程共享 + 申请学习）====================
 
-/** 课程访问申请：他人申请学习某分享课程；作者批准后申请者获学习权。 */
+/**
+ * 课程访问申请：他人申请学习某分享课程；作者批准后申请者获学习权。
+ */
 model CourseAccessRequest {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   courseId    String
-  requesterId String   // 申请人 userId
-  ownerId     String   // 课程作者 userId（冗余便于查"我的分享"）
-  status      String   @default("pending") // pending / approved / rejected
-  message     String?  // 申请留言
+  requesterId String // 申请人 userId
+  ownerId     String // 课程作者 userId（冗余便于查"我的分享"）
+  status      String    @default("pending") // pending / approved / rejected
+  message     String? // 申请留言
   decidedAt   DateTime?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime  @default(now())
 
   @@unique([courseId, requesterId]) // 同一人对同一课只能申请一次
   @@index([ownerId, status])
@@ -1101,7 +1198,9 @@ model CourseAccessRequest {
 
 // ==================== v2.3 §1 自习室广场升级（评论/转发）====================
 
-/** 帖子评论（一级盖楼）。 */
+/**
+ * 帖子评论（一级盖楼）。
+ */
 model PostComment {
   id        String   @id @default(cuid())
   postId    String
@@ -1117,7 +1216,9 @@ model PostComment {
 
 // ==================== v2.3 §3 笔记采集（附件）====================
 
-/** 笔记附件：图片/PDF/文档。path 是私有存储 key，下载必须经过笔记本人鉴权。 */
+/**
+ * 笔记附件：图片/PDF/文档。path 是私有存储 key，下载必须经过笔记本人鉴权。
+ */
 model NoteAttachment {
   id        String   @id @default(cuid())
   noteId    String
@@ -1125,8 +1226,8 @@ model NoteAttachment {
   fileName  String
   mimeType  String
   size      Int
-  path      String   // 私有磁盘文件名或对象存储 key；历史行可能是 /uploads/xxx
-  summary   String?  // 文本类附件的 AI 摘要
+  path      String // 私有磁盘文件名或对象存储 key；历史行可能是 /uploads/xxx
+  summary   String? // 文本类附件的 AI 摘要
   createdAt DateTime @default(now())
 
   @@index([noteId])
@@ -1139,8 +1240,8 @@ model Exam {
   userId     String
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title      String
-  scopeType  String   // course / notebook / all
-  scopeId    String?  // courseId / notebookId（all 时空）
+  scopeType  String // course / notebook / all
+  scopeId    String? // courseId / notebookId（all 时空）
   difficulty String   @default("basic") // basic / advanced
   status     String   @default("ready") // generating / ready / failed
   createdAt  DateTime @default(now())
@@ -1155,10 +1256,10 @@ model ExamQuestion {
   id          String  @id @default(cuid())
   examId      String
   exam        Exam    @relation(fields: [examId], references: [id], onDelete: Cascade)
-  type        String  // single(单选) / judge(判断) / short(简答)
+  type        String // single(单选) / judge(判断) / short(简答)
   stem        String
   optionsJson String? // 单选：["A","B",...]（judge/short 为空）
-  answer      String  // 单选=选项索引；判断=true/false；简答=参考答案
+  answer      String // 单选=选项索引；判断=true/false；简答=参考答案
   explanation String?
   sourceRef   String? // "第 N 讲" / 笔记标题，溯源
   sortOrder   Int     @default(0)
@@ -1172,10 +1273,10 @@ model ExamAttempt {
   exam        Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  answersJson String   // 用户作答 {questionId: answer}
+  answersJson String // 用户作答 {questionId: answer}
   score       Int      @default(0)
   total       Int      @default(0)
-  detailJson  String?  // 判卷详情（每题对错+简答评语）
+  detailJson  String? // 判卷详情（每题对错+简答评语）
   finishedAt  DateTime @default(now())
 
   @@index([userId, finishedAt])
@@ -1188,14 +1289,14 @@ model ExamMistake {
   id            String   @id @default(cuid())
   userId        String
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  examId        String   // 来源试卷（软引用：Exam 删除不级联，靠快照字段保留题面）
-  attemptId     String   // 来源作答（幂等键的一半）
-  questionId    String   // 来源题目（幂等键的一半）
-  stem          String   // 题干快照
-  correctAnswer String   // 正确答案快照（single=选项索引 / judge=true|false / short=参考答案）
-  userAnswer    String   // 我的作答快照
-  sourceRef     String?  // "第 N 讲" / 笔记标题，溯源
-  courseId      String?  // 归属课程（若试卷 scopeType=course，则为 scopeId，供按课过滤）
+  examId        String // 来源试卷（软引用：Exam 删除不级联，靠快照字段保留题面）
+  attemptId     String // 来源作答（幂等键的一半）
+  questionId    String // 来源题目（幂等键的一半）
+  stem          String // 题干快照
+  correctAnswer String // 正确答案快照（single=选项索引 / judge=true|false / short=参考答案）
+  userAnswer    String // 我的作答快照
+  sourceRef     String? // "第 N 讲" / 笔记标题，溯源
+  courseId      String? // 归属课程（若试卷 scopeType=course，则为 scopeId，供按课过滤）
   createdAt     DateTime @default(now())
 
   @@unique([attemptId, questionId]) // 幂等：同 attempt 同题只留一条
@@ -1207,12 +1308,12 @@ model ExamMistake {
 
 model Notification {
   id        String    @id @default(cuid())
-  userId    String    // 接收者
+  userId    String // 接收者
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String    // access_request / access_approved / post_comment / post_like / course_update / credit_grant / system
+  type      String // access_request / access_approved / post_comment / post_like / course_update / credit_grant / system
   title     String
   body      String?
-  refType   String?   // course / post / request / exam
+  refType   String? // course / post / request / exam
   refId     String?
   readAt    DateTime?
   createdAt DateTime  @default(now())

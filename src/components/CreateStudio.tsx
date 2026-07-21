@@ -28,6 +28,7 @@ import {
   FileText,
   SlidersHorizontal,
   Pause,
+  Plus,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui";
 import { TemplateModelPicker } from "@/components/TemplateModelPicker";
@@ -64,6 +65,7 @@ export interface DraftCheckpoint {
   slug: string;
   title: string;
   lessons: { id: string; title: string }[];
+  isImport?: boolean;
 }
 
 // 赛道选项（只取造课常用赛道；label 从 lib/tracks.ts 单一真源派生，避免两处手抄漂移）。
@@ -94,7 +96,7 @@ const IMPORT_BENEFITS: { Icon: typeof BookOpen; label: string; hint: string }[] 
   { Icon: Waves, label: "进度可视", hint: "学到哪一目了然" },
 ];
 
-type Tab = "generate" | "import";
+type Tab = "generate" | "import" | "manual";
 
 /** 单节写作状态：pending 未开始 / writing 正在写 / done 已完成 / failed 失败可重试 */
 type LessonState = "pending" | "writing" | "done" | "failed";
@@ -129,6 +131,109 @@ interface DoneSummary {
   videos?: number; // v3.1：已发起/就绪的视频课件节数（勾选「生成视频课件」时）
 }
 
+export interface ManualCourseState {
+  id: string;
+  slug: string;
+  title: string;
+  lessons: { id: string; title: string }[];
+}
+
+/** 不调用 AI 的手工建课入口：先建课程与首张空白画布，再交给统一内容块管理器。 */
+function ManualCourseBuilder({ canUseLLM, initialCourse = null }: { canUseLLM: boolean; initialCourse?: ManualCourseState | null }) {
+  const { toast } = useToast();
+  const [title, setTitle] = useState("");
+  const [subtitle, setSubtitle] = useState("");
+  const [category, setCategory] = useState("ai_skill");
+  const [busy, setBusy] = useState(false);
+  const [course, setCourse] = useState<ManualCourseState | null>(initialCourse);
+
+  async function createManualCourse() {
+    const cleanTitle = title.trim();
+    if (!cleanTitle || busy) {
+      if (!cleanTitle) toast("先给课程起个名字吧", { tone: "info" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const courseRes = await fetch("/api/courses", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ title: cleanTitle, subtitle: subtitle.trim() || undefined, category }),
+      });
+      const courseJson = await courseRes.json().catch(() => null);
+      if (!courseRes.ok || !courseJson?.ok || !courseJson.data?.course?.id) {
+        throw new Error(courseJson?.error || "创建课程失败");
+      }
+      const created = courseJson.data.course as { id: string; slug: string; title: string };
+      const lessonRes = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ courseId: created.id, title: "第一节 · 开始创作" }),
+      });
+      const lessonJson = await lessonRes.json().catch(() => null);
+      const firstLesson = lessonRes.ok && lessonJson?.ok && lessonJson.data?.lesson?.id
+        ? [{ id: lessonJson.data.lesson.id as string, title: lessonJson.data.lesson.title as string }]
+        : [];
+      setCourse({ ...created, lessons: firstLesson });
+      track("course_manual_workspace_open", { course_id: created.id });
+      toast(firstLesson.length ? "课程和第一张空白画布已创建" : "课程已创建，可在下方新增课节", { tone: "success" });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : "创建失败，请稍后再试", { tone: "warn" });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (course) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="rounded-[14px] border border-[var(--ok)]/25 bg-[var(--ok-soft)] px-4 py-3">
+          <div className="flex items-start gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[10px] bg-[var(--surface)] text-[var(--ok)]"><Check size={17} weight="bold" /></span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[14px] font-bold text-[var(--ink)]">《{course.title}》已建立</p>
+              <p className="mt-0.5 text-[12px] text-[var(--ink3)]">内容、结构与课节数量都由你决定；保存内容块后系统会自动生成可学习课件。</p>
+            </div>
+            <Link href="/me/courses" className="shrink-0 text-[12px] font-semibold text-[var(--ink2)] hover:text-[var(--ink)]">查看我的课</Link>
+          </div>
+        </div>
+        <CoursewareManager courseId={course.id} lessons={course.lessons} isSubscriber={canUseLLM} allowAddLesson />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="sm:col-span-2">
+          <span className="mono mb-1.5 block text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">课程标题</span>
+          <input value={title} onChange={(e) => setTitle(e.target.value.slice(0, 120))} placeholder="比如：我的产品设计方法课" className="w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 py-3 text-[15px] outline-none focus:border-[var(--red)] focus:bg-[var(--surface)]" />
+        </label>
+        <label>
+          <span className="mono mb-1.5 block text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">课程方向</span>
+          <select value={category} onChange={(e) => setCategory(e.target.value)} className="min-h-[46px] w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 text-[14px] outline-none focus:border-[var(--red)]">
+            {TRACK_OPTIONS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="mono mb-1.5 block text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">一句话说明 · 可选</span>
+          <input value={subtitle} onChange={(e) => setSubtitle(e.target.value.slice(0, 180))} placeholder="这门课帮助谁解决什么问题" className="min-h-[46px] w-full rounded-[14px] border border-[var(--border2)] bg-[var(--surface-inset)] px-4 text-[14px] outline-none focus:border-[var(--red)]" />
+        </label>
+      </div>
+      <div className="rounded-[12px] border border-dashed border-[var(--border2)] bg-[var(--surface2)] px-4 py-3">
+        <p className="text-[13px] font-semibold text-[var(--ink)]">从真正的空白开始</p>
+        <p className="mt-1 text-[12px] leading-relaxed text-[var(--ink3)]">创建后可新增任意课节，并自由插入概念、场景、对话、代码、公式、图示、测验等 18 类内容块。整个过程不消耗 AI 额度。</p>
+      </div>
+      <button type="button" onClick={() => void createManualCourse()} disabled={busy || !title.trim()} className="studio-press inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[14px] bg-[var(--ink)] px-5 text-[15px] font-semibold text-[var(--surface)] disabled:opacity-50">
+        {busy ? <Spinner size={15} /> : <Plus size={17} weight="bold" />}
+        {busy ? "正在建立空白课程" : "创建空白课程"}
+      </button>
+    </div>
+  );
+}
+
 function delay(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -148,12 +253,15 @@ export function CreateStudio({
   canUseLLM,
   generatingCourses = [],
   draftCheckpoint = null,
+  initialManualCourse = null,
 }: {
   canUseLLM: boolean;
   /** 服务端预取的「生成中的课」，用于剧场恢复（生产中横幅 + 回到剧场）。 */
   generatingCourses?: GeneratingCourse[];
   /** L2 服务端预取的「未确认大纲草稿」，用于回到 /create 时重开检查点。 */
   draftCheckpoint?: DraftCheckpoint | null;
+  /** 从“我的课”回来继续编辑的手工课程。 */
+  initialManualCourse?: ManualCourseState | null;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -171,8 +279,8 @@ export function CreateStudio({
   const [category, setCategory] = useState<string>("");
   // v3.1：造课时是否同时生成视频课件（选中 → 逐节写完块课件后，对每节发起视频生成）。
   const [genVideo, setGenVideo] = useState(false);
-  // v3.2：课件模板（默认经典）与生成模型（空=用默认模型）。造课/导入共用，透传进生成请求体。
-  const [template, setTemplate] = useState<string>("classic");
+  // v6：空值表示自由导演；只有用户在专业模式明确选中时才把某种创作偏好传给模型。
+  const [template, setTemplate] = useState<string>("");
   const [model, setModel] = useState<string>("");
   const [qualityTier, setQualityTier] = useState<"standard" | "premium">("standard");
   // L2 专业模式：开则造课先停在大纲检查点（outline_draft），由用户确认后再扇出逐节生成。
@@ -184,7 +292,7 @@ export function CreateStudio({
   const [bpBlockPrefs, setBpBlockPrefs] = useState<string[]>([]);
   const [bpReference, setBpReference] = useState<string>("");
   // 大纲检查点数据（generate-course 返回 checkpoint:true 时填充；确认后清空进剧场）。
-  const [checkpoint, setCheckpoint] = useState<{ courseId: string; slug: string; title: string; lessons: OutlineLesson[] } | null>(null);
+  const [checkpoint, setCheckpoint] = useState<{ courseId: string; slug: string; title: string; lessons: OutlineLesson[]; isImport: boolean } | null>(null);
   // P1-1：AI 是否可用（服务端配了可用模型）。默认 true 避免加载态闪禁用；TemplateModelPicker
   // 拉到 defaultModel=null（未配 key）时置 false，据此禁用生成 CTA 并显示维护横幅，
   // 避免用户填完表单点生成才收到 503。
@@ -193,6 +301,7 @@ export function CreateStudio({
   // —— 导入资料状态 ——
   const [importTitle, setImportTitle] = useState("");
   const [importText, setImportText] = useState("");
+  const [importCheckpoint, setImportCheckpoint] = useState(true);
   // 文件导入：拖拽高亮态 + 隐藏 file input 引用（点击整卡触发选择）。
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -212,6 +321,8 @@ export function CreateStudio({
     if (q && q.trim()) {
       setPrompt(q.trim().slice(0, 500));
       setTab("generate");
+    } else if (searchParams.get("manual")) {
+      setTab("manual");
     } else if (searchParams.get("tab") === "import") {
       setTab("import");
     }
@@ -222,11 +333,14 @@ export function CreateStudio({
   // L2 大纲检查点恢复：?draft=<courseId> 且匹配预取的草稿 → 直接打开检查点（从「我的课·去确认大纲」深链进入）。
   useEffect(() => {
     if (draftCheckpoint && searchParams.get("draft") === draftCheckpoint.courseId) {
+      setSource(draftCheckpoint.isImport ? "import" : "generate");
+      if (draftCheckpoint.isImport) setTab("import");
       setCheckpoint({
         courseId: draftCheckpoint.courseId,
         slug: draftCheckpoint.slug,
         title: draftCheckpoint.title,
         lessons: draftCheckpoint.lessons.map((l) => ({ id: l.id, title: l.title })),
+        isImport: draftCheckpoint.isImport === true,
       });
       setPhase("checkpoint");
     }
@@ -266,7 +380,9 @@ export function CreateStudio({
 
   // 打开一份草稿的检查点（横幅「继续编辑」调用）。
   function openDraft(d: DraftCheckpoint) {
-    setCheckpoint({ courseId: d.courseId, slug: d.slug, title: d.title, lessons: d.lessons.map((l) => ({ id: l.id, title: l.title })) });
+    setSource(d.isImport ? "import" : "generate");
+    if (d.isImport) setTab("import");
+    setCheckpoint({ courseId: d.courseId, slug: d.slug, title: d.title, lessons: d.lessons.map((l) => ({ id: l.id, title: l.title })), isImport: d.isImport === true });
     setPhase("checkpoint");
   }
 
@@ -298,7 +414,7 @@ export function CreateStudio({
       id: cp.courseId,
       slug: cp.slug,
       title: cp.title,
-      isImport: false,
+      isImport: cp.isImport,
       total: initial.length,
       done: 0,
       firstLessonId: initial[0]?.id ?? "",
@@ -472,7 +588,7 @@ export function CreateStudio({
         body: JSON.stringify({
           prompt: q,
           category: category || undefined,
-          template,
+          template: template || undefined,
           model: model || undefined,
           qualityTier,
           checkpoint: proMode,
@@ -494,7 +610,7 @@ export function CreateStudio({
 
       // L2 检查点模式：大纲已落库为 outline_draft，停在检查点让用户增删改排序，确认后才扇出。
       if (data.checkpoint) {
-        setCheckpoint({ courseId: data.courseId, slug: data.slug, title: data.title || outline[0]?.title || data.slug, lessons: outline });
+        setCheckpoint({ courseId: data.courseId, slug: data.slug, title: data.title || outline[0]?.title || data.slug, lessons: outline, isImport: false });
         setPhase("checkpoint");
         return;
       }
@@ -591,9 +707,35 @@ export function CreateStudio({
         title?: string;
         charCount?: number;
         lessons: OutlineLesson[];
+        checkpoint?: boolean;
+        directReady?: boolean;
+        faithfulKind?: "presentation" | "scorm";
       };
       const outline = Array.isArray(data.lessons) ? data.lessons : [];
       if (outline.length === 0) throw new Error("未能从资料中拆出章节，请调整后重试");
+
+      // 忠实 PPT/Keynote/SCORM 已直接生成可播放课件，严禁再走逐节 AI 改写覆盖原版式。
+      if (data.directReady) {
+        const ready = outline.map((lesson) => ({ ...lesson, state: "done" as LessonState }));
+        setLessons(ready);
+        setSummary({
+          courseId: data.courseId, slug: data.slug, firstLessonId: outline[0].id,
+          total: outline.length, succeeded: outline.length, quizzes: 0, cards: 0, chars: data.charCount ?? 0,
+        });
+        setPhase("done");
+        toast(data.faithfulKind === "scorm" ? "SCORM 课程已在安全沙箱中就绪" : "演示文稿已按一页一屏忠实导入", { tone: "success" });
+        return;
+      }
+
+      if (data.checkpoint) {
+        setCheckpoint({
+          courseId: data.courseId, slug: data.slug,
+          title: data.title || opts.fallbackTitle || outline[0]?.title || data.slug,
+          lessons: outline, isImport: true,
+        });
+        setPhase("checkpoint");
+        return;
+      }
 
       // 导入的课同样已落库为 generating 态 + after() 后台接管；记下供「可退出」横幅接手。
       setLiveGen({
@@ -658,25 +800,26 @@ export function CreateStudio({
         fetch("/api/ai/import-source", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ title: importTitle.trim() || undefined, rawText: text, template, model: model || undefined, qualityTier }),
+          body: JSON.stringify({ title: importTitle.trim() || undefined, rawText: text, template: template || undefined, model: model || undefined, qualityTier, checkpoint: importCheckpoint }),
         }),
       fallbackTitle: importTitle.trim(),
     });
   }
 
   // 支持的文件格式（前端与后端 EXT_KIND 对齐）
-  const ACCEPT_EXT = ".pdf,.docx,.txt,.md,.markdown";
+  const ACCEPT_EXT = ".pdf,.docx,.txt,.md,.markdown,.pptx,.key,.scorm,.zip";
 
   // 文件导入（拖拽 / 点击选择均走这里）
   async function handleFileImport(file: File) {
     if (busy) return;
     if (!canUseLLM) return gate();
-    if (!/\.(pdf|docx|txt|md|markdown|text)$/i.test(file.name)) {
-      toast("仅支持 PDF / Word(.docx) / TXT / Markdown 文件", { tone: "warn" });
+    if (!/\.(pdf|docx|txt|md|markdown|text|pptx|key|scorm|zip)$/i.test(file.name)) {
+      toast("支持 PDF / DOCX / TXT / Markdown / PPTX / Keynote / SCORM", { tone: "warn" });
       return;
     }
-    if (file.size > 15_000_000) {
-      toast("文件过大（上限 15MB）", { tone: "warn" });
+    const richPackage = /\.(pptx|key|scorm|zip)$/i.test(file.name);
+    if (file.size > (richPackage ? 100_000_000 : 15_000_000)) {
+      toast(richPackage ? "演示文稿或 SCORM 上限 100MB" : "文本文档上限 15MB", { tone: "warn" });
       return;
     }
     if (file.size === 0) {
@@ -688,8 +831,9 @@ export function CreateStudio({
     const fd = new FormData();
     fd.append("file", file);
     if (importTitle.trim()) fd.append("title", importTitle.trim());
-    fd.append("template", template);
+    if (template) fd.append("template", template);
     fd.append("qualityTier", qualityTier);
+    fd.append("checkpoint", String(importCheckpoint));
     if (model) fd.append("model", model);
     await runImportTheater({
       outline: () => fetch("/api/ai/import-file", { method: "POST", body: fd }),
@@ -763,14 +907,16 @@ export function CreateStudio({
       {/* —— 顶部大标题 —— */}
       <div className="mb-1.5 flex items-center gap-2 rounded-full border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1">
         <Sparkle size={13} weight="fill" className="text-[var(--red)]" />
-        <span className="mono text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--red)]">AI STUDIO</span>
+        <span className="mono text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--red)]">{tab === "manual" ? "CREATOR STUDIO" : "AI STUDIO"}</span>
       </div>
       <h1 className="text-center text-[30px] font-extrabold leading-[1.15] tracking-tight text-[var(--ink)] sm:text-[38px]">
-        {tab === "import" ? "把任何资料，变成一门你的课" : "一句话，生成你的专属课"}
+        {tab === "import" ? "把任何资料，变成一门你的课" : tab === "manual" ? "从空白画布，亲手搭一门课" : "一句话，生成你的专属课"}
       </h1>
       <p className="mt-2.5 max-w-[460px] text-center text-[15px] leading-relaxed text-[var(--ink2)]">
         {tab === "import"
           ? "粘贴文章、笔记、PDF 内容，AI 现场拆章、配测验、装上伴侣，资料立刻能学。"
+          : tab === "manual"
+          ? "不调用 AI，不套固定章节结构。你决定课程、课节和每一个内容块。"
           : "说出你想学的，AI 现场搭好课程大纲、逐节写好讲解与测验，学完就能用。"}
       </p>
 
@@ -780,6 +926,7 @@ export function CreateStudio({
           {[
             { key: "generate" as Tab, label: "AI 生成课", Icon: MagicWand },
             { key: "import" as Tab, label: "导入我的资料", Icon: FilePlus },
+            { key: "manual" as Tab, label: "空白建课", Icon: BookOpen },
           ].map((t) => {
             const active = tab === t.key;
             return (
@@ -800,7 +947,7 @@ export function CreateStudio({
       )}
 
       {/* —— 权益预检提示（未订阅时，红只做关键信号） —— */}
-      {!canUseLLM && !inTheater && (
+      {!canUseLLM && !inTheater && tab !== "manual" && (
         <div className="studio-rise mt-5 flex w-full items-center gap-2.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-3 text-[13px] text-[var(--ink2)] shadow-[var(--card)]">
           <Lock size={16} weight="fill" className="shrink-0 text-[var(--red)]" />
           <span className="flex-1">AI 造课为订阅会员专享，订阅后即可无限生成专属课程。</span>
@@ -890,7 +1037,7 @@ export function CreateStudio({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-[14px] font-semibold text-[var(--ink)]">专业模式 · 自己掌控</span>
-                  <span className="block text-[12px] leading-snug text-[var(--ink3)]">选课件模板与模型、定制受众口吻，先看大纲满意再逐节生成，不满意不烧整门课的钱</span>
+                  <span className="block text-[12px] leading-snug text-[var(--ink3)]">定制受众、篇幅、创作方向与参考资料，先确认大纲再逐节生成</span>
                 </span>
                 <span
                   className={`relative h-6 w-11 shrink-0 rounded-full transition-colors duration-200 ${
@@ -911,7 +1058,7 @@ export function CreateStudio({
                 <div className="flex flex-col gap-3 rounded-[14px] border border-[var(--red-soft-border)] bg-[var(--red-soft)]/40 p-3.5">
                   <BlueprintChips label="受众水平" value={bpAudience} onChange={setBpAudience} options={[["beginner", "零基础"], ["some", "有基础"], ["advanced", "进阶"]]} />
                   <BlueprintChips label="讲解口吻" value={bpTone} onChange={setBpTone} options={[["textbook", "严谨教科书"], ["coach", "轻松教练"], ["interview", "面试冲刺"]]} />
-                  <BlueprintChips label="课程篇幅" value={bpLength} onChange={setBpLength} options={[["brief", "速览 5 节"], ["standard", "标准 8 节"], ["deep", "深研 12 节"]]} />
+                  <BlueprintChips label="课程篇幅" value={bpLength} onChange={setBpLength} options={[["brief", "精简"], ["standard", "标准"], ["deep", "深研"]]} />
                   <BlueprintMultiChips label="内容偏好" values={bpBlockPrefs} onToggle={(k) => setBpBlockPrefs((prev) => prev.includes(k) ? prev.filter((x) => x !== k) : [...prev, k])} options={[["quiz", "多做题"], ["diagram", "多图示"], ["code", "多代码"], ["flashcard", "多背诵卡"]]} />
                   <div>
                     <div className="mono mb-1.5 text-[11px] uppercase tracking-[0.14em] text-[var(--ink4)]">参考资料 · 让内容有出处</div>
@@ -924,7 +1071,7 @@ export function CreateStudio({
                     />
                   </div>
 
-                  {/* 呈现设置：课件模板 + 生成模型 + 质量档（v3.2；由默认流程迁入专业模式，默认关时用经典模板+默认模型+标准档）。 */}
+                  {/* 创作设置：默认自由导演；模板仅在用户明确选择时作为灵感偏好。 */}
                   <div className="border-t border-[var(--red-soft-border)] pt-3">
                     <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
                   </div>
@@ -986,6 +1133,8 @@ export function CreateStudio({
                 <ArrowRight size={16} weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5" />
               </button>
             </div>
+          ) : tab === "manual" ? (
+            <ManualCourseBuilder canUseLLM={canUseLLM} initialCourse={initialManualCourse} />
           ) : (
             <div className="flex flex-col gap-4">
               {/* §4 导入收益六宫格：stagger 递延进场 + hover 抬升，材质分级到 surface2 */}
@@ -1016,7 +1165,15 @@ export function CreateStudio({
               {/* v3.2：课件模板 + 模型（放上传区之上——拖入文件即刻开始生成，须先选好）*/}
               <TemplateModelPicker template={template} setTemplate={setTemplate} model={model} setModel={setModel} qualityTier={qualityTier} setQualityTier={setQualityTier} onAvailability={setAiAvailable} />
 
-              {/* 文件上传区：点击整卡或拖拽文件入内均可选择；支持 PDF / Word / TXT / MD。 */}
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-2.5">
+                <input type="checkbox" checked={importCheckpoint} onChange={(event) => setImportCheckpoint(event.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--red)]" />
+                <span>
+                  <span className="block text-[12px] font-semibold text-[var(--ink)]">文本资料先确认大纲</span>
+                  <span className="mt-0.5 block text-[11px] leading-relaxed text-[var(--ink3)]">PDF、DOCX、TXT、Markdown 会先进入人工编排检查点；PPTX、Keynote、SCORM 始终忠实导入，不经 AI 改写。</span>
+                </span>
+              </label>
+
+              {/* 文件上传区：文本文档可结构化；演示文稿/SCORM 走忠实导入。 */}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -1032,7 +1189,7 @@ export function CreateStudio({
               <div
                 role="button"
                 tabIndex={0}
-                aria-label="上传文件导入（PDF / Word / TXT / Markdown）"
+                aria-label="上传文件导入（PDF、Word、文本、PPTX、Keynote 或 SCORM）"
                 onClick={() => !busy && fileInputRef.current?.click()}
                 onKeyDown={(e) => {
                   if ((e.key === "Enter" || e.key === " ") && !busy) {
@@ -1074,7 +1231,9 @@ export function CreateStudio({
                   <span className="inline-flex items-center gap-1">
                     <FileText size={13} weight="fill" className="text-[var(--ink3)]" /> TXT / Markdown
                   </span>
-                  <span className="text-[var(--ink4)]">· 单个 ≤ 15MB</span>
+                  <span className="inline-flex items-center gap-1"><Cards size={13} weight="fill" className="text-[var(--info)]" /> PPTX / Keynote</span>
+                  <span className="inline-flex items-center gap-1"><Waves size={13} weight="fill" className="text-[var(--ok)]" /> SCORM</span>
+                  <span className="text-[var(--ink4)]">· 文档 15MB / 富媒体 100MB</span>
                 </span>
               </div>
 
@@ -1124,6 +1283,7 @@ export function CreateStudio({
           initialLessons={checkpoint.lessons.map((l) => ({ id: l.id, title: l.title }))}
           onConfirmed={proceedFromCheckpoint}
           onCancel={resetTheater}
+          allowRegenerate={!checkpoint.isImport}
         />
       ) : phase === "done" && summary ? (
         <DonePanel

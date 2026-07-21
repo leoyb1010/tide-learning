@@ -170,7 +170,9 @@ export function createStreamSignature(assetId: string, expiresAt: number): strin
 }
 
 export function verifyStreamSignature(assetId: string, expiresAt: number, signature: string | null, now = Date.now()): boolean {
-  if (!signature || !Number.isSafeInteger(expiresAt) || expiresAt <= now || expiresAt > now + 10 * 60_000 + 5_000) return false;
+  // 接受窗口 20 分钟(与 signedVideoUrl 的 +2 窗口边界对齐,2026-07-21 修复窗口尾部即刻过期):
+  // 未来戳超过 20min+5s 视为伪造/时钟异常,仍然拒绝。
+  if (!signature || !Number.isSafeInteger(expiresAt) || expiresAt <= now || expiresAt > now + 20 * 60_000 + 5_000) return false;
   try {
     const expected = Buffer.from(createStreamSignature(assetId, expiresAt), "hex");
     const actual = Buffer.from(signature, "hex");

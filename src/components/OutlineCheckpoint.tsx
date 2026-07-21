@@ -32,6 +32,7 @@ export function OutlineCheckpoint({
   initialLessons,
   onConfirmed,
   onCancel,
+  allowRegenerate = true,
 }: {
   courseId: string;
   courseTitle: string;
@@ -39,6 +40,7 @@ export function OutlineCheckpoint({
   /** 确认并触发扇出后回调：父组件据此进入逐节生成剧场。传回最终节列表（含服务端补建的 id）。 */
   onConfirmed: (lessons: { id: string; title: string }[]) => void;
   onCancel: () => void;
+  allowRegenerate?: boolean;
 }) {
   const { toast } = useToast();
   const [lessons, setLessons] = useState<CheckpointLesson[]>(initialLessons);
@@ -70,8 +72,8 @@ export function OutlineCheckpoint({
     setSelected((s) => Math.max(0, s - (i <= s ? 1 : 0)));
   }
   function add() {
-    if (lessons.length >= 12) {
-      toast("最多 12 节", { tone: "info" });
+    if (lessons.length >= 100) {
+      toast("最多 100 节", { tone: "info" });
       return;
     }
     setLessons((ls) => [...ls, { title: "新的一节", summary: "" }]);
@@ -232,15 +234,17 @@ export function OutlineCheckpoint({
           )}
 
           <div className="mt-4 flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={regenerate}
-              disabled={busy}
-              className="studio-press inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] disabled:opacity-60"
-            >
-              {regenerating ? <Spinner size={13} /> : <ArrowClockwise size={14} weight="bold" />}
-              {regenerating ? "重拟中" : "重新生成大纲"}
-            </button>
+            {allowRegenerate && (
+              <button
+                type="button"
+                onClick={regenerate}
+                disabled={busy}
+                className="studio-press inline-flex min-h-[42px] items-center justify-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface2)] px-4 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] disabled:opacity-60"
+              >
+                {regenerating ? <Spinner size={13} /> : <ArrowClockwise size={14} weight="bold" />}
+                {regenerating ? "重拟中" : "重新生成大纲"}
+              </button>
+            )}
             <button
               type="button"
               onClick={confirm}

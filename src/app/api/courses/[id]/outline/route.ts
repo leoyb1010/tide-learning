@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const rawLessons = Array.isArray(body?.lessons) ? body!.lessons : null;
     if (!rawLessons) return fail("缺少大纲节列表");
-    // 规范化 + 校验：标题必填，长度上限对齐首次造课（title 120 / summary 300）；1~12 节。
+    // 规范化 + 校验：标题必填，长度上限对齐首次造课；导入现成大纲可包含较多课节。
     const lessons = rawLessons
       .filter((l) => l && typeof l.title === "string" && l.title.trim())
       .map((l) => ({
@@ -45,7 +45,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         summary: (typeof l.summary === "string" ? l.summary : "").trim().slice(0, 300) || null,
       }));
     if (lessons.length === 0) return fail("大纲至少保留 1 节");
-    if (lessons.length > 12) return fail("大纲最多 12 节");
+    if (lessons.length > 100) return fail("大纲最多 100 节");
 
     const course = await prisma.course.findUnique({
       where: { id },

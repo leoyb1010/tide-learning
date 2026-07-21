@@ -7,7 +7,8 @@ import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
-import { readBlueprint, blueprintOutlineFragment, lessonCountForLength } from "@/lib/ai/blueprint";
+import { readBlueprint, blueprintOutlineFragment, lessonRangeForLength } from "@/lib/ai/blueprint";
+import { createCourseContentBrief, serializeCourseContentBrief } from "@/lib/ai/content-brief";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
@@ -20,6 +21,14 @@ interface OutlineResult {
   title: string;
   subtitle: string;
   intro: string;
+  plan?: {
+    learnerOutcome?: unknown;
+    scope?: unknown;
+    prerequisites?: unknown;
+    capstone?: unknown;
+    exclusions?: unknown;
+    planningRationale?: unknown;
+  };
   outline: OutlineItem[];
 }
 
@@ -80,7 +89,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
       const category = course.category || "ai_skill";
       const blueprint = readBlueprint(course.blueprintJson);
-      const { system, user: userMsg } = courseOutlinePrompt({ prompt: basePrompt, category, template: course.template ?? undefined });
+      const lessonRange = blueprint?.length ? lessonRangeForLength(blueprint.length) : undefined;
+      const { system, user: userMsg } = courseOutlinePrompt({
+        prompt: basePrompt,
+        category,
+        template: course.template ?? undefined,
+        lessonRange,
+      });
       const result = await chatJson<OutlineResult>({
         system,
         user: userMsg + blueprintOutlineFragment(blueprint),
@@ -98,7 +113,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           title: o.title.trim().slice(0, 120),
           objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
         }))
-        .slice(0, lessonCountForLength(blueprint?.length));
+        .slice(0, lessonRange?.max ?? 24);
       if (outline.length === 0) throw new AppError("大纲生成失败，请调整需求后重试", 502);
 
       // 全量替换：删掉现有空节（outline_draft 态全部 blocksJson=null），按新大纲重建。
@@ -119,7 +134,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           });
         }
         // 大纲标题/副标题/简介也随之刷新（若模型给了）。
-        const meta: { title?: string; subtitle?: string | null; description?: string | null } = {};
+        const meta: { title?: string; subtitle?: string | null; description?: string | null; contentBriefJson?: string } = {
+          contentBriefJson: serializeCourseContentBrief(createCourseContentBrief({ request: basePrompt, plan: result?.plan })),
+        };
         if (typeof result?.title === "string" && result.title.trim()) meta.title = result.title.trim().slice(0, 120);
         if (typeof result?.subtitle === "string") meta.subtitle = result.subtitle.trim().slice(0, 200) || null;
         if (typeof result?.intro === "string") meta.description = result.intro.trim().slice(0, 2000) || null;

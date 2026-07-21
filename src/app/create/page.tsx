@@ -5,9 +5,9 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { freeCourseGenRemaining } from "@/lib/ai-guard";
 import { prisma } from "@/lib/db";
-import type { GeneratingCourse, DraftCheckpoint } from "@/components/CreateStudio";
+import type { GeneratingCourse, DraftCheckpoint, ManualCourseState } from "@/components/CreateStudio";
 
-export const metadata = { title: "AI 造课" };
+export const metadata = { title: "课程创作" };
 
 // 造课剧场按需懒加载：CreateStudio 体量大（造课全流程），拆出独立 chunk
 // 减小 /create 首包。宿主是 Server Component，next/dynamic 不能用 ssr:false，
@@ -44,9 +44,10 @@ function CreateStudioSkeleton() {
  * 真正的权益闸门在各 AI route 内二次校验（越权/权益判断只信服务端）。
  * 未登录先引导登录（AI 功能必须登录）。
  */
-export default async function CreatePage() {
+export default async function CreatePage({ searchParams }: { searchParams: Promise<{ manual?: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/create");
+  const requestedManualId = (await searchParams).manual?.trim();
 
   const snapshot = await resolveEntitlement(user.id);
 
@@ -87,19 +88,30 @@ export default async function CreatePage() {
   // 专业模式造课停在 outline_draft，用户若离开/刷新，回到 /create 用它把检查点重新打开
   // （否则草稿会成为无客户端可达的死角，/outline* 系列接口没有入口）。
   const draftRow = await prisma.course.findFirst({
-    where: { authorUserId: user.id, genStatus: "outline_draft", origin: "ai_generated" },
+    where: { authorUserId: user.id, genStatus: "outline_draft", origin: { in: ["ai_generated", "user_imported"] } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, slug: true, title: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
+    select: { id: true, slug: true, title: true, origin: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
   });
   const draftCheckpoint: DraftCheckpoint | null = draftRow
-    ? { courseId: draftRow.id, slug: draftRow.slug, title: draftRow.title, lessons: draftRow.lessons.map((l) => ({ id: l.id, title: l.title })) }
+    ? { courseId: draftRow.id, slug: draftRow.slug, title: draftRow.title, isImport: draftRow.origin === "user_imported", lessons: draftRow.lessons.map((l) => ({ id: l.id, title: l.title })) }
+    : null;
+
+  // 手工课程恢复：只能读取当前用户自己的 user_created 课程，刷新/离开后仍能继续导演。
+  const manualRow = requestedManualId
+    ? await prisma.course.findFirst({
+        where: { id: requestedManualId, authorUserId: user.id, origin: "user_created" },
+        select: { id: true, slug: true, title: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
+      })
+    : null;
+  const initialManualCourse: ManualCourseState | null = manualRow
+    ? { id: manualRow.id, slug: manualRow.slug, title: manualRow.title, lessons: manualRow.lessons }
     : null;
 
   return (
     <div className="mx-auto flex min-h-[calc(100vh-160px)] w-full max-w-[1040px] flex-col justify-center py-8 sm:py-12">
       {/* CreateStudio 用 useSearchParams 读 ?prompt，Next15 需 Suspense 边界 */}
       <Suspense fallback={null}>
-        <CreateStudio canUseLLM={canCreate} generatingCourses={generatingCourses} draftCheckpoint={draftCheckpoint} />
+        <CreateStudio canUseLLM={canCreate} generatingCourses={generatingCourses} draftCheckpoint={draftCheckpoint} initialManualCourse={initialManualCourse} />
       </Suspense>
     </div>
   );

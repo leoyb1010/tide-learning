@@ -215,6 +215,10 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
         select: {
           ...COURSE_PUBLIC_SELECT,
           lessons: { orderBy: { sortOrder: "asc" }, select: LESSON_OUTLINE_SELECT },
+          lessonEdges: {
+            orderBy: { sortOrder: "asc" },
+            select: { fromLessonId: true, toLessonId: true, label: true, conditionJson: true, sortOrder: true },
+          },
         },
       },
       subtitles: {
@@ -230,8 +234,21 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   const snapshot = await resolveEntitlement(userId);
   const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned);
 
-  const { lessons: siblings, ...courseMeta } = lesson.course;
+  const { lessons: siblings, lessonEdges, ...courseMeta } = lesson.course;
   const idx = siblings.findIndex((l) => l.id === lesson.id);
+  const graphMode = lesson.course.navigationMode === "graph";
+  const parseConditionType = (json: string | null): string => {
+    try { return (JSON.parse(json ?? '{"type":"always"}') as { type?: string }).type ?? "always"; }
+    catch { return "always"; }
+  };
+  const outgoing = graphMode
+    ? lessonEdges.filter((edge) => edge.fromLessonId === lesson.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    : [];
+  const incoming = graphMode
+    ? lessonEdges.filter((edge) => edge.toLessonId === lesson.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    : [];
+  // 条件边由课件内 choice/quiz/hotspot 明确触发；底部“下一节”只沿 always 边，避免绕过学习者选择。
+  const defaultGraphNext = outgoing.find((edge) => parseConditionType(edge.conditionJson) === "always") ?? null;
 
   return {
     snapshot,
@@ -272,8 +289,8 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       durationSec: l.durationSec,
       current: l.id === lesson.id,
     })),
-    prevLessonId: idx > 0 ? siblings[idx - 1].id : null,
-    nextLessonId: idx < siblings.length - 1 ? siblings[idx + 1].id : null,
+    prevLessonId: graphMode ? (incoming[0]?.fromLessonId ?? null) : idx > 0 ? siblings[idx - 1].id : null,
+    nextLessonId: graphMode ? (defaultGraphNext?.toLessonId ?? null) : idx < siblings.length - 1 ? siblings[idx + 1].id : null,
   };
 }
 
@@ -284,8 +301,11 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
  */
 const STREAM_TTL_MS = 10 * 60 * 1000;
 function signedVideoUrl(assetId: string): string {
-  // 取当前所在时间窗口的下一个边界作为过期戳 —— 稳定、可缓存、跨渲染一致。
-  const exp = (Math.floor(Date.now() / STREAM_TTL_MS) + 1) * STREAM_TTL_MS;
+  // 过期戳取「下下个」窗口边界(2026-07-21 修复):此前取下一个边界,页面若恰在窗口尾部渲染
+  // (如 xx:09:58),URL 2 秒后即过期——视频 range 拉流中途 403 中断(CI runtime-contract 在窗口
+  // 边界稳定复现,线上用户同样会踩)。+2 后剩余有效期恒在 (10,20] 分钟,同窗口内仍跨渲染一致
+  // (SSR 与 hydration 同 URL,无 mismatch);verifyStreamSignature 的接受窗口已同步放宽到 20 分钟。
+  const exp = (Math.floor(Date.now() / STREAM_TTL_MS) + 2) * STREAM_TTL_MS;
   const sig = createStreamSignature(assetId, exp);
   return `/api/stream/${encodeURIComponent(assetId)}?exp=${exp}&sig=${sig}`;
 }

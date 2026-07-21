@@ -16,6 +16,7 @@ export const COURSE_PUBLIC_SELECT = {
   authorUserId: true,
   sharedStatus: true,
   template: true,
+  navigationMode: true,
   sourceDemandId: true,
   instructorName: true,
   reviewerName: true,

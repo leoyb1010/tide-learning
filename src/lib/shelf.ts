@@ -3,6 +3,7 @@
 import { prisma } from "./db";
 import { CATEGORY_LABELS } from "./queries";
 import { resolveCoverSrc } from "./tracks";
+import { USER_AUTHORED_ORIGINS } from "./course-origin";
 
 /** 书架分类 key（五层）。 */
 export type ShelfCategory = "ai_created" | "imported" | "learning" | "collected" | "completed";
@@ -15,7 +16,7 @@ export interface ShelfCourse {
   category: string; // 赛道 key
   categoryLabel: string; // 赛道中文标签
   lessonsCount: number;
-  origin: string; // official / ai_generated / user_imported
+  origin: string; // official / ai_generated / user_imported / user_created
   progress: number; // 完课百分比 0-100（完课 lesson 数 / 总 lesson 数）
   coverSrc: string; // 真实封面图路径
   // —— 生成态（仅自造/导入课有意义；官方/淘来课恒为 ready）——
@@ -29,7 +30,7 @@ export type MyShelf = Record<ShelfCategory, ShelfCourse[]>;
 
 /**
  * 取用户书架的全部课，按五个分类归组：
- * - ai_created：我造的 AI 课（origin=ai_generated 且 authorUserId=userId）
+ * - ai_created：我造的课（origin=ai_generated/user_created 且 authorUserId=userId）
  * - imported  ：我导入的课（origin=user_imported 且 authorUserId=userId）
  * - learning  ：我在学的官方课（有 LearningProgress、origin=official、且未全部完成）
  * - collected ：我从集市「拿走」的课（非我造、非官方，且我有 LearningProgress，即 fork 起始记录）
@@ -43,7 +44,7 @@ export type MyShelf = Record<ShelfCategory, ShelfCourse[]>;
 export async function getMyShelf(userId: string): Promise<MyShelf> {
   // —— 1. 我造/导入的课（归属 = 我）：与 LearningProgress 无关，作者天然拥有。 ——
   const myAuthoredCourses = await prisma.course.findMany({
-    where: { authorUserId: userId, origin: { in: ["ai_generated", "user_imported"] } },
+    where: { authorUserId: userId, origin: { in: [...USER_AUTHORED_ORIGINS] } },
     select: {
       id: true,
       slug: true,
@@ -126,7 +127,7 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
       genStatus,
       genDone,
     };
-    if (c.origin === "ai_generated") shelf.ai_created.push(view);
+    if (c.origin === "ai_generated" || c.origin === "user_created") shelf.ai_created.push(view);
     else shelf.imported.push(view);
   }
 
@@ -176,7 +177,7 @@ export async function getMyShelf(userId: string): Promise<MyShelf> {
 export async function getShelfCount(userId: string): Promise<number> {
   const [authored, progressed] = await Promise.all([
     prisma.course.findMany({
-      where: { authorUserId: userId, origin: { in: ["ai_generated", "user_imported"] } },
+      where: { authorUserId: userId, origin: { in: [...USER_AUTHORED_ORIGINS] } },
       select: { id: true },
     }),
     prisma.learningProgress.findMany({

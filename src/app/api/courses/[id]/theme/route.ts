@@ -49,7 +49,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const lessons = await prisma.lesson.findMany({
       where: { courseId: course.id, blocksJson: { not: null } },
       orderBy: { sortOrder: "asc" },
-      select: { id: true, title: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true },
+      // designJson/renderEngine 必须带上(2026-07-21 审查 M 修复):v6 起 lesson.designJson 存逐节原创
+      // 设计 token,select 漏掉会让 renderAndStoreLessonHtml 落库时把它静默清空——用户换个固定皮肤,
+      // 整课花钱精修出的逐节设计全没了,回 bespoke 时还得重烧 LLM。
+      select: { id: true, title: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true },
     });
 
     let rendered = 0;

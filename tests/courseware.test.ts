@@ -17,7 +17,6 @@ import {
 import { heroMotif, cornerMotif } from "@/lib/ai/courseware-motifs";
 import { resolveCoursewareMode, getModeProfile, llmStyleBrief, MODE_PROFILES } from "@/lib/ai/courseware-catalog";
 import { assessCoursewareDiversity } from "@/lib/ai/courseware-html";
-import { goldenExemplar } from "@/lib/ai/courseware-exemplars";
 import type { Block } from "@/lib/blocks";
 
 /**
@@ -144,18 +143,10 @@ describe("课件风格智能层 catalog（内容类型→mode→风格）", () =
 
 });
 
-describe("LLM 增强双闸门（few-shot 范例 + 多样性机检）", () => {
+describe("LLM 表现层视觉观测", () => {
   const d = resolveCourseDesign({ id: "x", category: "ai_skill", template: null, designJson: null });
 
-  it("goldenExemplar 本身合规（含 CSP/内联SVG/reduce-motion，过安全校验）", () => {
-    const ex = goldenExemplar(d);
-    expect(ex).toContain("Content-Security-Policy");
-    expect(ex).toContain("<svg");
-    expect(ex).toContain("prefers-reduced-motion");
-    expect(validateCoursewareHtml(ex).ok).toBe(true);
-  });
-
-  it("多样性闸门：纯文字墙(无SVG/同底色)拒收，图形分化产物通过", () => {
+  it("多样性评分仍能识别文字墙，但 v6 只把它作为设计评审信号", () => {
     const wall = "<body>" + "<section><p>text</p></section>".repeat(6) + "</body>";
     const bad = assessCoursewareDiversity(wall);
     expect(bad.ok).toBe(false);

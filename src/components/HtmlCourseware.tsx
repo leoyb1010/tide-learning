@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { CornersOut, CornersIn, Sparkle } from "@phosphor-icons/react";
 import { track } from "@/lib/analytics-client";
+import { useRouter } from "next/navigation";
 
 /**
  * HtmlCourseware —— AI 生成的自包含 HTML 课件的**沙箱渲染器**（v3.4：默认翻页，可切滚动）。
@@ -37,12 +38,15 @@ function injectNonce(html: string, nonce: string | undefined): string {
 export function HtmlCourseware({
   html,
   lessonId,
+  courseSlug,
   nonce,
   onPage,
   initialPage,
 }: {
   html: string;
   lessonId?: string;
+  /** 分支块跳转必须绑定当前课程 slug；目标课节由服务端再次校验同课归属。 */
+  courseSlug?: string;
   /** 父页 CSP nonce(middleware x-nonce)。不传则不注入——独立/测试渲染场景仍可用。 */
   nonce?: string;
   /** 翻页课件页码变化回调(index 0 起, total 总页数)。宿主用它接进度上报(蓝图 D1 补口)。 */
@@ -50,6 +54,7 @@ export function HtmlCourseware({
   /** v4.2 续读:上次读到的页(0-indexed)。收到 ct-ready 后一次性下发 ct-goto 恢复位置。 */
   initialPage?: number;
 }) {
+  const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number>(560);
   const [fullscreen, setFullscreen] = useState(false);
@@ -128,11 +133,17 @@ export function HtmlCourseware({
             }),
           }).catch(() => {});
         }
+      } else if (d.type === "ct-branch" && courseSlug && typeof d.targetLessonId === "string") {
+        const target = d.targetLessonId.trim();
+        if (/^[A-Za-z0-9_-]{1,80}$/.test(target)) {
+          track("courseware_branch_navigate", { lesson_id: lessonId ?? null, target_lesson_id: target });
+          router.push(`/courses/${encodeURIComponent(courseSlug)}/learn/${encodeURIComponent(target)}`);
+        }
       }
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [postToFrame, lessonId, onPage, initialPage]);
+  }, [postToFrame, lessonId, courseSlug, router, onPage, initialPage]);
 
   const switchMode = useCallback(
     (m: ViewMode) => {

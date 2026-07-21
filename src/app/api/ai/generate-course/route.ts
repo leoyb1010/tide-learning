@@ -9,9 +9,10 @@ import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
-import { isValidTemplate, pickTemplate } from "@/lib/ai/templates";
+import { isValidTemplate } from "@/lib/ai/templates";
 import { selectModelFor } from "@/lib/ai/models";
-import { parseBlueprint, serializeBlueprint, blueprintOutlineFragment, lessonCountForLength } from "@/lib/ai/blueprint";
+import { parseBlueprint, serializeBlueprint, blueprintOutlineFragment, lessonRangeForLength } from "@/lib/ai/blueprint";
+import { createCourseContentBrief, serializeCourseContentBrief } from "@/lib/ai/content-brief";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,14 @@ interface OutlineResult {
   title: string;
   subtitle: string;
   intro: string;
+  plan?: {
+    learnerOutcome?: unknown;
+    scope?: unknown;
+    prerequisites?: unknown;
+    capstone?: unknown;
+    exclusions?: unknown;
+    planningRationale?: unknown;
+  };
   outline: OutlineItem[];
 }
 
@@ -78,8 +87,8 @@ export async function POST(req: NextRequest) {
       // v3.2 课件模板：模板全员免费，非法 key 直接拒绝（不静默回落，避免脏数据落库）。
       const provided = body?.template?.trim() || undefined;
       if (provided && !isValidTemplate(provided)) return fail("未知的课件模板");
-      // #3b：未显式选模板时据内容自动匹配课型，避免全默认 classic → 内容块千篇一律。
-      const template = provided ?? pickTemplate({ category, prompt });
+      // 未显式选择时保持自由导演，不再暗中挑一套模板并把它注入全课内容结构。
+      const template = provided ?? null;
 
       // v3.2 选模型：会员可选高级模型。请求了不在可用集内的模型 → 402（会员专享/未配置）。
       const requestedModel = body?.model?.trim();
@@ -92,7 +101,7 @@ export async function POST(req: NextRequest) {
       const modelKey = modelEntry.key;
       const qualityTier = body?.qualityTier === "premium" ? "premium" : "standard";
       if (qualityTier === "premium" && !snapshot.isSubscriber) {
-        return fail("精修排版为会员专享，请升级订阅或使用标准排版", 402);
+        return fail("深度研究为会员专享，请升级订阅或使用完整生成", 402);
       }
 
       // 积分预检（P1-3 修复）：按所选模型的真实计费权重设门槛（高级模型门槛更高），
@@ -102,7 +111,8 @@ export async function POST(req: NextRequest) {
 
       // 内置 prompt 库：金牌架构师 + 分赛道吸引力包 + 起承转合 + 模板结构 + 合规底线。
       // 输出契约不变：{title, subtitle, intro, outline:[{title, objective, difficulty}]}。
-      const { system, user: userMsg } = courseOutlinePrompt({ prompt, category, template });
+      const lessonRange = blueprint?.length ? lessonRangeForLength(blueprint.length) : undefined;
+      const { system, user: userMsg } = courseOutlinePrompt({ prompt, category, template: template ?? undefined, lessonRange });
       // L1 蓝图：受众/口吻/篇幅影响大纲规划，追加到 user 消息末尾。
       const userMsgWithBlueprint = userMsg + blueprintOutlineFragment(blueprint);
 
@@ -123,8 +133,7 @@ export async function POST(req: NextRequest) {
       const subtitle = (result?.subtitle || "").trim() || null;
       const intro = (result?.intro || "").trim();
       const rawOutline = Array.isArray(result?.outline) ? result.outline : [];
-      // L1 蓝图篇幅：brief=5 / standard=8 / deep=12 节上限（缺省 8）。
-      const maxLessons = lessonCountForLength(blueprint?.length);
+      // 篇幅是范围而非固定配额；保留模型按主题复杂度少设或多设的决策。
       const outline = rawOutline
         .filter((o) => o && typeof o.title === "string" && o.title.trim())
         .map((o) => ({
@@ -132,8 +141,10 @@ export async function POST(req: NextRequest) {
           objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
           difficulty: (typeof o.difficulty === "string" ? o.difficulty : "").trim().slice(0, 20),
         }))
-        .slice(0, maxLessons);
+        .slice(0, lessonRange?.max ?? 24);
       if (outline.length === 0) throw new AppError("大纲生成失败，请调整需求后重试", 502);
+
+      const contentBrief = createCourseContentBrief({ request: prompt, plan: result?.plan });
 
       // v5 专属视觉：本课设计 brief 不在此同步生成（避免给用户点「生成课程」再叠加一次 LLM 阻塞，
       // review #5）。designJson 先留空,由后台 runCourseGenBackground 的 ensureDesignBrief 在渲染前补齐
@@ -160,8 +171,9 @@ export async function POST(req: NextRequest) {
             // 检查点模式先停在 outline_draft（等用户确认），否则直接 generating 走后台扇出。
             genStatus: checkpoint ? "outline_draft" : "generating",
             blueprintJson: blueprint ? serializeBlueprint(blueprint) : null,
+            contentBriefJson: serializeCourseContentBrief(contentBrief),
             // designJson 留空：由后台 ensureDesignBrief 生成本课专属 brief 后写入（v5，见上）。
-            template: template ?? null,
+            template,
             modelUsed: modelKey,
             qualityTier,
             disclaimer: "本课程由 AI 生成，内容仅供学习参考",
@@ -198,7 +210,7 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             type: "course_outline",
             status: "done",
-            inputJson: JSON.stringify({ prompt, category, template: template ?? null, model: modelKey, qualityTier }),
+            inputJson: JSON.stringify({ prompt, category, template, model: modelKey, qualityTier }),
             resultRef: course.id,
             finishedAt: new Date(),
           },

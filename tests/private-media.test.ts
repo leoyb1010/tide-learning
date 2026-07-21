@@ -81,7 +81,11 @@ describe("短时流地址签名", () => {
     expect(verifyStreamSignature("media_test", exp, signature, now)).toBe(true);
     expect(verifyStreamSignature("media_other", exp, signature, now)).toBe(false);
     expect(verifyStreamSignature("media_test", now - 1, createStreamSignature("media_test", now - 1), now)).toBe(false);
-    const tooLong = now + 11 * 60_000;
+    // 接受窗口 2026-07-21 起为 20min+5s(signedVideoUrl 改取 +2 窗口边界,修窗口尾部即刻过期):
+    // 15 分钟在窗口内应放行,21 分钟超窗应拒绝。
+    const withinWindow = now + 15 * 60_000;
+    expect(verifyStreamSignature("media_test", withinWindow, createStreamSignature("media_test", withinWindow), now)).toBe(true);
+    const tooLong = now + 21 * 60_000;
     expect(verifyStreamSignature("media_test", tooLong, createStreamSignature("media_test", tooLong), now)).toBe(false);
   });
 });

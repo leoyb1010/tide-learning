@@ -13,6 +13,7 @@ import { TidalReveal as Reveal } from "@/components/motion";
 import { TrackView } from "@/components/TrackView";
 import { CourseCard } from "@/components/CourseCard";
 import { StudyDesk, type DeskResume, type DeskNote } from "@/components/StudyDesk";
+import { USER_AUTHORED_ORIGINS } from "@/lib/course-origin";
 
 export const metadata = { title: "书桌" };
 
@@ -59,9 +60,9 @@ async function StudyDeskHome({ user }: { user: User }) {
           lesson: { select: { id: true, title: true, durationSec: true } },
         },
       }),
-      // 我的课数量（AI 造课 / 导入课，归属当前用户）
+      // 我的课数量（AI 造课 / 导入课 / 手工课，归属当前用户）
       prisma.course.count({
-        where: { authorUserId: userId, origin: { in: ["ai_generated", "user_imported"] } },
+        where: { authorUserId: userId, origin: { in: [...USER_AUTHORED_ORIGINS] } },
       }),
       // 最近笔记 3 条
       prisma.note.findMany({

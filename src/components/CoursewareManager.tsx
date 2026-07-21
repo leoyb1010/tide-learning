@@ -14,12 +14,14 @@
 
 import { useState, useEffect } from "react";
 import {
-  Palette, PencilSimple, ClockCounterClockwise, Sparkle, ArrowClockwise, Check, ListBullets,
+  Palette, PencilSimple, ClockCounterClockwise, Sparkle, ArrowClockwise, Check, ListBullets, Plus, Stack, ShareNetwork,
 } from "@phosphor-icons/react";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/GenProgress";
 import { BlockEditor } from "@/components/BlockEditor";
+import { CreatorLibraryDialog } from "@/components/CreatorLibraryDialog";
+import { LessonGraphDialog } from "@/components/LessonGraphDialog";
 import { track } from "@/lib/analytics-client";
 
 /** 换肤可选的艺术方向（key 与服务端 ART_DIRECTIONS 一致；此处只需 key+label，避免打包服务端 token 数据）。 */
@@ -55,6 +57,7 @@ export function CoursewareManager({
   lessons,
   initialArtKey,
   isSubscriber = false,
+  allowAddLesson = false,
 }: {
   courseId: string;
   lessons: ManagerLesson[];
@@ -62,6 +65,8 @@ export function CoursewareManager({
   initialArtKey?: string | null;
   /** 会员才可用 bespoke 精修（前端也钳一次，服务端仍是权威）。 */
   isSubscriber?: boolean;
+  /** 手工建课工作区可从空白画布继续增加课节。 */
+  allowAddLesson?: boolean;
 }) {
   const { toast } = useToast();
   const [artKey, setArtKey] = useState<string | null>(initialArtKey ?? null);
@@ -69,6 +74,41 @@ export function CoursewareManager({
   const [rewriteFor, setRewriteFor] = useState<ManagerLesson | null>(null);
   const [historyFor, setHistoryFor] = useState<ManagerLesson | null>(null);
   const [editFor, setEditFor] = useState<ManagerLesson | null>(null);
+  const [managedLessons, setManagedLessons] = useState(lessons);
+  const [newLessonTitle, setNewLessonTitle] = useState("");
+  const [lessonBusy, setLessonBusy] = useState(false);
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [graphOpen, setGraphOpen] = useState(false);
+
+  useEffect(() => setManagedLessons(lessons), [lessons]);
+
+  async function addLesson() {
+    const title = newLessonTitle.trim();
+    if (!title || lessonBusy) return;
+    setLessonBusy(true);
+    try {
+      const r = await fetch("/api/lessons", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ courseId, title }),
+      });
+      const j = await r.json().catch(() => null);
+      if (r.ok && j?.ok && j.data?.lesson?.id) {
+        const created = { id: j.data.lesson.id as string, title: j.data.lesson.title as string };
+        setManagedLessons((prev) => [...prev, created]);
+        setNewLessonTitle("");
+        setEditFor(created);
+        toast("空白课节已创建，开始添加内容块吧", { tone: "success" });
+      } else {
+        toast(j?.error || "新增课节失败", { tone: "warn" });
+      }
+    } catch {
+      toast("网络异常，请稍后再试", { tone: "warn" });
+    } finally {
+      setLessonBusy(false);
+    }
+  }
 
   async function switchSkin(key: string) {
     if (themeBusy || key === artKey) return;
@@ -97,10 +137,24 @@ export function CoursewareManager({
 
   return (
     <div className="mt-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-4 shadow-[var(--card)]">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <Palette size={16} weight="fill" className="text-[var(--red)]" />
         <span className="text-[13px] font-semibold text-[var(--ink)]">内容管理 · 可控编辑</span>
-        <span className="mono text-[11px] text-[var(--ink4)]">换肤免费 · 改写按节计费</span>
+        <span className="mono flex-1 text-[11px] text-[var(--ink4)]">内容、结构与视觉都可继续编辑</span>
+        <button
+          type="button"
+          onClick={() => setGraphOpen(true)}
+          className="studio-press inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-[11px] font-semibold text-[var(--ink2)] hover:border-[var(--border2)]"
+        >
+          <ShareNetwork size={13} weight="fill" /> 课程路径图
+        </button>
+        <button
+          type="button"
+          onClick={() => setLibraryOpen(true)}
+          className="studio-press inline-flex min-h-[34px] items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-[11px] font-semibold text-[var(--ink2)] hover:border-[var(--border2)]"
+        >
+          <Stack size={13} weight="fill" /> 模板与皮肤库
+        </button>
       </div>
 
       {/* —— L5 换肤 —— */}
@@ -129,9 +183,31 @@ export function CoursewareManager({
       </div>
 
       {/* —— L4 逐节改写 / 回滚 —— */}
-      <p className="mt-4 text-[12px] font-semibold text-[var(--ink2)]">逐节编辑</p>
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <p className="text-[12px] font-semibold text-[var(--ink2)]">逐节编辑</p>
+        {allowAddLesson && <span className="text-[11px] text-[var(--ink4)]">每节从空白画布开始</span>}
+      </div>
+      {allowAddLesson && (
+        <div className="mt-2 flex items-center gap-2 rounded-[10px] border border-dashed border-[var(--border2)] bg-[var(--surface)] p-2">
+          <input
+            value={newLessonTitle}
+            onChange={(e) => setNewLessonTitle(e.target.value.slice(0, 120))}
+            onKeyDown={(e) => { if (e.key === "Enter") void addLesson(); }}
+            placeholder="新课节标题"
+            className="min-h-[36px] min-w-0 flex-1 rounded-[8px] border border-[var(--border)] bg-[var(--surface2)] px-3 text-[13px] outline-none focus:border-[var(--ink3)]"
+          />
+          <button
+            type="button"
+            onClick={() => void addLesson()}
+            disabled={!newLessonTitle.trim() || lessonBusy}
+            className="studio-press inline-flex min-h-[36px] items-center gap-1.5 rounded-[8px] bg-[var(--ink)] px-3 text-[12px] font-semibold text-[var(--surface)] disabled:opacity-50"
+          >
+            {lessonBusy ? <Spinner size={12} /> : <Plus size={13} weight="bold" />} 新增课节
+          </button>
+        </div>
+      )}
       <ul className="mt-2 flex flex-col gap-1.5">
-        {lessons.map((l, i) => (
+        {managedLessons.map((l, i) => (
           <li
             key={l.id}
             className="flex items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
@@ -173,6 +249,8 @@ export function CoursewareManager({
         />
       )}
       {historyFor && <HistoryDialog lesson={historyFor} onClose={() => setHistoryFor(null)} />}
+      {libraryOpen && <CreatorLibraryDialog courseId={courseId} lessons={managedLessons} onClose={() => setLibraryOpen(false)} />}
+      {graphOpen && <LessonGraphDialog courseId={courseId} onClose={() => setGraphOpen(false)} />}
     </div>
   );
 }

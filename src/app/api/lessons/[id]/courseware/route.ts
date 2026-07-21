@@ -1,10 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { readFile } from "node:fs/promises";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, canAccessLesson } from "@/lib/entitlement";
 import { canViewCourse, hasPurchasedCourse } from "@/lib/queries";
+import { creatorAssetDiskPath } from "@/lib/creator-assets";
 
 export const dynamic = "force-dynamic";
+
+/**
+ * sandbox iframe 是不透明源，不能依赖 Cookie 拉私有图片。返回课件前只把“课程作者自己的图片素材”
+ * 内联成 data URI：既能跨学习者显示，也不会因模型猜到别人的 assetId 而越权读文件。
+ */
+async function inlineOwnedCreatorImages(html: string, ownerId: string | null): Promise<string> {
+  if (!ownerId) return html;
+  const ids = Array.from(html.matchAll(/\/api\/assets\/([a-z0-9_-]{8,80})/gi), (match) => match[1]);
+  const unique = Array.from(new Set(ids)).slice(0, 20);
+  if (unique.length === 0) return html;
+  const assets = await prisma.asset.findMany({
+    where: { id: { in: unique }, userId: ownerId, kind: "image", size: { lte: 10 * 1024 * 1024 } },
+    select: { id: true, mimeType: true, storagePath: true },
+  });
+  let result = html;
+  // 总量预算(2026-07-21 审查 M 修复):无预算时 20×10MB 图经 base64 可把单次响应撑到 ~270MB
+  // 且 no-store 每次现读盘。超预算的图跳过内联(裂图呈现,不空白),文档体积有界。
+  let budget = 8 * 1024 * 1024;
+  for (const asset of assets) {
+    const diskPath = creatorAssetDiskPath(asset.storagePath);
+    const bytes = diskPath ? await readFile(diskPath).catch(() => null) : null;
+    if (!bytes || bytes.length > budget) continue;
+    budget -= bytes.length;
+    const data = `data:${asset.mimeType};base64,${bytes.toString("base64")}`;
+    result = result.replaceAll(`/api/assets/${asset.id}`, data);
+  }
+  return result;
+}
 
 /**
  * GET /api/lessons/:id/courseware —— 课件「独立同源文档」承载(2026-07-20 空白根因根治)。
@@ -52,6 +82,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return notFound();
     }
     if (!html) return notFound();
+    html = await inlineOwnedCreatorImages(html, lesson.course.authorUserId);
 
     return new NextResponse(html, {
       status: 200,
@@ -61,7 +92,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         // frame-ancestors 'self':只允许本站嵌入,防外站盗链嵌框。
         "content-security-policy":
           "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
-          "img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+          "img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
         "x-content-type-options": "nosniff",
         // 私有内容不落共享缓存;htmlJson 重渲后立即生效。
         "cache-control": "private, no-store",

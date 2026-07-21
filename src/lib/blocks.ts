@@ -15,7 +15,7 @@ export type Block =
   // 基础 5 种（v2 保留，前向兼容旧课）
   | { type: "concept"; title: string; markdown: string }
   | { type: "code"; lang: string; code: string; explanation?: string }
-  | { type: "quiz"; question: string; options: string[]; answerIndex: number; explain: string }
+  | { type: "quiz"; question: string; options: string[]; answerIndex: number; explain: string; branchTargets?: (string | null)[] }
   | { type: "keypoint"; points: string[] }
   | { type: "callout"; tone: "info" | "warn"; markdown: string }
   // v3 新增 7 种（叙事结构 + 交互）
@@ -35,6 +35,15 @@ export type Block =
   //  - dragwords 拖词：blanks 从打乱的词库（正解 + 干扰词）点选填入（移动友好，不用 HTML5 拖拽）。
   | { type: "fillblank"; prompt?: string; segments: string[]; blanks: string[][] }
   | { type: "dragwords"; prompt?: string; segments: string[]; blanks: string[]; distractors?: string[] }
+  // v6 非线性课程：目标课节只保存安全 lesson id，保存 API 再校验目标与当前课同属一门课。
+  | { type: "choice"; prompt: string; choices: { label: string; feedback?: string; targetLessonId?: string }[] }
+  | { type: "branch"; prompt: string; options: { label: string; condition?: string; targetLessonId: string }[] }
+  | {
+      type: "hotspot";
+      imageSrc: string;
+      prompt?: string;
+      spots: { x: number; y: number; label: string; feedback?: string; correct?: boolean; targetLessonId?: string }[];
+    }
   // v4.3 语义图示（leohtml 图示纪律:结构取自关系、节点必须有完整标签与明确方向,拒绝装饰性无标签图形）
   | {
       type: "diagram";
@@ -58,6 +67,7 @@ const BLOCK_TYPES = new Set([
   "concept", "code", "quiz", "keypoint", "callout",
   "objectives", "scene", "dialog", "steps", "compare", "example", "flashcard", "summary", "image", "diagram", "formula",
   "fillblank", "dragwords",
+  "choice", "branch", "hotspot",
 ]);
 
 /** 公式 latex 长度上限（防超长 latex 撑爆渲染/存储）。 */
@@ -65,6 +75,13 @@ const MAX_LATEX = 1200;
 /** 交互块：空数上限（防异常长），词库干扰词上限。 */
 const MAX_BLANKS = 8;
 const MAX_DISTRACTORS = 8;
+const MAX_BRANCH_OPTIONS = 12;
+
+function safeLessonId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const id = value.trim();
+  return /^[A-Za-z0-9_-]{1,80}$/.test(id) ? id : null;
+}
 
 /** diagram 块 kind 白名单与节点数窗口(cycle/hub 至少 3 个节点才成形)。 */
 const DIAGRAM_KINDS = new Set(["flow", "cycle", "hub", "layers", "funnel"]);
@@ -72,7 +89,7 @@ const DIAGRAM_MIN: Record<string, number> = { flow: 2, cycle: 3, hub: 3, layers:
 const MAX_DIAGRAM_ITEMS = 6;
 
 /**
- * 图片块 src 白名单前缀：只认站内绝对路径（/ 开头，指向 public/ 下真实资产）。
+ * 图片块 src 白名单前缀：只认站内绝对路径（public 资产或创作者私有素材 API）。
  * 防注入：拒绝 http(s):// 外链、data:/javascript:/blob: 伪协议、协议相对 //host、以及路径穿越 ../。
  * 课件图解目前只引用 public/ 下已就位的图（covers/courseware/lesson-stills/note-captures 等）。
  */
@@ -86,6 +103,7 @@ function sanitizeImageSrc(v: unknown): string {
   // 显式拒绝任何伪协议 / 反斜杠 / 路径穿越片段。
   const lowered = s.toLowerCase();
   if (lowered.includes(":") || lowered.includes("\\") || s.includes("..")) return "";
+  if (s.startsWith("/api/") && !/^\/api\/assets\/[a-z0-9_-]{8,80}$/i.test(s)) return "";
   return clampStr(s, 512);
 }
 
@@ -186,7 +204,11 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
         // 越界归 0（安全默认，永不指向不存在的选项）
         if (answerIndex < 0 || answerIndex >= options.length) answerIndex = 0;
         const explain = clampStr(b.explain, MAX_MARKDOWN);
-        out.push({ id, type: "quiz", question, options, answerIndex, explain });
+        const rawTargets = Array.isArray(b.branchTargets) ? b.branchTargets : [];
+        const branchTargets = options.map((_, index) => safeLessonId(rawTargets[index]));
+        const block: Block & { id: string } = { id, type: "quiz", question, options, answerIndex, explain };
+        if (branchTargets.some(Boolean)) block.branchTargets = branchTargets;
+        out.push(block);
         break;
       }
       case "keypoint": {
@@ -347,6 +369,61 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
         out.push(block);
         break;
       }
+      case "choice": {
+        const prompt = clampStr(b.prompt, 500);
+        const choices = (Array.isArray(b.choices) ? b.choices : [])
+          .filter((choice): choice is Record<string, unknown> => Boolean(choice) && typeof choice === "object")
+          .map((choice) => {
+            const label = clampStr(choice.label, 200);
+            const feedback = clampStr(choice.feedback, 600);
+            const targetLessonId = safeLessonId(choice.targetLessonId);
+            return { label, ...(feedback ? { feedback } : {}), ...(targetLessonId ? { targetLessonId } : {}) };
+          })
+          .filter((choice) => choice.label)
+          .slice(0, MAX_BRANCH_OPTIONS);
+        if (!prompt || choices.length < 2) continue;
+        out.push({ id, type: "choice", prompt, choices });
+        break;
+      }
+      case "branch": {
+        const prompt = clampStr(b.prompt, 500);
+        const options = (Array.isArray(b.options) ? b.options : [])
+          .filter((option): option is Record<string, unknown> => Boolean(option) && typeof option === "object")
+          .map((option) => ({
+            label: clampStr(option.label, 200),
+            condition: clampStr(option.condition, 300),
+            targetLessonId: safeLessonId(option.targetLessonId),
+          }))
+          .filter((option): option is { label: string; condition: string; targetLessonId: string } => Boolean(option.label && option.targetLessonId))
+          .slice(0, MAX_BRANCH_OPTIONS)
+          .map((option) => ({ label: option.label, ...(option.condition ? { condition: option.condition } : {}), targetLessonId: option.targetLessonId }));
+        if (!prompt || options.length < 2) continue;
+        out.push({ id, type: "branch", prompt, options });
+        break;
+      }
+      case "hotspot": {
+        const imageSrc = sanitizeImageSrc(b.imageSrc);
+        const prompt = clampStr(b.prompt, 500);
+        const spots = (Array.isArray(b.spots) ? b.spots : [])
+          .filter((spot): spot is Record<string, unknown> => Boolean(spot) && typeof spot === "object")
+          .map((spot) => {
+            const x = typeof spot.x === "number" && Number.isFinite(spot.x) ? Math.max(0, Math.min(100, spot.x)) : 50;
+            const y = typeof spot.y === "number" && Number.isFinite(spot.y) ? Math.max(0, Math.min(100, spot.y)) : 50;
+            const label = clampStr(spot.label, 160);
+            const feedback = clampStr(spot.feedback, 600);
+            const targetLessonId = safeLessonId(spot.targetLessonId);
+            return {
+              x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, label,
+              ...(feedback ? { feedback } : {}), ...(spot.correct === true ? { correct: true } : {}),
+              ...(targetLessonId ? { targetLessonId } : {}),
+            };
+          })
+          .filter((spot) => spot.label)
+          .slice(0, MAX_BRANCH_OPTIONS);
+        if (!imageSrc || spots.length === 0) continue;
+        out.push({ id, type: "hotspot", imageSrc, ...(prompt ? { prompt } : {}), spots });
+        break;
+      }
       case "diagram": {
         // 语义图示铁律（leohtml）：kind 白名单、节点须有标签、数量落在该结构成形的窗口内,否则整块丢弃。
         const kind = typeof b.kind === "string" && DIAGRAM_KINDS.has(b.kind) ? (b.kind as "flow") : null;
@@ -462,7 +539,29 @@ export function blocksToPlainText(blocks: (Block & { id: string })[]): string {
         parts.push(s);
         break;
       }
+      case "choice":
+        parts.push(`${b.prompt}\n${b.choices.map((choice) => `- ${choice.label}${choice.feedback ? `：${choice.feedback}` : ""}`).join("\n")}`);
+        break;
+      case "branch":
+        parts.push(`${b.prompt}\n${b.options.map((option) => `- ${option.label}${option.condition ? `（${option.condition}）` : ""}`).join("\n")}`);
+        break;
+      case "hotspot":
+        if (b.prompt) parts.push(b.prompt);
+        parts.push(b.spots.map((spot) => `${spot.label}${spot.feedback ? `：${spot.feedback}` : ""}`).join("\n"));
+        break;
     }
   }
   return parts.join("\n\n").trim();
+}
+
+/** 提取课件内声明的跳转目标，供写 API 做“同课程”鉴权，不信任客户端传来的 id。 */
+export function lessonTargetsFromBlocks(blocks: (Block & { id: string })[]): string[] {
+  const ids = new Set<string>();
+  for (const block of blocks) {
+    if (block.type === "quiz") block.branchTargets?.forEach((id) => { if (id) ids.add(id); });
+    if (block.type === "choice") block.choices.forEach((choice) => { if (choice.targetLessonId) ids.add(choice.targetLessonId); });
+    if (block.type === "branch") block.options.forEach((option) => ids.add(option.targetLessonId));
+    if (block.type === "hotspot") block.spots.forEach((spot) => { if (spot.targetLessonId) ids.add(spot.targetLessonId); });
+  }
+  return [...ids];
 }

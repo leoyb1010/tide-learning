@@ -10,6 +10,7 @@ import { ShareToMarketButton, type ShareState } from "@/components/ShareToMarket
 import { CourseManageButton } from "@/components/CourseManageButton";
 import { AccessRequestActions } from "@/components/AccessRequestActions";
 import { CourseGenControls } from "@/components/CourseGenControls";
+import { USER_AUTHORED_ORIGINS, authoredOriginLabel } from "@/lib/course-origin";
 
 /** sharedStatus → 徽标文案与配色（STUDIO 语义色 pill，写法对齐卡片内既有 pill）。 */
 const SHARE_BADGE: Record<ShareState, { label: string; cls: string }> = {
@@ -23,7 +24,7 @@ export const metadata = { title: "我的课" };
 
 /**
  * /me/courses —— 我的课（server）。
- * 越权铁律：where 强制 authorUserId = user.id，只列当前用户 origin ∈ {ai_generated, user_imported} 的课，
+ * 越权铁律：where 强制 authorUserId = user.id，只列当前用户 AI 生成、资料导入或手工创建的课，
  * 按 createdAt desc。展示来源标签 / 生成态 / 学习进度 / 分享到社区按钮。
  * 「我的分享」区：列出他人对我课程的待批准申请（ownerId=user.id, status=pending），批准/拒绝。
  * 空态引导去 /create。未登录跳登录。
@@ -35,7 +36,7 @@ export default async function MyCoursesPage() {
   const courses = await prisma.course.findMany({
     where: {
       authorUserId: user.id,
-      origin: { in: ["ai_generated", "user_imported"] },
+      origin: { in: [...USER_AUTHORED_ORIGINS] },
     },
     orderBy: { createdAt: "desc" },
     select: {
@@ -199,6 +200,7 @@ export default async function MyCoursesPage() {
           {cards.map((c) => {
             const href = c.firstLessonId ? `/courses/${c.slug}/learn/${c.firstLessonId}` : `/courses/${c.slug}`;
             const isAi = c.origin === "ai_generated";
+            const isManual = c.origin === "user_created";
             // 仅生成就绪的课可分享（生成中/失败禁用分享，避免半成品上架）。
             const canShare = !c.notReady;
             return (
@@ -211,8 +213,8 @@ export default async function MyCoursesPage() {
                   <CoverBg color={c.coverColor} imageSrc={resolveCoverSrc(c.slug, c.category ?? "", c.id)} alt={c.title} className="aspect-[16/9] w-full">
                     {/* 来源标签 */}
                     <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-black/25 px-2.5 py-1 text-[0.68rem] font-semibold text-white backdrop-blur-sm">
-                      {isAi ? <Sparkle size={11} weight="fill" /> : <FilePlus size={11} weight="fill" />}
-                      {isAi ? "AI 生成" : "我的导入"}
+                      {isAi ? <Sparkle size={11} weight="fill" /> : isManual ? <GraduationCap size={11} weight="fill" /> : <FilePlus size={11} weight="fill" />}
+                      {authoredOriginLabel(c.origin)}
                     </div>
                     {/* 生成态标签 */}
                     {c.isGenerating ? (
@@ -297,6 +299,14 @@ export default async function MyCoursesPage() {
                     已上架/审核中 → 经营（改价/编辑文案/下架，pending 只可撤回）；
                     就绪未上架 → 分享到社区（上架弹窗含定价）；生成中/失败 → 进度环 + 查看进度/继续生成。 */}
                 <div className="mt-auto flex items-center justify-end border-t border-[var(--border)] px-4 py-3">
+                  {isManual && (
+                    <Link
+                      href={`/create?manual=${c.id}`}
+                      className="studio-press mr-auto inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink2)] hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                    >
+                      <GraduationCap size={13} weight="fill" /> 编辑课程
+                    </Link>
+                  )}
                   {canShare && (c.sharedStatus === "shared" || c.sharedStatus === "pending") ? (
                     <CourseManageButton
                       courseId={c.id}

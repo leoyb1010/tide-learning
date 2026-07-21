@@ -9,6 +9,8 @@
 const DEFAULT_BASE_URL = "https://newapi.inner.youdao.com/v1";
 const NEWAPI_KEY_ENV = "NEWAPI_API_KEY";
 const NEWAPI_BASE_URL_ENV = "NEWAPI_BASE_URL";
+const DEEPSEEK_KEY_ENV = "DEEPSEEK_API_KEY";
+const DEEPSEEK_BASE_URL_ENV = "DEEPSEEK_BASE_URL";
 
 export interface LlmModelEntry {
   key: string; // 传给上游 API 的 model 名，落库到 Course.modelUsed
@@ -49,7 +51,7 @@ export function hasModalityAvailable(modality: "tts" | "image" | "video"): boole
  * v3.4 bespoke HTML 只允许强模型；可用环境变量逗号列表覆盖，便于网关模型升级时零代码切换。
  * 蓝图 A3：清掉不在注册表里的死条目（原首位 claude-sonnet-5 未注册，导致白名单命中率为 0 的一环）。
  */
-const DEFAULT_BESPOKE_MODELS = ["claude-opus-4-8", "gpt-5.6-sol", "glm-5.2"];
+const DEFAULT_BESPOKE_MODELS = ["claude-opus-4-8", "gpt-5.6-sol", "glm-5.2", "deepseek-chat"];
 
 export function bespokeModelKeys(): string[] {
   const configured = process.env.COURSEWARE_BESPOKE_MODELS?.split(",").map((v) => v.trim()).filter(Boolean);
@@ -57,6 +59,19 @@ export function bespokeModelKeys(): string[] {
 }
 
 export const LLM_MODELS: LlmModelEntry[] = [
+  {
+    // 兼容仓库既有的直连 DeepSeek 环境；NewAPI 未配置时仍可生成，而不是误判 AI 全部不可用。
+    key: "deepseek-chat",
+    label: "DeepSeek Chat",
+    desc: "直连兼容模型，适合中文课程生成与原创课件排版",
+    tier: "free",
+    costWeight: 1,
+    envKeyName: DEEPSEEK_KEY_ENV,
+    baseUrlEnvName: DEEPSEEK_BASE_URL_ENV,
+    enabled: true,
+    latencyTier: "slow",
+    maxOutput: 8000,
+  },
   {
     key: "gpt-5.6-sol",
     label: "GPT-5.6 Sol",
@@ -178,7 +193,7 @@ function validateBespokeList(): void {
 }
 
 export const DEFAULT_MODEL_KEY =
-  process.env.NEWAPI_DEFAULT_MODEL || process.env.DEEPSEEK_MODEL || LLM_MODELS[0].key;
+  process.env.NEWAPI_DEFAULT_MODEL || process.env.DEEPSEEK_MODEL || (process.env[NEWAPI_KEY_ENV] ? "gpt-5.6-sol" : LLM_MODELS[0].key);
 
 /** 某模型当前是否真正可用（启用 + env 配了 key）。 */
 export function isModelUsable(m: LlmModelEntry): boolean {
@@ -254,9 +269,10 @@ function normalizeBaseUrl(raw?: string): string {
 
 /** 解析条目的 apiKey / baseUrl（供 llm.ts 直连）。 */
 export function modelCredentials(m: LlmModelEntry): { apiKey: string | undefined; baseUrl: string } {
+  const defaultForModel = m.envKeyName === DEEPSEEK_KEY_ENV ? "https://api.deepseek.com" : DEFAULT_BASE_URL;
   return {
     apiKey: process.env[m.envKeyName],
-    baseUrl: normalizeBaseUrl(m.baseUrlEnvName ? process.env[m.baseUrlEnvName] : undefined),
+    baseUrl: normalizeBaseUrl((m.baseUrlEnvName ? process.env[m.baseUrlEnvName] : undefined) || defaultForModel),
   };
 }
 

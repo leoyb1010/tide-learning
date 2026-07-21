@@ -7,15 +7,17 @@ import { paragraphizePlainText } from "@/lib/note-structure";
 import { structureImportedTextIntoCourse, MIN_IMPORT_TEXT, MAX_IMPORT_TEXT } from "@/lib/course-import";
 import { isValidTemplate } from "@/lib/ai/templates";
 import { selectModelFor } from "@/lib/ai/models";
+import { createPresentationCourse, createScormCourse } from "@/lib/import-faithful";
 
 // Node 运行时：pdf-parse / mammoth 依赖 Buffer 与 node 内建。
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_FILE_BYTES = 15_000_000; // 上传硬上限 15MB
+const MAX_FILE_BYTES = 100_000_000; // PPT/Keynote/SCORM 含媒体，上传硬上限 100MB
+const MAX_TEXT_FILE_BYTES = 15_000_000;
 const PARSE_TIMEOUT_MS = 20_000; // 抽取超时 20s，防畸形文件卡死
 
-type FileKind = "pdf" | "docx" | "text";
+type FileKind = "pdf" | "docx" | "text" | "pptx" | "key" | "scorm";
 
 // 前后端对齐的受支持扩展名与展示文案（前端 accept 也用同一集合）。
 const EXT_KIND: Record<string, FileKind> = {
@@ -25,6 +27,10 @@ const EXT_KIND: Record<string, FileKind> = {
   md: "text",
   markdown: "text",
   text: "text",
+  pptx: "pptx",
+  key: "key",
+  scorm: "scorm",
+  zip: "scorm",
 };
 
 /** pdf-parse 运行时加载（绕开打包器对模板字面量动态依赖的静态分析），与 import-pdf 同款。 */
@@ -61,7 +67,7 @@ function titleFromFilename(name: string | null): string {
 }
 
 /** 按类型抽取纯文本；失败统一收敛为 422 文案，不泄露解析器细节。 */
-async function extractText(kind: FileKind, bytes: Buffer): Promise<string> {
+async function extractText(kind: "pdf" | "docx" | "text", bytes: Buffer): Promise<string> {
   if (kind === "pdf") {
     const magic = bytes.subarray(0, 5).toString("latin1");
     if (!magic.startsWith("%PDF-")) throw new AppError("该文件不是有效的 PDF", 422);
@@ -91,7 +97,7 @@ async function extractText(kind: FileKind, bytes: Buffer): Promise<string> {
 }
 
 /**
- * POST /api/ai/import-file —— 引擎B · 文件导入（PDF / DOCX / TXT / MD）。
+ * POST /api/ai/import-file —— 文本文档结构化，或 PPTX/Keynote/SCORM 忠实导入。
  *
  * multipart/form-data：字段 file（必填）、title（可选）。抽取纯文本 → 复用
  * structureImportedTextIntoCourse 走与粘贴导入完全一致的切章 / 落库 / 后台生成流程。
@@ -123,16 +129,27 @@ export async function POST(req: NextRequest) {
       if (!file || typeof file === "string") return fail("请选择要导入的文件");
       const blob = file as File;
       if (blob.size === 0) return fail("文件内容为空");
-      if (blob.size > MAX_FILE_BYTES) return fail("文件过大（上限 15MB）", 413);
+      if (blob.size > MAX_FILE_BYTES) return fail("文件过大（上限 100MB）", 413);
 
       const filename = "name" in blob && typeof blob.name === "string" ? blob.name : null;
       const ext = extFromName(filename);
       const kind = EXT_KIND[ext];
       if (!kind) {
-        return fail("暂不支持该格式，请上传 PDF / Word(.docx) / TXT / Markdown 文件");
+        return fail("暂不支持该格式，请上传 PDF / DOCX / TXT / Markdown / PPTX / Keynote / SCORM 文件");
       }
+      if (["pdf", "docx", "text"].includes(kind) && blob.size > MAX_TEXT_FILE_BYTES) return fail("文本文档过大（上限 15MB）", 413);
 
       const bytes = Buffer.from(await blob.arrayBuffer());
+      const title = (form.get("title") as string | null)?.trim() || titleFromFilename(filename);
+
+      // 演示文稿与 SCORM 不走“抽文本重写”：保留原页面坐标/图片或原包运行时，直接产出 ready 课程。
+      if (kind === "pptx" || kind === "key") {
+        return ok(await createPresentationCourse({ userId: user.id, title, bytes, kind }));
+      }
+      if (kind === "scorm") {
+        return ok(await createScormCourse({ userId: user.id, title, bytes, fileName: filename || `${title}.scorm` }));
+      }
+
       let rawText = (await extractText(kind, bytes)).trim();
 
       if (!rawText) return fail("未能从文件中提取到可用文本（可能是纯图片扫描件）", 422);
@@ -143,8 +160,6 @@ export async function POST(req: NextRequest) {
       if (rawText.length > MAX_IMPORT_TEXT) {
         rawText = rawText.slice(0, MAX_IMPORT_TEXT);
       }
-
-      const title = (form.get("title") as string | null)?.trim() || titleFromFilename(filename);
 
       // v3.2 模板/模型（multipart 字段）：模板全员免费，非法即拒；模型须在可用集内。
       const template = (form.get("template") as string | null)?.trim() || undefined;
@@ -171,6 +186,7 @@ export async function POST(req: NextRequest) {
         template,
         model: modelEntry.key,
         qualityTier,
+        checkpoint: form.get("checkpoint") === "true",
       });
 
       return ok(result);

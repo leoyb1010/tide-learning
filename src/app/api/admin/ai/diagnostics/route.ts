@@ -55,7 +55,7 @@ export async function GET() {
     };
 
     if (!apiKey) {
-      probe.detail = "未配置 API 密钥（env NEWAPI_API_KEY 为空）";
+      probe.detail = "未配置 API 密钥（env NEWAPI_API_KEY / DEEPSEEK_API_KEY 均为空）";
     } else {
       const started = Date.now();
       const controller = new AbortController();
