@@ -24,6 +24,7 @@ import { validateBlocks } from "@/lib/blocks";
 import { renderMarkdown } from "@/lib/markdown";
 import { coursewareThemeAttr } from "@/lib/ai/themes";
 import { HtmlCourseware } from "./HtmlCourseware";
+import { ScormCourseware } from "./ScormCourseware";
 import { trapFocus } from "./focus-trap";
 import { isPlayableVideoUrl } from "@/lib/media-url";
 
@@ -398,6 +399,7 @@ export function Player({
   // 门控随 access（付费节无权益时 htmlJson 为 null）；契约脏/无 html 时回落到块渲染。
   const htmlContract = safeParseJson(lesson.htmlJson) as { html?: string } | null;
   const isHtmlLesson = Boolean(htmlContract && typeof htmlContract.html === "string" && htmlContract.html);
+  const isScormLesson = lesson.contentType === "scorm" && Boolean(lesson.articleMd);
 
   // ai_block 块课件：解析并校验块数组（validateBlocks 永不抛错，脏数据归空数组）。
   // 块课无视频时间轴，不做截帧 / 时间进度条；MVP 笔记走普通笔记（anchorRef 可空），先保证能记能显示。
@@ -848,7 +850,9 @@ export function Player({
         <div className={`grid min-w-0 gap-4 xl:gap-5 ${focus ? "" : "lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
           {/* 左：视频/图文。P1-3：min-w-0 让窄屏单列可收缩到视口宽度，杜绝 390px 下 412 横向溢出。 */}
           <div className={focus ? "mx-auto w-full max-w-4xl" : "min-w-0"}>
-            {isHtmlLesson ? (
+            {isScormLesson ? (
+              <ScormCourseware configJson={lesson.articleMd!} lessonId={lesson.id} title={lesson.title} onComplete={onBlockComplete} />
+            ) : isHtmlLesson ? (
               // v3.3 多样化 HTML 课件：沙箱 iframe 渲染 AI 生成的自包含高级课件（见 HtmlCourseware / 计划 §7）。
               // key=lesson.id：换课强制重挂,清掉跨课残留的去重集/页码 state(审计修复 H1);
               // onPage 接页序进度上报(蓝图 D1 补口:此前 HTML 课件零进度、streak 恒空),末页触发下一节卡。
@@ -856,6 +860,7 @@ export function Player({
                 key={lesson.id}
                 html={htmlContract!.html as string}
                 lessonId={lesson.id}
+                courseSlug={courseSlug}
                 nonce={cspNonce}
                 initialPage={initialSlidePage > 1 ? initialSlidePage - 1 : 0}
                 onPage={(i, t) => {

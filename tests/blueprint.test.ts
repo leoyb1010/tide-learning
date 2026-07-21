@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  parseBlueprint, readBlueprint, serializeBlueprint, lessonCountForLength,
+  parseBlueprint, readBlueprint, serializeBlueprint, lessonCountForLength, lessonRangeForLength,
   blueprintLessonFragment, blueprintOutlineFragment,
 } from "@/lib/ai/blueprint";
 
@@ -48,6 +48,14 @@ describe("lessonCountForLength", () => {
     expect(lessonCountForLength("standard")).toBe(8);
     expect(lessonCountForLength("deep")).toBe(12);
     expect(lessonCountForLength(undefined)).toBe(8);
+  });
+});
+
+describe("lessonRangeForLength", () => {
+  it("把篇幅表达为范围而非固定配额", () => {
+    expect(lessonRangeForLength("brief")).toEqual({ min: 3, target: 5, max: 6 });
+    expect(lessonRangeForLength("deep")).toEqual({ min: 8, target: 12, max: 16 });
+    expect(lessonRangeForLength(undefined)).toEqual({ min: 4, target: 7, max: 12 });
   });
 });
 

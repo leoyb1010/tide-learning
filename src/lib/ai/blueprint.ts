@@ -68,6 +68,16 @@ export function lessonCountForLength(length?: LengthPref): number {
   return length === "brief" ? 5 : length === "deep" ? 12 : 8;
 }
 
+/**
+ * 篇幅是规划范围，不是要求模型凑满固定节数。target 供 UI 表达预期，min/max 是内容复杂度允许的边界。
+ */
+export function lessonRangeForLength(length?: LengthPref): { min: number; target: number; max: number } {
+  if (length === "brief") return { min: 3, target: 5, max: 6 };
+  if (length === "deep") return { min: 8, target: 12, max: 16 };
+  if (length === "standard") return { min: 5, target: 8, max: 12 };
+  return { min: 4, target: 7, max: 12 };
+}
+
 const AUDIENCE_LINE: Record<Audience, string> = {
   beginner: "受众是零基础新手：多打比方、拆小步、先讲“为什么”再讲“怎么做”，术语首次出现必须用大白话解释。",
   some: "受众是有一定基础的学习者：可略过最基础铺垫，直接讲重点、易错点与进阶用法。",
@@ -102,7 +112,10 @@ export function blueprintOutlineFragment(bp: Blueprint | null): string {
   const parts: string[] = [];
   if (bp.audience) parts.push(AUDIENCE_LINE[bp.audience]);
   if (bp.tone) parts.push(TONE_LINE[bp.tone]);
-  if (bp.length) parts.push(`本课规划 ${lessonCountForLength(bp.length)} 节左右（${bp.length === "brief" ? "速览精简" : bp.length === "deep" ? "深入系统" : "标准"}）。`);
+  if (bp.length) {
+    const range = lessonRangeForLength(bp.length);
+    parts.push(`课程篇幅倾向为${bp.length === "brief" ? "速览精简" : bp.length === "deep" ? "深入系统" : "标准"}，目标约 ${range.target} 节；根据内容需要可在 ${range.min}-${range.max} 节内调整，不为凑数拆章。`);
+  }
   if (!parts.length) return "";
   return "\n【课程定制要求（专业模式）】\n" + parts.map((p) => "- " + p).join("\n") + "\n";
 }

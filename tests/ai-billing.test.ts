@@ -115,7 +115,7 @@ describe("estimateCredits —— 预检门槛的典型成本", () => {
 //  scoreLesson —— 造课质量规则评估
 // ————————————————————————————————————————————————————————————
 
-/** 造一节「满分」块序列（命中全部六项规则）：8 块、scene 开头、summary 结尾、含交互与 ≥2 视觉块、concept 占比低。 */
+/** 造一节「满分」内容真值：体量健康、有检验、有证据、动作多样、定义占比健康。 */
 function goodLesson(): { type: string }[] {
   return [
     { type: "scene" }, // 开头钩子
@@ -130,90 +130,80 @@ function goodLesson(): { type: string }[] {
 }
 
 describe("scoreLesson —— 满分课件", () => {
-  it("命中全部六项规则 → 100 分、达标", () => {
+  it("命中全部五项内容底线 → 100 分、达标", () => {
     const q = scoreLesson(goodLesson());
     expect(q.score).toBe(100);
     expect(q.passed).toBe(true);
     expect(q.flags).toEqual({
       countOk: true,
-      hasOpening: true,
-      hasSummary: true,
-      hasInteractive: true,
-      hasVisuals: true,
+      hasAssessment: true,
+      hasEvidence: true,
+      hasVariety: true,
       conceptRatioOk: true,
     });
   });
 });
 
 describe("scoreLesson —— 逐项扣分", () => {
-  it("块数越界（<6）：扣 countOk 的 20 分", () => {
-    const blocks = [{ type: "scene" }, { type: "quiz" }, { type: "compare" }, { type: "dialog" }, { type: "summary" }];
-    const q = scoreLesson(blocks); // 5 块
-    expect(q.flags.countOk).toBe(false);
-    expect(q.score).toBe(80); // 100 - 20
+  it("少量但有效的内容不因固定块数下限被拒绝", () => {
+    const q = scoreLesson([{ type: "quiz" }, { type: "example" }]);
+    expect(q.flags.countOk).toBe(true);
   });
 
-  it("非 scene/objectives 开头：扣 hasOpening 的 15 分", () => {
+  it("不再奖励固定开头：concept 开头不扣分", () => {
     const blocks = goodLesson();
-    blocks[0] = { type: "concept" }; // 开头换成 concept
+    blocks[0] = { type: "concept" };
     const q = scoreLesson(blocks);
-    expect(q.flags.hasOpening).toBe(false);
-    expect(q.score).toBe(85);
+    expect(q.score).toBe(100);
   });
 
-  it("无 summary 结尾：扣 hasSummary 的 15 分", () => {
+  it("不再奖励固定结尾：没有 summary 结尾不扣分", () => {
     const blocks = goodLesson();
-    blocks[blocks.length - 1] = { type: "keypoint" }; // 结尾换掉 summary
+    blocks[blocks.length - 1] = { type: "keypoint" };
     const q = scoreLesson(blocks);
-    expect(q.flags.hasSummary).toBe(false);
-    expect(q.score).toBe(85);
+    expect(q.score).toBe(100);
   });
 
-  it("无交互块：扣 hasInteractive 的 20 分", () => {
-    // 去掉 quiz，且不含 flashcard
+  it("无理解检验：扣 hasAssessment 的 20 分", () => {
     const blocks = [
       { type: "scene" }, { type: "objectives" }, { type: "concept" },
       { type: "dialog" }, { type: "compare" }, { type: "steps" },
       { type: "keypoint" }, { type: "summary" },
     ];
     const q = scoreLesson(blocks);
-    expect(q.flags.hasInteractive).toBe(false);
+    expect(q.flags.hasAssessment).toBe(false);
     expect(q.score).toBe(80);
   });
 
-  it("视觉强块不足 2：扣 hasVisuals 的 20 分", () => {
+  it("没有案例/步骤/对照等证据：扣 hasEvidence 的 20 分", () => {
     const blocks = [
       { type: "scene" }, { type: "objectives" }, { type: "concept" },
-      { type: "keypoint" }, { type: "example" }, { type: "compare" }, // 仅 1 个视觉块
-      { type: "quiz" }, { type: "summary" },
+      { type: "keypoint" }, { type: "quiz" }, { type: "summary" },
     ];
     const q = scoreLesson(blocks);
-    expect(q.flags.hasVisuals).toBe(false);
-    expect(q.visualCount).toBe(1);
+    expect(q.flags.hasEvidence).toBe(false);
     expect(q.score).toBe(80);
   });
 
-  it("concept 占比 ≥60%（文字墙）：扣 conceptRatioOk 的 10 分", () => {
-    // 6 块里 4 个 concept → 66.7%
-    const blocks = [
-      { type: "scene" }, { type: "concept" }, { type: "concept" },
-      { type: "concept" }, { type: "concept" }, { type: "summary" },
-    ];
+  it("教学动作少于三种：扣 hasVariety 的 20 分", () => {
+    const q = scoreLesson([{ type: "quiz" }, { type: "example" }, { type: "quiz" }, { type: "example" }]);
+    expect(q.flags.hasVariety).toBe(false);
+    expect(q.score).toBe(80);
+  });
+
+  it("concept 占比 ≥75%（定义墙）：扣 conceptRatioOk 的 20 分", () => {
+    const blocks = Array.from({ length: 6 }, () => ({ type: "concept" })).concat([{ type: "quiz" }, { type: "example" }]);
     const q = scoreLesson(blocks);
-    expect(q.conceptRatio).toBeCloseTo(0.67, 2);
+    expect(q.conceptRatio).toBe(0.75);
     expect(q.flags.conceptRatioOk).toBe(false);
-    // 6 块 countOk✓、scene 开头✓、summary 结尾✓、无交互✗、无≥2视觉✗、占比✗
-    // = 20 + 15 + 15 + 0 + 0 + 0 = 50
-    expect(q.score).toBe(50);
-    expect(q.passed).toBe(false);
+    expect(q.score).toBe(80);
   });
 });
 
 describe("scoreLesson —— 降级占位节（单个 concept）", () => {
-  it("单块 concept：低分、不达标（total<2 占比判定直接不过）", () => {
+  it("单块 concept：仅命中非空底线，仍低分且不达标", () => {
     const q = scoreLesson([{ type: "concept" }]);
-    // countOk✗(1块)、开头非scene/obj✗、无summary✗、无交互✗、无视觉✗、占比(total<2)✗ = 0
-    expect(q.score).toBe(0);
+    expect(q.score).toBe(20);
     expect(q.passed).toBe(false);
     expect(q.flags.conceptRatioOk).toBe(false);
   });
@@ -229,15 +219,11 @@ describe("scoreLesson —— 降级占位节（单个 concept）", () => {
 
 describe("scoreLesson —— 达标阈值语义", () => {
   it("恰好命中阈值判定：score >= 阈值 即 passed", () => {
-    // 构造 60 分：countOk(20)+hasOpening(15)+hasSummary(15)+conceptRatioOk(10) = 60，无交互、视觉不足
-    const blocks = [
-      { type: "scene" }, { type: "objectives" }, { type: "example" },
-      { type: "keypoint" }, { type: "concept" }, { type: "example" },
-      { type: "compare" }, { type: "summary" }, // 仅 1 视觉块 → hasVisuals✗
-    ];
+    // 60 分：体量、动作多样、定义占比健康；无检验、无证据。
+    const blocks = [{ type: "scene" }, { type: "objectives" }, { type: "keypoint" }, { type: "summary" }];
     const q = scoreLesson(blocks);
-    expect(q.flags.hasInteractive).toBe(false);
-    expect(q.flags.hasVisuals).toBe(false);
+    expect(q.flags.hasAssessment).toBe(false);
+    expect(q.flags.hasEvidence).toBe(false);
     expect(q.score).toBe(LESSON_QUALITY_THRESHOLD);
     expect(q.passed).toBe(true); // >= 阈值
   });

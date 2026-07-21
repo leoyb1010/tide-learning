@@ -26,7 +26,7 @@ interface LockedModelOpt {
 }
 
 /**
- * 造课「课件模板 + 生成模型」选择器（造课 Tab 与导入 Tab 共用）。
+ * 造课「创作方向 + 生成模型」选择器（造课 Tab 与导入 Tab 共用）。
  * 数据来自 GET /api/ai/models（按订阅态过滤模型；模板全员可选）。
  * 受控：template/model 由父组件持有并透传进生成请求体。
  * 模型只有 1 个可选且无锁定项时，模型区自动隐藏（避免单选下拉的无谓 UI）。
@@ -82,14 +82,37 @@ export function TemplateModelPicker({
 
   return (
     <div className="flex flex-col gap-4">
-      {/* —— 课件模板 —— */}
+      {/* —— 创作方向：自由导演为默认，旧模板只作为显式偏好 —— */}
       <div className="flex flex-col gap-2">
         <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
-          课件模板
+          创作方向
         </span>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => setTemplate("")}
+            aria-pressed={!template}
+            className={`studio-press group relative flex flex-col items-stretch gap-2 overflow-hidden rounded-[14px] border p-2.5 text-left transition-[border-color,box-shadow,transform] duration-200 ${
+              !template
+                ? "border-[var(--red)] bg-[var(--surface)] shadow-[0_0_0_1px_var(--red),0_10px_28px_-16px_var(--red)]"
+                : "border-[var(--border)] bg-[var(--surface2)] hover:border-[var(--border2)] hover:bg-[var(--surface)] hover:-translate-y-0.5"
+            }`}
+          >
+            {!template && (
+              <span className="absolute right-2 top-2 grid h-[18px] w-[18px] place-items-center rounded-full bg-[var(--red)] text-white">
+                <Check size={11} weight="bold" />
+              </span>
+            )}
+            <span aria-hidden className="grid aspect-[16/9] w-full place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)]">
+              <Sparkle size={30} weight="duotone" className="text-[var(--red)]" />
+            </span>
+            <span className="flex flex-col gap-0.5 px-1 pb-0.5">
+              <span className={`text-[13px] font-semibold leading-tight ${!template ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>自由导演</span>
+              <span className="text-[11px] leading-snug text-[var(--ink4)]">按内容决定讲法与视觉</span>
+            </span>
+          </button>
           {templates.map((t) => {
-            const active = (template || "classic") === t.key;
+            const active = template === t.key;
             return (
               <button
                 key={t.key}
@@ -129,10 +152,10 @@ export function TemplateModelPicker({
         </div>
       </div>
 
-      {/* —— 排版质量档 —— */}
+      {/* —— 内容深度档 —— */}
       <div className="flex flex-col gap-2">
         <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
-          排版质量
+          内容深度
         </span>
         <div className="grid grid-cols-2 gap-2">
           <button
@@ -141,8 +164,8 @@ export function TemplateModelPicker({
             aria-pressed={qualityTier === "standard"}
             className={`studio-press rounded-[12px] border p-3 text-left transition-colors ${qualityTier === "standard" ? "border-[var(--red)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface2)]"}`}
           >
-            <span className="block text-[13px] font-semibold text-[var(--ink)]">标准排版</span>
-            <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">稳定快速，确定性高级视觉</span>
+            <span className="block text-[13px] font-semibold text-[var(--ink)]">完整生成</span>
+            <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">讲清核心内容、检验与迁移</span>
           </button>
           {isSubscriber ? (
             <button
@@ -151,13 +174,13 @@ export function TemplateModelPicker({
               aria-pressed={qualityTier === "premium"}
               className={`studio-press rounded-[12px] border p-3 text-left transition-colors ${qualityTier === "premium" ? "border-[var(--red)] bg-[var(--red-soft)]" : "border-[var(--border)] bg-[var(--surface2)]"}`}
             >
-              <span className="flex items-center gap-1 text-[13px] font-semibold text-[var(--ink)]"><Sparkle size={13} weight="fill" className="text-[var(--red)]" />精修排版</span>
-              <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">强模型逐节定制，失败自动回落</span>
+              <span className="flex items-center gap-1 text-[13px] font-semibold text-[var(--ink)]"><Sparkle size={13} weight="fill" className="text-[var(--red)]" />深度研究</span>
+              <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">扩大范围，补足边界与复杂案例</span>
             </button>
           ) : (
             <Link href="/pricing" className="studio-press rounded-[12px] border border-dashed border-[var(--border2)] bg-[var(--surface)] p-3 text-left">
-              <span className="flex items-center gap-1 text-[13px] font-semibold text-[var(--ink3)]"><Lock size={13} weight="fill" />精修排版</span>
-              <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">会员专享，点击查看订阅</span>
+              <span className="flex items-center gap-1 text-[13px] font-semibold text-[var(--ink3)]"><Lock size={13} weight="fill" />深度研究</span>
+              <span className="mt-1 block text-[11px] leading-snug text-[var(--ink4)]">会员可扩大范围与案例深度</span>
             </Link>
           )}
         </div>

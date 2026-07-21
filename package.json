@@ -25,6 +25,9 @@
     "video:courseware": "tsx scripts/export-courseware-video.mts",
     "check:embed": "tsx scripts/embed-e2e.mts",
     "audit:quality": "tsx scripts/quality-audit.mts",
+    "accept:content": "tsx scripts/content-quality-acceptance.mts",
+    "accept:visual": "tsx scripts/visual-originality-acceptance.mts",
+    "accept:imports": "tsx scripts/import-faithful-acceptance.mts",
     "rerender:courseware": "tsx scripts/rerender-courseware.mts",
     "enrich:diagrams": "tsx scripts/enrich-diagrams.mts"
   },
@@ -35,6 +38,7 @@
     "@types/jsdom": "^28.0.3",
     "framer-motion": "^12.42.2",
     "jsdom": "^29.1.1",
+    "jszip": "^3.10.1",
     "katex": "^0.18.1",
     "mammoth": "^1.12.0",
     "next": "15.5.20",

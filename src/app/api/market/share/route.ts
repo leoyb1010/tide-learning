@@ -7,11 +7,12 @@ import { chatJson } from "@/lib/llm";
 import { track } from "@/lib/analytics";
 import { notify } from "@/lib/notify";
 import { scanContentSafety } from "@/lib/content-safety";
+import { USER_AUTHORED_ORIGINS } from "@/lib/course-origin";
 
 export const dynamic = "force-dynamic";
 
 // 可分享到集市的课程来源：仅用户自己造/导入的课，官方课不走此通道。
-const SHARABLE_ORIGINS = ["ai_generated", "user_imported"] as const;
+const SHARABLE_ORIGINS = USER_AUTHORED_ORIGINS;
 
 // 规则黑名单（复用 posts route 的秒拒思路）：命中即秒拒，省一次 LLM 调用。
 const BLOCKLIST = ["政治敏感", "赌博", "色情", "毒品", "诈骗", "加微信", "私聊", "代刷", "外挂"];
@@ -116,7 +117,7 @@ interface ModerationResult {
 /**
  * POST /api/market/share — 把自己的 AI 造课/导入课分享到集市 / 经营已上架课（改价、改文案）。
  * 入参：{ courseId, priceCredits?, title?, subtitle?, action?: "update" }
- * 校验：登录 + 课程 authorUserId===user.id + origin ∈ {ai_generated,user_imported}（越权铁律：只碰自己的课）。
+ * 校验：登录 + 课程 authorUserId===user.id + 来源属于用户创作课程（越权铁律：只碰自己的课）。
  *
  * 三种语义（按 action 与 sharedStatus 分派）：
  * 1) action="update"：仅更新 title/subtitle/priceCredits，不改变 sharedStatus、不触发审核。

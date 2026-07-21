@@ -41,6 +41,7 @@ export async function POST(req: NextRequest) {
         template?: string;
         model?: string;
         qualityTier?: string;
+        checkpoint?: boolean;
       } | null;
 
       const rawText = body?.rawText?.trim();
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
         template,
         model: modelEntry.key,
         qualityTier,
+        checkpoint: body?.checkpoint === true,
       });
 
       return ok(result);

@@ -6,6 +6,7 @@ import { ensureMonthlyGrant } from "@/lib/credits";
 import { ok, handle } from "@/lib/api";
 import { listUpdates, formatDuration, relativeTime } from "@/lib/queries";
 import { shanghaiDayKey } from "@/lib/week";
+import { USER_AUTHORED_ORIGINS } from "@/lib/course-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export async function GET(_req: NextRequest) {
           },
         }),
         prisma.course.count({
-          where: { authorUserId: userId, origin: { in: ["ai_generated", "user_imported"] } },
+          where: { authorUserId: userId, origin: { in: [...USER_AUTHORED_ORIGINS] } },
         }),
         prisma.note.findMany({
           where: { userId, deletedAt: null },

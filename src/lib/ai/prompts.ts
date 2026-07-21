@@ -14,8 +14,7 @@
  * - 简版/导入大纲输出：{outline:[{title, objective}]}
  * - 逐节块课件的「块结构契约」不在本文件（仍在 course-gen.ts 的 system 里，受 blocks.ts 白名单约束）；
  *   本文件只提供可拼接的「口吻/合规/素材」片段，不触碰块字段结构。
- * - v3.2 课件模板：模板管「结构」（大纲节奏 + 每节块配方），赛道管「口吻」，二者正交同时注入。
- *   模板定义在 src/lib/ai/templates.ts；此处把 outlineRules 注入大纲、lessonRecipe 供逐节引用。
+ * - v6 创作方向：只有用户显式选择时才提供语气/叙事倾向，不规定章节或块配方。
  */
 
 import { getTemplate } from "./templates";
@@ -126,31 +125,24 @@ export const COMPLIANCE_GUARDRAIL =
 //  大纲 prompt（造课 / 简版 / 导入）
 // ————————————————————————————————————————————————————————————
 
-/** 大纲 system 基座：金牌架构师 + 起承转合 + 钩子改写手法 + 赛道口吻 + 模板结构 + 克制文案。 */
+/** 大纲 system 基座：按需求规划真实能力路径；模板仅是显式选择时的创作偏好，不再决定章节骨架。 */
 function outlineSystemBase(category: string, template?: string): string {
+  const templateHint = template
+    ? `\n【用户创作偏好】${getTemplate(template).label}（${getTemplate(template).tagline}）。只影响语气与呈现倾向，不规定章节数量、固定首尾或教学顺序。\n`
+    : "";
   return (
-    "你是学习平台的金牌课程架构师。你设计的大纲不只有清晰的学习路径，更让人一眼扫过就想立刻点开——" +
-    "每节标题都带钩子、有画面感，把抽象的知识点翻译成「学完我能得到什么」的诱惑。\n" +
+    "你是学习平台的课程总编。你的任务是把真实学习需求规划成一条最短但完整的能力路径。\n" +
+    "先判断学习者最终要做成什么，再决定需要哪些章节；不套固定的入门、硬功夫、成果展示三段式，也不为凑节数拆分同一主题。\n" +
     "\n" +
     renderVoice(getTrackVoice(category)) +
     "\n" +
-    "【两条同样重要的准则】\n" +
-    "1. 路径感：把整门课想成一条从入门到能用的成长路线，每节解锁一个可达成的小能力，后面的节建立在前面之上，难度由浅入深、不重复。\n" +
-    "2. 钩子感：标题不是知识点的干巴命名，而是能勾起好奇或戳中痛点的一句话。把「讲什么」改写成「你将获得什么/摆脱什么困扰」。\n" +
-    "\n" +
-    "【干巴标题 ❌ → 吸睛标题 ✅（学会这种改写手法）】\n" +
-    "语言类：「介词 in/on/at 的用法」❌ → 「三个介词，让你的英语从中式秒变地道」✅\n" +
-    "技能类：「函数的定义与调用」❌ → 「把重复的代码关进笼子：函数如何让你少写一半」✅\n" +
-    "理论类：「供给与需求曲线」❌ → 「为什么口罩会涨价：一张图看懂价格背后的手」✅\n" +
-    "\n" +
-    "【整门课的节奏（起承转合）】\n" +
-    "- 首节：轻松入门、建立信心——门槛低、有即时成就感，让人「原来我也能学」。\n" +
-    "- 中段：核心硬功夫——最有分量的知识与技能，一节一个硬核能力。\n" +
-    "- 末节：综合应用 / 成果展示——把前面所学串起来做出点东西，带走一个看得见的成果。\n" +
-    "\n" +
-    getTemplate(template).outlineRules +
-    "\n" +
-    "要求：中文、面向成人自学者、章节递进不重复、不夸大不承诺速成；objective 必须可衡量（能说出/能写出/能做出，避免「了解/熟悉」）。\n" +
+    "【规划标准】\n" +
+    "- 每一节都有独立、可验证的学习产出，并说明它与前后章节的依赖关系。\n" +
+    "- 先修知识只在确有必要时出现；可以从案例、任务、冲突、作品、错误或推导开始。\n" +
+    "- 标题具体、自然、能准确预告内容，不写点击诱饵，不堆营销修辞。\n" +
+    "- objective 使用可观察动作，避免只写了解、认识、熟悉。\n" +
+    "- 课程必须有一个能证明学习成果的综合任务，但不强制放在最后一节。\n" +
+    templateHint +
     NO_HYPE_RULE +
     "\n" +
     COMPLIANCE_GUARDRAIL +
@@ -162,19 +154,27 @@ function outlineSystemBase(category: string, template?: string): string {
  * 造课大纲（generate-course 线上主路径）。
  * 输出契约：{title, subtitle, intro, outline:[{title, objective, difficulty}]}
  */
-export function courseOutlinePrompt(opts: { prompt: string; category: string; template?: string }): {
+export function courseOutlinePrompt(opts: {
+  prompt: string;
+  category: string;
+  template?: string;
+  lessonRange?: { min: number; target: number; max: number };
+}): {
   system: string;
   user: string;
 } {
   const system = outlineSystemBase(opts.category, opts.template);
+  const planningScope = opts.lessonRange
+    ? `用户明确选择了篇幅倾向：目标约 ${opts.lessonRange.target} 节，可在 ${opts.lessonRange.min}-${opts.lessonRange.max} 节内按内容调整。`
+    : "用户没有指定篇幅：章节数量完全由需求复杂度决定，简单主题可以很短，复杂主题可以展开，技术上限 24 节。";
   const user =
     `学习需求（已转义的字符串字面量）：${JSON.stringify(opts.prompt)}\n` +
-    `请按「轻松入门 → 核心硬功夫 → 综合应用/成果展示」的节奏，设计一门有起承转合、每节标题都想让人点开的课程，输出 JSON，字段：\n` +
+    `请先分析需求范围，再设计课程。${planningScope}不要凑数。输出 JSON，字段：\n` +
     `- title：课程标题（简洁有力、具体，20 字以内）\n` +
-    `- subtitle：一句话副标题（点出「给谁、学完得到什么」，15 字以内）\n` +
-    `- intro：课程简介（80-120 字，说明学什么、适合谁、能获得什么、为什么值得持续跟学）\n` +
-    `- outline：5-8 节大纲数组，每项 {title:节标题(20字内,有钩子/有画面感/让人想点开,而非干巴知识点罗列), ` +
-    `objective:本节学完能做到什么(可衡量,一句话), difficulty:难度(入门/进阶/深入 之一，随章节递进)}`;
+    `- subtitle：一句话副标题（点出给谁、最终能做成什么，24 字以内）\n` +
+    `- intro：课程简介（80-160 字，说明范围、受众、最终成果与学习方式）\n` +
+    `- plan：{learnerOutcome:整课最终可验证成果,scope:讲什么及讲到什么深度,prerequisites:必要前置基础,capstone:综合成果任务,exclusions:[明确不讲的相邻主题],planningRationale:为什么采用这条路径}\n` +
+    `- outline：章节数组，每项 {title:准确具体的节标题(30字内), objective:可验证的本节产出, difficulty:难度(入门/进阶/深入 之一)}。相邻章节不得重复覆盖同一能力。`;
   return { system, user };
 }
 
@@ -189,8 +189,8 @@ export function simpleOutlinePrompt(opts: { prompt: string; category?: string; t
   const system = outlineSystemBase(opts.category || "ai_skill", opts.template);
   const user =
     `学习需求（已转义的字符串字面量）：${JSON.stringify(opts.prompt.slice(0, 800))}\n` +
-    `请按「轻松入门 → 核心硬功夫 → 综合应用/成果展示」的节奏，输出一门有起承转合的课程大纲 JSON：\n` +
-    `{outline:[{title:节标题(20字内,有钩子/有画面感/让人想点开,而非干巴知识点罗列), objective:本节学完能做到什么(可衡量,一句话)}]}，共 5-8 节。`;
+    `章节数量完全由主题复杂度决定（技术上限 24 节），输出课程大纲 JSON：\n` +
+    `{outline:[{title:准确具体的节标题(30字内), objective:本节学完可验证地做到什么}]}。不套固定首尾，不重复，不为凑数拆章。`;
   return { system, user };
 }
 
@@ -207,9 +207,8 @@ export function importOutlinePrompt(opts: { title: string; rawText: string; temp
     "【第一原则：忠于原文】只依据原文内容归纳，不虚构原文之外的知识点、数据或案例。\n" +
     "【在忠实前提下让标题更好读】章节标题可以从干巴的主题命名，改写成让人想点开的一句话，" +
     "但改写只能基于原文已有的内容，不得夸大或添加原文没有的承诺。\n" +
-    getTemplate(opts.template).outlineRules +
-    "（注意：以上结构模板在忠于原文的前提下应用，不得为套模板而虚构原文没有的内容。）\n" +
-    "要求：中文、按主题分 5-8 章、章节递进不重复。\n" +
+    (opts.template ? `用户选择了「${getTemplate(opts.template).label}」作为表达偏好，但它不得改变原文结构或事实边界。\n` : "") +
+    "要求：中文、按原文真实结构决定 1-24 章；短材料可以只设 1 章，长材料按标题与主题边界切分，章节不重叠。\n" +
     NO_HYPE_RULE +
     "\n" +
     COMPLIANCE_GUARDRAIL +
@@ -217,7 +216,7 @@ export function importOutlinePrompt(opts: { title: string; rawText: string; temp
   const user =
     `原始材料标题（已转义）：${JSON.stringify(opts.title)}\n` +
     `原始材料内容（已转义的字符串字面量）：${JSON.stringify(opts.rawText)}\n\n` +
-    `请忠于原文，按主题把材料切分为 5-8 章，标题在忠实前提下尽量好读，输出 JSON：\n` +
+    `请忠于原文，按材料真实主题边界切章，标题在忠实前提下尽量好读，输出 JSON：\n` +
     `{outline:[{title:章节标题(20字内), objective:本章要点一句话}]}`;
   return { system, user };
 }
@@ -231,7 +230,9 @@ export function importOutlinePrompt(opts: { title: string; rawText: string; temp
  * 是模板差异化的核心。course-gen 的逐节 system 拼上它，块字段结构仍受 blocks.ts 白名单约束。
  */
 export function lessonRecipeBlock(template: string | null | undefined): string {
-  return `\n${getTemplate(template).lessonRecipe}\n`;
+  if (!template) return "";
+  const selected = getTemplate(template);
+  return `\n【用户创作方向】${selected.label}：${selected.tagline}。只作表达启发，不规定块型、数量或顺序。\n`;
 }
 
 /** 逐节生成时插入 system 的赛道口吻行（一句话，不改块结构契约）。 */
@@ -245,14 +246,79 @@ export function lessonVoiceLine(category: string | null | undefined): string {
 }
 
 /** 导入素材注入逐节生成的上限（字符）。控制成本，同时覆盖大多数粘贴文章。 */
-export const SOURCE_CTX_MAX = 6000;
+export const SOURCE_CTX_MAX = 12000;
+
+function grams(text: string): Set<string> {
+  const compact = text.toLowerCase().replace(/[\s\p{P}\p{S}]+/gu, "");
+  const out = new Set<string>();
+  for (let i = 0; i < compact.length - 1; i++) out.add(compact.slice(i, i + 2));
+  return out;
+}
+
+/**
+ * 从长资料里给当前章节挑相关片段。关键词相似度与章节位置共同参与，避免每一节都只看到资料开头 6000 字。
+ * 这是确定性的检索层，不改写原文；返回片段仍按原文顺序排列，便于忠实讲解。
+ */
+export function selectRelevantSourceText(
+  rawText: string,
+  context?: { query?: string; lessonIndex?: number; lessonCount?: number },
+  maxChars = SOURCE_CTX_MAX,
+): string {
+  const normalized = rawText.replace(/\r\n?/g, "\n").trim();
+  if (normalized.length <= maxChars) return normalized;
+  const paragraphs = normalized.split(/\n{2,}|(?=^#{1,6}\s)/m).map((p) => p.trim()).filter(Boolean);
+  const chunks: string[] = [];
+  let current = "";
+  for (const paragraph of paragraphs.length ? paragraphs : [normalized]) {
+    if (current && current.length + paragraph.length + 2 > 1400) {
+      chunks.push(current);
+      current = paragraph;
+    } else {
+      current += (current ? "\n\n" : "") + paragraph;
+    }
+  }
+  if (current) chunks.push(current);
+  if (chunks.length <= 1) {
+    chunks.length = 0;
+    for (let i = 0; i < normalized.length; i += 1300) chunks.push(normalized.slice(i, i + 1300));
+  }
+  const queryGrams = grams(context?.query ?? "");
+  const expected = context?.lessonCount && context.lessonCount > 1
+    ? ((context.lessonIndex ?? 0) / (context.lessonCount - 1)) * Math.max(0, chunks.length - 1)
+    : 0;
+  const ranked = chunks.map((chunk, index) => {
+    const chunkGrams = grams(chunk.slice(0, 1800));
+    let overlap = 0;
+    for (const gram of queryGrams) if (chunkGrams.has(gram)) overlap += 1;
+    const relevance = queryGrams.size ? overlap / queryGrams.size : 0;
+    const position = 1 - Math.min(1, Math.abs(index - expected) / Math.max(1, chunks.length / 2));
+    const headingBoost = /^(#{1,6}\s|第[一二三四五六七八九十百\d]+[章节课讲])/m.test(chunk) ? 0.12 : 0;
+    return { chunk, index, score: relevance * 0.72 + position * 0.28 + headingBoost };
+  }).sort((a, b) => b.score - a.score || a.index - b.index);
+  const chosen: { chunk: string; index: number }[] = [];
+  let total = 0;
+  for (const item of ranked) {
+    if (total + item.chunk.length > maxChars && chosen.length >= 2) continue;
+    chosen.push({ chunk: item.chunk, index: item.index });
+    total += item.chunk.length;
+    if (total >= maxChars * 0.88 || chosen.length >= 10) break;
+  }
+  return chosen
+    .sort((a, b) => a.index - b.index)
+    .map((item) => `[素材片段 ${item.index + 1}]\n${item.chunk}`)
+    .join("\n\n")
+    .slice(0, maxChars);
+}
 
 /**
  * 导入课「素材不丢」（P1）：把原始素材裁剪后拼成一段，供 generateLessonCore 注入 userMsg，
  * 让逐节生成忠于原文而非从标题自由发挥。仅导入课（origin=user_imported）调用。
  */
-export function sourceContextBlock(rawText: string): string {
-  const text = rawText.length > SOURCE_CTX_MAX ? rawText.slice(0, SOURCE_CTX_MAX) + "……（素材较长，此处截断）" : rawText;
+export function sourceContextBlock(
+  rawText: string,
+  context?: { query?: string; lessonIndex?: number; lessonCount?: number },
+): string {
+  const text = selectRelevantSourceText(rawText, context);
   return (
     `\n\n【本节须忠于以下导入原始素材】\n` +
     `只讲素材涵盖的内容，可归纳、举例、解释，但不得虚构素材之外的事实、数据或案例；` +

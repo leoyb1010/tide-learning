@@ -25,6 +25,9 @@ export default async function LearnPage({
   const user = await getCurrentUser();
   const data = await getLessonForUser(lessonId, user?.id ?? null);
   if (!data) notFound();
+  // URL 中的课程段必须与目标课节同属一门课，避免分支 target 或手输 id 跨课串线。
+  // 接受 slug 或课程 id(审查 P1):笔记馆/时间线等既有深链用的是 course.id,只认 slug 会把它们全打成 404。
+  if (data.course.slug !== id && data.course.id !== id) notFound();
 
   const { lesson, access, snapshot, course, outline, prevLessonId, nextLessonId } = data;
 

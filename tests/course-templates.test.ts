@@ -9,18 +9,18 @@ import {
 import { coursewareThemeAttr, COURSEWARE_THEMES } from "@/lib/ai/themes";
 
 /**
- * v3.3 课件模板差异化：签名块硬性要求 + 遵循度机检 + 主题解析。
- * 覆盖「选了模板却生成得千篇一律」根治链路的纯函数层，锁死行为防回归。
+ * v6 创作方向兼容层：只保留非约束的叙事倾向与主题解析。
+ * 防止旧模板重新向内容链注入固定章节骨架、块配方或发布门槛。
  */
 
 describe("模板注册表基本约束", () => {
-  it("八个内置模板齐全，且每个都声明了 mustInclude / signature / temperature", () => {
+  it("八个兼容创作方向齐全，且不携带固定块配方", () => {
     expect(COURSE_TEMPLATES).toHaveLength(8);
     for (const t of COURSE_TEMPLATES) {
-      expect(typeof t.mustInclude).toBe("object");
-      expect(typeof t.signature).toBe("string");
       expect(t.temperature).toBeGreaterThan(0);
       expect(t.temperature).toBeLessThanOrEqual(1);
+      expect("lessonRecipe" in t).toBe(false);
+      expect("mustInclude" in t).toBe(false);
     }
   });
 
@@ -34,65 +34,18 @@ describe("模板注册表基本约束", () => {
   });
 });
 
-describe("templateHardRequirement —— 签名块硬性要求注入", () => {
-  it("story 明确要求 dialog 块，并带签名提醒", () => {
-    const req = templateHardRequirement("story");
-    expect(req).toContain("dialog");
-    expect(req).toContain("必须包含");
-    expect(req).toContain("签名块");
-  });
-
-  it("socratic 要求 ≥3 quiz", () => {
-    const req = templateHardRequirement("socratic");
-    expect(req).toContain("3");
-    expect(req).toContain("quiz");
-  });
-
-  it("每个模板都产出非空硬性要求段（都至少有 signature）", () => {
+describe("templateHardRequirement —— v6 不再注入固定块要求", () => {
+  it("每个创作方向的硬性要求都为空", () => {
     for (const t of COURSE_TEMPLATES) {
-      expect(templateHardRequirement(t.key).length).toBeGreaterThan(0);
+      expect(templateHardRequirement(t.key)).toBe("");
     }
   });
 });
 
-describe("checkTemplateAdherence —— 模板遵循度机检", () => {
-  it("story 含 dialog → 达标；缺 dialog → 报缺失", () => {
-    const withDialog = [{ type: "scene" }, { type: "dialog" }, { type: "summary" }];
-    const noDialog = [{ type: "scene" }, { type: "concept" }, { type: "compare" }, { type: "summary" }];
-    expect(checkTemplateAdherence(withDialog, "story").ok).toBe(true);
-    const miss = checkTemplateAdherence(noDialog, "story");
-    expect(miss.ok).toBe(false);
-    expect(miss.missing.join()).toContain("dialog");
-  });
-
-  it("socratic 需 3 个 quiz：2 个不达标，3 个达标", () => {
-    const two = [{ type: "quiz" }, { type: "quiz" }, { type: "summary" }];
-    const three = [{ type: "quiz" }, { type: "quiz" }, { type: "quiz" }, { type: "summary" }];
-    expect(checkTemplateAdherence(two, "socratic").ok).toBe(false);
-    expect(checkTemplateAdherence(three, "socratic").ok).toBe(true);
-  });
-
-  it("exam_sprint 需 keypoint≥1 且 quiz≥3", () => {
-    const blocks = [{ type: "keypoint" }, { type: "quiz" }, { type: "quiz" }, { type: "quiz" }];
-    expect(checkTemplateAdherence(blocks, "exam_sprint").ok).toBe(true);
-    const short = [{ type: "quiz" }, { type: "quiz" }, { type: "quiz" }]; // 缺 keypoint
-    const r = checkTemplateAdherence(short, "exam_sprint");
-    expect(r.ok).toBe(false);
-    expect(r.missing.join()).toContain("keypoint");
-  });
-
-  it("classic（mustInclude 仅 example）：含 example 即达标", () => {
-    expect(checkTemplateAdherence([{ type: "example" }], "classic").ok).toBe(true);
-    expect(checkTemplateAdherence([{ type: "concept" }], "classic").ok).toBe(false);
-  });
-
-  it("新增语言沉浸与少儿明亮模板具有可机检签名", () => {
-    expect(checkTemplateAdherence([{ type: "dialog" }, { type: "dialog" }, { type: "flashcard" }], "language_immersion").ok).toBe(true);
-    expect(checkTemplateAdherence([{ type: "scene" }, { type: "quiz" }, { type: "quiz" }], "kids_bright").ok).toBe(true);
-  });
-
-  it("空块数组：非空 mustInclude 的模板判不达标，不崩", () => {
-    expect(checkTemplateAdherence([], "story").ok).toBe(false);
+describe("checkTemplateAdherence —— 不再把风格当发布门", () => {
+  it("任意结构和空结构都不会因创作方向被判不合格", () => {
+    expect(checkTemplateAdherence([{ type: "dialog" }], "story")).toEqual({ ok: true, missing: [] });
+    expect(checkTemplateAdherence([], "exam_sprint")).toEqual({ ok: true, missing: [] });
   });
 });
 

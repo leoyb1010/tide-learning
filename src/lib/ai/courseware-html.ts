@@ -40,10 +40,10 @@ export interface CoursewareContract {
   checksum: string; // sha256:<hex>
 }
 
-/** CSP：写进 srcdoc head 第一个元素。default-src none 兜底；connect-src none 掐断外泄；只允许内联 + data: 图/字体。 */
+/** CSP：写进 head 第一个元素。connect-src none 掐断外泄；图片仅允许站内鉴权素材与 data URI。 */
 export const CSP_META =
   `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; ` +
-  `script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; ` +
+  `script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; ` +
   `connect-src 'none'; base-uri 'none'; form-action 'none'">`;
 
 /**
@@ -313,6 +313,7 @@ body.ct-paged .opener--poster{min-height:0}
   padding:30px;text-align:center;color:var(--ct-ink3);font-size:14px}
 /* 蓝图 B4：内容级插图框景 */
 .illu{margin:0;border:1px solid var(--ct-border);border-radius:var(--ct-radius);overflow:hidden;box-shadow:var(--ct-shadow)}
+.illu img{display:block;width:100%;max-height:620px;object-fit:contain;background:var(--ct-surface2)}
 .illu figcaption{padding:10px 16px;border-top:1px solid var(--ct-border);background:var(--ct-surface2);
   font-size:13.5px;color:var(--ct-ink2);text-align:center}
 ${DIAGRAM_CSS}
@@ -519,6 +520,20 @@ const RUNTIME_SCRIPT = `
       });
     });
   }
+  function branches(){
+    document.querySelectorAll('[data-ct-target],[data-ct-feedback]').forEach(function(el){
+      el.addEventListener('click',function(){
+        var feedback = el.getAttribute('data-ct-feedback');
+        var host = el.closest ? el.closest('.ct-route-card,.ct-hotspot-card') : null;
+        var output = host && host.querySelector ? host.querySelector('.ct-route-feedback') : null;
+        if(output && feedback){ output.textContent = feedback; output.hidden = false; }
+        var target = el.getAttribute('data-ct-target');
+        if(target && /^[A-Za-z0-9_-]{1,80}$/.test(target)){
+          try{ parent.postMessage({type:'ct-branch', targetLessonId:target, bid:el.getAttribute('data-bid')||null}, '*'); }catch(e){}
+        }
+      });
+    });
+  }
   function postHeight(){
     if (mode === 'paged') return; // 翻页模式高度由父页固定，不上报
     try{
@@ -645,7 +660,7 @@ const RUNTIME_SCRIPT = `
     else if (d.type === 'ct-hello') announce();
   });
 
-  reveal(); quiz(); cards();
+  reveal(); quiz(); cards(); branches();
 ${INTERACTIVE_RUNTIME}
   setMode('paged');
   announce();
@@ -794,7 +809,7 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     }
     case "quiz": {
       const opts = `<div class="opts">${b.options
-        .map((o, oi) => `<button class="opt"><span class="ol">${String.fromCharCode(65 + oi)}</span><span>${esc(o)}</span><span class="mk">●</span></button>`)
+        .map((o, oi) => `<button class="opt"${b.branchTargets?.[oi] ? ` data-ct-target="${esc(b.branchTargets[oi])}" data-bid="${esc(b.id)}"` : ""}><span class="ol">${String.fromCharCode(65 + oi)}</span><span>${esc(o)}</span><span class="mk">●</span></button>`)
         .join("")}</div>`;
       // split：题干与选项左右分栏（宽屏），与单列 stage 构图不同；交互 JS 靠 .quiz/.opt 不变。
       // data-bid：块 id，作答结果经 ct-quiz 回传宿主时定位到具体块（蓝图 D2）。
@@ -820,11 +835,12 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
         ${b.next ? `<div class="next"><b>下一节</b>${esc(b.next)}</div>` : ""}</div></section>`;
     }
     case "image": {
-      // 蓝图 B4（审查 P1-10）：image 块不再是文字占位——按 caption 语义 + 种子生成主题化内联插图
-      // （概念图/流程/比例环/柱图/几何场景，全取 art token 上色），CSP 自包含铁律不变。
+      // 创作者上传的站内素材直接呈现；旧图解仍可按语义生成自包含 SVG 兜底。
       const label = b.caption || b.alt || "";
-      const svg = illustrationSvg(design.art, hashSeed(`illu:${b.id}:${label}`), label);
-      return `<section ${rv}><figure class="illu">${svg}${label ? `<figcaption>${esc(label)}</figcaption>` : ""}</figure></section>`;
+      const media = b.src
+        ? `<img src="${esc(b.src)}" alt="${esc(b.alt || b.caption || "课程素材")}" loading="lazy">`
+        : illustrationSvg(design.art, hashSeed(`illu:${b.id}:${label}`), label);
+      return `<section ${rv}><figure class="illu">${media}${label ? `<figcaption>${esc(label)}</figcaption>` : ""}</figure></section>`;
     }
     case "diagram": {
       // v4.3 语义图示(leohtml 纪律):结构取自关系、节点标签来自内容、方向显式、结果强调。
@@ -842,6 +858,12 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     case "dragwords":
       // v4.3 交互块(H5P 式):填空/拖词,判分经 ct-quiz 回传宿主进错题闭环(见 courseware-interactive)。
       return `<section ${rv}>${interactiveHtml(b)}</section>`;
+    case "choice":
+      return `<section ${rv}><div class="card ct-route-card"><span class="pill">学习选择</span><div class="q" style="margin-top:12px">${esc(b.prompt)}</div><div class="opts">${b.choices.map((choice, index) => `<button class="opt" data-bid="${esc(b.id)}"${choice.targetLessonId ? ` data-ct-target="${esc(choice.targetLessonId)}"` : ""}${choice.feedback ? ` data-ct-feedback="${esc(choice.feedback)}"` : ""}><span class="ol">${index + 1}</span><span>${esc(choice.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
+    case "branch":
+      return `<section ${rv}><div class="card ct-route-card"><span class="pill">路径分支</span><div class="q" style="margin-top:12px">${esc(b.prompt)}</div><div class="opts">${b.options.map((option, index) => `<button class="opt" data-bid="${esc(b.id)}" data-ct-target="${esc(option.targetLessonId)}"${option.condition ? ` data-ct-feedback="${esc(option.condition)}"` : ""}><span class="ol">${index + 1}</span><span>${esc(option.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
+    case "hotspot":
+      return `<section ${rv}><div class="ct-hotspot-card">${b.prompt ? `<div class="q" style="margin-bottom:12px">${esc(b.prompt)}</div>` : ""}<div style="position:relative;overflow:hidden;border-radius:var(--ct-radius);background:var(--ct-surface)"><img src="${esc(b.imageSrc)}" alt="${esc(b.prompt || "互动热点图")}" style="display:block;width:100%;height:auto">${b.spots.map((spot, index) => `<button type="button" aria-label="${esc(spot.label)}" title="${esc(spot.label)}" data-bid="${esc(b.id)}"${spot.targetLessonId ? ` data-ct-target="${esc(spot.targetLessonId)}"` : ""}${spot.feedback ? ` data-ct-feedback="${esc(spot.feedback)}"` : ""} style="position:absolute;left:${spot.x}%;top:${spot.y}%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:3px solid var(--ct-bg);background:var(--ct-accent);color:var(--ct-accent-ink);font-weight:800;cursor:pointer">${index + 1}</button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite" style="margin-top:10px;color:var(--ct-ink)"></p></div></section>`;
     default:
       return "";
   }
@@ -1181,6 +1203,12 @@ const BESPOKE_ADAPTER_SCRIPT = `
     if (idx >= 0 && !isNaN(ans)) { q.__ctReported = true; post({type:'ct-quiz', bid: q.getAttribute('data-bid') || null, answer: idx, correct: idx === ans}); }
   }, true);
   document.addEventListener('click', function(ev){
+    var t = ev.target && ev.target.closest ? ev.target.closest('[data-ct-target]') : null;
+    if (!t) return;
+    var target = t.getAttribute('data-ct-target');
+    if (target && /^[A-Za-z0-9_-]{1,80}$/.test(target)) post({type:'ct-branch', targetLessonId:target, bid:t.getAttribute('data-bid') || null});
+  }, true);
+  document.addEventListener('click', function(ev){
     var t = ev.target && ev.target.closest ? ev.target.closest('.fc') : null;
     if (t && !t.__ctFlipped) { t.__ctFlipped = true; post({type:'ct-flash', bid: t.getAttribute('data-bid') || null}); }
   }, true);
@@ -1256,38 +1284,12 @@ export function validateCoursewareHtml(html: string): CoursewareLint {
 }
 
 /**
- * 蓝图 A4：风格软违规后处理自愈——把可机械修正的 style lint 直接改到 HTML 里，
- * 保住 LLM 已产出的整节 bespoke，而不是拒收白扔。修正全部替换为中性安全值
- * （不猜设计意图，只消除违规本身）；不可机械修正的项（scroll 监听/营销词等）留给 lint 观测。
+ * v6 安全自愈：只补无障碍降级，不再改写模型原创的字体、配色、背景、圆角或投影。
+ * style lint 继续进入观测与设计评审，但不再把所有课件机械收敛成同一套“中性安全值”。
  */
 export function normalizeCoursewareStyle(html: string): { html: string; fixes: string[] } {
   let h = html || "";
   const fixes: string[] = [];
-
-  // 硬黑投影 → 带色相投影色。审计修复：只改 box-shadow/text-shadow 声明内的纯黑，
-  // 且**保留原透明度**——原实现全局替换并把 α 钉死 .10，会把正文色 rgba(0,0,0,.85)、
-  // 弹层遮罩 rgba(0,0,0,.6) 一并改到近乎不可见。
-  if (/(?:box-shadow|text-shadow)[^;}]*rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*0?\.[1-9]/i.test(h)) {
-    h = h.replace(/((?:box-shadow|text-shadow)[^;}]*)/gi, (decl) =>
-      decl.replace(/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*(0?\.\d+)\s*\)/gi, "rgba(18,24,32,$1)"),
-    );
-    fixes.push("shadow 纯黑→带色相投影色(保留透明度)");
-  }
-
-  // 廉价默认字体 → system-ui（只动 font-family 声明内的字体名，不碰正文文字）
-  if (/font-family[^;}]*\b(Inter|Roboto|Arial|Open Sans|Helvetica)\b/i.test(h)) {
-    h = h.replace(/(font-family[^;}]*)/gi, (decl) =>
-      decl.replace(/\b(Inter|Roboto|Arial|Open Sans|Helvetica)\b/gi, "system-ui"),
-    );
-    fixes.push("廉价字体→system-ui");
-  }
-
-  // 纯黑/纯白背景 → 近黑/暖白（保留背景声明结构，只替换 hex）
-  if (/background[^;}]*#(?:000000|000|ffffff|fff)\b/i.test(h)) {
-    h = h.replace(/(background[^;}]*?)#(000000|000)\b/gi, "$1#0c0f14");
-    h = h.replace(/(background[^;}]*?)#(ffffff|fff)\b/gi, "$1#fcfbf7");
-    fixes.push("纯黑/纯白背景→近黑/暖白");
-  }
 
   // 缺 reduce-motion → 注入全局降级分支（放 </head> 前，对整页动画/过渡一刀切降级）
   if (!/prefers-reduced-motion/i.test(h)) {

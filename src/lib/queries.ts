@@ -215,6 +215,10 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
         select: {
           ...COURSE_PUBLIC_SELECT,
           lessons: { orderBy: { sortOrder: "asc" }, select: LESSON_OUTLINE_SELECT },
+          lessonEdges: {
+            orderBy: { sortOrder: "asc" },
+            select: { fromLessonId: true, toLessonId: true, label: true, conditionJson: true, sortOrder: true },
+          },
         },
       },
       subtitles: {
@@ -230,8 +234,21 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   const snapshot = await resolveEntitlement(userId);
   const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned);
 
-  const { lessons: siblings, ...courseMeta } = lesson.course;
+  const { lessons: siblings, lessonEdges, ...courseMeta } = lesson.course;
   const idx = siblings.findIndex((l) => l.id === lesson.id);
+  const graphMode = lesson.course.navigationMode === "graph";
+  const parseConditionType = (json: string | null): string => {
+    try { return (JSON.parse(json ?? '{"type":"always"}') as { type?: string }).type ?? "always"; }
+    catch { return "always"; }
+  };
+  const outgoing = graphMode
+    ? lessonEdges.filter((edge) => edge.fromLessonId === lesson.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    : [];
+  const incoming = graphMode
+    ? lessonEdges.filter((edge) => edge.toLessonId === lesson.id).sort((a, b) => a.sortOrder - b.sortOrder)
+    : [];
+  // 条件边由课件内 choice/quiz/hotspot 明确触发；底部“下一节”只沿 always 边，避免绕过学习者选择。
+  const defaultGraphNext = outgoing.find((edge) => parseConditionType(edge.conditionJson) === "always") ?? null;
 
   return {
     snapshot,
@@ -272,8 +289,8 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       durationSec: l.durationSec,
       current: l.id === lesson.id,
     })),
-    prevLessonId: idx > 0 ? siblings[idx - 1].id : null,
-    nextLessonId: idx < siblings.length - 1 ? siblings[idx + 1].id : null,
+    prevLessonId: graphMode ? (incoming[0]?.fromLessonId ?? null) : idx > 0 ? siblings[idx - 1].id : null,
+    nextLessonId: graphMode ? (defaultGraphNext?.toLessonId ?? null) : idx < siblings.length - 1 ? siblings[idx + 1].id : null,
   };
 }
 

@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { importOutlinePrompt } from "@/lib/ai/prompts";
+import { createCourseContentBrief, serializeCourseContentBrief } from "@/lib/ai/content-brief";
 
 // 粘贴 / 文件导入共用的文本长度口径。
 export const MIN_IMPORT_TEXT = 100;
@@ -25,6 +26,7 @@ export interface ImportCourseResult {
   title: string;
   charCount: number;
   lessons: { id: string; title: string }[];
+  checkpoint?: boolean;
 }
 
 /**
@@ -49,8 +51,10 @@ export async function structureImportedTextIntoCourse(opts: {
   model?: string;
   /** v3.4 排版质量档：standard / premium。 */
   qualityTier?: "standard" | "premium";
+  /** 导入现成大纲时先停在 OutlineCheckpoint，由作者确认结构后再逐节生成。 */
+  checkpoint?: boolean;
 }): Promise<ImportCourseResult> {
-  const { userId, rawText, kind, template, model, qualityTier = "standard" } = opts;
+  const { userId, rawText, kind, template, model, qualityTier = "standard", checkpoint = false } = opts;
   const title = (opts.title?.trim() || rawText.slice(0, 20)).slice(0, 120);
 
   // —— 先落库 ImportedSource（已抽取出纯文本即 parsed）——
@@ -80,7 +84,7 @@ export async function structureImportedTextIntoCourse(opts: {
         title: o.title.trim().slice(0, 120),
         objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
       }))
-      .slice(0, 8);
+      .slice(0, 24);
   } catch {
     outline = [];
   }
@@ -106,7 +110,17 @@ export async function structureImportedTextIntoCourse(opts: {
         authorUserId: userId,
         ownerId: userId,
         visibility: "private",
-        genStatus: "generating",
+        genStatus: checkpoint ? "outline_draft" : "generating",
+        contentBriefJson: serializeCourseContentBrief(createCourseContentBrief({
+          request: `忠实地把《${title}》整理成可学习、可检验的课程`,
+          plan: {
+            learnerOutcome: "能够复述、解释并应用导入资料中的核心内容",
+            scope: "仅覆盖导入资料中明确出现的主题、事实与方法",
+            capstone: "用导入资料中的方法完成一次综合解释或应用任务",
+            exclusions: ["导入资料没有提供依据的延伸知识"],
+          },
+          sourceBased: true,
+        })),
         template: template ?? null,
         modelUsed: model ?? null,
         qualityTier,
@@ -170,11 +184,13 @@ export async function structureImportedTextIntoCourse(opts: {
 
   // —— 服务端后台续跑：大纲已落库，逐节生成交给 after() 在响应返回后接管（关页/刷新不影响）。——
   const courseId = created.course.id;
-  await initGenJob(courseId, userId, created.lessons.length, { category: "user_imported" });
-  after(async () => {
-    // after() 内绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。
-    await runCourseGenBackground(courseId, userId);
-  });
+  if (!checkpoint) {
+    await initGenJob(courseId, userId, created.lessons.length, { category: "user_imported" });
+    after(async () => {
+      // after() 内绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。
+      await runCourseGenBackground(courseId, userId);
+    });
+  }
 
   return {
     courseId: created.course.id,
@@ -182,5 +198,6 @@ export async function structureImportedTextIntoCourse(opts: {
     title: created.course.title,
     charCount: rawText.length,
     lessons: created.lessons,
+    ...(checkpoint ? { checkpoint: true } : {}),
   };
 }

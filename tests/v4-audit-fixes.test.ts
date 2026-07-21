@@ -64,16 +64,22 @@ describe("QC 分级(审计修复:性能硬伤不放行 / 正文纯黑不误伤)"
   });
 });
 
-describe("normalizeCoursewareStyle(审计修复:不误伤正文,保留透明度)", () => {
+describe("normalizeCoursewareStyle(v6:只补安全降级,不改原创风格)", () => {
   it("正文色 rgba(0,0,0,.85) 不被改写", () => {
     const h = '<p style="color:rgba(0,0,0,.85)">x</p>';
     expect(normalizeCoursewareStyle(h).html).toContain("rgba(0,0,0,.85)");
   });
 
-  it("box-shadow 纯黑改带色相但保留原透明度", () => {
+  it("box-shadow 不再被平台改成统一色", () => {
     const { html, fixes } = normalizeCoursewareStyle('<div style="box-shadow:0 2px 8px rgba(0,0,0,.3)">x</div>');
-    expect(html).toContain("rgba(18,24,32,.3)");
-    expect(fixes.length).toBeGreaterThan(0);
+    expect(html).toContain("rgba(0,0,0,.3)");
+    expect(fixes).toEqual(["注入 reduce-motion 降级"]);
+  });
+
+  it("缺 reduce-motion 时只注入无障碍降级", () => {
+    const { html, fixes } = normalizeCoursewareStyle("<html><head></head><body>x</body></html>");
+    expect(html).toContain("prefers-reduced-motion");
+    expect(fixes).toEqual(["注入 reduce-motion 降级"]);
   });
 });
 

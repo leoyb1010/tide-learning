@@ -13,10 +13,10 @@ export const dynamic = "force-dynamic";
  * POST /api/ai/generate-lesson-html —— v3.3 把一节的块课件升级为「多样化 HTML 课件」。
  *
  * body: { lessonId, enhance?: boolean, model?: string }
- * - 默认 enhance=false：走确定性渲染引擎（按课级设计系统 × Variance 抽签渲染，免费、快、可复现）。
- * - enhance=true：先试 LLM bespoke HTML（按真实 token 记 generate_lesson_html），过安全/反slop 校验才采用，
- *   否则回落确定性渲染；再不行由内核兜底。绝不空/崩（内容层 blocksJson 始终保留）。
- * 权益：需 canUseLLM（enhance 才真花钱，但入口统一按 LLM 能力门控）。限流：每用户每小时 60 节。
+ * - 默认 enhance=true：设计 Agent 为本节原创 OKLCH token，强模型生成自包含 HTML。
+ * - 仅安全、宿主协议与对比度是硬门；失败重做一次，仍失败才回落确定性安全网。
+ * - enhance=false 是显式的低成本逃生门，不再是默认质量路径。
+ * 限流：每用户每小时 60 节。
  */
 export async function POST(req: NextRequest) {
   return handle(async () => {
@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
     const lessonId = body?.lessonId?.trim();
     if (!lessonId) return fail("缺少 lessonId");
 
-    // 蓝图 D5：免费用户对自己名下课放行（确定性渲染零 LLM 成本）；enhance 精修仍会员专属（下方钳制）。
+    // 用户只能处理自己名下的课；模型档位仍由权益过滤，但原创表现层不再被会员开关关闭。
     const target = await prisma.lesson.findUnique({
       where: { id: lessonId },
       select: { course: { select: { authorUserId: true } } },
@@ -47,8 +47,7 @@ export async function POST(req: NextRequest) {
     let result;
     try {
       result = await generateLessonHtml(lessonId, user.id, {
-        // 蓝图 D5 钳制：bespoke 精修是订阅权益，免费体验课只走确定性渲染（不花 LLM 钱）。
-        enhance: Boolean(body?.enhance) && snapshot.isSubscriber,
+        enhance: body?.enhance !== false,
         model: allowedModel?.key ?? null,
       });
     } catch (e) {
