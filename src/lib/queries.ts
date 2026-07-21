@@ -301,8 +301,11 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
  */
 const STREAM_TTL_MS = 10 * 60 * 1000;
 function signedVideoUrl(assetId: string): string {
-  // 取当前所在时间窗口的下一个边界作为过期戳 —— 稳定、可缓存、跨渲染一致。
-  const exp = (Math.floor(Date.now() / STREAM_TTL_MS) + 1) * STREAM_TTL_MS;
+  // 过期戳取「下下个」窗口边界(2026-07-21 修复):此前取下一个边界,页面若恰在窗口尾部渲染
+  // (如 xx:09:58),URL 2 秒后即过期——视频 range 拉流中途 403 中断(CI runtime-contract 在窗口
+  // 边界稳定复现,线上用户同样会踩)。+2 后剩余有效期恒在 (10,20] 分钟,同窗口内仍跨渲染一致
+  // (SSR 与 hydration 同 URL,无 mismatch);verifyStreamSignature 的接受窗口已同步放宽到 20 分钟。
+  const exp = (Math.floor(Date.now() / STREAM_TTL_MS) + 2) * STREAM_TTL_MS;
   const sig = createStreamSignature(assetId, exp);
   return `/api/stream/${encodeURIComponent(assetId)}?exp=${exp}&sig=${sig}`;
 }
