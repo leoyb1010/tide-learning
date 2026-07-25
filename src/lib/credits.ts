@@ -343,8 +343,11 @@ export async function ensureFreeMonthlyGrant(userId: string, monthKey: string): 
 export function creditingOnUsage(userId: string, scene: Scene) {
   return (usage: LlmUsageInfo) => {
     try {
-      after(() => {
-        void recordLlmSpend(userId, usage, scene);
+      // 必须 async + await(2026-07-21 资金审查 A-4 修):此前回调是同步函数、立即返回 undefined,
+      // Next 认为该 after 任务已完成,真正的 DB 写成了游离 promise —— 响应返回后进程被冻结/回收时
+      // 这笔记账会丢(正是 after 本想解决的问题)。改成 await 后 Next 会等它落库。
+      after(async () => {
+        await recordLlmSpend(userId, usage, scene);
       });
     } catch {
       // 非请求作用域：after() 不可用，退回直发（recordLlmSpend 内部已自带失败落 AuditLog 兜底）。

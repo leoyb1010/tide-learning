@@ -44,10 +44,12 @@ function CreateStudioSkeleton() {
  * 真正的权益闸门在各 AI route 内二次校验（越权/权益判断只信服务端）。
  * 未登录先引导登录（AI 功能必须登录）。
  */
-export default async function CreatePage({ searchParams }: { searchParams: Promise<{ manual?: string }> }) {
+export default async function CreatePage({ searchParams }: { searchParams: Promise<{ manual?: string; draft?: string }> }) {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/create");
-  const requestedManualId = (await searchParams).manual?.trim();
+  const sp = await searchParams;
+  const requestedManualId = sp.manual?.trim();
+  const requestedDraftId = sp.draft?.trim();
 
   const snapshot = await resolveEntitlement(user.id);
 
@@ -87,8 +89,16 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
   // —— L2 大纲检查点恢复：把「最近一份未确认的大纲草稿」透给客户端 ——
   // 专业模式造课停在 outline_draft，用户若离开/刷新，回到 /create 用它把检查点重新打开
   // （否则草稿会成为无客户端可达的死角，/outline* 系列接口没有入口）。
+  // 2026-07-21 修(B1):此前恒取「最新一份」草稿,而「我的课」给每份草稿都渲染了 /create?draft=<id>。
+  // 有两份以上草稿时,点旧那份 → 服务端返回的是新那份 → CreateStudio 因 draft 参数与之不符而不弹检查点
+  // → 用户「点了没反应」,旧草稿永远确认不了。现在按 ?draft= 精确定位(仍严格限本人 + outline_draft)。
   const draftRow = await prisma.course.findFirst({
-    where: { authorUserId: user.id, genStatus: "outline_draft", origin: { in: ["ai_generated", "user_imported"] } },
+    where: {
+      authorUserId: user.id,
+      genStatus: "outline_draft",
+      origin: { in: ["ai_generated", "user_imported"] },
+      ...(requestedDraftId ? { id: requestedDraftId } : {}),
+    },
     orderBy: { createdAt: "desc" },
     select: { id: true, slug: true, title: true, origin: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
   });

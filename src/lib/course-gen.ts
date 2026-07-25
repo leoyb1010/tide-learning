@@ -1,6 +1,6 @@
 import { chatJson } from "./llm";
 import { prisma } from "./db";
-import { creditingOnUsage } from "./credits";
+import { creditingOnUsage, estimateCredits, getBalanceFresh } from "./credits";
 import { track } from "./analytics";
 import { blocksToPlainText, validateBlocks, type Block } from "./blocks";
 import { simpleOutlinePrompt, lessonVoiceLine, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
@@ -241,7 +241,12 @@ export async function writeLessonBlocks(opts: {
 
 /** 节级 claim 的 TTL：认领超时未落库视为死锁可重取（generateLessonCore 抢占 /
  *  runCourseGenBackground 收尾判定「另一流水是否仍活跃」共用同一口径）。 */
-const CLAIM_TTL_MS = 10 * 60_000;
+// 2026-07-21 资金审查 C-1 修:此前 claim TTL(10min) < job 僵尸阈值(15min),而 claim 只在认领时
+// 写一次、生成期间从不刷新。任何慢到能触发「僵尸对账判 failed」的节(单节最坏 = 6 稿 ×(作者
+// 90~120s×2重试 + 双评审 90~120s×2重试),轻易 >15min),其 claim 必然也已过 10 分钟 —— 于是
+// resume-gen 的「保留新鲜 claim 以防重复扣费」形同虚设,新流水必定重认领同一节 → 双份生成、双份扣费。
+// 现在把 claim TTL 抬到 50 分钟(> 单节理论最长耗时,且 > 僵尸阈值),让「仍在跑的节」始终被认作新鲜。
+const CLAIM_TTL_MS = 50 * 60_000;
 
 /**
  * 逐节 prompt 的字段级转义：与 prompts.ts「用户输入一律 JSON.stringify 转义」口径对齐。
@@ -595,7 +600,10 @@ export async function generateLessonCore(
         const candidateJudge = await judgeLesson(
           candidate,
           { courseTitle: course.title, lessonTitle: lesson.title, objective: lesson.summary, category: course.category },
-          { model: model.key, ...judgeContext },
+          // onUsage 必传(2026-07-21 修漏扣):judgeLesson 内部是「内容评审 + 教学评审」两次
+          // 独立强模型调用(prompt 含最多 22000 字正文),每稿 2 次 × 最多 6 稿 = 单节最多 12 次
+          // 强模型调用;此前唯一调用点没传 onUsage → 这部分成本 100% 不计费,量级与作者调用同级。
+          { model: model.key, onUsage: creditingOnUsage(userId, "generate_lesson"), ...judgeContext },
         );
         const candidateScore = lessonJudgeScore(candidateJudge) * 20 + candidateQuality.score * 0.12
           - candidateJudge.blockingIssues.length * 12
@@ -1229,8 +1237,20 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     const start = await readGenProgress(courseId);
     let failed = start.failed;
 
-    // v6 质量优先：入口仍保留身份、限流和基础计费校验，但开始一门课后不再按逐节预估余额
-    // 中途截断。真实 token 继续记账；课程要么完成，要么因真实生成错误进入可续跑状态。
+    // 逐节余额闸门(2026-07-21 资金审查 A-1 返修)。
+    // v6 曾以「质量优先」为由整段移除它,但入口预检只按 estimateCredits("generate_course")=4 分把关,
+    // 而一门 8 节课的真实扇出是:每节 narrativePlan + 最多 6 稿作者调用 + 每稿两次强模型评审
+    // + 最多 4 次 bespoke HTML(权重 1.5)≈ 1600~3000 分。也就是 4 分的门放行了上千分的消费,
+    // 余额被扣成深度负数(recordLlmSpend 允许欠账,只靠下一次 assertCanSpend 拦)。免费用户同理:
+    // 100 分月赠即可产生数千分真实 API 成本。限流(10/天)不是成本护栏。
+    // 现在:每节开始前读实时余额,不足以覆盖「一节最坏成本」即停止扇出并落 failed(可续造),
+    // 已生成的节全部保留。滞后记账最多让实际透支一节,有界。
+    const genCourse = await prisma.course.findUnique({ where: { id: courseId }, select: { modelUsed: true } });
+    const genModel = genCourse?.modelUsed ?? undefined;
+    const perLessonCost =
+      estimateCredits("generate_lesson", undefined, genModel) +
+      estimateCredits("generate_lesson_html", undefined, genModel);
+    let stoppedForCredits = false;
     let stoppedForPause = false;
 
     for (const { id: lessonId } of pending) {
@@ -1242,6 +1262,13 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       if (fresh?.genStatus === "paused") {
         stoppedForPause = true;
         console.warn(`[course-gen] 用户暂停造课，停止后续节`, courseId);
+        break;
+      }
+      // 实时余额闸门:留足一节最坏预估才继续,否则停止扇出(课落 failed,用户可充值后续造)。
+      const balanceNow = await getBalanceFresh(userId);
+      if (balanceNow < perLessonCost) {
+        stoppedForCredits = true;
+        console.warn(`[course-gen] 逐节积分门:余额不足(实时 ${balanceNow} < 单节门槛 ${perLessonCost}),停止后续节`, courseId);
         break;
       }
       await updateGenJob(courseId, { currentLessonId: lessonId });
@@ -1292,6 +1319,14 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       await renderCourseHtmlBestEffort(courseId);
       await prisma.course.update({ where: { id: courseId }, data: { genStatus: "failed" } });
       await finalizeGenJob(courseId, "failed");
+      // 因余额闸门截停时打点,便于区分「真实生成错误」与「积分不足」两类 failed(前者要查错,后者引导充值)。
+      if (stoppedForCredits) {
+        await track({
+          eventName: "ai_gen_stopped_credits",
+          userId,
+          properties: { courseId, remaining, perLessonCost },
+        }).catch(() => {});
+      }
     }
   } catch (e) {
     // 兜底：整段后台异常也不能崩进程
