@@ -171,6 +171,7 @@ model Course {
 
   @@index([sharedStatus, lastUpdatedAt]) // 课程集市列表：按分享状态过滤 + 时间排序
   @@index([authorUserId]) // 「我造/我导入的课」列表 + 用户删除时按作者反查（authorUserId 为软 FK，无级联，查询侧用索引兜住）
+  @@index([status, visibility]) // 公开课列表(首页/书桌/课程库 listCourses 的主过滤):此前全表 SCAN
 }
 
 model Lesson {
@@ -353,6 +354,7 @@ model LearningProgress {
   updatedAt      DateTime  @updatedAt
 
   @@unique([userId, lessonId])
+  @@index([lastPlayedAt]) // 「此刻在学」(首页/书桌/admin 三处)按时间窗过滤:此前全表 SCAN
 }
 
 // ---------- 课程评价（S5 评价系统闭环）----------
@@ -796,6 +798,7 @@ model AnalyticsEvent {
   // 全站最热写表：埋点查询按事件名 + 时间范围、按用户漏斗高频过滤，补两条覆盖索引。
   @@index([eventName, createdAt])
   @@index([userId, eventName, createdAt])
+  @@index([createdAt]) // 只增不减的埋点表按时间排序/限窗:此前 SCAN + TEMP B-TREE
 }
 
 // ---------- §8.2.2 内容排期 ----------
@@ -956,6 +959,7 @@ model GenerationJob {
   finishedAt       DateTime?
 
   @@index([userId, status])
+  @@index([type, resultRef, createdAt]) // getGenJobsFor:前端 8 秒轮询的热路径,此前全表 SCAN
 }
 
 // 中枢：AI 学习伴侣 对话线程

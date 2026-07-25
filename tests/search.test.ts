@@ -10,10 +10,12 @@ import { describe, it, expect, beforeAll } from "vitest";
  *  4. 空 q 返回空结果（不查库）。
  *
  * 与既有 contract.test.ts 同款「服务器未起则 skip、绝不误红」的探活模式。
- * 默认打 http://localhost:3200（自测端口），可用 SEARCH_BASE 覆盖。
+ * 默认打 http://localhost:3100（项目约定端口，见 CLAUDE.md），可用 SEARCH_BASE/CONTRACT_BASE 覆盖。
+ * 2026-07-21 修:此前默认 3200(无人监听)+ 守卫用裸 return 而非 skip()，三个用例长期「零断言假绿」——
+ *   其中「notes 域越权铁律」从未真正执行过。现改为 3100 + skip()，未跑到会显式标记 skipped。
  */
 
-const BASE = process.env.SEARCH_BASE ?? process.env.CONTRACT_BASE ?? "http://localhost:3200";
+const BASE = process.env.SEARCH_BASE ?? process.env.CONTRACT_BASE ?? "http://localhost:3100";
 
 let SERVER_UP = false;
 
@@ -29,8 +31,8 @@ beforeAll(async () => {
 const ALLOWED_TYPES = new Set(["course", "note", "post", "market", "demand"]);
 
 describe("GET /api/search 五域联搜", () => {
-  it("响应信封 {ok,data:{results,counts}} + type 合法", async () => {
-    if (!SERVER_UP) return; // 服务器未起：跳过，不误红
+  it("响应信封 {ok,data:{results,counts}} + type 合法", async ({ skip }) => {
+    if (!SERVER_UP) return skip(); // 服务器未起：显式 skip（不是静默零断言）
     const res = await fetch(`${BASE}/api/search?q=${encodeURIComponent("英语")}`);
     // 429（限流窗口内）不算失败——契约形状本身无从校验，跳过即可
     if (res.status === 429) return;
@@ -53,8 +55,8 @@ describe("GET /api/search 五域联搜", () => {
     }
   });
 
-  it("notes 域越权铁律：未登录时 notes 恒空", async () => {
-    if (!SERVER_UP) return;
+  it("notes 域越权铁律：未登录时 notes 恒空", async ({ skip }) => {
+    if (!SERVER_UP) return skip();
     // 不带 Authorization → 游客。用一个大概率命中笔记的常见词。
     const res = await fetch(`${BASE}/api/search?q=${encodeURIComponent("笔记")}`);
     if (res.status === 429) return;
@@ -64,8 +66,8 @@ describe("GET /api/search 五域联搜", () => {
     expect(json.data.results.some((r: { type: string }) => r.type === "note")).toBe(false);
   });
 
-  it("空 q 返回空结果（不查库）", async () => {
-    if (!SERVER_UP) return;
+  it("空 q 返回空结果（不查库）", async ({ skip }) => {
+    if (!SERVER_UP) return skip();
     const res = await fetch(`${BASE}/api/search?q=`);
     if (res.status === 429) return;
     expect(res.ok).toBe(true);

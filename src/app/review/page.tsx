@@ -1163,9 +1163,13 @@ function ReviewSkeleton() {
    空态：今日无到期，加练 10 张（从未到期卡抽最早 10 张）
    ============================================================ */
 function EmptyState({ onPractice, practiceEmpty }: { onPractice: () => void; practiceEmpty?: boolean }) {
+  // 2026-07-21 修:此前空态标题恒为 variant 默认的「今日已复习完」——新用户一张卡没复习过
+  // 也被告知「已复习完」(撒谎),且「加练 10 张」在无卡时点了画面纹丝不动(死按钮)。
+  // 现在:标题据真实状态区分,且确认无卡可练时直接撤掉该按钮,只留真正有用的出口。
   return (
     <EmptyTide
       variant="review"
+      title={practiceEmpty ? "复习室还是空的" : "今日无到期复习"}
       description={
         practiceEmpty
           ? "还没有可加练的卡片——复习卡来自课程测验的错题和笔记转化。先去上课做题，或在笔记馆把笔记转成卡片。"
@@ -1173,13 +1177,16 @@ function EmptyState({ onPractice, practiceEmpty }: { onPractice: () => void; pra
       }
       action={
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={onPractice}
-            className="hover-sheen studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--red)]"
-          >
-            <Lightning size={15} weight="fill" /> 加练 10 张
-          </button>
+          {!practiceEmpty && (
+            <button
+              type="button"
+              onClick={onPractice}
+              className="hover-sheen studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red-ink)] shadow-[var(--card),var(--inner-hi)] transition-colors hover:border-[var(--red)]"
+            >
+              <Lightning size={15} weight="fill" /> 加练 10 张
+            </button>
+          )}
+          {practiceEmpty && <Button href="/courses">去上课</Button>}
           <Button href="/notes">去笔记馆</Button>
         </div>
       }

@@ -60,6 +60,13 @@ export function HtmlCourseware({
   const [fullscreen, setFullscreen] = useState(false);
   const [mode, setMode] = useState<ViewMode>("paged");
   const [pagedReady, setPagedReady] = useState(false); // 收到 ct-ready 才认翻页能力（旧课件回落滚动）
+  /**
+   * 课件承载失败兜底（2026-07-21）：iframe 此前无 onError、无超时兜底,课件路由 404 时
+   * 用户看到的是一整块纯白(暗色下刺眼白板)或孤零零的英文 "Not Found",无从判断是没权限、
+   * 加载失败还是网卡,也没有重试入口。现在给出中文可操作提示。
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [page, setPage] = useState<{ index: number; total: number } | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const modeRef = useRef<ViewMode>("paged");
@@ -69,6 +76,19 @@ export function HtmlCourseware({
   // 蓝图 D2：已上报过的 quiz 块（同一次会话内去重，服务端 upsert 兜底幂等）。
   // 注：Player 侧以 key={lesson.id} 挂载本组件,换课必重挂,Set 不会跨课残留(审计修复 H1)。
   const reportedQuizRef = useRef<Set<string>>(new Set());
+  // 承载超时兜底(2026-07-21):12s 内既无 ct-ready、也无任何高度上报 → 认定课件没起来,
+  // 给中文可操作提示而不是把纯白/英文 404 留给用户。reloadKey 变化时重新计时。
+  const sawSignalRef = useRef(false);
+  useEffect(() => {
+    if (!lessonId) return;
+    sawSignalRef.current = false;
+    setLoadFailed(false);
+    const t = window.setTimeout(() => {
+      if (!sawSignalRef.current) setLoadFailed(true);
+    }, 12_000);
+    return () => window.clearTimeout(t);
+  }, [lessonId, reloadKey]);
+
   // 续读 ct-goto 只发一次(ct-ready 会重播)。
   const sentGotoRef = useRef(false);
   const srcdocHtml = useMemo(() => injectNonce(html, nonce), [html, nonce]);
@@ -94,6 +114,8 @@ export function HtmlCourseware({
       if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
       const d = e.data;
       if (!d || typeof d !== "object") return;
+      // 收到本 iframe 的任何合法消息 = 课件运行时活着,撤销超时兜底(2026-07-21)。
+      sawSignalRef.current = true;
       if (d.type === "ct-height" && typeof d.height === "number") {
         // clamp：防异常极值；上限给足长课件，下限保证不塌陷。
         setHeight(Math.max(240, Math.min(20000, Math.round(d.height))));
@@ -122,16 +144,20 @@ export function HtmlCourseware({
         // 沙箱 connect-src 'none'，课件自身无法发请求，必须由宿主代发。失败静默（学习主链不受影响）。
         const bid = typeof d.bid === "string" && d.bid ? d.bid : null;
         if (bid && !reportedQuizRef.current.has(bid)) {
+          // 去抖标记先置位防同题连点重复上报;但**失败必须回滚**(2026-07-21 修复):
+          // 此前失败即永久丢弃该题结果 —— 掌握度不涨、答错也不进错题复习卡,用户「明明做了题」。
           reportedQuizRef.current.add(bid);
-          fetch(`/api/lessons/${lessonId}/quiz-result`, {
+          const answerIndex = typeof d.answer === "number" ? d.answer : 0;
+          const correct = d.correct;
+          void fetch(`/api/lessons/${lessonId}/quiz-result`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({
-              blockId: bid,
-              answerIndex: typeof d.answer === "number" ? d.answer : 0,
-              correct: d.correct,
-            }),
-          }).catch(() => {});
+            body: JSON.stringify({ blockId: bid, answerIndex, correct }),
+          })
+            .then((res) => {
+              if (!res.ok) reportedQuizRef.current.delete(bid); // 允许重答时重试
+            })
+            .catch(() => reportedQuizRef.current.delete(bid));
         }
       } else if (d.type === "ct-branch" && courseSlug && typeof d.targetLessonId === "string") {
         const target = d.targetLessonId.trim();
@@ -278,7 +304,23 @@ export function HtmlCourseware({
           </button>
         </div>
       </div>
+      {loadFailed && (
+        <div className="flex min-h-[240px] flex-col items-center justify-center gap-3 border-t border-[var(--border)] bg-[var(--surface2)] px-6 py-10 text-center">
+          <p className="text-[14px] font-medium text-[var(--ink)]">课件没能加载出来</p>
+          <p className="max-w-sm text-[12px] leading-relaxed text-[var(--ink3)]">
+            可能是网络波动，或本节需要订阅/购买后才能查看。你可以重试一次，或先看本页下方的图文内容。
+          </p>
+          <button
+            type="button"
+            onClick={() => { setLoadFailed(false); setReloadKey((k) => k + 1); }}
+            className="studio-press mt-1 inline-flex items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2 text-[13px] font-semibold text-[var(--ink)] transition-colors hover:border-[var(--ink3)]"
+          >
+            重新加载
+          </button>
+        </div>
+      )}
       <iframe
+        key={reloadKey}
         ref={iframeRef}
         // 空白根因根治(2026-07-20)：有 lessonId 时改用「独立同源文档」路由承载（网络 scheme 文档
         // **不继承父页 CSP**，由该响应自带 CSP 头独立约束）——彻底铲除 srcdoc 继承父页 CSP 带来的
@@ -291,9 +333,10 @@ export function HtmlCourseware({
         loading="lazy"
         title="AI 课件"
         className="block w-full border-0 bg-white"
-        style={{ height: frameHeight }}
+        style={{ height: frameHeight, display: loadFailed ? "none" : undefined }}
         // 握手兜底：若运行时的 ct-ready 早于本组件挂监听（SSR/hydration 竞态），load 后再要一次。
         onLoad={() => postToFrame({ type: "ct-hello" })}
+        onError={() => setLoadFailed(true)}
       />
     </div>
   );
