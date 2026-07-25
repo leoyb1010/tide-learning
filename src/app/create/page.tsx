@@ -109,7 +109,11 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
   // 手工课程恢复：只能读取当前用户自己的 user_created 课程，刷新/离开后仍能继续导演。
   const manualRow = requestedManualId
     ? await prisma.course.findFirst({
-        where: { id: requestedManualId, authorUserId: user.id, origin: "user_created" },
+        // 2026-07-21(B5):去掉 origin 过滤 —— v6 的路径图/模板皮肤库/换肤/逐节改写回滚
+        // 只在造课剧场内渲染,而重入口硬限 user_created,导致 AI 课与导入课「造完即锁死」,
+        // 后端 5 条路由(theme/graph/templates/themes/revisions)实现完好却永远够不着。
+        // authorUserId 本身已是完整的越权边界,origin 不承担安全职责。
+        where: { id: requestedManualId, authorUserId: user.id },
         select: { id: true, slug: true, title: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
       })
     : null;

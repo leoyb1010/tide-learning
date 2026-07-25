@@ -386,11 +386,20 @@ export function CreateStudio({
     setPhase("checkpoint");
   }
 
-  // 未订阅时的统一提示
-  const gate = () => {
-    toast("AI 造课为订阅会员专享功能", {
+  /**
+   * 402 提示(M1 修,2026-07-21)。
+   * 此前无论后端说什么都统一弹「AI 造课为订阅会员专享」+「去订阅」→ 服务端精心区分的 5 句文案
+   * (免费额度用完 / 积分不足 / 模型为会员专享 / 深研档为会员专享 / 未订阅)全被丢弃。
+   * 最要命的是:**已订阅但积分耗尽**的付费用户被引导去订阅页,到了发现自己已经订阅——彻底死路,
+   * 而真正需要的充值入口在 /me。现在:透传后端文案,并按「是否已订阅」分流到充值/订阅。
+   */
+  const gate = (serverMessage?: string) => {
+    const subscribed = canUseLLM;
+    toast(serverMessage || (subscribed ? "本次操作无法继续" : "AI 造课为订阅会员专享功能"), {
       tone: "warn",
-      action: { label: "去订阅", onClick: () => router.push("/pricing") },
+      action: subscribed
+        ? { label: "去充值", onClick: () => router.push("/me") }
+        : { label: "去订阅", onClick: () => router.push("/pricing") },
     });
   };
 
@@ -482,7 +491,7 @@ export function CreateStudio({
         });
         const lj = await r.json().catch(() => null);
         if (r.status === 402) {
-          gate();
+          gate(lj?.error);
           // 权益中途失效：把剩余节标 failed 后结束（同步写回入参 list，供 requestVideos 判定）
           setLessons((prev) => prev.map((l, idx) => (idx >= i ? { ...l, state: "failed" } : l)));
           for (let k = i; k < list.length; k++) list[k].state = "failed";
@@ -542,7 +551,7 @@ export function CreateStudio({
         body: JSON.stringify({ lessonId }),
       });
       const lj = await r.json().catch(() => null);
-      if (r.status === 402) return gate();
+      if (r.status === 402) return gate(lj?.error);
       okThis = r.ok && !!lj?.ok;
     } catch {
       okThis = false;
@@ -600,7 +609,7 @@ export function CreateStudio({
       if (!res.ok || !json?.ok) {
         if (res.status === 402) {
           resetTheater();
-          return gate();
+          return gate(json?.error);
         }
         throw new Error(json?.error || "生成失败");
       }
@@ -692,7 +701,7 @@ export function CreateStudio({
       if (!res.ok || !json?.ok) {
         if (res.status === 402) {
           resetTheater();
-          return gate();
+          return gate(json?.error);
         }
         if (res.status === 404) {
           resetTheater();

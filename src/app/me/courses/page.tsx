@@ -201,6 +201,10 @@ export default async function MyCoursesPage() {
             const href = c.firstLessonId ? `/courses/${c.slug}/learn/${c.firstLessonId}` : `/courses/${c.slug}`;
             const isAi = c.origin === "ai_generated";
             const isManual = c.origin === "user_created";
+            // 2026-07-21(B5):v6 的路径图/模板皮肤库/换肤/逐节改写回滚只在造课剧场渲染,
+            // 此前入口硬限 user_created → AI 课/导入课造完即锁死,后端路由实现完好却够不着。
+            // 现在「我的、已就绪的课」一律给入口(本页只列自己的课,归属已保证)。
+            const canManage = isManual || !c.notReady;
             // 仅生成就绪的课可分享（生成中/失败禁用分享，避免半成品上架）。
             const canShare = !c.notReady;
             return (
@@ -299,12 +303,12 @@ export default async function MyCoursesPage() {
                     已上架/审核中 → 经营（改价/编辑文案/下架，pending 只可撤回）；
                     就绪未上架 → 分享到社区（上架弹窗含定价）；生成中/失败 → 进度环 + 查看进度/继续生成。 */}
                 <div className="mt-auto flex items-center justify-end border-t border-[var(--border)] px-4 py-3">
-                  {isManual && (
+                  {canManage && (
                     <Link
                       href={`/create?manual=${c.id}`}
                       className="studio-press mr-auto inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink2)] hover:border-[var(--border2)] hover:text-[var(--ink)]"
                     >
-                      <GraduationCap size={13} weight="fill" /> 编辑课程
+                      <GraduationCap size={13} weight="fill" /> {isManual ? "编辑课程" : "管理课件"}
                     </Link>
                   )}
                   {canShare && (c.sharedStatus === "shared" || c.sharedStatus === "pending") ? (

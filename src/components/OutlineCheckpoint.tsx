@@ -98,7 +98,9 @@ export function OutlineCheckpoint({
         setSelected(0);
         toast("已换一版大纲", { tone: "success" });
       } else if (r.status === 402) {
-        toast("AI 造课需订阅后使用", { tone: "warn" });
+        // M1(2026-07-21):透传后端文案 —— 402 可能是「积分不足」而非「未订阅」,
+        // 硬写「需订阅」会把已订阅的付费用户引到订阅页发现自己已订阅(死路)。
+        toast(j?.error || "AI 造课需订阅后使用", { tone: "warn" });
       } else {
         toast(j?.error || "重新生成失败，请稍后再试", { tone: "warn" });
       }
@@ -145,7 +147,7 @@ export function OutlineCheckpoint({
       });
       const confirmJson = await confirmRes.json().catch(() => null);
       if (!confirmRes.ok || !confirmJson?.ok) {
-        if (confirmRes.status === 402) toast("AI 造课需订阅后使用", { tone: "warn" });
+        if (confirmRes.status === 402) toast(confirmJson?.error || "AI 造课需订阅后使用", { tone: "warn" }); // M1:透传真实原因
         else toast(confirmJson?.error || "确认失败，请稍后再试", { tone: "warn" });
         setConfirming(false);
         return;
