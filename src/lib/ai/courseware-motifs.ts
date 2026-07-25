@@ -255,7 +255,3 @@ export function cornerMotif(art: ArtDirection): string {
   return `<div class="sec-corner" aria-hidden="true"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${inner}</svg></div>`;
 }
 
-/** 供 UI/测试引用的母题种子（课内相邻 hero 页分化）。 */
-export function motifSeed(courseId: string, key: string): number {
-  return hashSeed(`motif:${courseId}:${key}`);
-}

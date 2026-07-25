@@ -4,30 +4,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "./Toast";
 
-export function LogoutButton() {
-  const router = useRouter();
-  const { toast } = useToast();
-  async function logout() {
-    // 退出失败（网络/服务端）不能跳走假装已退出——静默假成功会让用户以为已登出实则仍在登录态。
-    try {
-      const res = await fetch("/api/auth/logout", { method: "POST" });
-      if (!res.ok) {
-        toast("退出失败，请稍后重试", { tone: "warn" });
-        return;
-      }
-      router.push("/");
-      router.refresh();
-    } catch {
-      toast("网络异常，退出失败，请重试", { tone: "warn" });
-    }
-  }
-  return (
-    <button onClick={logout} className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left text-sm text-ink-800 hover:border-error hover:text-error">
-      退出登录
-    </button>
-  );
-}
-
 /** 取消订阅（§6.7：入口可见，一屏挽留但不隐藏取消按钮）。 */
 export function CancelSubscription() {
   const router = useRouter();

@@ -54,7 +54,8 @@ export function CourseGenControls({
       setStatusOverride("generating");
       toast("已继续生成，可在此查看进度", { tone: "success" });
     } else if (r.status === 402) {
-      toast("AI 造课需订阅后使用", { tone: "warn" });
+      // M1(2026-07-21):透传后端文案(积分不足 / 未订阅 / 会员专享档 各不相同)。
+      toast(r.error || "AI 造课需订阅后使用", { tone: "warn" });
     } else if (r.status === 409) {
       // 已在跑 / 无需续 —— 温和提示，视为已在进行。
       setStatusOverride("generating");

@@ -42,7 +42,3 @@ export async function notify(params: {
   }
 }
 
-/** 未读数（Topbar 铃铛）。 */
-export async function unreadCount(userId: string): Promise<number> {
-  return prisma.notification.count({ where: { userId, readAt: null } });
-}

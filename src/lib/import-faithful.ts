@@ -10,6 +10,7 @@ import { creatorLibrarySlug } from "./creator-library";
 import { storeCreatorAsset } from "./creator-assets";
 import { buildContract, CSP_META, injectBespokeAdapter } from "./ai/courseware-html";
 import { AppError } from "./errors";
+import { escapeHtml } from "./html-escape";
 
 const execFileAsync = promisify(execFile);
 
@@ -33,10 +34,6 @@ function xmlText(value: string): string {
   return value
     .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'").replace(/&amp;/g, "&");
-}
-
-function esc(value: unknown): string {
-  return String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
 
 function attr(xml: string, name: string): string | null {
@@ -178,11 +175,11 @@ export async function parsePptx(bytes: Buffer): Promise<PresentationSlide[]> {
       const fill = node.match(/<p:spPr[\s\S]*?<a:solidFill>[\s\S]*?<a:srgbClr\b[^>]*val="([0-9a-f]{6})"/i)?.[1];
       const bold = /<a:rPr\b[^>]*\bb="1"/i.test(node) || /<a:defRPr\b[^>]*\bb="1"/i.test(node);
       const align = node.match(/<a:pPr\b[^>]*algn="(ctr|r|l)"/i)?.[1];
-      elements.push(`<div class="ppt-text" style="${style};font-size:clamp(10px,${fontSize / 16}vw,${fontSize}px);color:${color};font-weight:${bold ? 700 : 400};text-align:${align === "ctr" ? "center" : align === "r" ? "right" : "left"};${fill ? `background:${safeHex(fill, "transparent")};` : ""}">${runs.map((run) => `<div>${esc(run)}</div>`).join("")}</div>`);
+      elements.push(`<div class="ppt-text" style="${style};font-size:clamp(10px,${fontSize / 16}vw,${fontSize}px);color:${color};font-weight:${bold ? 700 : 400};text-align:${align === "ctr" ? "center" : align === "r" ? "right" : "left"};${fill ? `background:${safeHex(fill, "transparent")};` : ""}">${runs.map((run) => `<div>${escapeHtml(run)}</div>`).join("")}</div>`);
     }
     const text = slideTexts.join("\n").trim();
     const title = (slideTexts[0]?.split("\n")[0] || `第 ${index + 1} 页`).slice(0, 120);
-    const rawHtml = `<!doctype html><html lang="zh-CN"><head>${CSP_META}<meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}html,body{margin:0;background:${bg};font-family:system-ui,-apple-system,'PingFang SC',sans-serif}.ppt-slide{position:relative;width:100%;aspect-ratio:${slideWidth}/${slideHeight};overflow:hidden;background:${bg}}.ppt-text{position:absolute;display:flex;flex-direction:column;justify-content:center;overflow:hidden;white-space:pre-wrap;line-height:1.2;padding:.25%}.ppt-image{position:absolute;object-fit:contain} @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style></head><body><main class="ppt-slide" aria-label="${esc(title)}">${elements.join("")}</main></body></html>`;
+    const rawHtml = `<!doctype html><html lang="zh-CN"><head>${CSP_META}<meta name="viewport" content="width=device-width,initial-scale=1"><style>*{box-sizing:border-box}html,body{margin:0;background:${bg};font-family:system-ui,-apple-system,'PingFang SC',sans-serif}.ppt-slide{position:relative;width:100%;aspect-ratio:${slideWidth}/${slideHeight};overflow:hidden;background:${bg}}.ppt-text{position:absolute;display:flex;flex-direction:column;justify-content:center;overflow:hidden;white-space:pre-wrap;line-height:1.2;padding:.25%}.ppt-image{position:absolute;object-fit:contain} @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}</style></head><body><main class="ppt-slide" aria-label="${escapeHtml(title)}">${elements.join("")}</main></body></html>`;
     slides.push({ title, text, html: injectBespokeAdapter(rawHtml) });
   }
   return slides;

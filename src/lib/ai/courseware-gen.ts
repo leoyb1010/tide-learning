@@ -334,7 +334,12 @@ export async function renderAndStoreLessonHtml(
     const durationMs = Date.now() - startedAt;
 
     // —— 蓝图 S1：轻版本化——覆盖旧课件前存档（保留最近 3 版），重渲染有「后悔药」。
-    if (lesson.htmlJson) {
+    // 瘦身(2026-07-21 性能审查 #3):只存**不可复现**的产物。确定性渲染是
+    // 「同 blocks + 同 design + 同 version → 同 HTML」的纯函数(renderSourceHash 就是这个语义),
+    // 随时可零成本重建,存档毫无价值;而它恰恰是绝大多数(实测 renderEngine 分布 deterministic 89 / llm 1),
+    // 每次重渲存一份 54KB × 保留 3 版,把 LessonRevision 撑成整库的 65.5%(16.4MB/25MB)。
+    // 现在只对上一版是 LLM 精修(花过钱、不可复现)的产物存档,预计省下约 14MB 且不丢任何真实后悔药。
+    if (lesson.htmlJson && prior?.renderEngine === "llm") {
       try {
         await prisma.lessonRevision.create({
           data: { lessonId: lesson.id, htmlJson: lesson.htmlJson, blocksJson: null, reason: "rerender" },

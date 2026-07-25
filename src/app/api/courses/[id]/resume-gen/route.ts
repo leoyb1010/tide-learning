@@ -62,8 +62,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     // 无空节 = 已全部生成：顺手把 genStatus 收敛为 ready，返回 done
+    // 口径与 runCourseGenBackground 一致(B3,2026-07-21):待处理 = 空节 + 降级占位节。
+    // 否则占位节课走「无空节 → 直接置 ready」捷径,「继续生成」点了等于什么都没修。
     const remaining = await prisma.lesson.count({
-      where: { courseId: course.id, blocksJson: null },
+      where: {
+        courseId: course.id,
+        OR: [{ blocksJson: null }, { qualityJson: { contains: '"status":"fallback"' } }],
+      },
     });
     if (remaining === 0) {
       // 此处 genStatus 只可能是 generating/failed/paused（上面已排除其它），一律收敛为 ready。

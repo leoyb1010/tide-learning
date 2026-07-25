@@ -24,6 +24,7 @@ import { renderFormula, katexSelfContainedCss } from "./courseware-math";
 import { interactiveHtml, INTERACTIVE_CSS, INTERACTIVE_RUNTIME } from "./courseware-interactive";
 import { hashSeed } from "./courseware-design";
 import { getModeProfile, type CoursewareMode } from "./courseware-catalog";
+import { escapeHtml } from "@/lib/html-escape";
 
 // 款式层字体族（modeCss 按 mode 换字族，与 art 的配色正交）。自包含、无外链（CSP 只允 data: 字体）。
 const MONO_STACK = "ui-monospace,SFMono-Regular,Menlo,Consolas,'Liberation Mono',monospace";
@@ -64,22 +65,13 @@ export function enforceTrustedCsp(html: string): string {
 //  文本安全
 // ————————————————————————————————————————————————————————————
 
-function esc(s: unknown): string {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
-
 /** 块的 markdown 字段 → 安全 HTML（renderMarkdown 已做 HTML 转义，输出仅受控标签+class）。 */
 function md(s: string): string {
   return renderMarkdown(s || "");
 }
 
 // —— 轻量确定性语法着色（代码课件 IDE 质感）——
-// 跨语言通用 tokenizer：逐行扫描，先切 token 再对**每个 token 文本 esc()**、再包类名 span。
+// 跨语言通用 tokenizer：逐行扫描，先切 token 再对**每个 token 文本 escapeHtml()**、再包类名 span。
 // 安全铁律：所有输出文本恒经 esc（先 tokenize 后 escape），class 由本文件控制，无 XSS 面。块注释/跨行串按行处理（学习片段足够）。
 const CODE_KEYWORDS = new Set([
   "def","class","function","func","fn","return","import","from","export","default","package","use",
@@ -97,7 +89,7 @@ export function highlightCodeLine(raw: string): string {
   let i = 0;
   let out = "";
   const put = (cls: string | null, text: string) => {
-    out += cls ? `<span class="${cls}">${esc(text)}</span>` : esc(text);
+    out += cls ? `<span class="${cls}">${escapeHtml(text)}</span>` : escapeHtml(text);
   };
   while (i < s.length) {
     const rest = s.slice(i);
@@ -696,7 +688,7 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       // 由 variance 抽签，破「每节第一页同一副骨架」。
       if (variant === "hero-split") {
         return `<section ${rv}><div class="opener opener--split">
-          <div><span class="eyebrow">场景 · 为什么学</span>${b.title ? `<h1 class="lead">${esc(b.title)}</h1>` : ""}</div>
+          <div><span class="eyebrow">场景 · 为什么学</span>${b.title ? `<h1 class="lead">${escapeHtml(b.title)}</h1>` : ""}</div>
           ${b.markdown ? `<div class="body">${md(b.markdown)}</div>` : ""}</div></section>`;
       }
       const cls =
@@ -706,20 +698,20 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
         : variant === "hero-poster" ? "opener opener--poster"
         : "opener";
       return `<section ${rv}><div class="${cls}"><span class="eyebrow">场景 · 为什么学</span>
-        ${b.title ? `<h1 class="lead">${esc(b.title)}</h1>` : ""}
+        ${b.title ? `<h1 class="lead">${escapeHtml(b.title)}</h1>` : ""}
         ${b.markdown ? `<div class="body" style="margin-top:18px;max-width:60ch">${md(b.markdown)}</div>` : ""}</div></section>`;
     }
     case "objectives":
       return `<section ${rv}><span class="eyebrow">本节你将学会</span>
         <ul class="obj" data-stagger>${b.items
-          .map((it, k) => `<li style="--i:${k}"><span class="dot">${k + 1}</span><span>${esc(it)}</span></li>`)
+          .map((it, k) => `<li style="--i:${k}"><span class="dot">${k + 1}</span><span>${escapeHtml(it)}</span></li>`)
           .join("")}</ul></section>`;
     case "concept": {
       if (variant === "big-lead") {
-        return `<section ${rv}>${b.title ? `<h2 class="lead" style="font-size:clamp(24px,4vw,36px)">${esc(b.title)}</h2>` : ""}
+        return `<section ${rv}>${b.title ? `<h2 class="lead" style="font-size:clamp(24px,4vw,36px)">${escapeHtml(b.title)}</h2>` : ""}
           <div class="body" style="margin-top:16px;max-width:62ch">${md(b.markdown)}</div></section>`;
       }
-      const inner = `${b.title ? `<h3 class="h-title">${esc(b.title)}</h3>` : ""}<div class="body">${md(b.markdown)}</div>`;
+      const inner = `${b.title ? `<h3 class="h-title">${escapeHtml(b.title)}</h3>` : ""}<div class="body">${md(b.markdown)}</div>`;
       if (variant === "framed") return `<section ${rv}><div class="card">${inner}</div></section>`;
       if (variant === "split-note")
         return `<section ${rv}><div class="card card--alt"><span class="pill">概念</span><div style="margin-top:12px">${inner}</div></div></section>`;
@@ -743,28 +735,28 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
         <ol class="steps ${rail ? "steps--rail" : cards ? "steps--cards" : ""}" data-stagger>${b.steps
           .map(
             (s, k) =>
-              `<li style="--i:${k}"><span class="n">${k + 1}</span><div><div class="st">${esc(s.title)}</div>${
-                s.detail ? `<div class="sd">${esc(s.detail)}</div>` : ""
+              `<li style="--i:${k}"><span class="n">${k + 1}</span><div><div class="st">${escapeHtml(s.title)}</div>${
+                s.detail ? `<div class="sd">${escapeHtml(s.detail)}</div>` : ""
               }</div></li>`,
           )
           .join("")}</ol></section>`;
     }
     case "compare": {
       const stacked = variant === "stacked";
-      const eyebrow = b.title ? `<span class="eyebrow">${esc(b.title)}</span>` : `<span class="eyebrow">对比辨析</span>`;
+      const eyebrow = b.title ? `<span class="eyebrow">${escapeHtml(b.title)}</span>` : `<span class="eyebrow">对比辨析</span>`;
       // ledger：左右对齐成台账行（表格式），与双面板 duel/stacked 构图不同。
       if (variant === "ledger") {
         const rows = Math.max(b.left.items.length, b.right.items.length);
         const body = Array.from({ length: rows }, (_, k) =>
-          `<div class="lg-row"><div class="lg-cell">${esc(b.left.items[k] || "")}</div><div class="lg-cell r">${esc(b.right.items[k] || "")}</div></div>`,
+          `<div class="lg-row"><div class="lg-cell">${escapeHtml(b.left.items[k] || "")}</div><div class="lg-cell r">${escapeHtml(b.right.items[k] || "")}</div></div>`,
         ).join("");
         return `<section ${rv}>${eyebrow}<div class="cmp--ledger">
-          <div class="lg-row lg-head"><div class="lg-cell">${esc(b.left.heading || "常见误区")}</div><div class="lg-cell r">${esc(b.right.heading || "正确做法")}</div></div>
+          <div class="lg-row lg-head"><div class="lg-cell">${escapeHtml(b.left.heading || "常见误区")}</div><div class="lg-cell r">${escapeHtml(b.right.heading || "正确做法")}</div></div>
           ${body}</div></section>`;
       }
       const col = (heading: string, items: string[], right: boolean) =>
-        `<div class="col ${right ? "right" : "wrong"}"><h4>${esc(heading)}</h4><ul>${items
-          .map((it) => `<li>${esc(it)}</li>`)
+        `<div class="col ${right ? "right" : "wrong"}"><h4>${escapeHtml(heading)}</h4><ul>${items
+          .map((it) => `<li>${escapeHtml(it)}</li>`)
           .join("")}</ul></div>`;
       return `<section ${rv}>${eyebrow}
         <div class="cmp ${stacked ? "cmp--stacked" : ""}">${col(b.left.heading || "常见误区", b.left.items, false)}${col(
@@ -780,15 +772,15 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
         <div class="dlg" data-stagger>${b.turns
           .map((t, k) => {
             const right = order.indexOf(t.speaker) % 2 === 1;
-            return `<div class="turn ${right ? "r" : "l"}" style="--i:${k}"><div class="who">${esc(t.speaker)}</div>
-              <div class="bub">${esc(t.text)}</div>${t.note ? `<div class="note">${esc(t.note)}</div>` : ""}</div>`;
+            return `<div class="turn ${right ? "r" : "l"}" style="--i:${k}"><div class="who">${escapeHtml(t.speaker)}</div>
+              <div class="bub">${escapeHtml(t.text)}</div>${t.note ? `<div class="note">${escapeHtml(t.note)}</div>` : ""}</div>`;
           })
           .join("")}</div></section>`;
     }
     case "keypoint":
       return `<section ${rv}><span class="eyebrow">本节要点</span>
         <div class="kp ${variant === "checklist" ? "kp--list" : variant === "kpi" ? "kp--kpi" : ""}" data-stagger>${b.points
-          .map((p, k) => `<div class="item" style="--i:${k}"><span class="b">${k + 1}</span><span>${esc(p)}</span></div>`)
+          .map((p, k) => `<div class="item" style="--i:${k}"><span class="b">${k + 1}</span><span>${escapeHtml(p)}</span></div>`)
           .join("")}</div></section>`;
     case "callout":
       return `<section ${rv}><div class="callout ${b.tone === "warn" ? "warn" : "info"}"><span class="ic">${
@@ -802,45 +794,45 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       const lines = shiki ?? code.split("\n").map((l) => highlightCodeLine(l));
       const codeBody = lines.map((l) => `<span class="cl">${l || "&nbsp;"}</span>`).join("");
       return `<section ${rv}><div class="code-term">
-        <div class="ct-bar"><span class="ct-dot r"></span><span class="ct-dot y"></span><span class="ct-dot g"></span><span class="ct-fname">${esc(b.lang || "code")}</span></div>
+        <div class="ct-bar"><span class="ct-dot r"></span><span class="ct-dot y"></span><span class="ct-dot g"></span><span class="ct-fname">${escapeHtml(b.lang || "code")}</span></div>
         <pre class="ct-code"><code>${codeBody}</code></pre>${
-          b.explanation ? `<div class="ct-note">${esc(b.explanation)}</div>` : ""
+          b.explanation ? `<div class="ct-note">${escapeHtml(b.explanation)}</div>` : ""
         }</div></section>`;
     }
     case "quiz": {
       const opts = `<div class="opts">${b.options
-        .map((o, oi) => `<button class="opt"${b.branchTargets?.[oi] ? ` data-ct-target="${esc(b.branchTargets[oi])}" data-bid="${esc(b.id)}"` : ""}><span class="ol">${String.fromCharCode(65 + oi)}</span><span>${esc(o)}</span><span class="mk">●</span></button>`)
+        .map((o, oi) => `<button class="opt"${b.branchTargets?.[oi] ? ` data-ct-target="${escapeHtml(b.branchTargets[oi])}" data-bid="${escapeHtml(b.id)}"` : ""}><span class="ol">${String.fromCharCode(65 + oi)}</span><span>${escapeHtml(o)}</span><span class="mk">●</span></button>`)
         .join("")}</div>`;
       // split：题干与选项左右分栏（宽屏），与单列 stage 构图不同；交互 JS 靠 .quiz/.opt 不变。
       // data-bid：块 id，作答结果经 ct-quiz 回传宿主时定位到具体块（蓝图 D2）。
       if (variant === "split") {
-        return `<section ${rv}><div class="card quiz quiz--split" data-answer="${b.answerIndex}" data-bid="${esc(b.id)}"><span class="pill">随堂测</span>
-          <div class="q-grid" style="margin-top:12px"><div class="q">${esc(b.question)}</div>${opts}</div>
-          <div class="exp">${esc(b.explain)}</div></div></section>`;
+        return `<section ${rv}><div class="card quiz quiz--split" data-answer="${b.answerIndex}" data-bid="${escapeHtml(b.id)}"><span class="pill">随堂测</span>
+          <div class="q-grid" style="margin-top:12px"><div class="q">${escapeHtml(b.question)}</div>${opts}</div>
+          <div class="exp">${escapeHtml(b.explain)}</div></div></section>`;
       }
-      return `<section ${rv}><div class="card quiz" data-answer="${b.answerIndex}" data-bid="${esc(b.id)}"><span class="pill">随堂测</span>
-        <div class="q" style="margin-top:12px">${esc(b.question)}</div>
+      return `<section ${rv}><div class="card quiz" data-answer="${b.answerIndex}" data-bid="${escapeHtml(b.id)}"><span class="pill">随堂测</span>
+        <div class="q" style="margin-top:12px">${escapeHtml(b.question)}</div>
         ${opts}
-        <div class="exp">${esc(b.explain)}</div></div></section>`;
+        <div class="exp">${escapeHtml(b.explain)}</div></div></section>`;
     }
     case "flashcard":
-      return `<section ${rv}><div class="fc" data-bid="${esc(b.id)}"><div class="inner">
-        <div class="face front"><span class="lab">记忆卡 · 点击翻面</span><div class="t">${esc(b.front)}</div></div>
-        <div class="face back"><span class="lab">答案</span><div class="t">${esc(b.back)}</div></div>
+      return `<section ${rv}><div class="fc" data-bid="${escapeHtml(b.id)}"><div class="inner">
+        <div class="face front"><span class="lab">记忆卡 · 点击翻面</span><div class="t">${escapeHtml(b.front)}</div></div>
+        <div class="face back"><span class="lab">答案</span><div class="t">${escapeHtml(b.back)}</div></div>
       </div></div></section>`;
     case "summary": {
       const band = variant === "band";
       return `<section ${rv}><div class="summary ${band ? "summary--band" : ""}"><div class="top"><span class="pill">本节小结</span>
         <div class="body" style="margin-top:12px;color:var(--ct-ink)">${md(b.markdown)}</div></div>
-        ${b.next ? `<div class="next"><b>下一节</b>${esc(b.next)}</div>` : ""}</div></section>`;
+        ${b.next ? `<div class="next"><b>下一节</b>${escapeHtml(b.next)}</div>` : ""}</div></section>`;
     }
     case "image": {
       // 创作者上传的站内素材直接呈现；旧图解仍可按语义生成自包含 SVG 兜底。
       const label = b.caption || b.alt || "";
       const media = b.src
-        ? `<img src="${esc(b.src)}" alt="${esc(b.alt || b.caption || "课程素材")}" loading="lazy">`
+        ? `<img src="${escapeHtml(b.src)}" alt="${escapeHtml(b.alt || b.caption || "课程素材")}" loading="lazy">`
         : illustrationSvg(design.art, hashSeed(`illu:${b.id}:${label}`), label);
-      return `<section ${rv}><figure class="illu">${media}${label ? `<figcaption>${esc(label)}</figcaption>` : ""}</figure></section>`;
+      return `<section ${rv}><figure class="illu">${media}${label ? `<figcaption>${escapeHtml(label)}</figcaption>` : ""}</figure></section>`;
     }
     case "diagram": {
       // v4.3 语义图示(leohtml 纪律):结构取自关系、节点标签来自内容、方向显式、结果强调。
@@ -851,7 +843,7 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       // v4.3 公式(KaTeX):服务端渲染自包含 HTML;display 独立居中,caption 作图注。
       const inner = renderFormula(b.latex, b.display !== false);
       return `<section ${rv}><figure class="ct-formula">${inner}${
-        b.caption ? `<figcaption>${esc(b.caption)}</figcaption>` : ""
+        b.caption ? `<figcaption>${escapeHtml(b.caption)}</figcaption>` : ""
       }</figure></section>`;
     }
     case "fillblank":
@@ -859,11 +851,11 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
       // v4.3 交互块(H5P 式):填空/拖词,判分经 ct-quiz 回传宿主进错题闭环(见 courseware-interactive)。
       return `<section ${rv}>${interactiveHtml(b)}</section>`;
     case "choice":
-      return `<section ${rv}><div class="card ct-route-card"><span class="pill">学习选择</span><div class="q" style="margin-top:12px">${esc(b.prompt)}</div><div class="opts">${b.choices.map((choice, index) => `<button class="opt" data-bid="${esc(b.id)}"${choice.targetLessonId ? ` data-ct-target="${esc(choice.targetLessonId)}"` : ""}${choice.feedback ? ` data-ct-feedback="${esc(choice.feedback)}"` : ""}><span class="ol">${index + 1}</span><span>${esc(choice.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
+      return `<section ${rv}><div class="card ct-route-card"><span class="pill">学习选择</span><div class="q" style="margin-top:12px">${escapeHtml(b.prompt)}</div><div class="opts">${b.choices.map((choice, index) => `<button class="opt" data-bid="${escapeHtml(b.id)}"${choice.targetLessonId ? ` data-ct-target="${escapeHtml(choice.targetLessonId)}"` : ""}${choice.feedback ? ` data-ct-feedback="${escapeHtml(choice.feedback)}"` : ""}><span class="ol">${index + 1}</span><span>${escapeHtml(choice.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
     case "branch":
-      return `<section ${rv}><div class="card ct-route-card"><span class="pill">路径分支</span><div class="q" style="margin-top:12px">${esc(b.prompt)}</div><div class="opts">${b.options.map((option, index) => `<button class="opt" data-bid="${esc(b.id)}" data-ct-target="${esc(option.targetLessonId)}"${option.condition ? ` data-ct-feedback="${esc(option.condition)}"` : ""}><span class="ol">${index + 1}</span><span>${esc(option.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
+      return `<section ${rv}><div class="card ct-route-card"><span class="pill">路径分支</span><div class="q" style="margin-top:12px">${escapeHtml(b.prompt)}</div><div class="opts">${b.options.map((option, index) => `<button class="opt" data-bid="${escapeHtml(b.id)}" data-ct-target="${escapeHtml(option.targetLessonId)}"${option.condition ? ` data-ct-feedback="${escapeHtml(option.condition)}"` : ""}><span class="ol">${index + 1}</span><span>${escapeHtml(option.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
     case "hotspot":
-      return `<section ${rv}><div class="ct-hotspot-card">${b.prompt ? `<div class="q" style="margin-bottom:12px">${esc(b.prompt)}</div>` : ""}<div style="position:relative;overflow:hidden;border-radius:var(--ct-radius);background:var(--ct-surface)"><img src="${esc(b.imageSrc)}" alt="${esc(b.prompt || "互动热点图")}" style="display:block;width:100%;height:auto">${b.spots.map((spot, index) => `<button type="button" aria-label="${esc(spot.label)}" title="${esc(spot.label)}" data-bid="${esc(b.id)}"${spot.targetLessonId ? ` data-ct-target="${esc(spot.targetLessonId)}"` : ""}${spot.feedback ? ` data-ct-feedback="${esc(spot.feedback)}"` : ""} style="position:absolute;left:${spot.x}%;top:${spot.y}%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:3px solid var(--ct-bg);background:var(--ct-accent);color:var(--ct-accent-ink);font-weight:800;cursor:pointer">${index + 1}</button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite" style="margin-top:10px;color:var(--ct-ink)"></p></div></section>`;
+      return `<section ${rv}><div class="ct-hotspot-card">${b.prompt ? `<div class="q" style="margin-bottom:12px">${escapeHtml(b.prompt)}</div>` : ""}<div style="position:relative;overflow:hidden;border-radius:var(--ct-radius);background:var(--ct-surface)"><img src="${escapeHtml(b.imageSrc)}" alt="${escapeHtml(b.prompt || "互动热点图")}" style="display:block;width:100%;height:auto">${b.spots.map((spot, index) => `<button type="button" aria-label="${escapeHtml(spot.label)}" title="${escapeHtml(spot.label)}" data-bid="${escapeHtml(b.id)}"${spot.targetLessonId ? ` data-ct-target="${escapeHtml(spot.targetLessonId)}"` : ""}${spot.feedback ? ` data-ct-feedback="${escapeHtml(spot.feedback)}"` : ""} style="position:absolute;left:${spot.x}%;top:${spot.y}%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:3px solid var(--ct-bg);background:var(--ct-accent);color:var(--ct-accent-ink);font-weight:800;cursor:pointer">${index + 1}</button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite" style="margin-top:10px;color:var(--ct-ink)"></p></div></section>`;
     default:
       return "";
   }
@@ -1091,7 +1083,7 @@ export function renderCoursewareHtml(input: RenderInput): string {
   return (
     `<!doctype html><html lang="zh-CN"><head>${CSP_META}` +
     `<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">` +
-    `<title>${esc(title)}</title><style>${baseCss(design)}${geneCss(design.art)}${modeCss(mode)}${mathCss}</style></head>` +
+    `<title>${escapeHtml(title)}</title><style>${baseCss(design)}${geneCss(design.art)}${modeCss(mode)}${mathCss}</style></head>` +
     // v4.5 视觉基因:body 挂 ct-l-*(版式)/ct-m-*(动效签名)类,geneCss 据此分支——皮肤不再只是换色。
     `<body class="ct-mode-${mode} ct-l-${design.art.layout} ct-m-${design.art.motion}"><main class="deck">${spacedBody}</main><script>${RUNTIME_SCRIPT}</script></body></html>`
   );

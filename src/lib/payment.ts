@@ -240,6 +240,16 @@ export async function createCheckoutSession(
         // 旧订单仍 pending/failed（放弃后重试）→ 复用名额、改指向新订单，不重复自增全局名额。
         const prev = await tx.order.findUnique({ where: { id: existing.orderId }, select: { status: true } });
         if (prev && prev.status === "paid") throw new AppError("该优惠券每人限用一次");
+        // 资金审查 B-1 修(2026-07-21)：此前只把名额搬到新单，**旧 pending 单原样保留且折扣价仍在**。
+        // 于是「下单不付 → 再下单」可攒出 N 张打折订单，逐一支付时回调因 (couponId,userId) 唯一冲突
+        // 走 alreadyRedeemed 分支跳过校验直接激活 → 同一张券完成 N 笔折扣订单（100% 折扣券即无限免费订阅），
+        // 而 redeemedCount 只 +1。现在搬移名额的同时把旧 pending 单作废并剥离折扣，杜绝「囤打折单」。
+        if (prev && prev.status === "pending") {
+          await tx.order.update({
+            where: { id: existing.orderId },
+            data: { status: "failed", couponId: null, discountCents: 0 },
+          });
+        }
         await tx.couponRedemption.update({ where: { id: existing.id }, data: { orderId: o.id } });
       } else {
         if (couponMaxRedeem > 0) {
@@ -372,6 +382,32 @@ export async function processWebhook(channel: string, payload: {
               alreadyRedeemed = true;
             } else {
               throw e;
+            }
+          }
+          // 纵深防线(资金审查 B-1,2026-07-21):P2002 只说明「该用户对该券已有核销行」,
+          // 若那一行指向的是**另一张订单**,说明本单是历史遗留的打折 pending 单(名额已搬走),
+          // 属于「同券第二次使用」——钱已收不能拒绝履约,故仍激活订阅,但记审计以便对账追回差额。
+          // 上游 createCheckoutSession 已在搬移名额时作废旧单,此处兜住存量数据。
+          if (alreadyRedeemed) {
+            const holder = await tx.couponRedemption.findUnique({
+              where: { couponId_userId: { couponId: order.couponId, userId: order.userId } },
+              select: { orderId: true },
+            });
+            if (holder && holder.orderId !== order.id) {
+              console.warn(
+                `[payment] 同券重复使用:couponId=${order.couponId} 本单=${order.id} 名额持有单=${holder.orderId}（已激活，请对账折扣差额）`,
+              );
+              await tx.auditLog
+                .create({
+                  data: {
+                    operatorId: order.userId,
+                    action: "coupon_reuse_detected",
+                    targetType: "order",
+                    targetId: order.id,
+                    detail: JSON.stringify({ couponId: order.couponId, holderOrderId: holder.orderId, discountCents: order.discountCents }),
+                  },
+                })
+                .catch(() => {});
             }
           }
           if (!alreadyRedeemed) {
@@ -633,29 +669,3 @@ export async function changeSubscriptionPlan(userId: string, newPlanId: string) 
  * 由 cron / 对账任务调用；此处提供纯状态机逻辑。
  */
 const BILLABLE_STATUSES = ["active", "trial", "grace_period", "billing_retry"];
-export async function handleBillingFailure(subscriptionId: string) {
-  const sub = await prisma.subscription.findUnique({ where: { id: subscriptionId } });
-  if (!sub) throw new AppError("订阅不存在");
-  // 仅对仍处可续费状态的订阅生效：已 expired/refunded/canceled 的订阅绝不「复活」
-  if (!BILLABLE_STATUSES.includes(sub.status)) {
-    throw new AppError("该订阅当前状态不可进行续费重试");
-  }
-  const retry = sub.billingRetryCount + 1;
-  let status = sub.status;
-  let periodEndOverride: Date | undefined;
-  if (retry === 1) {
-    status = "grace_period";
-    // 宽限期从「原到期时间与当下的较晚者」再顺延 3 天：既不缩短仍有效的远期权益，也不凭空延长已过期订阅
-    const from = sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-    periodEndOverride = new Date(from.getTime() + 3 * 864e5);
-  } else if (retry === 2) {
-    status = "billing_retry";
-  } else {
-    status = "expired";
-  }
-  await prisma.subscription.update({
-    where: { id: sub.id },
-    data: { status, billingRetryCount: retry, ...(periodEndOverride ? { currentPeriodEnd: periodEndOverride } : {}) },
-  });
-  return resolveEntitlement(sub.userId);
-}

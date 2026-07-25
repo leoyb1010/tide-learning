@@ -11,18 +11,15 @@
  */
 
 import type { Block } from "../blocks";
+import { escapeHtml } from "@/lib/html-escape";
 
 type DiagramBlock = Extract<Block, { type: "diagram" }>;
-
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
 
 /** 节点卡:标签 + 可选一行注(所有结构共用,保证图内文字风格一致)。 */
 function node(item: { label: string; detail?: string }, cls = ""): string {
   return (
-    `<div class="dg-node${cls ? ` ${cls}` : ""}"><span class="dg-label">${esc(item.label)}</span>` +
-    (item.detail ? `<span class="dg-detail">${esc(item.detail)}</span>` : "") +
+    `<div class="dg-node${cls ? ` ${cls}` : ""}"><span class="dg-label">${escapeHtml(item.label)}</span>` +
+    (item.detail ? `<span class="dg-detail">${escapeHtml(item.detail)}</span>` : "") +
     `</div>`
   );
 }
@@ -130,9 +127,9 @@ export function diagramHtml(d: DiagramBlock): string {
     : funnel(d);
   return (
     `<div class="dg">` +
-    (d.title ? `<div class="dg-title">${esc(d.title)}</div>` : "") +
+    (d.title ? `<div class="dg-title">${escapeHtml(d.title)}</div>` : "") +
     body +
-    (d.note ? `<div class="dg-note">${esc(d.note)}</div>` : "") +
+    (d.note ? `<div class="dg-note">${escapeHtml(d.note)}</div>` : "") +
     `</div>`
   );
 }

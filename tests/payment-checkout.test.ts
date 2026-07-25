@@ -104,3 +104,52 @@ describe("createCheckoutSession —— provider 先校验", () => {
     expect(prismaMock.order.update).not.toHaveBeenCalled();
   });
 });
+
+describe("优惠券名额搬移 —— 旧 pending 打折单必须作废(资金审查 B-1 回归)", () => {
+  const COUPON = { id: "cp1", code: "SAVE", kind: "percent", value: 100, maxRedeem: 100, redeemedCount: 1, isActive: true, expiresAt: null, planScope: "any" };
+
+  it("已有指向旧 pending 单的核销行:名额搬到新单,且旧单被置 failed 并剥离折扣", async () => {
+    providerMock.getProvider.mockReturnValue({
+      channel: "mock",
+      createCheckout: vi.fn().mockResolvedValue({ ticket: { kind: "mock", payUrl: "/x" } }),
+      verifyWebhookSignature: () => true,
+    });
+    prismaMock.coupon.findUnique.mockResolvedValue(COUPON);
+    prismaMock.order.create.mockResolvedValue({ id: "order_new" });
+    // 该用户已对此券占过名额,持有单是 order_old 且仍 pending(用户下单不付、反复下单的场景)
+    prismaMock.couponRedemption.findUnique.mockResolvedValue({ id: "red1", orderId: "order_old" });
+    prismaMock.order.findUnique.mockResolvedValue({ status: "pending" });
+    prismaMock.order.update.mockResolvedValue({});
+    prismaMock.couponRedemption.update.mockResolvedValue({});
+
+    await createCheckoutSession("u1", "plan_all", "mock", "SAVE");
+
+    // 关键断言:旧 pending 单被作废且折扣被剥离——否则可攒出 N 张打折单逐一支付,
+    // 回调走 alreadyRedeemed 分支跳过校验,同券完成 N 笔折扣订单(100% 券=无限免费订阅)。
+    expect(prismaMock.order.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "order_old" },
+        data: expect.objectContaining({ status: "failed", couponId: null, discountCents: 0 }),
+      }),
+    );
+    // 名额确实搬到新单
+    expect(prismaMock.couponRedemption.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "red1" }, data: { orderId: "order_new" } }),
+    );
+  });
+
+  it("持有单已 paid:直接拒绝,不搬名额也不作废任何单", async () => {
+    providerMock.getProvider.mockReturnValue({
+      channel: "mock",
+      createCheckout: vi.fn(),
+      verifyWebhookSignature: () => true,
+    });
+    prismaMock.coupon.findUnique.mockResolvedValue(COUPON);
+    prismaMock.order.create.mockResolvedValue({ id: "order_new" });
+    prismaMock.couponRedemption.findUnique.mockResolvedValue({ id: "red1", orderId: "order_paid" });
+    prismaMock.order.findUnique.mockResolvedValue({ status: "paid" });
+
+    await expect(createCheckoutSession("u1", "plan_all", "mock", "SAVE")).rejects.toThrow(/每人限用一次/);
+    expect(prismaMock.couponRedemption.update).not.toHaveBeenCalled();
+  });
+});

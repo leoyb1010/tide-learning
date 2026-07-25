@@ -120,11 +120,6 @@ export function abbrevCount(n: number): string {
   return `${w >= 10 ? Math.round(w) : w.toFixed(1)}万`;
 }
 
-/** 赛道渐变（代理 tracks.trackGradientVar，保持 market 侧单一 import 面）。 */
-export function stallGradientVar(category: string): string {
-  return trackGradientVar(category);
-}
-
 /**
  * 交易市场排序（server 页与 iOS API 共用；纯函数、不改原数组、同分保稳定原序）。
  *   hot   → 成交热度降序（tradeVolume：付费看销量、免费看拿走数）

@@ -225,16 +225,6 @@ export function importOutlinePrompt(opts: { title: string; rawText: string; temp
 //  逐节 prompt 的可拼接片段（块结构契约仍在 course-gen.ts，本处只提供口吻/合规/素材）
 // ————————————————————————————————————————————————————————————
 
-/**
- * 逐节生成时插入 system 的「模板块配方」段（v3.2）。它规定本节该用哪些块、什么顺序与数量，
- * 是模板差异化的核心。course-gen 的逐节 system 拼上它，块字段结构仍受 blocks.ts 白名单约束。
- */
-export function lessonRecipeBlock(template: string | null | undefined): string {
-  if (!template) return "";
-  const selected = getTemplate(template);
-  return `\n【用户创作方向】${selected.label}：${selected.tagline}。只作表达启发，不规定块型、数量或顺序。\n`;
-}
-
 /** 逐节生成时插入 system 的赛道口吻行（一句话，不改块结构契约）。 */
 export function lessonVoiceLine(category: string | null | undefined): string {
   const v = getTrackVoice(category);

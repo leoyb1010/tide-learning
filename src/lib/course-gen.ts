@@ -793,7 +793,14 @@ export async function generateLessonCore(
     const remaining = await prisma.lesson.count({
       where: { courseId: course.id, blocksJson: null },
     });
-    const allReady = remaining === 0;
+    // B3 修(2026-07-21):降级占位节也有 blocksJson,此前照样计入「全部就绪」→ 课程置 ready、
+    // 剧场宣告「全部 N 节已生成,随时可学」,而点进去只有一句「本节内容正在完善中」,
+    // 且作者没有任何重造入口(学习页无作者控件、我的课对 ready 课只剩分享)。
+    // 现在:含占位节的课不收敛 ready,落 failed → 前端「继续生成」出现,用户可自助重试该节。
+    const fallbackCount = await prisma.lesson.count({
+      where: { courseId: course.id, qualityJson: { contains: '"status":"fallback"' } },
+    });
+    const allReady = remaining === 0 && fallbackCount === 0;
     if (allReady && course.genStatus !== "ready") {
       // 根因修复(2026-07-20)：此收尾是「逐节路径补齐最后一节」的唯一出口（前端逐节重试 /
       // 续造与后台流水竞速）。此前只置 ready 不渲染 HTML 课件 → 整课 htmlJson 缺失，
@@ -1228,11 +1235,24 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     await ensureDesignBrief(courseId, userId);
 
     // 只取还没生成的空节，按顺序生成
-    const pending = await prisma.lesson.findMany({
+    // 待生成 = 空节 + 降级占位节(B3,2026-07-21)。占位节有 blocksJson,此前不会被续造捡起,
+    // 于是「AI 说全部生成好了,点进去只有一句『本节内容正在完善中』」且无任何自助修复路径。
+    // 占位节以 regen 模式重造(其 claim 不要求 blocksJson=null),重造成功即摘掉 fallback 标记。
+    const emptyLessons = await prisma.lesson.findMany({
       where: { courseId, blocksJson: null },
       orderBy: { sortOrder: "asc" },
       select: { id: true },
     });
+    const fallbackLessons = await prisma.lesson.findMany({
+      where: { courseId, blocksJson: { not: null }, qualityJson: { contains: '"status":"fallback"' } },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true },
+    });
+    const emptyIds = new Set(emptyLessons.map((l) => l.id));
+    const pending = [
+      ...emptyLessons.map((l) => ({ id: l.id, regen: false })),
+      ...fallbackLessons.filter((l) => !emptyIds.has(l.id)).map((l) => ({ id: l.id, regen: true })),
+    ];
 
     const start = await readGenProgress(courseId);
     let failed = start.failed;
@@ -1253,7 +1273,7 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     let stoppedForCredits = false;
     let stoppedForPause = false;
 
-    for (const { id: lessonId } of pending) {
+    for (const { id: lessonId, regen: isFallbackRetry } of pending) {
       // —— L3 可控造课：协作式暂停闸门 ——
       // 用户点「暂停生产」后 pause-gen 把 genStatus 置 paused；本循环每节前重读一次，
       // 命中即停止扇出（当前若有在跑的 LLM 调用会先自然跑完本节，下一节起停）。
@@ -1273,7 +1293,7 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       }
       await updateGenJob(courseId, { currentLessonId: lessonId });
       try {
-        const r = await generateLessonCore(lessonId, userId);
+        const r = await generateLessonCore(lessonId, userId, isFallbackRetry ? { regen: true } : undefined);
         if (r.failed) failed += 1;
       } catch (e) {
         // 越权 / 章节不存在 / 未知异常：标记失败继续，绝不中断整条后台流水

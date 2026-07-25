@@ -95,13 +95,6 @@ export function sha256(input: string): string {
   return createHash("sha256").update(input).digest("hex");
 }
 
-export function anonId(seed?: string): string {
-  return createHash("sha256")
-    .update((seed ?? randomBytes(8).toString("hex")) + Date.now())
-    .digest("hex")
-    .slice(0, 24);
-}
-
 // ---------- Session ----------
 export async function createSession(userId: string): Promise<string> {
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 864e5);
@@ -293,13 +286,6 @@ export function effectivePermissions(role: string): { permissions: Permission[];
     return { permissions: ALL_PERMISSIONS.filter((p) => override.has(p)), source: "db" };
   }
   return { permissions: ROLE_PERMISSIONS[role] ?? [], source: "default" };
-}
-
-/** 后台入口：任一后台角色即可（用于布局壳）。 */
-export async function requireAdmin(): Promise<User> {
-  const user = await requireUser();
-  if (!ADMIN_ROLES.includes(user.role)) throw new AuthError("需要后台权限");
-  return user;
 }
 
 /**
