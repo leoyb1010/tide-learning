@@ -112,8 +112,8 @@ function VariantGlyph({ variant }: { variant: Variant }) {
 
 /** 完整空态卡片（插画 + 标题 + 描述 + 可选 CTA）。 */
 export function EmptyTide({
-  variant, description, action,
-}: { variant: Variant; description?: string; action?: React.ReactNode }) {
+  variant, title, description, action,
+}: { variant: Variant; title?: string; description?: string; action?: React.ReactNode }) {
   return (
     <motion.div
       className="flex flex-col items-center justify-center py-14 text-center"
@@ -125,7 +125,9 @@ export function EmptyTide({
           已退出渲染路径，文案一律交由下方 title + description 承担。 */}
       <TideIllustration variant={variant} size={200} />
       {/* 插画→标题多一档呼吸（mt-6），补上「大图—标题」间距档位，避免 200px 插画贴着标题 */}
-      <p className="mt-6 text-base font-medium text-ink-800">{TITLES[variant]}</p>
+      {/* title 可覆写 variant 默认标题(2026-07-21):复习室对「从没有过卡」的新用户曾硬显示
+          「今日已复习完」——把没复习过说成复习完了。调用方据真实状态传入准确标题。 */}
+      <p className="mt-6 text-base font-medium text-ink-800">{title ?? TITLES[variant]}</p>
       {description && <p className="mt-1 max-w-xs text-sm text-ink-500">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </motion.div>

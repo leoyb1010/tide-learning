@@ -151,17 +151,34 @@ export function Player({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasRealVideo]);
 
+  /**
+   * 统一的进度上报（2026-07-21 修复静默丢弃）。
+   * 此前四处上报都是 `.catch(() => {})` 且**去抖标记先于请求置位**——一次网络抖动就让
+   * 本节完课/页序永不补发,直接体现为「认真学完却不记进度、streak 与完课恒为 0」。
+   * 现在:返回是否成功,由调用方在失败时回滚去抖标记,使下一次交互能自然重试。
+   */
+  const postProgress = useCallback(async (body: Record<string, unknown>): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/progress", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }, []);
+
   // 进度保存（每 10 秒或暂停时），切章不丢进度
   const saveProgress = useCallback(async (completed = false) => {
     if (!isLoggedIn || !access) return;
     if (!completed && Math.abs(timeRef.current - savedRef.current) < 8) return;
+    const prevSaved = savedRef.current;
     savedRef.current = timeRef.current;
-    await fetch("/api/progress", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson.id, progressSec: Math.floor(timeRef.current), completed }),
-    }).catch(() => {});
-  }, [isLoggedIn, access, lesson.id]);
+    const ok = await postProgress({ lessonId: lesson.id, progressSec: Math.floor(timeRef.current), completed });
+    if (!ok) savedRef.current = prevSaved; // 回滚去抖:下个 10 秒周期/暂停时会重试
+  }, [isLoggedIn, access, lesson.id, postProgress]);
 
   // 用 ref 持有最新 saveProgress，供卸载/离开页面时读取，避免下方定时器 effect 因依赖变化重挂时误触发保存
   const saveProgressRef = useRef(saveProgress);
@@ -430,13 +447,11 @@ export function Player({
     // completed 仅在首次到末页时置真：已上报过则本次只更新页序、不再重复 POST completed。
     const completed = reachedEnd && !blockCompletedRef.current;
     if (reachedEnd) blockCompletedRef.current = true;
-    fetch("/api/progress", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson.id, progressSec: page, completed, kind: "slide" }),
-    }).catch(() => {});
+    void postProgress({ lessonId: lesson.id, progressSec: page, completed, kind: "slide" }).then((ok) => {
+      if (!ok && completed) blockCompletedRef.current = false; // 回滚:完课未落库,下次翻到末页可重试
+    });
     track("lesson_slide_advance", { lesson_id: lesson.id, page, total: totalPages });
-  }, [isLoggedIn, access, lesson.id]);
+  }, [isLoggedIn, access, lesson.id, postProgress]);
 
   // 翻页课件完课：抵达末页触发下一节卡（若有下一节且未手动关过）。与视频完课逻辑对齐但走页序而非时间轴。
   const onBlockComplete = useCallback(() => {
@@ -452,14 +467,12 @@ export function Player({
   );
   const markArticleDone = useCallback(() => {
     setArticleDone(true);
-    fetch("/api/progress", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }),
-    }).catch(() => {});
+    void postProgress({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }).then((ok) => {
+      if (!ok) setArticleDone(false); // 回滚:未落库就不该显示「已读完」,用户可再点一次
+    });
     track("lesson_article_done", { lesson_id: lesson.id });
     onBlockComplete();
-  }, [lesson.id, onBlockComplete]);
+  }, [lesson.id, onBlockComplete, postProgress]);
 
   // 滚动模式完课：滚动读到末块（BlockRenderer.onReachEnd）时上报一次完课并弹下一节卡，
   // 与翻页模式末页完课语义一致。与翻页共享 blockCompletedRef 去抖：本节已上报过完课
@@ -469,13 +482,11 @@ export function Player({
     if (!isLoggedIn || !access) return;
     if (blockCompletedRef.current) return; // 本节已上报过完课，去抖
     blockCompletedRef.current = true;
-    fetch("/api/progress", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }),
-    }).catch(() => {});
+    void postProgress({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }).then((ok) => {
+      if (!ok) blockCompletedRef.current = false; // 回滚:下次滚到末块可重试
+    });
     onBlockComplete();
-  }, [isLoggedIn, access, lesson.id, onBlockComplete]);
+  }, [isLoggedIn, access, lesson.id, onBlockComplete, postProgress]);
 
   // 工具按钮命中区扩展：透明 44x44 伪元素外扩，视觉尺寸不变（WCAG 2.5.5 目标尺寸）。
   const hit44 = "relative after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']";

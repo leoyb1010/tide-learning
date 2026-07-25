@@ -33,7 +33,12 @@ export async function GET() {
         slug: true,
         title: true,
         origin: true,
-        lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, blocksJson: true } },
+        // 性能(2026-07-21 实测修复):此前 select blocksJson 只为在 JS 里数「非空条数」,
+        // 单次响应实测 202.5KB;而本路由被前端 8 秒轮询、且恰在造课期间(blocksJson 最满时)持续触发,
+        // 一门 15 节课 10 分钟 ≈ 75 次 × 200KB ≈ 15MB 无谓传输。
+        // 现在:done 用带 where 的关系计数(不搬运正文),total/firstLessonId 用只含 id 的轻量数组。
+        _count: { select: { lessons: { where: { blocksJson: { not: null } } } } },
+        lessons: { orderBy: { sortOrder: "asc" }, select: { id: true } },
       },
     });
 
@@ -43,7 +48,7 @@ export async function GET() {
     const courses = [];
     for (const c of rows) {
       const total = c.lessons.length;
-      const done = c.lessons.filter((l) => l.blocksJson != null).length;
+      const done = c._count.lessons; // 带 where 的关系计数(blocksJson 非空),不搬运正文
 
       // 列表自愈：全部 lesson 已就绪但 course.genStatus 没被后台收尾时，直接收敛 ready，
       // 避免“正在生成”横幅永久出现。

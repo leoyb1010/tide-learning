@@ -36,7 +36,12 @@ import {
 import { ensureHighlighter } from "./courseware-highlight";
 
 const HTML_RENDER_VERSION = "v6.0.0"; // v6：逐节设计 Agent 原创 token + LLM 默认表现层；确定性引擎仅兜底
-const HTML_CLAIM_TTL_MS = 10 * 60_000;
+// 2026-07-21 资金审查 C-1 修:此前 claim TTL(10min) < job 僵尸阈值(15min),而 claim 只在认领时
+// 写一次、生成期间从不刷新。任何慢到能触发「僵尸对账判 failed」的节(单节最坏 = 6 稿 ×(作者
+// 90~120s×2重试 + 双评审 90~120s×2重试),轻易 >15min),其 claim 必然也已过 10 分钟 —— 于是
+// resume-gen 的「保留新鲜 claim 以防重复扣费」形同虚设,新流水必定重认领同一节 → 双份生成、双份扣费。
+// 现在把 claim TTL 抬到 50 分钟(> 单节理论最长耗时,且 > 僵尸阈值),让「仍在跑的节」始终被认作新鲜。
+const HTML_CLAIM_TTL_MS = 50 * 60_000;
 
 export interface CoursewareBudget {
   remaining: number;

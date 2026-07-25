@@ -1,7 +1,12 @@
+/**
+ * source 标记边的来源:"block_target" = 由课件跳转块自动派生(归 blocks 路由独占管理)。
+ * 2026-07-21 修复:此前 parseCondition 丢弃该字段,图谱 PUT 全量重建后自动边失去标记,
+ * blocks 路由既清不掉旧边(清理依赖该标记)、又会追加同名新边 → 去重命中 → 该节永久保存失败。
+ */
 export type LessonEdgeCondition =
-  | { type: "always" }
-  | { type: "quiz"; blockId: string; answerIndex: number }
-  | { type: "choice"; blockId: string; optionIndex: number };
+  | { type: "always"; source?: string }
+  | { type: "quiz"; blockId: string; answerIndex: number; source?: string }
+  | { type: "choice"; blockId: string; optionIndex: number; source?: string };
 
 export interface LessonGraphEdgeInput {
   fromLessonId: string;
@@ -31,16 +36,18 @@ function cleanText(value: unknown, max: number): string {
 
 function parseCondition(value: unknown): LessonEdgeCondition | null {
   const raw = value && typeof value === "object" ? value as Record<string, unknown> : {};
-  if (raw.type === undefined || raw.type === "always") return { type: "always" };
+  // source 白名单透传:只认 "block_target" 这一个已知标记,其余一律丢弃(防任意字段注入)。
+  const source = cleanText(raw.source, 32) === "block_target" ? { source: "block_target" } : {};
+  if (raw.type === undefined || raw.type === "always") return { type: "always", ...source };
   const blockId = cleanText(raw.blockId, 64);
   if (!/^[A-Za-z0-9_-]{1,64}$/.test(blockId)) return null;
   if (raw.type === "quiz") {
     const answerIndex = Number(raw.answerIndex);
-    return Number.isInteger(answerIndex) && answerIndex >= 0 && answerIndex < 12 ? { type: "quiz", blockId, answerIndex } : null;
+    return Number.isInteger(answerIndex) && answerIndex >= 0 && answerIndex < 12 ? { type: "quiz", blockId, answerIndex, ...source } : null;
   }
   if (raw.type === "choice") {
     const optionIndex = Number(raw.optionIndex);
-    return Number.isInteger(optionIndex) && optionIndex >= 0 && optionIndex < 12 ? { type: "choice", blockId, optionIndex } : null;
+    return Number.isInteger(optionIndex) && optionIndex >= 0 && optionIndex < 12 ? { type: "choice", blockId, optionIndex, ...source } : null;
   }
   return null;
 }
