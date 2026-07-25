@@ -13,6 +13,7 @@
  */
 
 import type { Highlighter, BundledLanguage } from "shiki";
+import { escapeHtml } from "@/lib/html-escape";
 
 /** 课程里常见语言（多装无害，仅服务端内存；未列出的语言按 text 降级）。 */
 const LANGS = [
@@ -61,10 +62,6 @@ export async function ensureHighlighter(): Promise<Highlighter> {
   return loading;
 }
 
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 /**
  * 同步把代码切成「逐行 inner HTML」（带 inline color 的 span），供课件终端镜框逐行渲染。
  * @returns 每行的 inner HTML 数组；highlighter 未就绪或异常 → null（调用方回落手写高亮）。
@@ -79,7 +76,7 @@ export function highlightLinesSync(code: string, lang: string | undefined, dark:
       if (line.length === 0) return "";
       return line
         .map((t) => {
-          const content = esc(t.content);
+          const content = escapeHtml(t.content);
           const style: string[] = [];
           if (t.color) style.push(`color:${t.color}`);
           // fontStyle 位掩码：1=italic 2=bold 4=underline（shiki FontStyle）。

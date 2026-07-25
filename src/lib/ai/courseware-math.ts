@@ -16,6 +16,7 @@ import { readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 import katex from "katex";
+import { escapeHtml } from "@/lib/html-escape";
 
 const require_ = createRequire(import.meta.url);
 
@@ -69,10 +70,6 @@ export function katexSelfContainedCss(): string {
   }
 }
 
-function escText(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
-
 /**
  * 渲染一个公式为自包含 HTML。latex 非法/KaTeX 报错 → 回落为等宽纯文本（不抛、不留破渲染）。
  * @param display 独立居中公式（true）或行内（false）。
@@ -86,6 +83,6 @@ export function renderFormula(latex: string, display: boolean): string {
       strict: "ignore",
     });
   } catch {
-    return `<code class="ct-formula-fallback">${escText(latex)}</code>`;
+    return `<code class="ct-formula-fallback">${escapeHtml(latex)}</code>`;
   }
 }

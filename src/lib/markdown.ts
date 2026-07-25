@@ -3,19 +3,13 @@
  * 支持：标题、粗斜体、行内代码、代码块、引用、无序/有序列表、链接、换行。
  * 输出前对原始文本做 HTML 转义，避免 XSS。
  */
-function esc(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 import { hetiSpacing } from "./cjk-spacing";
+import { escapeHtml } from "./html-escape";
 
 export function renderMarkdown(src: string): string {
   if (!src) return "";
-  const lines = esc(src).split("\n");
+  const lines = escapeHtml(src).split("\n");
   const out: string[] = [];
   let inCode = false;
   let listType: "ul" | "ol" | null = null;

@@ -669,29 +669,3 @@ export async function changeSubscriptionPlan(userId: string, newPlanId: string) 
  * 由 cron / 对账任务调用；此处提供纯状态机逻辑。
  */
 const BILLABLE_STATUSES = ["active", "trial", "grace_period", "billing_retry"];
-export async function handleBillingFailure(subscriptionId: string) {
-  const sub = await prisma.subscription.findUnique({ where: { id: subscriptionId } });
-  if (!sub) throw new AppError("订阅不存在");
-  // 仅对仍处可续费状态的订阅生效：已 expired/refunded/canceled 的订阅绝不「复活」
-  if (!BILLABLE_STATUSES.includes(sub.status)) {
-    throw new AppError("该订阅当前状态不可进行续费重试");
-  }
-  const retry = sub.billingRetryCount + 1;
-  let status = sub.status;
-  let periodEndOverride: Date | undefined;
-  if (retry === 1) {
-    status = "grace_period";
-    // 宽限期从「原到期时间与当下的较晚者」再顺延 3 天：既不缩短仍有效的远期权益，也不凭空延长已过期订阅
-    const from = sub.currentPeriodEnd > new Date() ? sub.currentPeriodEnd : new Date();
-    periodEndOverride = new Date(from.getTime() + 3 * 864e5);
-  } else if (retry === 2) {
-    status = "billing_retry";
-  } else {
-    status = "expired";
-  }
-  await prisma.subscription.update({
-    where: { id: sub.id },
-    data: { status, billingRetryCount: retry, ...(periodEndOverride ? { currentPeriodEnd: periodEndOverride } : {}) },
-  });
-  return resolveEntitlement(sub.userId);
-}

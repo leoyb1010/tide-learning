@@ -33,19 +33,6 @@ export function getTemplate(key?: string | null): CourseTemplate {
   return COURSE_TEMPLATES.find((template) => template.key === key) ?? COURSE_TEMPLATES[0];
 }
 
-/** 兼容旧调用；新建课程不会自动选择，只有显式使用此 helper 的历史入口才会得到建议。 */
-export function pickTemplate(input: { category?: string | null; title?: string | null; prompt?: string | null }): string {
-  const text = `${input.title ?? ""} ${input.prompt ?? ""}`;
-  if (input.category === "exam" || /备考|考试|考点|真题|证书|面试题/i.test(text)) return "exam_sprint";
-  if (/编程|代码|工具|操作|实操|写作|设计|做一个|交付物/i.test(text)) return "workshop";
-  if (/少儿|儿童|亲子|启蒙/i.test(text)) return "kids_bright";
-  if (/口语|听力|跟读|发音|会话|外语|英语|日语|韩语/i.test(text)) return "language_immersion";
-  if (/故事|沟通|表达|社交/i.test(text)) return "story";
-  if (/案例|复盘|商业|管理|营销|运营|决策/i.test(text)) return "case_driven";
-  if (/思维|逻辑|误区|为什么|辨析|认知/i.test(text)) return "socratic";
-  return DEFAULT_TEMPLATE;
-}
-
 export function isValidTemplate(key?: string | null): boolean {
   return !key || COURSE_TEMPLATES.some((template) => template.key === key);
 }

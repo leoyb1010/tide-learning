@@ -3,10 +3,6 @@ export const USER_AUTHORED_ORIGINS = ["ai_generated", "user_imported", "user_cre
 
 export type UserAuthoredOrigin = (typeof USER_AUTHORED_ORIGINS)[number];
 
-export function isUserAuthoredOrigin(origin: string): origin is UserAuthoredOrigin {
-  return (USER_AUTHORED_ORIGINS as readonly string[]).includes(origin);
-}
-
 export function authoredOriginLabel(origin: string): string {
   if (origin === "ai_generated") return "AI 生成";
   if (origin === "user_imported") return "我的导入";

@@ -50,33 +50,6 @@ async function makeQr(userId: string): Promise<string> {
   }
 }
 
-/** 侧栏缩微版（同步，client 安全）：同纸质语言，砍格言/二维码。 */
-export function StudentCardMini({ data }: { data: StudentCardData }) {
-  const level = deriveLevel(data.totalSeconds);
-  const initial = data.nickname.slice(0, 1);
-  return (
-    <div className="studio-lift relative overflow-hidden rounded-[14px] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--card)]">
-      <span className="absolute left-0 top-3.5 h-4 w-[3px] rounded-r bg-[var(--red)]" aria-hidden />
-      <div className="flex items-center gap-2.5">
-        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--surface-inset)] text-[13px] font-bold text-[var(--ink2)]">
-          {initial}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate text-[13px] font-semibold text-[var(--ink)]">{data.nickname}</span>
-            {data.isSubscriber && <span className="h-1.5 w-1.5 shrink-0 rounded-[2px] bg-[var(--red)]" aria-hidden />}
-          </div>
-          <span className="mono block truncate text-[10px] tracking-[0.08em] text-[var(--ink4)]">{data.studentNo}</span>
-        </div>
-      </div>
-      <div className="mt-2.5 flex items-center justify-between border-t border-[var(--border)] pt-2">
-        <span className="mono text-[10px] text-[var(--ink4)]">Lv.{level.level} {level.title}</span>
-        <span className="mono text-[11px] font-semibold text-[var(--ink2)]">{data.streak}d</span>
-      </div>
-    </div>
-  );
-}
-
 /** /me 头部大卡（async server：含二维码生成）。 */
 export async function StudentCard({ data, headerAction }: { data: StudentCardData; headerAction?: React.ReactNode }) {
   const level = deriveLevel(data.totalSeconds);

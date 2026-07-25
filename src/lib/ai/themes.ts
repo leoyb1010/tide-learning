@@ -52,7 +52,3 @@ export function coursewareThemeAttr(template?: string | null): string | undefine
   return template && THEME_KEYS.has(template) ? template : undefined;
 }
 
-/** 取某主题元信息（未知 → undefined）。供 UI/报表按 key 查展示信息。 */
-export function getCoursewareTheme(key?: string | null): CoursewareTheme | undefined {
-  return key ? COURSEWARE_THEMES.find((t) => t.key === key) : undefined;
-}

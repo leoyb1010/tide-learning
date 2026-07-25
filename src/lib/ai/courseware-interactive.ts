@@ -11,13 +11,10 @@
 
 import type { Block } from "../blocks";
 import { hashSeed } from "./courseware-design";
+import { escapeHtml } from "@/lib/html-escape";
 
 type FillBlock = Extract<Block, { type: "fillblank" }> & { id: string };
 type DragBlock = Extract<Block, { type: "dragwords" }> & { id: string };
-
-function esc(s: string): string {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
 
 /** 确定性洗牌（Fisher-Yates + seed，同输入同结果，可复现）。 */
 function shuffle<T>(arr: T[], seed: number): T[] {
@@ -35,18 +32,18 @@ function shuffle<T>(arr: T[], seed: number): T[] {
 export function fillblankHtml(b: FillBlock): string {
   const parts: string[] = [];
   b.segments.forEach((seg, i) => {
-    parts.push(esc(seg));
+    parts.push(escapeHtml(seg));
     if (i < b.blanks.length) {
-      const ans = esc(JSON.stringify(b.blanks[i]));
+      const ans = escapeHtml(JSON.stringify(b.blanks[i]));
       parts.push(
         `<input class="fb-in" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" data-ans="${ans}" aria-label="填空 ${i + 1}">`,
       );
     }
   });
   return (
-    `<div class="ia fb" data-bid="${esc(b.id)}" data-ia="fill">` +
+    `<div class="ia fb" data-bid="${escapeHtml(b.id)}" data-ia="fill">` +
     `<div class="ia-tag">填空练习</div>` +
-    (b.prompt ? `<div class="ia-q">${esc(b.prompt)}</div>` : "") +
+    (b.prompt ? `<div class="ia-q">${escapeHtml(b.prompt)}</div>` : "") +
     `<div class="ia-body">${parts.join("")}</div>` +
     `<div class="ia-foot"><button class="ia-check" type="button">检查</button><span class="ia-fx"></span></div>` +
     `</div>`
@@ -57,18 +54,18 @@ export function fillblankHtml(b: FillBlock): string {
 export function dragwordsHtml(b: DragBlock, seed: number): string {
   const parts: string[] = [];
   b.segments.forEach((seg, i) => {
-    parts.push(esc(seg));
+    parts.push(escapeHtml(seg));
     if (i < b.blanks.length) parts.push(`<span class="dw-slot" data-i="${i}" role="button" tabindex="0"></span>`);
   });
   const bank = shuffle([...b.blanks, ...(b.distractors ?? [])], seed);
   const words = bank
-    .map((w, i) => `<button class="dw-word" type="button" data-w="${i}">${esc(w)}</button>`)
+    .map((w, i) => `<button class="dw-word" type="button" data-w="${i}">${escapeHtml(w)}</button>`)
     .join("");
-  const ans = esc(JSON.stringify(b.blanks));
+  const ans = escapeHtml(JSON.stringify(b.blanks));
   return (
-    `<div class="ia dw" data-bid="${esc(b.id)}" data-ia="drag" data-ans="${ans}">` +
+    `<div class="ia dw" data-bid="${escapeHtml(b.id)}" data-ia="drag" data-ans="${ans}">` +
     `<div class="ia-tag">选词填空</div>` +
-    (b.prompt ? `<div class="ia-q">${esc(b.prompt)}</div>` : "") +
+    (b.prompt ? `<div class="ia-q">${escapeHtml(b.prompt)}</div>` : "") +
     `<div class="ia-body">${parts.join("")}</div>` +
     `<div class="dw-bank">${words}</div>` +
     `<div class="ia-foot"><button class="ia-check" type="button">检查</button><span class="ia-fx"></span></div>` +
