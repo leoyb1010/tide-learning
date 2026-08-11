@@ -1167,18 +1167,19 @@ export function buildContract(html: string): CoursewareContract {
 
 /**
  * bespoke 适配脚本：LLM 的 bespoke HTML 是「孤岛页」——不发 ct-height 会卡在宿主 560px 兜底高度，
- * 不响应 ct-hello 握手，quiz 结果也不回传。此脚本注入后补齐三件事（滚动语义，不冒充翻页能力，
- * 故**不发 ct-ready**——宿主对无 ct-ready 的课件正确回落滚动模式）：
- *  1) ct-height 高度上报（load + ResizeObserver + 定时重播 + 响应 ct-hello/ct-mode）；
- *  2) ct-quiz 判分回传：约定 .quiz[data-answer]>.opt 结构（prompt 已要求），捕获阶段监听不干扰模型自带 JS；
- *  3) ct-flash 翻卡回传：.fc 点击首次上报。
+ * 不响应 ct-hello 握手，quiz 结果也不回传。此脚本注入后补齐四件事（滚动语义，不冒充翻页能力，
+ * 故不发 ct-ready；改发 ct-scroll-ready，让宿主为长滚动课件建立续读/完课观察）：
+ *  1) ct-scroll-ready 能力握手；
+ *  2) ct-height 高度上报（load + ResizeObserver + 定时重播 + 响应 ct-hello/ct-mode）；
+ *  3) ct-quiz 判分回传：约定 .quiz[data-answer]>.opt 结构（prompt 已要求），捕获阶段监听不干扰模型自带 JS；
+ *  4) ct-flash 翻卡回传：.fc 点击首次上报。
  */
 const BESPOKE_ADAPTER_SCRIPT = `
 (function(){
-  if (window.__ctBespokeAdapter) return; window.__ctBespokeAdapter = true;
+  if (window.__ctBespokeAdapterV2) return; window.__ctBespokeAdapterV2 = true;
   function h(){ try{ return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0); }catch(e){ return 0; } }
   function post(m){ try{ parent.postMessage(m, '*'); }catch(e){} }
-  function announce(){ var v = h(); if (v > 0) post({type:'ct-height', height: v}); }
+  function announce(){ post({type:'ct-scroll-ready', contract:1}); var v = h(); if (v > 0) post({type:'ct-height', height: v}); }
   window.addEventListener('message', function(e){ var d = e.data || {}; if (d.type === 'ct-hello' || d.type === 'ct-mode') announce(); });
   window.addEventListener('load', announce);
   if ('ResizeObserver' in window) { try{ new ResizeObserver(announce).observe(document.documentElement); }catch(e){} }
@@ -1210,9 +1211,11 @@ const BESPOKE_ADAPTER_SCRIPT = `
 /** 给 bespoke HTML 注入协议壳（幂等；无 </body> 时追加到尾部）。在 enforceTrustedCsp 之后调用。 */
 export function injectBespokeAdapter(html: string): string {
   const h = html || "";
-  if (h.includes("__ctBespokeAdapter")) return h;
-  const tag = `<script data-ct-bespoke-adapter>${BESPOKE_ADAPTER_SCRIPT}</script>`;
-  return /<\/body>/i.test(h) ? h.replace(/<\/body>/i, `${tag}</body>`) : h + tag;
+  if (h.includes("__ctBespokeAdapterV2")) return h;
+  // 存量 v1 适配器不会声明长滚动协议。重新渲染/复用旧 LLM HTML 时先移除旧壳，再注入 v2。
+  const migrated = h.replace(/<script\b[^>]*data-ct-bespoke-adapter[^>]*>[\s\S]*?<\/script>/gi, "");
+  const tag = `<script data-ct-bespoke-adapter="2">${BESPOKE_ADAPTER_SCRIPT}</script>`;
+  return /<\/body>/i.test(migrated) ? migrated.replace(/<\/body>/i, `${tag}</body>`) : migrated + tag;
 }
 
 // ————————————————————————————————————————————————————————————

@@ -18,7 +18,7 @@ const prismaMock = vi.hoisted(() => ({
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
 
-import { isGenJobStale, reconcileStaleGenJobs, GEN_JOB_STALE_MS } from "@/lib/course-gen";
+import { isGenJobStale, isLessonQualityPublishable, reconcileStaleGenJobs, GEN_JOB_STALE_MS } from "@/lib/course-gen";
 
 const minsAgo = (m: number) => new Date(Date.now() - m * 60_000);
 const isoMinsAgo = (m: number) => minsAgo(m).toISOString();
@@ -57,7 +57,7 @@ describe("reconcileStaleGenJobs —— 直接扫 running job 收敛", () => {
     prismaMock.generationJob.findMany.mockResolvedValue([
       { id: "job_1", resultRef: "course_1", createdAt: minsAgo(60), inputJson: JSON.stringify({ heartbeatAt: isoMinsAgo(30) }) },
     ]);
-    prismaMock.lesson.count.mockResolvedValueOnce(6).mockResolvedValueOnce(0); // total=6, remaining=0
+    prismaMock.lesson.count.mockResolvedValueOnce(6).mockResolvedValueOnce(0).mockResolvedValueOnce(0); // total=6, remaining=0, qualityFailures=0
 
     const res = await reconcileStaleGenJobs();
     expect(res.reconciled).toBe(1);
@@ -73,12 +73,27 @@ describe("reconcileStaleGenJobs —— 直接扫 running job 收敛", () => {
     prismaMock.generationJob.findMany.mockResolvedValue([
       { id: "job_1", resultRef: "course_1", createdAt: minsAgo(60), inputJson: JSON.stringify({ heartbeatAt: isoMinsAgo(30) }) },
     ]);
-    prismaMock.lesson.count.mockResolvedValueOnce(6).mockResolvedValueOnce(2); // total=6, remaining=2
+    prismaMock.lesson.count.mockResolvedValueOnce(6).mockResolvedValueOnce(2).mockResolvedValueOnce(0); // total=6, remaining=2
 
     const res = await reconcileStaleGenJobs();
     expect(res.reconciled).toBe(1);
     expect(prismaMock.course.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "course_1" }, data: { genStatus: "failed" } }),
+    );
+    expect(prismaMock.generationJob.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "failed" }) }),
+    );
+  });
+
+  it("blocks 齐全但存在 best_effort_failed → 课程仍 failed，不虚假收敛 ready", async () => {
+    prismaMock.generationJob.findMany.mockResolvedValue([
+      { id: "job_1", resultRef: "course_1", createdAt: minsAgo(60), inputJson: JSON.stringify({ heartbeatAt: isoMinsAgo(30) }) },
+    ]);
+    prismaMock.lesson.count.mockResolvedValueOnce(6).mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+    await reconcileStaleGenJobs();
+    expect(prismaMock.course.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { genStatus: "failed" } }),
     );
     expect(prismaMock.generationJob.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: "failed" }) }),
@@ -100,5 +115,20 @@ describe("reconcileStaleGenJobs —— 直接扫 running job 收敛", () => {
     const res = await reconcileStaleGenJobs();
     expect(res.reconciled).toBe(0);
     expect(prismaMock.lesson.count).not.toHaveBeenCalled();
+  });
+});
+
+describe("质量终态口径", () => {
+  it("明确失败、未验证、占位和脏档案均不可发布", () => {
+    expect(isLessonQualityPublishable('{"status":"best_effort_failed"}')).toBe(false);
+    expect(isLessonQualityPublishable('{"status":"best_effort_unverified"}')).toBe(false);
+    expect(isLessonQualityPublishable('{"status":"fallback"}')).toBe(false);
+    expect(isLessonQualityPublishable("{broken")).toBe(false);
+  });
+
+  it("passed 与历史无 status 档案保持兼容", () => {
+    expect(isLessonQualityPublishable('{"status":"passed"}')).toBe(true);
+    expect(isLessonQualityPublishable('{"score":80}')).toBe(true);
+    expect(isLessonQualityPublishable(null)).toBe(true);
   });
 });

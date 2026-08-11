@@ -18,13 +18,8 @@ import {
 import { useToast } from "@/components/Toast";
 import { Spinner } from "@/components/GenProgress";
 import { track } from "@/lib/analytics-client";
+import { checkpointPatchLessons, type CheckpointLesson } from "@/lib/outline-checkpoint";
 import type { CSSProperties } from "react";
-
-export interface CheckpointLesson {
-  id?: string; // 已有节带 id；新增节无 id（确认时服务端补建）
-  title: string;
-  summary?: string | null;
-}
 
 export function OutlineCheckpoint({
   courseId,
@@ -113,9 +108,7 @@ export function OutlineCheckpoint({
 
   async function confirm() {
     if (busy) return;
-    const clean = lessons
-      .map((l) => ({ ...l, title: l.title.trim() }))
-      .filter((l) => l.title);
+    const clean = checkpointPatchLessons(lessons);
     if (clean.length === 0) {
       toast("大纲至少保留 1 节有标题的章节", { tone: "warn" });
       return;
@@ -128,7 +121,7 @@ export function OutlineCheckpoint({
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ lessons: clean.map((l) => ({ id: l.id, title: l.title, summary: l.summary ?? "" })) }),
+        body: JSON.stringify({ lessons: clean }),
       });
       const saveJson = await saveRes.json().catch(() => null);
       if (!saveRes.ok || !saveJson?.ok) {

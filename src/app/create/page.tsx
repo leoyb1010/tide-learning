@@ -100,10 +100,10 @@ export default async function CreatePage({ searchParams }: { searchParams: Promi
       ...(requestedDraftId ? { id: requestedDraftId } : {}),
     },
     orderBy: { createdAt: "desc" },
-    select: { id: true, slug: true, title: true, origin: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true } } },
+    select: { id: true, slug: true, title: true, origin: true, lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true, summary: true } } },
   });
   const draftCheckpoint: DraftCheckpoint | null = draftRow
-    ? { courseId: draftRow.id, slug: draftRow.slug, title: draftRow.title, isImport: draftRow.origin === "user_imported", lessons: draftRow.lessons.map((l) => ({ id: l.id, title: l.title })) }
+    ? { courseId: draftRow.id, slug: draftRow.slug, title: draftRow.title, isImport: draftRow.origin === "user_imported", lessons: draftRow.lessons.map((l) => ({ id: l.id, title: l.title, summary: l.summary })) }
     : null;
 
   // 手工课程恢复：只能读取当前用户自己的 user_created 课程，刷新/离开后仍能继续导演。

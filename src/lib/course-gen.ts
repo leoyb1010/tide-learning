@@ -2,8 +2,9 @@ import { chatJson } from "./llm";
 import { prisma } from "./db";
 import { creditingOnUsage, estimateCredits, getBalanceFresh } from "./credits";
 import { track } from "./analytics";
-import { blocksToPlainText, validateBlocks, type Block } from "./blocks";
-import { simpleOutlinePrompt, lessonVoiceLine, sourceContextBlock, COMPLIANCE_GUARDRAIL } from "./ai/prompts";
+import { blocksToPlainText, showcaseIssues, validateBlocks, type Block } from "./blocks";
+import { simpleOutlinePrompt, lessonVoiceLine, sourceContextBlock, COMPLIANCE_GUARDRAIL, BLOCK_ENTRY_RULES } from "./ai/prompts";
+import { topicTaxonomyFragment } from "./ai/topic-taxonomy";
 import { getTemplate, checkTemplateAdherence } from "./ai/templates";
 import { resolveCourseDesign, serializeCourseDesign, designJsonFromBrief } from "./ai/courseware-design";
 import { generateDesignBrief } from "./ai/generate-design-brief";
@@ -92,6 +93,41 @@ export interface LessonCoreResult {
   blocks: number;
   /** 本节课件质量评分（规则评估，0-100；降级占位节为 0）。见 scoreLesson。 */
   qualityScore: number;
+}
+
+export const NON_PUBLISHABLE_QUALITY_STATUSES = ["fallback", "best_effort_failed", "best_effort_unverified"] as const;
+
+/** 历史无 status 的质量档案保持兼容；只有明确记录为不合格/未验证的课节才阻止课程宣告 ready。 */
+export function isLessonQualityPublishable(qualityJson: string | null | undefined): boolean {
+  if (!qualityJson) return true;
+  try {
+    const status = (JSON.parse(qualityJson) as { status?: unknown })?.status;
+    return typeof status !== "string" || !(NON_PUBLISHABLE_QUALITY_STATUSES as readonly string[]).includes(status);
+  } catch {
+    // 脏质量档案不能冒充已通过；生成课应进入可重试态。
+    return false;
+  }
+}
+
+function nonPublishableQualityWhere() {
+  return {
+    OR: NON_PUBLISHABLE_QUALITY_STATUSES.map((status) => ({ qualityJson: { contains: `"status":"${status}"` } })),
+  };
+}
+
+/** 所有生成/自愈出口共用同一个就绪口径，避免某条捷径只看 blocksJson 就虚假成功。 */
+export async function assessCourseGenerationReadiness(courseId: string): Promise<{
+  total: number;
+  remaining: number;
+  qualityFailures: number;
+  ready: boolean;
+}> {
+  const [total, remaining, qualityFailures] = await Promise.all([
+    prisma.lesson.count({ where: { courseId } }),
+    prisma.lesson.count({ where: { courseId, blocksJson: null } }),
+    prisma.lesson.count({ where: { courseId, ...nonPublishableQualityWhere() } }),
+  ]);
+  return { total, remaining, qualityFailures, ready: total > 0 && remaining === 0 && qualityFailures === 0 };
 }
 
 // ————————————————————————————————————————————————————————————
@@ -426,6 +462,8 @@ export async function generateLessonCore(
   const outlineText = outlineLines.join("\n");
   const contentBrief = await resolveContentBrief(course);
   const contentBriefText = contentBriefPrompt(contentBrief);
+  // 主题类型以用户原始需求为主真值；课程/章节标题只补充，避免生成中途把社会议题误换成技术教程。
+  const topicContext = `${contentBrief.request} ${course.title} ${lesson.title}`;
 
   // 分赛道口吻（吸引力包）：贴合本课赛道人群，不改块结构契约。
   const voice = lessonVoiceLine(course.category);
@@ -467,6 +505,7 @@ export async function generateLessonCore(
     lessonTitle: lesson.title,
     objective: lesson.summary,
     category: course.category,
+    topicContext,
     audience: blueprint?.audience,
     previousLessonTitles: priorTitles,
     sourceContext: sourceCtx,
@@ -508,9 +547,12 @@ export async function generateLessonCore(
     "summary{markdown,next?}; diagram{kind:flow|cycle|hub|layers|funnel,title,items:[{label,detail?}],note?}; " +
     "formula{latex,caption?,display?}; image{src:'/illustration/auto.svg',caption}; " +
     "choice{prompt,choices:[{label,feedback?,targetLessonId?}]}; branch{prompt,options:[{label,condition?,targetLessonId}]}; " +
-    "hotspot{imageSrc,prompt?,spots:[{x:0-100,y:0-100,label,feedback?,targetLessonId?}]}。只有课程需求确实包含分流时才使用跳转块，targetLessonId 必须从全课地图原样选取。\n" +
-    "quiz/flashcard 是学习闭环锚点；diagram 表达真实关系；formula 承载公式；image 只作氛围图。" +
-    "全程中文讲解（目标语言示例除外），保留具体性与可操作性。\n" +
+    "hotspot{imageSrc,prompt?,spots:[{x:0-100,y:0-100,label,feedback?,targetLessonId?}]}。\n" +
+    "quiz/flashcard 是学习闭环锚点。全程中文讲解（目标语言示例除外），保留具体性与可操作性。\n" +
+    // 块准入条件：把「什么时候不该用某个块」写成硬门，治「协议里有就都用上」的花活堆砌。
+    BLOCK_ENTRY_RULES + "\n" +
+    // 主题类型：史实/议题/时事/行业不该被套技能进阶结构，举证标准也各不相同。
+    topicTaxonomyFragment(topicContext, course.category) +
     COMPLIANCE_GUARDRAIL + "\n" +
     blueprintFragment +
     (deep
@@ -559,6 +601,7 @@ export async function generateLessonCore(
       blocks: (Block & { id: string })[];
       quality: LessonQuality;
       judge: LessonJudgeVerdict;
+      disciplineIssues: string[];
       score: number;
       pass: number;
       model: string;
@@ -596,10 +639,11 @@ export async function generateLessonCore(
           continue;
         }
         const candidateQuality = scoreLesson(candidate, course.template);
+        const candidateDiscipline = showcaseIssues(candidate);
         lastDraftText = blocksToPlainText(candidate).slice(0, 12_000);
         const candidateJudge = await judgeLesson(
           candidate,
-          { courseTitle: course.title, lessonTitle: lesson.title, objective: lesson.summary, category: course.category },
+          { courseTitle: course.title, lessonTitle: lesson.title, objective: lesson.summary, category: course.category, topicContext },
           // onUsage 必传(2026-07-21 修漏扣):judgeLesson 内部是「内容评审 + 教学评审」两次
           // 独立强模型调用(prompt 含最多 22000 字正文),每稿 2 次 × 最多 6 稿 = 单节最多 12 次
           // 强模型调用;此前唯一调用点没传 onUsage → 这部分成本 100% 不计费,量级与作者调用同级。
@@ -607,16 +651,27 @@ export async function generateLessonCore(
         );
         const candidateScore = lessonJudgeScore(candidateJudge) * 20 + candidateQuality.score * 0.12
           - candidateJudge.blockingIssues.length * 12
+          - candidateDiscipline.length * 8
           - (candidateJudge.judged ? 0 : 50);
         if (!best || candidateScore > best.score) {
-          best = { blocks: candidate, quality: candidateQuality, judge: candidateJudge, score: candidateScore, pass, model: model.key };
+          best = {
+            blocks: candidate,
+            quality: candidateQuality,
+            judge: candidateJudge,
+            disciplineIssues: candidateDiscipline,
+            score: candidateScore,
+            pass,
+            model: model.key,
+          };
         }
-        if (candidateQuality.passed && candidateJudge.passed) break;
+        if (candidateQuality.passed && candidateJudge.passed && candidateDiscipline.length === 0) break;
         const structural = Object.entries(candidateQuality.flags)
           .filter(([, ok]) => !ok)
           .map(([key]) => FLAG_HINTS[key] ?? key);
         feedback = [
           ...structural,
+          // 块滥用自检：确定性、零成本，和内容/教学评审共同构成发布门。
+          ...candidateDiscipline.map((item) => `块使用不当：${item}`),
           ...(candidateJudge.judged && !candidateJudge.passed
             ? [
                 `发布门评分未达标：内容深度 ${candidateJudge.depth}/5、相关性 ${candidateJudge.relevance}/5、具体性 ${candidateJudge.specificity}/5、教学参与 ${candidateJudge.teaching}/5、检验有效性 ${candidateJudge.assessment}/5、迁移 ${candidateJudge.transfer}/5。标为 4 的维度才可发布。`,
@@ -653,7 +708,7 @@ export async function generateLessonCore(
       model: best?.model ?? revisionModel.key,
       beforeScore: quality.score,
       attempts: authorAttempts,
-      passed: !usedFallback && quality.passed && judge.passed,
+      passed: !usedFallback && quality.passed && judge.passed && (best?.disciplineIssues.length ?? 0) === 0,
       judgeScore: Math.round(lessonJudgeScore(judge) * 100) / 100,
     };
 
@@ -715,7 +770,7 @@ export async function generateLessonCore(
     }
     // 弱课件（低于阈值且非降级占位）：记一条可查事件，供 admin 观测哪些节需重生成。
     // 降级占位节（usedFallback）由 fallback 标志单独区分，不重复报低质量噪声。
-    if (!usedFallback && (!quality.passed || !judge.passed)) {
+    if (!usedFallback && (!quality.passed || !judge.passed || (best?.disciplineIssues.length ?? 0) > 0)) {
       await track({
         eventName: "ai_gen_lesson_low_quality",
         userId,
@@ -729,6 +784,7 @@ export async function generateLessonCore(
           judged: judge.judged,
           judgePassed: judge.passed,
           judgeIssues: judge.issues,
+          disciplineIssues: best?.disciplineIssues ?? [],
         },
       });
     }
@@ -756,8 +812,15 @@ export async function generateLessonCore(
       blocksJson,
       qualityJson: JSON.stringify({
         score: usedFallback ? 0 : quality.score,
-        passed: !usedFallback && quality.passed && judge.passed,
-        status: usedFallback ? "fallback" : judge.passed && quality.passed ? "passed" : judge.judged ? "best_effort_failed" : "best_effort_unverified",
+        passed: !usedFallback && quality.passed && judge.passed && (best?.disciplineIssues.length ?? 0) === 0,
+        status:
+          usedFallback
+            ? "fallback"
+            : judge.passed && quality.passed && (best?.disciplineIssues.length ?? 0) === 0
+              ? "passed"
+              : judge.judged
+                ? "best_effort_failed"
+                : "best_effort_unverified",
         flags: quality.flags,
         adherence: { ok: adherence.ok, missing: adherence.missing },
         regen: regenInfo,
@@ -790,17 +853,8 @@ export async function generateLessonCore(
     });
 
     // 是否所有 lesson 都已生成 blocksJson（还剩多少空节）
-    const remaining = await prisma.lesson.count({
-      where: { courseId: course.id, blocksJson: null },
-    });
-    // B3 修(2026-07-21):降级占位节也有 blocksJson,此前照样计入「全部就绪」→ 课程置 ready、
-    // 剧场宣告「全部 N 节已生成,随时可学」,而点进去只有一句「本节内容正在完善中」,
-    // 且作者没有任何重造入口(学习页无作者控件、我的课对 ready 课只剩分享)。
-    // 现在:含占位节的课不收敛 ready,落 failed → 前端「继续生成」出现,用户可自助重试该节。
-    const fallbackCount = await prisma.lesson.count({
-      where: { courseId: course.id, qualityJson: { contains: '"status":"fallback"' } },
-    });
-    const allReady = remaining === 0 && fallbackCount === 0;
+    const readiness = await assessCourseGenerationReadiness(course.id);
+    const allReady = readiness.ready;
     if (allReady && course.genStatus !== "ready") {
       // 根因修复(2026-07-20)：此收尾是「逐节路径补齐最后一节」的唯一出口（前端逐节重试 /
       // 续造与后台流水竞速）。此前只置 ready 不渲染 HTML 课件 → 整课 htmlJson 缺失，
@@ -810,6 +864,12 @@ export async function generateLessonCore(
       await prisma.course.update({
         where: { id: course.id },
         data: { genStatus: "ready" },
+      });
+    } else if (readiness.remaining === 0 && course.genStatus !== "paused") {
+      // blocks 齐全但存在明确未通过/未评审节：保留内容供预览，课程进入可续造态，绝不宣称发布就绪。
+      await prisma.course.updateMany({
+        where: { id: course.id, genStatus: { not: "paused" } },
+        data: { genStatus: "failed" },
       });
     }
 
@@ -1085,11 +1145,8 @@ export async function reconcileStaleGenJobs(userId?: string): Promise<{ reconcil
     if (!job.resultRef) continue;
     if (!isGenJobStale(job)) continue; // 心跳仍新鲜（真在生成）→ 绝不打断
     try {
-      const [total, remaining] = await Promise.all([
-        prisma.lesson.count({ where: { courseId: job.resultRef } }),
-        prisma.lesson.count({ where: { courseId: job.resultRef, blocksJson: null } }),
-      ]);
-      const allReady = total > 0 && remaining === 0;
+      const readiness = await assessCourseGenerationReadiness(job.resultRef);
+      const allReady = readiness.ready;
       // updateMany：课已被删除时返回 count:0 而非抛错（避免无谓 Prisma 错误日志）；finalizeGenJob 仍收尾 job。
       await prisma.course.updateMany({
         where: { id: job.resultRef },
@@ -1244,7 +1301,7 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
       select: { id: true },
     });
     const fallbackLessons = await prisma.lesson.findMany({
-      where: { courseId, blocksJson: { not: null }, qualityJson: { contains: '"status":"fallback"' } },
+      where: { courseId, blocksJson: { not: null }, ...nonPublishableQualityWhere() },
       orderBy: { sortOrder: "asc" },
       select: { id: true },
     });
@@ -1322,8 +1379,8 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
     }
 
     // 收尾：以 DB 重新统计为准。无空节 → ready；仍有空节再看是否为「另一流水在生成」。
-    const remaining = await prisma.lesson.count({ where: { courseId, blocksJson: null } });
-    if (remaining === 0) {
+    const readiness = await assessCourseGenerationReadiness(courseId);
+    if (readiness.ready) {
       // v3.3：块全就绪后，为每节渲染确定性 HTML 课件（Web 端多样化高级课件；免费/瞬时；不动 contentType）。
       // best-effort：整段包 try/catch，HTML 渲染失败绝不影响块课件的 ready 收尾（块永远是兜底）。
       await renderCourseHtmlBestEffort(courseId);
@@ -1344,7 +1401,7 @@ export async function runCourseGenBackground(courseId: string, userId: string): 
         await track({
           eventName: "ai_gen_stopped_credits",
           userId,
-          properties: { courseId, remaining, perLessonCost },
+          properties: { courseId, remaining: readiness.remaining, qualityFailures: readiness.qualityFailures, perLessonCost },
         }).catch(() => {});
       }
     }

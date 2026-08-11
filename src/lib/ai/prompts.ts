@@ -18,6 +18,7 @@
  */
 
 import { getTemplate } from "./templates";
+import { topicTaxonomyFragment } from "./topic-taxonomy";
 
 // ————————————————————————————————————————————————————————————
 //  赛道吸引力包（built-in prompt packs）
@@ -121,12 +122,37 @@ export const COMPLIANCE_GUARDRAIL =
   "- 长辈内容：文字清楚、句子短、信息密度低；禁止羞辱、制造焦虑、夸大危险。\n" +
   "- 不编造讲师资质、审核人、数据、案例或来源；信息不足时宁可讲得保守，也不虚构。";
 
+/**
+ * 块准入条件（吸收 bolt-slides SKILL.md 的 entry condition 纪律）。
+ *
+ * 现存问题：块协议列了 20+ 种块，每种只有「能干什么」的说明，没有「什么时候不该用」的门槛——
+ * 于是模型倾向于把花活用满（起始 demo 用满所有版式是因为它就是个组件展示，一节真课不是）。
+ * 这里全部写成**负向门**：不满足条件就不要出现。不设最小数量、不给配方、不奖励块型丰富度，
+ * 与 v6「模板不再生成任何硬性块要求」和双评审「不奖励块数量或模板长相」完全一致。
+ */
+export const BLOCK_ENTRY_RULES =
+  "【块准入条件（不满足就不要用；块型丰富度本身不是优点）】\n" +
+  "- diagram：只在存在真实的流程、循环、层级或转化关系时用。并列要点画成流程图属于误用，用 keypoint。\n" +
+  "- code：只在学习者需要照着敲或读懂真实代码时用，且代码要能直接跑。不要为了显得技术而放伪代码。\n" +
+  "- formula：只在主题本身包含数学表达时用，不要把普通比例关系写成公式。\n" +
+  "- dialog：只在对话本身就是学习对象时用（口语、沟通、谈判、问诊），不要用两个虚构角色来复述讲解。\n" +
+  "- compare：只在两者真的可比、且比较会改变学习者判断时用。两边分量要相当，不要立稻草人。\n" +
+  "- scene：只在真实场景确实能建立学习动机时用，全节至多一个，不要每节都编一个小故事开场。\n" +
+  "- image：只作氛围图，全节至多一个；它不承载知识，缺了不影响理解。\n" +
+  "- hotspot：只在图上的位置本身承载知识时用（界面、结构、地图、解剖）。\n" +
+  "- fillblank / dragwords：只在词序、搭配或术语精确性就是本节学习目标时用。\n" +
+  "- choice / branch：只在课程需求确实包含分流时用，targetLessonId 必须从全课地图原样选取。\n" +
+  "- 最后自检：每个块都要能用一句话说清它为本节目标做了什么。说不清就删掉，不要因为协议里有就用上。";
+
 // ————————————————————————————————————————————————————————————
 //  大纲 prompt（造课 / 简版 / 导入）
 // ————————————————————————————————————————————————————————————
 
-/** 大纲 system 基座：按需求规划真实能力路径；模板仅是显式选择时的创作偏好，不再决定章节骨架。 */
-function outlineSystemBase(category: string, template?: string): string {
+/**
+ * 大纲 system 基座：按需求规划真实能力路径；模板仅是显式选择时的创作偏好，不再决定章节骨架。
+ * topicText 传学习需求原文，用于判主题类型（史实/议题/时事等不该被套技能进阶结构）。
+ */
+function outlineSystemBase(category: string, template?: string, topicText?: string): string {
   const templateHint = template
     ? `\n【用户创作偏好】${getTemplate(template).label}（${getTemplate(template).tagline}）。只影响语气与呈现倾向，不规定章节数量、固定首尾或教学顺序。\n`
     : "";
@@ -142,6 +168,7 @@ function outlineSystemBase(category: string, template?: string): string {
     "- 标题具体、自然、能准确预告内容，不写点击诱饵，不堆营销修辞。\n" +
     "- objective 使用可观察动作，避免只写了解、认识、熟悉。\n" +
     "- 课程必须有一个能证明学习成果的综合任务，但不强制放在最后一节。\n" +
+    topicTaxonomyFragment(topicText ?? "", category) +
     templateHint +
     NO_HYPE_RULE +
     "\n" +
@@ -163,7 +190,7 @@ export function courseOutlinePrompt(opts: {
   system: string;
   user: string;
 } {
-  const system = outlineSystemBase(opts.category, opts.template);
+  const system = outlineSystemBase(opts.category, opts.template, opts.prompt);
   const planningScope = opts.lessonRange
     ? `用户明确选择了篇幅倾向：目标约 ${opts.lessonRange.target} 节，可在 ${opts.lessonRange.min}-${opts.lessonRange.max} 节内按内容调整。`
     : "用户没有指定篇幅：章节数量完全由需求复杂度决定，简单主题可以很短，复杂主题可以展开，技术上限 24 节。";
@@ -186,7 +213,7 @@ export function simpleOutlinePrompt(opts: { prompt: string; category?: string; t
   system: string;
   user: string;
 } {
-  const system = outlineSystemBase(opts.category || "ai_skill", opts.template);
+  const system = outlineSystemBase(opts.category || "ai_skill", opts.template, opts.prompt);
   const user =
     `学习需求（已转义的字符串字面量）：${JSON.stringify(opts.prompt.slice(0, 800))}\n` +
     `章节数量完全由主题复杂度决定（技术上限 24 节），输出课程大纲 JSON：\n` +
@@ -209,6 +236,8 @@ export function importOutlinePrompt(opts: { title: string; rawText: string; temp
     "但改写只能基于原文已有的内容，不得夸大或添加原文没有的承诺。\n" +
     (opts.template ? `用户选择了「${getTemplate(opts.template).label}」作为表达偏好，但它不得改变原文结构或事实边界。\n` : "") +
     "要求：中文、按原文真实结构决定 1-24 章；短材料可以只设 1 章，长材料按标题与主题边界切分，章节不重叠。\n" +
+    // 主题类型只影响「怎么切、怎么命名」的预期（史料按编年、技能按可完成动作），忠于原文仍是第一原则。
+    topicTaxonomyFragment(`${opts.title} ${opts.rawText.slice(0, 400)}`) +
     NO_HYPE_RULE +
     "\n" +
     COMPLIANCE_GUARDRAIL +

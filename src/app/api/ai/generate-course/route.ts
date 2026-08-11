@@ -202,7 +202,8 @@ export async function POST(req: NextRequest) {
         const lessons = await tx.lesson.findMany({
           where: { courseId: course.id },
           orderBy: { sortOrder: "asc" },
-          select: { id: true, title: true },
+          // checkpoint 会把这份数据原样交给可编辑大纲；summary 是逐节学习目标，绝不能在回包时丢掉。
+          select: { id: true, title: true, summary: true },
         });
 
         await tx.generationJob.create({

@@ -8,6 +8,7 @@
 import { creditingOnUsage } from "../credits";
 import { chatJson } from "../llm";
 import { bespokeTimeoutMs, selectBespokeModel } from "./models";
+import { topicTaxonomyFragment } from "./topic-taxonomy";
 
 interface RawNarrativeBeat {
   purpose?: unknown;
@@ -97,6 +98,8 @@ export async function generateLessonNarrativePlan(input: {
   lessonTitle: string;
   objective?: string | null;
   category?: string | null;
+  /** 课程原始需求优先的稳定主题上下文；逐节标题只能补充，不能把课程中途换类。 */
+  topicContext?: string;
   audience?: string | null;
   previousLessonTitles?: string[];
   sourceContext?: string;
@@ -121,6 +124,9 @@ export async function generateLessonNarrativePlan(input: {
         "所有练习必须在课件内自给材料并可立即完成；不得要求学习者另找录音、案例、同伴或付费工具，除非用户明确提供。" +
         "检验必须直接测量本节目标，正确答案唯一或评分标准明确，迁移任务要写清提交物与成功标准。" +
         "必须设计真实的理解检验与迁移任务，但它们可以出现在最合适的位置，不必放在结尾。" +
+        // 主题类型决定「什么样的讲法在这类主题上才成立」：史实按编年与史料、议题必须并陈分歧、
+        // 时事要分已确认与未定论。导演阶段就吃进去，比到作者阶段才纠正便宜得多。
+        topicTaxonomyFragment(input.topicContext || `${input.courseTitle} ${input.lessonTitle}`, input.category) +
         "严格只输出 JSON。",
       user:
         `课程：${input.courseTitle}\n本节：${input.lessonTitle}\n` +

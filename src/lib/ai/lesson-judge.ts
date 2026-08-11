@@ -1,6 +1,7 @@
-import { blocksToPlainText, type Block } from "@/lib/blocks";
+import { blocksToAssessmentManifest, blocksToPlainText, type Block } from "@/lib/blocks";
 import { chatJson, type LlmUsageInfo } from "@/lib/llm";
 import { bespokeTimeoutMs, resolveModel, selectBespokeModel } from "@/lib/ai/models";
+import { topicTaxonomyFragment } from "@/lib/ai/topic-taxonomy";
 
 /**
  * 内容评审与教学评审由两个独立 Agent 完成。
@@ -88,6 +89,7 @@ async function judgeContent(input: {
   lessonTitle: string;
   objective?: string | null;
   category?: string | null;
+  topicContext?: string;
   context: string;
   sourceBased: boolean;
   model?: string;
@@ -101,6 +103,9 @@ async function judgeContent(input: {
         "判断本节是否准确回答用户原始需求、是否在全课地图中承担清晰且不重复的职责、是否讲透机制与边界，并用具体案例或证据支持。" +
         "不要奖励固定开场、固定总结、块数量或模板长相。不要因为结构非传统而扣分。" +
         "sourceFidelity 只判断给定资料与正文是否相符；没有资料时判断是否避免无依据的精确断言。" +
+        // 评审必须用这类主题**自己的**举证标准打分：史实看史料与分歧、时事看时间点、
+        // 议题看是否并陈分歧而非制造共识。作者侧已按同一份标准写作，此处闭环。
+        topicTaxonomyFragment(input.topicContext || `${input.courseTitle} ${input.lessonTitle}`, input.category) +
         "4=可以直接发布的高质量内容，5=示范级，3=勉强可用但仍需编辑，0-2=不可发布。" +
         "blockingIssues 只列必须重写才能发布的问题，例如事实或分类错误、与课程范围冲突、关键结论无依据。存在 blockingIssues 时 publishable 必须为 false，相关维度不得给 4-5 分。" +
         "issues 列非阻断但值得改进的问题。严格只输出 JSON。",
@@ -126,6 +131,7 @@ async function judgeContent(input: {
 
 async function judgeTeaching(input: {
   lessonText: string;
+  assessmentManifest: string;
   courseTitle: string;
   lessonTitle: string;
   objective?: string | null;
@@ -139,14 +145,17 @@ async function judgeTeaching(input: {
       system:
         "你是学习科学与教学设计评审，只评审学习过程，不评页面美术。" +
         "检查学习者是否需要观察、判断、解释、练习或创作，而非被动读完；检验是否真正测到目标；反馈是否解释原因；迁移是否换了情境；认知负荷是否合理。" +
+        "必须逐题核对 assessment manifest 中的真实答案键、正确答案文本与解析是否一致；冲突、越界、答案不唯一都属于 blockingIssues。" +
         "不要求 scene、objectives、quiz、summary 的固定顺序，也不要求每节都使用同一种交互。" +
+        "块型丰富度不是优点：每个块都要承担一个必要的教学动作，纯装饰、复述正文、" +
+        "或明显为了把协议里的花活用满而存在的块，在 issues 里点名要求删除。" +
         "4=可以直接发布，5=示范级，3=勉强可用但仍需编辑，0-2=不可发布。" +
         "blockingIssues 只列会让学习者无法完成、答案不唯一、反馈错误或检验不到目标的发布阻断项；存在阻断项时 publishable 必须为 false，相关维度不得给 4-5 分。" +
         "issues 列非阻断改进。严格只输出 JSON。",
       user:
         `课程：《${input.courseTitle}》\n本节：${input.lessonTitle}\n` +
         (input.objective ? `目标：${input.objective}\n` : "") +
-        `${input.context}\n\n【待评正文】\n${input.lessonText}\n\n` +
+        `${input.context}\n\n【待评正文】\n${input.lessonText}\n\n【判分清单（结构化真值）】\n${input.assessmentManifest}\n\n` +
         "从 0-5 评分并输出 {publishable,teaching,assessment,feedback,transfer,cognitiveLoad,blockingIssues,issues}。",
       temperature: 0.1,
       maxTokens: 1800,
@@ -163,7 +172,7 @@ async function judgeTeaching(input: {
 
 export async function judgeLesson(
   blocks: (Block & { id: string })[],
-  ctx: { courseTitle: string; lessonTitle: string; objective?: string | null; category?: string | null },
+  ctx: { courseTitle: string; lessonTitle: string; objective?: string | null; category?: string | null; topicContext?: string },
   opts: {
     model?: string;
     onUsage?: (u: LlmUsageInfo) => void;
@@ -176,6 +185,7 @@ export async function judgeLesson(
   } = {},
 ): Promise<LessonJudgeVerdict> {
   const lessonText = blocksToPlainText(blocks).slice(0, 22_000);
+  const assessmentManifest = blocksToAssessmentManifest(blocks).slice(0, 12_000);
   if (!lessonText.trim()) {
     return {
       passed: false,
@@ -200,7 +210,7 @@ export async function judgeLesson(
   const context = contextText(opts);
   const [content, teaching] = await Promise.all([
     judgeContent({ ...ctx, lessonText, context, sourceBased: Boolean(opts.sourceBased), model: opts.model, onUsage: opts.onUsage }),
-    judgeTeaching({ ...ctx, lessonText, context, model: opts.model, onUsage: opts.onUsage }),
+    judgeTeaching({ ...ctx, lessonText, assessmentManifest, context, model: opts.model, onUsage: opts.onUsage }),
   ]);
   const c = content.raw ?? {};
   const t = teaching.raw ?? {};

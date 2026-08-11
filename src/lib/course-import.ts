@@ -148,7 +148,8 @@ export async function structureImportedTextIntoCourse(opts: {
     const lessons = await tx.lesson.findMany({
       where: { courseId: course.id },
       orderBy: { sortOrder: "asc" },
-      select: { id: true, title: true },
+      // 专业模式确认会全量 PATCH 大纲；带回 summary 才能无损保留导入阶段生成的学习目标。
+      select: { id: true, title: true, summary: true },
     });
 
     await tx.importedSource.update({

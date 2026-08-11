@@ -89,6 +89,22 @@ describe("协议壳注入(A5)", () => {
     const twice = injectBespokeAdapter(once);
     expect((twice.match(/data-ct-bespoke-adapter/g) || []).length).toBe(1);
   });
+
+  it("bespoke 明确声明长滚动能力，不冒充翻页协议", () => {
+    const html = injectBespokeAdapter("<body>x</body>");
+    expect(html).toContain("ct-scroll-ready");
+    expect(html).toContain("ct-height");
+    expect(html).not.toContain("type:'ct-ready'");
+  });
+
+  it("存量 v1 适配器会被替换为 v2，而不是因旧标记被跳过", () => {
+    const old = '<body>x<script data-ct-bespoke-adapter>window.__ctBespokeAdapter=true;</script></body>';
+    const html = injectBespokeAdapter(old);
+    expect(html).toContain('data-ct-bespoke-adapter="2"');
+    expect(html).toContain("__ctBespokeAdapterV2");
+    expect(html).not.toContain("window.__ctBespokeAdapter=true");
+    expect((html.match(/data-ct-bespoke-adapter/g) || []).length).toBe(1);
+  });
 });
 
 describe("内容安全层(C4)", () => {

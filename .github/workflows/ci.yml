@@ -80,6 +80,7 @@ jobs:
           RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
           NODE_ENV=production BASE_URL=http://127.0.0.1:3100 node scripts/verify-browser-interactions.mjs
+          E2E_BASE=http://127.0.0.1:3100 npm run check:embed
 
       - name: Backup and restore drill
         run: |

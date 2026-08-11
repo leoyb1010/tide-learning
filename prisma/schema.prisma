@@ -135,9 +135,9 @@ model Course {
   priceCredits             Int? // 集市售价（积分）；null/0=免费，>0=付费
   salesCount               Int       @default(0) // 累计成交数（付费被购买次数；免费拿走不计入，销量口径 = 真实成交）
   genStatus                String? // 生成态：generating / ready / failed（仅 AI/import 课）
-  template                 String? // v3.2 课件模板 key（见 src/lib/ai/templates.ts）；空=classic
+  template                 String? // v6 可选教学方式/表达偏好；空=自由导演。不是视觉皮肤或章节模板
   modelUsed                String? // v3.2 本课生成所用 LLM 模型 key（见 src/lib/ai/models.ts）
-  qualityTier              String    @default("standard") // v3.4 standard=确定性 / premium=优先 bespoke 精修
+  qualityTier              String    @default("standard") // v6 内容研究深度：standard / premium；用户课视觉均优先原创 HTML
   blueprintJson            String? // L1 课程蓝图（专业模式）：{audience,tone,length,blockPrefs[],referenceText}，透传进大纲/逐节 prompt 定制 + grounding
   contentBriefJson         String? // v6 内容总纲：保留用户原始需求、课程承诺、范围边界与成果任务，逐节作者始终据此写作
   customTemplateId         String? // 创作者保存/复用的课程结构模板（软引用 Template.id）

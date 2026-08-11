@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
-import { readGenProgress, getGenJob, finalizeGenJob, isGenJobStale, renderCourseHtmlBestEffort } from "@/lib/course-gen";
+import { readGenProgress, getGenJob, finalizeGenJob, isGenJobStale, isLessonQualityPublishable, renderCourseHtmlBestEffort } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -31,19 +31,20 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       prisma.lesson.findMany({
         where: { courseId: course.id },
         orderBy: { sortOrder: "asc" },
-        select: { id: true, title: true, blocksJson: true },
+        select: { id: true, title: true, blocksJson: true, qualityJson: true },
       }),
     ]);
 
     const lessons = lessonRows.map((l) => ({
       id: l.id,
       title: l.title,
-      ready: l.blocksJson != null,
+      ready: l.blocksJson != null && isLessonQualityPublishable(l.qualityJson),
     }));
 
     // total 以实际 lesson 数为准（job 快照可能落后），保证前端进度条分母稳定。
     const total = lessons.length;
     const doneByLessons = lessons.filter((l) => l.ready).length;
+    const blocksDone = lessonRows.filter((lesson) => lesson.blocksJson != null).length;
     let genStatus = course.genStatus;
     let currentLessonId = progress.currentLessonId;
 
@@ -56,6 +57,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       await prisma.course.update({ where: { id: course.id }, data: { genStatus: "ready" } });
       await finalizeGenJob(course.id, "done");
       genStatus = "ready";
+      currentLessonId = null;
+    }
+
+    // 所有 blocks 已写完但存在 best_effort_failed/unverified/fallback：这是质量失败，不是“仍在生成”。
+    if (genStatus === "generating" && total > 0 && blocksDone === total && doneByLessons < total) {
+      await prisma.course.update({ where: { id: course.id }, data: { genStatus: "failed" } });
+      await finalizeGenJob(course.id, "failed");
+      genStatus = "failed";
       currentLessonId = null;
     }
 
@@ -73,8 +82,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     return ok({
       total,
-      done: Math.max(progress.done, doneByLessons),
-      failed: progress.failed,
+      done: doneByLessons,
+      failed: Math.max(progress.failed, total - doneByLessons - (total - blocksDone)),
       currentLessonId,
       genStatus,
       lessons,

@@ -17,13 +17,29 @@ import {
   CornersIn,
   Check,
   FlagCheckered,
+  GridFour,
   NotePencil,
   Keyboard,
   X,
 } from "@phosphor-icons/react";
+import { blocksToPlainText } from "@/lib/blocks";
 import type { BlockWithId } from "@/lib/slides";
 import { groupBlocksToSlides, slideKindLabel, type Slide } from "@/lib/slides";
 import { BlockSwitch } from "./BlockRenderer";
+
+/** #p7 → 6（0-indexed）。非法/缺失返回 null。 */
+function readHashPage(hash: string): number | null {
+  const m = /^#p(\d+)$/.exec(hash || "");
+  if (!m) return null;
+  const n = Number(m[1]);
+  return Number.isInteger(n) && n >= 1 ? n - 1 : null;
+}
+
+/** 总览卡片的一句话摘要：复用 blocksToPlainText，取首行压成一行。 */
+function slideDigest(slide: Slide): string {
+  const text = blocksToPlainText(slide.blocks).replace(/\s+/g, " ").trim();
+  return text.length > 46 ? `${text.slice(0, 46)}…` : text;
+}
 
 /**
  * BlockSlideshow —— 翻页课件 · 黑板式单屏视图（客户端）。
@@ -86,8 +102,10 @@ export function BlockSlideshow({
   const [fullscreen, setFullscreen] = useState(false);
   const [noteOpen, setNoteOpen] = useState(false); // 笔记浮层开合（仅 notePanel 存在时有意义）
   const [helpOpen, setHelpOpen] = useState(false); // 快捷键帮助浮层（? 键）
+  const [gridOpen, setGridOpen] = useState(false); // 页面总览（G 键）
   const rootRef = useRef<HTMLDivElement>(null);
   const completedRef = useRef(false); // 完课只触发一次
+  const hashReadRef = useRef(false); // hash 已消费：在此之前不回写，避免把 #p7 覆盖成 #p1
 
   // 自适应缩放：测量「舞台可用高度」vs「本页内容自然高度」，超出则等比缩到一屏（不滚）。
   const stageRef = useRef<HTMLDivElement>(null); // 舞台可视区（固定高度、居中容器）
@@ -111,6 +129,26 @@ export function BlockSlideshow({
   const goPrev = useCallback(() => goTo(safeIndex - 1), [goTo, safeIndex]);
   const goNext = useCallback(() => goTo(safeIndex + 1), [goTo, safeIndex]);
 
+  // URL hash 深链（#p7）：分享/回跳到具体一页。
+  // 只在挂载后读，不能塞进 useState 初值——服务端没有 window，初值不一致会造成 hydration 失配。
+  // hash 优先于 initialIndex（续读位置）：带页号的链接是显式的用户意图，比"我上次读到哪"更强。
+  useEffect(() => {
+    const fromHash = readHashPage(window.location.hash);
+    if (fromHash !== null && total > 0) setIndex(Math.max(0, Math.min(fromHash, total - 1)));
+    hashReadRef.current = true;
+    // 仅挂载时消费一次；后续翻页由下面的回写 effect 负责
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 翻页回写 hash。用 replaceState 而非直接改 location.hash：不往历史栈塞条目，
+  // 否则翻 30 页后浏览器返回键要按 30 次才能离开本节。
+  useEffect(() => {
+    if (!hashReadRef.current || total === 0) return;
+    const next = `#p${safeIndex + 1}`;
+    if (window.location.hash === next) return;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${next}`);
+  }, [safeIndex, total]);
+
   // 上报当前页（含首次挂载），并在停留最后一页时触发一次完课
   useEffect(() => {
     if (total === 0) return;
@@ -127,11 +165,13 @@ export function BlockSlideshow({
   // 焦点在输入类元件内时只保留 Esc（关浮层），其余不劫持，避免干扰块内答题 / 笔记输入。
   const onKeyRef = useRef<(e: KeyboardEvent) => void>(() => {});
   onKeyRef.current = (e: KeyboardEvent) => {
-    const tag = (e.target as HTMLElement)?.tagName;
-    const typing = tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT";
+    const target = e.target as HTMLElement | null;
+    const tag = target?.tagName;
+    const typing = tag === "TEXTAREA" || tag === "INPUT" || tag === "SELECT" || tag === "BUTTON" || tag === "A" || Boolean(target?.isContentEditable);
     // Esc 优先：先关帮助 / 笔记浮层，再退原生全屏（原生全屏 Esc 由浏览器接管，这里兜 CSS 兜底态）。
     if (e.key === "Escape") {
       if (helpOpen) { e.preventDefault(); setHelpOpen(false); return; }
+      if (gridOpen) { e.preventDefault(); setGridOpen(false); return; }
       if (noteOpen) { e.preventDefault(); setNoteOpen(false); return; }
       // 原生全屏的 Esc 由浏览器接管退出（fullscreenchange 会同步 state）；这里只兜「CSS 满屏兜底态」的退出，
       // 避免在原生全屏已退出后误触发再次进入全屏。
@@ -142,6 +182,7 @@ export function BlockSlideshow({
     if (e.key === "ArrowLeft") { e.preventDefault(); goPrev(); }
     else if (e.key === "ArrowRight" || e.key === " " || e.key === "Spacebar") { e.preventDefault(); goNext(); }
     else if (e.key === "f" || e.key === "F") { e.preventDefault(); void toggleFullscreen(); }
+    else if (e.key === "g" || e.key === "G") { e.preventDefault(); setGridOpen((v) => !v); }
     else if (notePanel && (e.key === "n" || e.key === "N")) { e.preventDefault(); setNoteOpen((v) => !v); }
     else if (e.key === "?" || (e.key === "/" && e.shiftKey)) { e.preventDefault(); setHelpOpen((v) => !v); }
   };
@@ -157,9 +198,11 @@ export function BlockSlideshow({
     if (!el) return;
     try {
       if (!document.fullscreenElement) {
-        await el.requestFullscreen?.();
+        if (typeof el.requestFullscreen === "function") await el.requestFullscreen();
+        else setFullscreen(true);
       } else {
-        await document.exitFullscreen?.();
+        if (typeof document.exitFullscreen === "function") await document.exitFullscreen();
+        else setFullscreen(false);
       }
     } catch {
       // 原生全屏被拒（iframe 权限 / 浏览器策略）：仅切换 CSS 满屏兜底
@@ -271,6 +314,21 @@ export function BlockSlideshow({
           aria-expanded={helpOpen}
         >
           <Keyboard size={16} />
+        </button>
+        {/* 页面总览（G 键或点击）：一屏看完全部页，点卡直达。长课件里比一路翻页找快得多。 */}
+        <button
+          type="button"
+          onClick={() => setGridOpen((v) => !v)}
+          className={`studio-press relative grid h-9 w-9 shrink-0 place-items-center rounded-[10px] border transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] ${
+            gridOpen
+              ? "border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)]"
+              : "border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] hover:text-[var(--ink)]"
+          }`}
+          title="页面总览 (G)"
+          aria-label="页面总览"
+          aria-expanded={gridOpen}
+        >
+          <GridFour size={16} />
         </button>
         {/* 记笔记（N 键或点击）：仅当宿主传入 notePanel 时出现。 */}
         {notePanel && (
@@ -506,13 +564,91 @@ export function BlockSlideshow({
         </AnimatePresence>
       )}
 
+      {/* 页面总览浮层：G 键呼出，一屏看完全部页并点卡直达。
+          刻意不渲染真实缩略图——课件页里 quiz/翻卡各自持有状态，全量重渲一遍代价高、
+          还会把已答状态拖进总览；对自学场景「第 7 页 · 测验 · 讲了什么」的定位效率也更高。 */}
+      <AnimatePresence>
+        {gridOpen && (
+          <>
+            <motion.div
+              className="fixed inset-0 bg-black/50"
+              style={{ zIndex: "calc(var(--z-focus) + 2)" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: reduce ? 0 : 0.18 }}
+              onClick={() => setGridOpen(false)}
+              aria-hidden
+            />
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-label="页面总览"
+              className="elev-3 fixed left-1/2 top-1/2 flex max-h-[82vh] w-[min(94vw,860px)] -translate-x-1/2 -translate-y-1/2 flex-col rounded-[var(--radius-card)] p-5"
+              style={{ zIndex: "calc(var(--z-focus) + 3)" }}
+              initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.98, y: 6 }}
+              transition={reduce ? { duration: 0.12 } : { type: "spring", stiffness: 320, damping: 30 }}
+            >
+              <div className="mb-3 flex shrink-0 items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-[14px] font-bold text-[var(--ink)]">
+                  <GridFour size={16} className="text-[var(--red)]" /> 页面总览
+                  <span className="mono ml-1 text-[11px] font-semibold tabular-nums text-[var(--ink4)]">共 {total} 页</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setGridOpen(false)}
+                  className="studio-press relative grid h-8 w-8 place-items-center rounded-[10px] text-[var(--ink3)] transition-colors after:absolute after:left-1/2 after:top-1/2 after:h-11 after:w-11 after:-translate-x-1/2 after:-translate-y-1/2 after:content-[''] hover:text-[var(--ink)]"
+                  title="关闭"
+                  aria-label="关闭"
+                >
+                  <X size={15} weight="bold" />
+                </button>
+              </div>
+              <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
+                {slides.map((s, i) => {
+                  const active = i === safeIndex;
+                  const digest = slideDigest(s);
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => { goTo(i); setGridOpen(false); }}
+                      aria-current={active ? "true" : undefined}
+                      className={`studio-press flex min-h-[76px] flex-col gap-1.5 rounded-[12px] border p-3 text-left transition-colors ${
+                        active
+                          ? "border-[var(--red)] bg-[var(--red-soft)]"
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--border2)] hover:bg-[var(--surface2)]"
+                      }`}
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <span className={`mono text-[11px] font-bold tabular-nums ${active ? "text-[var(--red)]" : "text-[var(--ink4)]"}`}>
+                          {String(i + 1).padStart(2, "0")}
+                        </span>
+                        <span className="mono rounded-full bg-[var(--surface-inset)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink3)]">
+                          {slideKindLabel(s.kind)}
+                        </span>
+                      </span>
+                      <span className="line-clamp-2 text-[12px] leading-relaxed text-[var(--ink2)]">
+                        {digest || "（本页无文字）"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
       {/* 快捷键帮助浮层：? 键或点击键盘图标呼出。列出学习台所有快捷键。 */}
       <AnimatePresence>
         {helpOpen && (
           <>
             <motion.div
               className="fixed inset-0 bg-black/40"
-              style={{ zIndex: "calc(var(--z-focus) + 3)" }}
+              style={{ zIndex: "calc(var(--z-focus) + 4)" }}
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -525,7 +661,7 @@ export function BlockSlideshow({
               aria-modal="true"
               aria-label="键盘快捷键"
               className="elev-3 fixed left-1/2 top-1/2 w-[min(92vw,360px)] -translate-x-1/2 -translate-y-1/2 rounded-[var(--radius-card)] p-5"
-              style={{ zIndex: "calc(var(--z-focus) + 4)" }}
+              style={{ zIndex: "calc(var(--z-focus) + 5)" }}
               initial={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.96, y: 8 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={reduce ? { opacity: 0 } : { opacity: 0, scale: 0.97, y: 6 }}
@@ -551,6 +687,7 @@ export function BlockSlideshow({
                     ["← / →", "上一页 / 下一页"],
                     ["空格", "下一页"],
                     ["F", "全屏 / 退出全屏"],
+                    ["G", "页面总览"],
                     ...(notePanel ? [["N", "记笔记"] as const] : []),
                     ["Esc", "退出全屏 / 关闭浮层"],
                     ["?", "显示 / 隐藏本帮助"],

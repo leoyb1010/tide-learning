@@ -878,6 +878,7 @@ export function Player({
                   reportBlockPage(i, t);
                   if (t > 0 && i + 1 >= t) onBlockComplete();
                 }}
+                onScrollComplete={reportScrollComplete}
               />
             ) : isBlockLesson ? (
               // 块课件：左侧内容区渲染块。v3.1 若有视频课件（ready/生成中），先给出「图文 / 视频」切换 Tab。

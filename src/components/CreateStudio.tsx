@@ -64,7 +64,7 @@ export interface DraftCheckpoint {
   courseId: string;
   slug: string;
   title: string;
-  lessons: { id: string; title: string }[];
+  lessons: { id: string; title: string; summary?: string | null }[];
   isImport?: boolean;
 }
 
@@ -89,10 +89,10 @@ const PROMPT_EXAMPLES: string[] = [
 // §4 资料升维——导入 Tab 的 6 项收益
 const IMPORT_BENEFITS: { Icon: typeof BookOpen; label: string; hint: string }[] = [
   { Icon: BookOpen, label: "结构化章节", hint: "长文自动拆成有序小节" },
-  { Icon: MagicWand, label: "自动测验", hint: "每节配单选题即学即测" },
+  { Icon: MagicWand, label: "按需互动", hint: "按学习目标选择测验或练习" },
   { Icon: Sparkle, label: "AI 伴侣答疑", hint: "读完全文随时追问" },
   { Icon: FilePlus, label: "笔记锚定", hint: "重点段落一键存笔记" },
-  { Icon: Cards, label: "复习卡", hint: "要点沉淀成间隔复习卡" },
+  { Icon: Cards, label: "复习提炼", hint: "关键概念可继续沉淀为复习卡" },
   { Icon: Waves, label: "进度可视", hint: "学到哪一目了然" },
 ];
 
@@ -114,6 +114,8 @@ type Phase = "idle" | "understand" | "outline" | "checkpoint" | "lessons" | "don
 interface OutlineLesson {
   id: string;
   title: string;
+  /** 大纲阶段生成的逐节学习目标；检查点必须原样往返，不能静默清空。 */
+  summary?: string | null;
   /** 本节写作状态（前端维护，随逐节生成推进） */
   state?: LessonState;
 }
@@ -125,8 +127,6 @@ interface DoneSummary {
   firstLessonId: string;
   total: number; // 节数
   succeeded: number; // 成功节数
-  quizzes: number; // 测验数（≈ 每节 1 测）
-  cards: number; // 要点卡数（≈ 每节 1 张）
   chars?: number; // 升维报告：原文字数
   videos?: number; // v3.1：已发起/就绪的视频课件节数（勾选「生成视频课件」时）
 }
@@ -339,7 +339,7 @@ export function CreateStudio({
         courseId: draftCheckpoint.courseId,
         slug: draftCheckpoint.slug,
         title: draftCheckpoint.title,
-        lessons: draftCheckpoint.lessons.map((l) => ({ id: l.id, title: l.title })),
+        lessons: draftCheckpoint.lessons.map((l) => ({ id: l.id, title: l.title, summary: l.summary })),
         isImport: draftCheckpoint.isImport === true,
       });
       setPhase("checkpoint");
@@ -382,7 +382,7 @@ export function CreateStudio({
   function openDraft(d: DraftCheckpoint) {
     setSource(d.isImport ? "import" : "generate");
     if (d.isImport) setTab("import");
-    setCheckpoint({ courseId: d.courseId, slug: d.slug, title: d.title, lessons: d.lessons.map((l) => ({ id: l.id, title: l.title })), isImport: d.isImport === true });
+    setCheckpoint({ courseId: d.courseId, slug: d.slug, title: d.title, lessons: d.lessons.map((l) => ({ id: l.id, title: l.title, summary: l.summary })), isImport: d.isImport === true });
     setPhase("checkpoint");
   }
 
@@ -436,8 +436,6 @@ export function CreateStudio({
       firstLessonId: initial[0]?.id ?? "",
       total: initial.length,
       succeeded,
-      quizzes: succeeded,
-      cards: succeeded,
     });
     setLiveGen(null);
     setPhase("done");
@@ -657,8 +655,6 @@ export function CreateStudio({
         firstLessonId: outline[0].id,
         total: outline.length,
         succeeded,
-        quizzes: succeeded,
-        cards: succeeded,
         videos: genVideo ? videos : undefined,
       });
       setLiveGen(null); // 已到完成页：闭环由完成页「已放入书架」接管，撤下顶部生产中横幅候选
@@ -729,7 +725,7 @@ export function CreateStudio({
         setLessons(ready);
         setSummary({
           courseId: data.courseId, slug: data.slug, firstLessonId: outline[0].id,
-          total: outline.length, succeeded: outline.length, quizzes: 0, cards: 0, chars: data.charCount ?? 0,
+          total: outline.length, succeeded: outline.length, chars: data.charCount ?? 0,
         });
         setPhase("done");
         toast(data.faithfulKind === "scorm" ? "SCORM 课程已在安全沙箱中就绪" : "演示文稿已按一页一屏忠实导入", { tone: "success" });
@@ -771,8 +767,6 @@ export function CreateStudio({
         firstLessonId: outline[0].id,
         total: outline.length,
         succeeded,
-        quizzes: succeeded,
-        cards: succeeded,
         chars: data.charCount ?? 0,
       });
       setLiveGen(null); // 已到完成页：闭环由完成页「已放入书架」接管，撤下顶部生产中横幅候选
@@ -1289,7 +1283,7 @@ export function CreateStudio({
         <OutlineCheckpoint
           courseId={checkpoint.courseId}
           courseTitle={checkpoint.title}
-          initialLessons={checkpoint.lessons.map((l) => ({ id: l.id, title: l.title }))}
+          initialLessons={checkpoint.lessons.map((l) => ({ id: l.id, title: l.title, summary: l.summary }))}
           onConfirmed={proceedFromCheckpoint}
           onCancel={resetTheater}
           allowRegenerate={!checkpoint.isImport}
@@ -1591,14 +1585,12 @@ function DonePanel({
   const facts: { Icon: typeof BookOpen; num?: number; check?: boolean; label: string }[] = isImport
     ? [
         { Icon: BookOpen, num: summary.total, label: "章" },
-        { Icon: MagicWand, num: summary.quizzes, label: "个测验" },
-        { Icon: Cards, num: summary.cards, label: "张要点卡" },
+        { Icon: MagicWand, check: true, label: "按内容组织互动" },
         { Icon: Sparkle, check: true, label: "AI 伴侣读完全文" },
       ]
     : [
         { Icon: BookOpen, num: summary.total, label: "节" },
-        { Icon: MagicWand, num: summary.quizzes, label: "个测验" },
-        { Icon: Cards, num: summary.cards, label: "张要点卡" },
+        { Icon: MagicWand, check: true, label: "按内容组织互动" },
         { Icon: Sparkle, check: true, label: "AI 伴侣" },
       ];
 
@@ -1627,7 +1619,7 @@ function DonePanel({
             {isImport ? "升维报告" : "这门课已就绪"}
           </div>
           <div className="text-[13px] text-white/65">
-            {isImport ? "你的资料已经变成一门可学的课" : "大纲、讲解、测验、伴侣，全部准备好了"}
+            {isImport ? "你的资料已经变成一门可学的课" : "大纲、讲解、互动与伴侣已经准备好了"}
           </div>
         </div>
       </div>
@@ -1648,8 +1640,7 @@ function DonePanel({
           你的 <span className="mono font-bold text-[var(--ink)]">{summary.chars.toLocaleString()}</span> 字资料
           <ArrowRight size={13} weight="bold" className="mx-1.5 inline align-middle text-[var(--red)]" />
           <span className="mono font-bold text-[var(--ink)]">{summary.total}</span> 章 ·
-          <span className="mono font-bold text-[var(--ink)]"> {summary.quizzes}</span> 测验 ·
-          <span className="mono font-bold text-[var(--ink)]"> {summary.cards}</span> 要点卡 · 伴侣已读完全文
+          内容已结构化 · 互动按学习目标生成 · 伴侣已读完全文
         </p>
       ) : (
         <p className="text-[14px] font-semibold text-[var(--ink2)]">这门课包含：</p>
