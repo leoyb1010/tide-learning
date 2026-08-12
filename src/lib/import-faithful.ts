@@ -11,6 +11,7 @@ import { storeCreatorAsset } from "./creator-assets";
 import { buildContract, CSP_META, injectBespokeAdapter } from "./ai/courseware-html";
 import { AppError } from "./errors";
 import { escapeHtml } from "./html-escape";
+import { completeImportOperation, type ImportOperation, type ImportOperationResponse } from "./import-operation";
 
 const execFileAsync = promisify(execFile);
 
@@ -206,7 +207,13 @@ export async function parseKeynote(bytes: Buffer): Promise<PresentationSlide[]> 
   }
 }
 
-export async function createPresentationCourse(input: { userId: string; title: string; bytes: Buffer; kind: "pptx" | "key" }): Promise<FaithfulImportResult> {
+export async function createPresentationCourse(input: {
+  userId: string;
+  title: string;
+  bytes: Buffer;
+  kind: "pptx" | "key";
+  operation: ImportOperation;
+}): Promise<FaithfulImportResult> {
   const slides = input.kind === "pptx" ? await parsePptx(input.bytes) : await parseKeynote(input.bytes);
   const rawText = slides.map((slide) => `${slide.title}\n${slide.text}`).join("\n\n").slice(0, 200_000);
   const created = await prisma.$transaction(async (tx) => {
@@ -236,10 +243,20 @@ export async function createPresentationCourse(input: { userId: string; title: s
     await tx.importedSource.create({
       data: { userId: input.userId, kind: `file_${input.kind}`, title: input.title, rawText, charCount: rawText.length, parseStatus: "parsed", generatedCourseId: course.id },
     });
-    const lessons = await tx.lesson.findMany({ where: { courseId: course.id }, orderBy: { sortOrder: "asc" }, select: { id: true, title: true } });
-    return { course, lessons };
+    const lessons = await tx.lesson.findMany({ where: { courseId: course.id }, orderBy: { sortOrder: "asc" }, select: { id: true, title: true, summary: true } });
+    const response: ImportOperationResponse = {
+      courseId: course.id,
+      slug: course.slug,
+      title: course.title,
+      charCount: rawText.length,
+      lessons,
+      directReady: true,
+      faithfulKind: "presentation",
+    };
+    await completeImportOperation(tx, input.operation, course.id, response);
+    return response;
   });
-  return { courseId: created.course.id, slug: created.course.slug, title: created.course.title, charCount: rawText.length, lessons: created.lessons, directReady: true, faithfulKind: "presentation" };
+  return created as FaithfulImportResult;
 }
 
 function safeScormPath(value: string): string | null {
@@ -272,7 +289,13 @@ function manifestItems(xml: string): { title: string; href: string }[] {
   return items;
 }
 
-export async function createScormCourse(input: { userId: string; title: string; bytes: Buffer; fileName: string }): Promise<FaithfulImportResult> {
+export async function createScormCourse(input: {
+  userId: string;
+  title: string;
+  bytes: Buffer;
+  fileName: string;
+  operation: ImportOperation;
+}): Promise<FaithfulImportResult> {
   let zip: JSZip;
   try { zip = await JSZip.loadAsync(input.bytes); }
   catch { throw new AppError("该文件不是有效的 SCORM 压缩包", 422); }
@@ -311,10 +334,20 @@ export async function createScormCourse(input: { userId: string; title: string; 
       }
       const source = await tx.importedSource.create({ data: { userId: input.userId, kind: "file_scorm", title: input.title, rawText: items.map((item) => item.title).join("\n"), assetId: asset.id, charCount: items.reduce((sum, item) => sum + item.title.length, 0), parseStatus: "parsed", generatedCourseId: course.id } });
       void source;
-      const lessons = await tx.lesson.findMany({ where: { courseId: course.id }, orderBy: { sortOrder: "asc" }, select: { id: true, title: true } });
-      return { course, lessons };
+      const lessons = await tx.lesson.findMany({ where: { courseId: course.id }, orderBy: { sortOrder: "asc" }, select: { id: true, title: true, summary: true } });
+      const response: ImportOperationResponse = {
+        courseId: course.id,
+        slug: course.slug,
+        title: course.title,
+        charCount: items.reduce((sum, item) => sum + item.title.length, 0),
+        lessons,
+        directReady: true,
+        faithfulKind: "scorm",
+      };
+      await completeImportOperation(tx, input.operation, course.id, response);
+      return response;
     });
-    return { courseId: created.course.id, slug: created.course.slug, title: created.course.title, charCount: items.reduce((sum, item) => sum + item.title.length, 0), lessons: created.lessons, directReady: true, faithfulKind: "scorm" };
+    return created as FaithfulImportResult;
   } catch (error) {
     const { unlink } = await import("node:fs/promises");
     const { creatorAssetDiskPath } = await import("./creator-assets");

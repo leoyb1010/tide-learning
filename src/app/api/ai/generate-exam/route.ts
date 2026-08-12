@@ -1,9 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { creditingOnUsage } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { validateBlocks, type Block } from "@/lib/blocks";
@@ -325,6 +325,7 @@ export async function POST(req: NextRequest) {
       `输出 JSON：{questions:[{type, stem, options?(仅single), answer, explanation, sourceRef}]}`;
 
     let questions: CleanQuestion[] = [];
+    const billingRequestId = randomUUID();
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const result = await chatJson<ExamGenResult>({
@@ -332,14 +333,20 @@ export async function POST(req: NextRequest) {
           user: userMsg,
           temperature: 0.4,
           maxTokens: 8000,
-          onUsage: creditingOnUsage(user.id, "generate_exam"),
+          billing: {
+            userId: user.id,
+            scene: "generate_exam",
+            callKey: `generate-exam:${user.id}:${billingRequestId}:attempt:${attempt}`,
+          },
         });
         const clean = sanitizeQuestions(result?.questions);
         if (clean.length > 0) {
           questions = clean;
           break;
         }
-      } catch {
+      } catch (error) {
+        // 余额竞争失败不能被当成模型偶发故障重试，否则会绕过硬预占继续生成。
+        if (error instanceof AppError && error.status === 402) throw error;
         // 网络/解析失败落入下一次重试
       }
     }

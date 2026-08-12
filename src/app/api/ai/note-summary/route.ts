@@ -1,9 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { creditingOnUsage } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 
@@ -86,7 +86,11 @@ export async function POST(req: NextRequest) {
       user: user_prompt,
       temperature: 0.4,
       maxTokens: 4000,
-      onUsage: creditingOnUsage(user.id, "note_summary"),
+      billing: {
+        userId: user.id,
+        scene: "note_summary",
+        callKey: `note-summary:${user.id}:${mode}:${randomUUID()}`,
+      },
     });
 
     // 清洗 LLM 原始输出再回传（对齐 review-card 口径）：字段白名单、逐项类型校验、限长限条数，

@@ -30,7 +30,7 @@ export type Block =
   | { type: "image"; src: string; caption?: string; alt?: string } // 课件图解：站内图 + 可选说明/替代文本
   // v4.3 公式块（吸收 KaTeX）：latex 源，服务端渲染为自包含 HTML；display=独立居中/inline=行内。
   | { type: "formula"; latex: string; display?: boolean; caption?: string }
-  // v4.3 交互块（吸收 H5P 交互设计，自研确定性渲染 + 判分回传 ct-quiz 进错题闭环）：
+  // v4.3 交互块（吸收 H5P 交互设计，自研确定性渲染 + 本地形成性反馈）：
   //  - fillblank 填空：blanks 由学员键入，每空 answers 多写法都算对；
   //  - dragwords 拖词：blanks 从打乱的词库（正解 + 干扰词）点选填入（移动友好，不用 HTML5 拖拽）。
   | { type: "fillblank"; prompt?: string; segments: string[]; blanks: string[][] }
@@ -69,6 +69,11 @@ const BLOCK_TYPES = new Set([
   "fillblank", "dragwords",
   "choice", "branch", "hotspot",
 ]);
+
+/** 只有 quiz 具备 answerIndex 服务端真值，可进入掌握度/错题本。 */
+export const SERVER_SCORED_BLOCK_TYPES = new Set<Block["type"]>(["quiz"]);
+/** 有确定性即时反馈，但不得冒充服务端评分结果。 */
+export const LOCAL_FORMATIVE_BLOCK_TYPES = new Set<Block["type"]>(["fillblank", "dragwords", "hotspot"]);
 
 /** 公式 latex 长度上限（防超长 latex 撑爆渲染/存储）。 */
 const MAX_LATEX = 1200;
@@ -148,7 +153,7 @@ function keepId(raw: unknown, index: number, seen: Set<string>): string {
 /**
  * 校验并规范化原始块数组。
  * - 丢弃非白名单 type 的块 / 结构不合法的块。
- * - quiz 的 answerIndex 越界（<0 或 >=options.length）归 0。
+ * - quiz 的 answerIndex 缺失或越界时整题丢弃，绝不静默伪造正确答案。
  * - 超长 markdown(>4000)/code(>6000) 截断。
  * - 每块生成稳定 id。
  * 永远返回合法数组（哪怕空）。
@@ -199,7 +204,10 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
           .filter((o) => typeof o === "string")
           .map((o) => clampStr(o, 300))
           .slice(0, MAX_OPTIONS);
-        if (!question || options.length < 2) continue; // 无题干或选项不足，丢弃
+        if (!question || options.length < 2 || options.some((option) => !option)) continue; // 无题干、空选项或选项不足，丢弃
+        // 选项文本重复时不存在唯一可判定的答案。这里必须 fail closed，不能把语义冲突留给客户端判分。
+        const normalizedOptions = options.map((option) => option.replace(/\s+/g, " ").trim().toLocaleLowerCase());
+        if (new Set(normalizedOptions).size !== normalizedOptions.length) continue;
         // 正确答案键是教学真值，缺失/越界时宁可丢弃坏题，也不能静默把第 1 项判成正确。
         if (typeof b.answerIndex !== "number" || !Number.isInteger(b.answerIndex)) continue;
         const answerIndex = b.answerIndex;
@@ -559,7 +567,7 @@ export function blocksToPlainText(blocks: (Block & { id: string })[]): string {
  * 给教学评审的结构化判分清单。普通纯文本刻意不暴露答案，适合搜索/伴侣；评审必须看到真实答案键，
  * 否则会出现“解析说 4、系统却把 3 判对”的隐形坏题。
  */
-export function blocksToAssessmentManifest(blocks: (Block & { id: string })[]): string {
+function assessmentRecords(blocks: (Block & { id: string })[]): Record<string, unknown>[] {
   const assessments: Record<string, unknown>[] = [];
   for (const block of blocks) {
     switch (block.type) {
@@ -594,7 +602,36 @@ export function blocksToAssessmentManifest(blocks: (Block & { id: string })[]): 
         break;
     }
   }
-  return JSON.stringify(assessments);
+  return assessments;
+}
+
+export function blocksToAssessmentManifest(blocks: (Block & { id: string })[]): string {
+  return JSON.stringify(assessmentRecords(blocks));
+}
+
+/**
+ * 把完整判分清单切成多份各自合法的 JSON。禁止对 JSON 字符串做字符级 slice：那会同时造成
+ * 尾部题目不可见和语法损坏。单个 assessment 已由 validateBlocks 做字段上限，因此总能独立成批。
+ */
+export function blocksToAssessmentManifestBatches(
+  blocks: (Block & { id: string })[],
+  maxChars = 12_000,
+): string[] {
+  const records = assessmentRecords(blocks);
+  if (records.length === 0) return ["[]"];
+  const batches: string[] = [];
+  let current: Record<string, unknown>[] = [];
+  for (const record of records) {
+    const candidate = JSON.stringify([...current, record]);
+    if (current.length > 0 && candidate.length > maxChars) {
+      batches.push(JSON.stringify(current));
+      current = [record];
+    } else {
+      current.push(record);
+    }
+  }
+  if (current.length > 0) batches.push(JSON.stringify(current));
+  return batches;
 }
 
 /**

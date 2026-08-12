@@ -12,6 +12,7 @@ import { LEDGER_TYPE } from "./credit-trade";
 // 不 import prisma）。此处 re-export 以兼容既有 server 侧引用（desk/me/demands 等）。
 import { relativeTime, formatDuration } from "./format";
 import { COURSE_PUBLIC_SELECT, LESSON_OUTLINE_SELECT } from "./course-public-select";
+import { isCurrentStoredCourseware } from "./courseware-publication";
 
 // 赛道标签（融合有道内容板块）。保留 CATEGORY_LABELS 名以兼容旧引用。
 export const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
@@ -30,10 +31,15 @@ export { relativeTime, formatDuration };
  * 不满足即视为不存在（调用方 return null → 页面 notFound / API 404）。
  */
 export function canViewCourse(
-  course: { visibility: string; authorUserId: string | null; sharedStatus: string },
+  course: { visibility: string; authorUserId: string | null; sharedStatus: string; status?: string },
   viewerUserId: string | null,
   owned = false,
 ): boolean {
+  // 非 published（draft / beta / archived）不对匿名或普通直链开放；作者与已购者
+  // 仍可取回。只特判 archived 会让 public draft/beta 泄漏完整免费课件。
+  if (course.status && course.status !== "published") {
+    return owned || Boolean(viewerUserId && course.authorUserId === viewerUserId);
+  }
   if (course.visibility === "public" || course.visibility === "unlisted") return true;
   if (owned) return true;
   if (course.sharedStatus === "shared") return true;
@@ -197,14 +203,19 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
     where: { id: lessonId },
     select: {
       id: true,
+      status: true,
       title: true,
       summary: true,
+      sortOrder: true,
       contentType: true,
       videoAssetId: true,
       videoUrl: true,
       articleMd: true,
       blocksJson: true,
       htmlJson: true,
+      renderSourceHash: true,
+      renderEngine: true,
+      designJson: true,
       videoGenStatus: true,
       videoDurationSec: true,
       durationSec: true,
@@ -214,6 +225,8 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       course: {
         select: {
           ...COURSE_PUBLIC_SELECT,
+          designJson: true,
+          genStatus: true,
           lessons: { orderBy: { sortOrder: "asc" }, select: LESSON_OUTLINE_SELECT },
           lessonEdges: {
             orderBy: { sortOrder: "asc" },
@@ -231,10 +244,14 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
   // 买断真值源：已购本课（CoursePurchase）则本节放行（不走赛道订阅门，修 P0 买断失能）。越权铁律：where userId=我。
   const owned = await hasPurchasedCourse(lesson.course.id, userId);
   if (!canViewCourse(lesson.course, userId, owned)) return null;
+  const authorView = Boolean(userId && lesson.course.authorUserId === userId);
+  if (lesson.status !== "published" && !authorView) return null;
   const snapshot = await resolveEntitlement(userId);
   const access = canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned);
+  const hasHtmlCourseware = access && isCurrentStoredCourseware(lesson, lesson.course);
 
-  const { lessons: siblings, lessonEdges, ...courseMeta } = lesson.course;
+  const { lessons: rawSiblings, lessonEdges, designJson: _courseDesignJson, genStatus: _genStatus, ...courseMeta } = lesson.course;
+  const siblings = rawSiblings.filter((item) => item.status === "published" || authorView);
   const idx = siblings.findIndex((l) => l.id === lesson.id);
   const graphMode = lesson.course.navigationMode === "graph";
   const parseConditionType = (json: string | null): string => {
@@ -273,8 +290,11 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       articleMd: access ? lesson.articleMd : null,
       // ai_block 类型的结构化课件（付费门控同 articleMd）
       blocksJson: access ? lesson.blocksJson : null,
-      // v3.3 ai_html 类型的自包含 HTML 课件渲染契约（付费门控同 blocksJson；blocksJson 仍保留作兜底/搜索）
-      htmlJson: access ? lesson.htmlJson : null,
+      // HTML 正文只允许由独立鉴权路由返回，绝不嵌入 RSC/API DTO；否则 stale/草稿
+      // 课件即使 iframe 404，原始 HTML 仍会在序列化 payload 中泄漏。
+      hasHtmlCourseware,
+      // 课件顶栏要诚实区分原创表现与安全基础排版，不能把 deterministic 冒充为精品。
+      renderEngine: hasHtmlCourseware ? lesson.renderEngine : null,
       // v3.1 视频课件生成态：ready + videoAssetId 时学习页出现「视频」Tab，可播放（复用受控流）。
       // 生成中/pending 显示占位；null 表示未生成视频课件。门控随 access（未订阅付费节拿不到）。
       videoGenStatus: access ? lesson.videoGenStatus : null,

@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import type { Prisma } from "@prisma/client";
 import { buildExcerpt } from "./format";
+import { currentMarketPublicationFence, filterCurrentMarketCourses, marketBaseWhere } from "./market-eligibility";
 
 /**
  * 五域联搜（流2 · U2 搜索与发现）。
@@ -141,12 +142,35 @@ async function searchCourses(term: string, viewerId: string | null, take: number
       subtitle: true,
       description: true,
       category: true,
+      template: true,
+      designJson: true,
+      contentBriefJson: true,
+      modelUsed: true,
+      status: true,
+      visibility: true,
+      authorUserId: true,
+      sharedStatus: true,
+      origin: true,
+      genStatus: true,
+      generationQualityJson: true,
+      presentationRevision: true,
+      lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
     },
     orderBy: [{ isFeatured: "desc" }, { learnersCount: "desc" }],
     take,
   });
 
-  return rows.map((c) => ({
+  // shared 只是集市入口，不能让 stale AI/import 借 course 分组绕过集市发布真值。
+  // public/unlisted、作者本人、已购者的课程可见性与集市无关，保持原语义。
+  const purchasedSet = new Set(purchasedIds);
+  const visible = await Promise.all(rows.map(async (course) => {
+    if (course.visibility === "public" || course.visibility === "unlisted") return true;
+    if (viewerId && course.authorUserId === viewerId) return true;
+    if (purchasedSet.has(course.id)) return true;
+    return Boolean(await currentMarketPublicationFence(course));
+  }));
+
+  return rows.filter((_, index) => visible[index]).map((c) => ({
     type: "course" as const,
     id: c.id,
     title: c.title,
@@ -223,26 +247,38 @@ async function searchPosts(term: string, take: number): Promise<SearchResult[]> 
  * 与 courses 域可能有重叠（shared 课两域都出），但语义不同（集市摊位 vs 课程详情），各自成组。
  */
 async function searchMarket(term: string, take: number): Promise<SearchResult[]> {
-  const rows = await prisma.course.findMany({
-    where: {
-      sharedStatus: "shared",
+  const candidates = await prisma.course.findMany({
+    where: marketBaseWhere({
       OR: [
         { title: { contains: term } },
         { subtitle: { contains: term } },
         { description: { contains: term } },
       ],
-    },
+    }),
     select: {
       id: true,
       slug: true,
       title: true,
+      category: true,
+      template: true,
+      designJson: true,
+      contentBriefJson: true,
+      modelUsed: true,
       subtitle: true,
       description: true,
       priceCredits: true,
+      origin: true,
+      status: true,
+      sharedStatus: true,
+      genStatus: true,
+      generationQualityJson: true,
+      presentationRevision: true,
+      lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
     },
     orderBy: [{ salesCount: "desc" }, { lastUpdatedAt: "desc" }],
     take,
   });
+  const rows = await filterCurrentMarketCourses(candidates);
 
   return rows.map((c) => ({
     type: "market" as const,

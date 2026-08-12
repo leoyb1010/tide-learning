@@ -5,19 +5,18 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertCanSpend } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { assessCourseGenerationReadiness, getGenJob, initGenJob, renderCourseHtmlBestEffort, runCourseGenBackground, ensureDesignBrief, NON_PUBLISHABLE_QUALITY_STATUSES } from "@/lib/course-gen";
+import {
+  assessCourseGenerationReadiness,
+  claimCourseGenerationStart,
+  ensureDesignBrief,
+  failGenJobLease,
+  finishGenJobLeaseOnly,
+  finalizeCourseGeneration,
+  initGenJob,
+  runCourseGenBackground,
+} from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
-
-/** running job 心跳超时阈值：超过 15 分钟无心跳视为 stale（进程重启杀死 after() 遗留），允许续造。 */
-const GEN_JOB_STALE_MS = 15 * 60_000;
-/** 节级 claim TTL：与 course-gen.ts 的 CLAIM_TTL_MS 对齐（10 分钟）。超此视为死锁可复位，未超视为仍新鲜。 */
-// 2026-07-21 资金审查 C-1 修:此前 claim TTL(10min) < job 僵尸阈值(15min),而 claim 只在认领时
-// 写一次、生成期间从不刷新。任何慢到能触发「僵尸对账判 failed」的节(单节最坏 = 6 稿 ×(作者
-// 90~120s×2重试 + 双评审 90~120s×2重试),轻易 >15min),其 claim 必然也已过 10 分钟 —— 于是
-// resume-gen 的「保留新鲜 claim 以防重复扣费」形同虚设,新流水必定重认领同一节 → 双份生成、双份扣费。
-// 现在把 claim TTL 抬到 50 分钟(> 单节理论最长耗时,且 > 僵尸阈值),让「仍在跑的节」始终被认作新鲜。
-const CLAIM_TTL_MS = 50 * 60_000;
 
 /**
  * POST /api/courses/:id/resume-gen —— 断点续造入口。
@@ -42,10 +41,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const course = await prisma.course.findUnique({
       where: { id },
-      select: { id: true, authorUserId: true, genStatus: true, modelUsed: true },
+      select: { id: true, authorUserId: true, status: true, genStatus: true, modelUsed: true, presentationRevision: true },
     });
     if (!course) return fail("课程不存在", 404);
     if (course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
+    if (course.status === "archived") return fail("已归档课程不能续造", 409);
 
     // 余额预检按该课所用模型设门槛（P1-3：与首次造课一致），置于归属校验之后（不对非作者做扣费预检）。
     // 整课扇出成本仍由 runCourseGenBackground 的逐节积分门按累计预估兜住。
@@ -64,75 +64,54 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // 无空节 = 已全部生成：顺手把 genStatus 收敛为 ready，返回 done
     // 口径与 runCourseGenBackground 一致(B3,2026-07-21):待处理 = 空节 + 降级占位节。
     // 否则占位节课走「无空节 → 直接置 ready」捷径,「继续生成」点了等于什么都没修。
-    const remaining = await prisma.lesson.count({
-      where: {
+    const readiness = await assessCourseGenerationReadiness(course.id);
+    const remaining = readiness.retryLessons.length;
+    if (readiness.ready) {
+      // 无待重试节也必须先 acquire：设计 brief/整课终审/HTML 都是付费且会写真值的阶段。
+      const total = readiness.total;
+      const lease = await initGenJob(course.id, user.id, total, {}, { allowCompletedReopen: true });
+      if (!lease) return fail("该课程正在生成中，请稍后查看进度", 409);
+      const started = await claimCourseGenerationStart({
         courseId: course.id,
-        OR: [
-          { blocksJson: null },
-          ...NON_PUBLISHABLE_QUALITY_STATUSES.map((status) => ({ qualityJson: { contains: `"status":"${status}"` } })),
-        ],
-      },
-    });
-    if (remaining === 0 && (await assessCourseGenerationReadiness(course.id)).ready) {
-      // 此处 genStatus 只可能是 generating/failed/paused（上面已排除其它），一律收敛为 ready。
-      // 根因修复(2026-07-20)：收敛前补渲 HTML 课件（幂等，已渲过的节被源哈希短路）——
-      // 此前该捷径只置 ready，经此路收尾的课整课无 htmlJson，永远回落旧版块课件。
-      // v5：补渲前先确保专属 brief（已完成但 brief 曾失败的课，经此续造路径补齐，review #3）。
-      await ensureDesignBrief(course.id, user.id);
-      await renderCourseHtmlBestEffort(course.id);
-      await prisma.course.update({ where: { id: course.id }, data: { genStatus: "ready" } });
-      return ok({ resumed: false, remaining: 0, genStatus: "ready" });
-    }
-
-    // —— 幂等：已在跑（course_gen job=running）则拒绝，防并发重复生成 ——
-    // 但 running 可能是「僵尸」：进程重启杀死 after() 后台后，job 永远停在 running，
-    // 课程将永久卡 generating。心跳存 inputJson.heartbeatAt（GenerationJob 无 updatedAt 列），
-    // 缺失回退 job.createdAt；超过 15 分钟无心跳视为 stale，放行续造（下方 initGenJob 会复用重置该 job）。
-    const job = await getGenJob(course.id);
-    if (job?.status === "running") {
-      let heartbeat = job.createdAt.getTime();
-      try {
-        const p = JSON.parse(job.inputJson || "{}");
-        if (typeof p.heartbeatAt === "string") {
-          const t = Date.parse(p.heartbeatAt);
-          if (Number.isFinite(t)) heartbeat = t;
-        }
-      } catch {
-        /* 解析失败按 createdAt 兜底 */
+        userId: user.id,
+        lease,
+        expectedGenStatus: course.genStatus,
+        expectedPresentationRevision: course.presentationRevision,
+      });
+      if (!started) {
+        await finishGenJobLeaseOnly(lease, "course resume state changed");
+        return fail("课程状态已变更，请刷新后重试", 409);
       }
-      if (Date.now() - heartbeat < GEN_JOB_STALE_MS) {
-        return fail("该课程正在生成中，请稍后查看进度", 409);
-      }
-      // stale：视为遗留僵尸 job，继续走下方 claim 复位 + initGenJob 重置流程
+      await ensureDesignBrief(course.id, user.id, lease);
+      const finalization = await finalizeCourseGeneration(course.id, {
+        userId: user.id,
+        settleIncomplete: true,
+        jobLease: lease,
+      });
+      if (finalization.ready) return ok({ resumed: false, remaining: 0, genStatus: "ready" });
+      return fail("课程整课终审未通过，请修订后重试", 409);
     }
-
-    // 释放遗留 claim：上一轮若在 claim 后、写库前被硬杀（如 serverless 超时），
-    // 空节会卡在 genClaimedAt 非空且 blocksJson=null，generateLessonCore 的原子 claim 将永远抢不到。
-    // 只复位「null 或已超 TTL」的 claim——不动仍新鲜的 claim。
-    // 关键（2026-07-20 审计 Medium 修复）：paused→resume 时旧后台流水可能还在跑某一节（协作式暂停
-    // 要到下一节边界才停），该节 claim 是新鲜的。若无差别复位，新流水会重认领同一节 → 重复生成+重复扣费。
-    // 保留新鲜 claim 后，新流水的原子 claim 抢不到该节（跳过），由仍在跑的旧流水把它写完，双流水经原子
-    // claim 安全并存（与 generate-course after() + 前端 writeLessons 双流水同机制）。失败/积分截停的课其
-    // 空节 genClaimedAt 本就为 null（异常路径已释放/从未认领），此改动不影响其快速续造。
-    const staleClaimBefore = new Date(Date.now() - CLAIM_TTL_MS);
-    await prisma.lesson.updateMany({
-      where: {
-        courseId: course.id,
-        blocksJson: null,
-        OR: [{ genClaimedAt: null }, { genClaimedAt: { lt: staleClaimBefore } }],
-      },
-      data: { genClaimedAt: null },
-    });
 
     // 复位为 generating，重置/复用进度 job（total 以现有 lesson 数为准）
     const total = await prisma.lesson.count({ where: { courseId: course.id } });
-    await prisma.course.update({ where: { id: course.id }, data: { genStatus: "generating" } });
-    await initGenJob(course.id, user.id, total, {});
+    const lease = await initGenJob(course.id, user.id, total, {}, { allowCompletedReopen: true });
+    if (!lease) return fail("该课程正在生成中，请稍后查看进度", 409);
+    const started = await claimCourseGenerationStart({
+      courseId: course.id,
+      userId: user.id,
+      lease,
+      expectedGenStatus: course.genStatus,
+      expectedPresentationRevision: course.presentationRevision,
+    });
+    if (!started) {
+      await finishGenJobLeaseOnly(lease, "course resume state changed");
+      return fail("课程状态已变更，请刷新后重试", 409);
+    }
 
     // 已完成的节数写回 done（continue，不从 0 重算），交给后台推进剩余空节
     const courseId = course.id;
     after(async () => {
-      await runCourseGenBackground(courseId, user.id);
+      await runCourseGenBackground(courseId, user.id, lease);
     });
 
     return ok({ resumed: true, remaining, genStatus: "generating" });

@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { notify } from "@/lib/notify";
 import { track } from "@/lib/analytics";
+import { currentMarketPublicationFence, marketBaseWhere } from "@/lib/market-eligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -31,10 +32,27 @@ export async function POST(req: NextRequest) {
 
     // 只允许申请已上架的课；顺带拿到作者 ownerId。
     const course = await prisma.course.findFirst({
-      where: { id: courseId, sharedStatus: "shared" },
-      select: { id: true, title: true, authorUserId: true },
+      where: marketBaseWhere({ id: courseId }),
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        template: true,
+        designJson: true,
+        contentBriefJson: true,
+        modelUsed: true,
+        authorUserId: true,
+        origin: true,
+        status: true,
+        sharedStatus: true,
+        genStatus: true,
+        generationQualityJson: true,
+        presentationRevision: true,
+        lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
+      },
     });
-    if (!course || !course.authorUserId) throw new AppError("课程不存在或未在集市展示", 404);
+    const publicationFence = course ? await currentMarketPublicationFence(course) : null;
+    if (!course || !course.authorUserId || !publicationFence) throw new AppError("课程不存在或当前版本未在集市展示", 404);
 
     const ownerId = course.authorUserId;
     if (ownerId === user.id) return fail("这是你自己的课，无需申请");

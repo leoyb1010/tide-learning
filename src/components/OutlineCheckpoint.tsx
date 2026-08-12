@@ -108,7 +108,13 @@ export function OutlineCheckpoint({
 
   async function confirm() {
     if (busy) return;
-    const clean = checkpointPatchLessons(lessons);
+    let clean: ReturnType<typeof checkpointPatchLessons>;
+    try {
+      clean = checkpointPatchLessons(lessons);
+    } catch (error) {
+      toast(error instanceof Error ? error.message : "大纲数据异常，请刷新后重试", { tone: "warn" });
+      return;
+    }
     if (clean.length === 0) {
       toast("大纲至少保留 1 节有标题的章节", { tone: "warn" });
       return;

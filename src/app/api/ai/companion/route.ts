@@ -1,10 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { getLessonForUser } from "@/lib/queries";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chat } from "@/lib/llm";
-import { creditingOnUsage } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { validateBlocks, blocksToPlainText } from "@/lib/blocks";
@@ -271,7 +271,11 @@ export async function POST(req: NextRequest) {
       user: userMsg,
       temperature: 0.5,
       maxTokens: 4000,
-      onUsage: creditingOnUsage(user.id, "companion"),
+      billing: {
+        userId: user.id,
+        scene: "companion",
+        callKey: `companion:${thread?.id ?? "new"}:${randomUUID()}`,
+      },
     });
 
     // —— 落库：无 thread 则创建；写入 user + assistant 两条消息 ——

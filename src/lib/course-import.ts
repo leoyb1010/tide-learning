@@ -1,20 +1,31 @@
 import { after } from "next/server";
 import { prisma } from "@/lib/db";
-import { chatJson } from "@/lib/llm";
-import { creditingOnUsage } from "@/lib/credits";
+import { chatJson, isFailClosedLlmError } from "@/lib/llm";
+import { AppError } from "@/lib/errors";
 import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { importOutlinePrompt } from "@/lib/ai/prompts";
-import { createCourseContentBrief, serializeCourseContentBrief } from "@/lib/ai/content-brief";
+import { createCourseContentBrief, normalizeAssessmentNeed, serializeCourseContentBrief } from "@/lib/ai/content-brief";
+import { sourcePolicyForTopic, trustedSourceAsOfDate } from "@/lib/ai/source-policy";
+import { runWithGenerationJobLeaseHeartbeat } from "@/lib/generation-job-lease";
+import {
+  completeImportOperation,
+  type ImportOperation,
+  type ImportOperationResponse,
+} from "@/lib/import-operation";
 
 // 粘贴 / 文件导入共用的文本长度口径。
 export const MIN_IMPORT_TEXT = 100;
 export const MAX_IMPORT_TEXT = 50_000;
+// 文件导入允许保留更长原文；大纲 prompt 会做覆盖首尾/标题/更正的确定性取样，逐节再按主题召回。
+// 超过此值明确拒绝，绝不再静默截断后宣称“忠实导入”。
+export const MAX_FILE_IMPORT_TEXT = 500_000;
 
 interface OutlineItem {
   title: string;
   objective: string;
+  assessmentNeed?: "none" | "check" | "practice" | "transfer" | "adaptive";
 }
 interface OutlineResult {
   outline: OutlineItem[];
@@ -25,7 +36,7 @@ export interface ImportCourseResult {
   slug: string;
   title: string;
   charCount: number;
-  lessons: { id: string; title: string }[];
+  lessons: { id: string; title: string; summary: string | null }[];
   checkpoint?: boolean;
 }
 
@@ -41,6 +52,7 @@ export interface ImportCourseResult {
  */
 export async function structureImportedTextIntoCourse(opts: {
   userId: string;
+  operation: ImportOperation;
   rawText: string;
   /** ImportedSource.kind：paste_text / file_pdf / file_docx / file_text，仅作来源追溯。 */
   kind: string;
@@ -56,17 +68,19 @@ export async function structureImportedTextIntoCourse(opts: {
 }): Promise<ImportCourseResult> {
   const { userId, rawText, kind, template, model, qualityTier = "standard", checkpoint = false } = opts;
   const title = (opts.title?.trim() || rawText.slice(0, 20)).slice(0, 120);
-
-  // —— 先落库 ImportedSource（已抽取出纯文本即 parsed）——
-  const source = await prisma.importedSource.create({
-    data: { userId, kind, title, rawText, charCount: rawText.length, parseStatus: "parsed" },
-  });
+  const sourcePolicy = sourcePolicyForTopic(`${title} ${rawText.slice(0, 2_000)}`);
+  // 风险主题仍只看标题+开头，避免超长文档中一次历史性提及误分类；
+  // 但“截至日期”是真值元数据，必须扫描完整已导入原文，不能困在前 2000 字。
+  const sourceAsOf = sourcePolicy.asOfDate ?? trustedSourceAsOfDate(rawText);
+  if (sourcePolicy.requiresAsOfDate && !sourceAsOf) {
+    throw new AppError("导入资料涉及最新/当前信息，请先在标题或原文中补充截至日期", 422, false);
+  }
 
   // —— 内置 prompt 库：忠于原文切章 + 模板结构。输出契约 {outline:[{title, objective}]}。——
   const { system, user: userMsg } = importOutlinePrompt({ title, rawText, template });
   let outline: OutlineItem[] = [];
   try {
-    const result = await chatJson<OutlineResult>({
+    const result = await runWithGenerationJobLeaseHeartbeat(opts.operation.lease, () => chatJson<OutlineResult>({
       system,
       user: userMsg,
       temperature: 0.3,
@@ -75,27 +89,36 @@ export async function structureImportedTextIntoCourse(opts: {
       // 切章是导入点击后同步等待的调用：不做超时重试，避免慢模型 120s 漫长转圈；
       // 失败会走下方「退回单章」兜底，导入不空。逐节生成（后台）仍保留默认重试。
       retries: 0,
-      onUsage: creditingOnUsage(userId, "import_source"),
-    });
+      billing: {
+        userId,
+        scene: "import_source",
+        callKey: `import-outline:${opts.operation.lease.jobId}:f${opts.operation.lease.fencingToken}`,
+        operationKey: opts.operation.operationKey,
+      },
+    }));
     const raw = Array.isArray(result?.outline) ? result.outline : [];
     outline = raw
       .filter((o) => o && typeof o.title === "string" && o.title.trim())
       .map((o) => ({
         title: o.title.trim().slice(0, 120),
         objective: (typeof o.objective === "string" ? o.objective : "").trim().slice(0, 300),
+        assessmentNeed: normalizeAssessmentNeed(o.assessmentNeed),
       }))
       .slice(0, 24);
-  } catch {
+  } catch (error) {
+    // 并发消费导致的真实余额不足不能被“单章兜底”绕过；供应商/格式失败则允许无计费降级。
+    if (isFailClosedLlmError(error)) throw error;
     outline = [];
   }
   // 切章失败退回单章，保证导入不空。
   if (outline.length === 0) {
-    outline = [{ title, objective: "根据导入材料整理的学习内容" }];
+    outline = [{ title, objective: "根据导入材料整理的学习内容", assessmentNeed: "adaptive" }];
   }
 
   const slug = slugify(title) + "-" + Math.random().toString(36).slice(2, 6);
 
-  // —— 事务落库：Course + N 个空 Lesson + 回填 generatedCourseId + GenerationJob ——
+  // —— 事务落库：Source + Course + Lessons + 客户端回放快照 + operation done ——
+  // 不再在 LLM 前先建孤儿 ImportedSource；响应丢失后同 requestId 只回放这个原子结果。
   const created = await prisma.$transaction(async (tx) => {
     const course = await tx.course.create({
       data: {
@@ -120,6 +143,11 @@ export async function structureImportedTextIntoCourse(opts: {
             exclusions: ["导入资料没有提供依据的延伸知识"],
           },
           sourceBased: true,
+          topicType: sourcePolicy.topicType,
+          sourceAsOf,
+          confirmedOutline: outline.map((item) => ({
+            title: item.title, objective: item.objective, assessmentNeed: item.assessmentNeed,
+          })),
         })),
         template: template ?? null,
         modelUsed: model ?? null,
@@ -152,53 +180,59 @@ export async function structureImportedTextIntoCourse(opts: {
       select: { id: true, title: true, summary: true },
     });
 
-    await tx.importedSource.update({
-      where: { id: source.id },
-      data: { generatedCourseId: course.id },
-    });
-
-    await tx.generationJob.create({
+    const source = await tx.importedSource.create({
       data: {
         userId,
-        type: "import_structure",
-        status: "done",
-        inputJson: JSON.stringify({ sourceId: source.id, charCount: rawText.length, kind, template: template ?? null, model: model ?? null, qualityTier }),
-        resultRef: course.id,
-        finishedAt: new Date(),
+        kind,
+        title,
+        rawText,
+        charCount: rawText.length,
+        parseStatus: "parsed",
+        generatedCourseId: course.id,
       },
     });
-
-    return { course, lessons };
+    const response: ImportOperationResponse = {
+      courseId: course.id,
+      slug: course.slug,
+      title: course.title,
+      charCount: rawText.length,
+      lessons,
+      ...(checkpoint ? { checkpoint: true } : {}),
+    };
+    await completeImportOperation(tx, opts.operation, course.id, response);
+    return { course, lessons, source, response };
   });
 
   await track({
     eventName: "ai_import_source",
     userId,
     properties: {
-      sourceId: source.id,
+      sourceId: created.source.id,
       courseId: created.course.id,
       lessons: created.lessons.length,
       chars: rawText.length,
       kind,
     },
-  });
+  }).catch(() => undefined);
 
   // —— 服务端后台续跑：大纲已落库，逐节生成交给 after() 在响应返回后接管（关页/刷新不影响）。——
   const courseId = created.course.id;
   if (!checkpoint) {
-    await initGenJob(courseId, userId, created.lessons.length, { category: "user_imported" });
-    after(async () => {
-      // after() 内绝不能抛：runCourseGenBackground 已全程 try/catch 自我兜底。
-      await runCourseGenBackground(courseId, userId);
+    const lease = await initGenJob(courseId, userId, created.lessons.length, { category: "user_imported" }).catch((error) => {
+      // 课程+回放快照已原子提交，调度瞬时失败不能向 UI 伪报未交付。
+      // 生产 worker 会扫描 generating 课程并补建/接管 course_gen job。
+      console.error("[course-import] course worker scheduling deferred:", error);
+      return null;
     });
+    if (lease) {
+      try {
+        after(async () => {
+          await runCourseGenBackground(courseId, userId, lease);
+        });
+      } catch (error) {
+        console.error("[course-import] after scheduling deferred:", error);
+      }
+    }
   }
-
-  return {
-    courseId: created.course.id,
-    slug: created.course.slug,
-    title: created.course.title,
-    charCount: rawText.length,
-    lessons: created.lessons,
-    ...(checkpoint ? { checkpoint: true } : {}),
-  };
+  return created.response;
 }

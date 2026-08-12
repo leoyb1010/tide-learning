@@ -41,12 +41,19 @@ function slideDigest(slide: Slide): string {
   return text.length > 46 ? `${text.slice(0, 46)}…` : text;
 }
 
+function useHydratedReducedMotion(): boolean {
+  const preferred = useReducedMotion();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated && Boolean(preferred);
+}
+
 /**
  * BlockSlideshow —— 翻页课件 · 黑板式单屏视图（客户端）。
  *
  * 把线性块数组交给纯函数 groupBlocksToSlides 切成「一幕幕单屏页」，一次只呈现一页（居中黑板/纸面），
  * 左右翻页（← → 键 + 底部翻页控件 + 页码 1/N + 顶部进度条），framer-motion 方向滑动/淡入转场，
- * 像看 PPT / Keynote。可全屏沉浸。翻到最后一页触发完课回调。
+ * 像看 PPT / Keynote。可全屏沉浸。到末页后由学员显式执行“完成本节”才触发完课。
  *
  * 复用：每页内部仍用 BlockRenderer 的单块渲染逻辑（BlockSwitch），只是容器从长列表换成单屏页。
  * 翻卡 / quiz 判分等块内交互原样保留（各块自持 state）。
@@ -81,15 +88,15 @@ export function BlockSlideshow({
   initialIndex?: number;
   /** 翻页时上报（index 从 0 起，total 为总页数）。用于把「当前页 / 总页」映射成学习进度。 */
   onSlideChange?: (index: number, total: number) => void;
-  /** 抵达并停留最后一页时触发一次（用于完课）。 */
-  onComplete?: () => void;
+  /** 在末页显式确认完成时触发一次，参数为总页数。 */
+  onComplete?: (total: number) => boolean | void | Promise<boolean | void>;
   /**
    * 笔记面板节点（通常是 Player 的 NoteEditor）。传入后：右下角出现「记笔记」浮钮、N 键呼出笔记浮层。
    * 面板渲染在本组件 rootRef 子树内，故原生全屏时也能呼出。不传则无笔记入口（纯翻页）。
    */
   notePanel?: ReactNode;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useHydratedReducedMotion();
   const slides = useMemo<Slide[]>(() => groupBlocksToSlides(blocks), [blocks]);
   const total = slides.length;
 
@@ -127,7 +134,24 @@ export function BlockSlideshow({
     [total, safeIndex],
   );
   const goPrev = useCallback(() => goTo(safeIndex - 1), [goTo, safeIndex]);
-  const goNext = useCallback(() => goTo(safeIndex + 1), [goTo, safeIndex]);
+  const completeCurrent = useCallback(() => {
+    if (completedRef.current || total <= 0) return;
+    completedRef.current = true;
+    void Promise.resolve(onComplete?.(total))
+      .then((ok) => {
+        if (ok === false) completedRef.current = false;
+      })
+      .catch(() => {
+        completedRef.current = false;
+      });
+  }, [onComplete, total]);
+  const goNext = useCallback(() => {
+    if (isLast) {
+      completeCurrent();
+      return;
+    }
+    goTo(safeIndex + 1);
+  }, [completeCurrent, goTo, isLast, safeIndex]);
 
   // URL hash 深链（#p7）：分享/回跳到具体一页。
   // 只在挂载后读，不能塞进 useState 初值——服务端没有 window，初值不一致会造成 hydration 失配。
@@ -149,15 +173,11 @@ export function BlockSlideshow({
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${next}`);
   }, [safeIndex, total]);
 
-  // 上报当前页（含首次挂载），并在停留最后一页时触发一次完课
+  // 只上报当前页（含首次挂载）。单页、hash 深链和续读直达末页都不代表完课。
   useEffect(() => {
     if (total === 0) return;
     onSlideChange?.(safeIndex, total);
-    if (safeIndex >= total - 1 && !completedRef.current) {
-      completedRef.current = true;
-      onComplete?.();
-    }
-    // onSlideChange/onComplete 由父组件 useCallback 稳定；仅页序/页数变化时上报
+    // onSlideChange 由父组件 useCallback 稳定；仅页序/页数变化时上报
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [safeIndex, total]);
 
@@ -196,13 +216,15 @@ export function BlockSlideshow({
   const toggleFullscreen = useCallback(async () => {
     const el = rootRef.current;
     if (!el) return;
+    if (typeof el.requestFullscreen !== "function" || typeof document.exitFullscreen !== "function") {
+      setFullscreen((v) => !v);
+      return;
+    }
     try {
       if (!document.fullscreenElement) {
-        if (typeof el.requestFullscreen === "function") await el.requestFullscreen();
-        else setFullscreen(true);
+        await el.requestFullscreen();
       } else {
-        if (typeof document.exitFullscreen === "function") await document.exitFullscreen();
-        else setFullscreen(false);
+        await document.exitFullscreen();
       }
     } catch {
       // 原生全屏被拒（iframe 权限 / 浏览器策略）：仅切换 CSS 满屏兜底
@@ -474,9 +496,15 @@ export function BlockSlideshow({
         </div>
 
         {isLast ? (
-          <span className="mono inline-flex h-11 items-center gap-1.5 rounded-[12px] bg-[var(--ok-soft)] px-4 text-[13px] font-semibold text-[var(--ok)]">
-            <FlagCheckered size={15} weight="fill" /> 已到末页
-          </span>
+          <button
+            type="button"
+            onClick={completeCurrent}
+            className="studio-press inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-[12px] bg-[var(--ok)] px-4 text-[13px] font-bold text-white transition-opacity hover:opacity-90"
+            title="完成本节"
+            aria-label="完成本节"
+          >
+            <FlagCheckered size={15} weight="fill" /> 完成本节
+          </button>
         ) : (
           <button
             type="button"
@@ -495,7 +523,7 @@ export function BlockSlideshow({
       {isLast && !fullscreen && (
         <div className="mt-2.5 flex items-center justify-center gap-1.5 text-[12px] text-[var(--ink3)]">
           <Check size={13} weight="bold" className="text-[var(--ok)]" />
-          已翻完全部 {total} 页
+          已读到末页，确认后记为完成
         </div>
       )}
 

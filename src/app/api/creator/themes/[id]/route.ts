@@ -4,6 +4,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { validateCreativeDesign, serializeCreativeDesign } from "@/lib/ai/courseware-creative-design";
 import { cleanLibraryText } from "@/lib/creator-library";
+import { assertThemeHasNoLivePresentationOperation } from "@/lib/course-presentation-operation";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -25,15 +26,18 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       if (!checked.ok || !checked.design) return fail(`皮肤未通过校验：${checked.issues.join("；").slice(0, 500)}`, 422);
       tokensJson = serializeCreativeDesign(checked.design);
     }
-    const theme = await prisma.theme.update({
-      where: { id },
-      data: {
-        ...(name !== undefined ? { name } : {}),
-        ...(body?.description !== undefined ? { description: cleanLibraryText(body.description, 400) || null } : {}),
-        ...(tokensJson ? { tokensJson } : {}),
-        ...(visibility !== undefined ? { visibility, status: visibility === "public" ? "published" : "draft" } : {}),
-      },
-      select: { id: true, name: true, description: true, visibility: true, status: true, updatedAt: true },
+    const theme = await prisma.$transaction(async (tx) => {
+      await assertThemeHasNoLivePresentationOperation(tx, id);
+      return tx.theme.update({
+        where: { id },
+        data: {
+          ...(name !== undefined ? { name } : {}),
+          ...(body?.description !== undefined ? { description: cleanLibraryText(body.description, 400) || null } : {}),
+          ...(tokensJson ? { tokensJson } : {}),
+          ...(visibility !== undefined ? { visibility, status: visibility === "public" ? "published" : "draft" } : {}),
+        },
+        select: { id: true, name: true, description: true, visibility: true, status: true, updatedAt: true },
+      });
     });
     return ok({ theme });
   });
@@ -47,10 +51,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const existing = await prisma.theme.findUnique({ where: { id }, select: { ownerId: true } });
     if (!existing) return fail("皮肤不存在", 404);
     if (existing.ownerId !== user.id) throw new AppError("无权删除该皮肤", 403);
-    await prisma.$transaction([
-      prisma.course.updateMany({ where: { customThemeId: id }, data: { customThemeId: null } }),
-      prisma.theme.delete({ where: { id } }),
-    ]);
+    await prisma.$transaction(async (tx) => {
+      await assertThemeHasNoLivePresentationOperation(tx, id);
+      await tx.course.updateMany({ where: { customThemeId: id }, data: { customThemeId: null } });
+      await tx.theme.delete({ where: { id } });
+    });
     return ok({ deleted: true });
   });
 }

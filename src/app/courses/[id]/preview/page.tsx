@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { prisma } from "@/lib/db";
 import { HtmlCourseware } from "@/components/HtmlCourseware";
 import { trackLabel } from "@/lib/tracks";
+import { isCurrentStoredCourseware } from "@/lib/courseware-publication";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     select: { title: true, subtitle: true },
   });
   if (!course) return { title: "课件预览" };
-  return { title: `${course.title} · 课件试读`, description: course.subtitle ?? "潮汐学习 · 精品课件试读" };
+  return { title: `${course.title} · 课件试读`, description: course.subtitle ?? "潮汐学习 · 互动课件试读" };
 }
 
 export default async function CoursePreviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -35,24 +36,29 @@ export default async function CoursePreviewPage({ params }: { params: Promise<{ 
       title: true,
       subtitle: true,
       category: true,
+      template: true,
+      designJson: true,
+      genStatus: true,
       lessons: {
         where: { isFree: true, htmlJson: { not: null }, status: "published" },
         orderBy: { sortOrder: "asc" },
         take: 1,
-        select: { id: true, title: true, htmlJson: true },
+        select: {
+          id: true,
+          title: true,
+          summary: true,
+          sortOrder: true,
+          blocksJson: true,
+          htmlJson: true,
+          renderSourceHash: true,
+          renderEngine: true,
+          designJson: true,
+        },
       },
     },
   });
   const lesson = course?.lessons[0];
-  if (!course || !lesson?.htmlJson) notFound();
-
-  let html = "";
-  try {
-    html = (JSON.parse(lesson.htmlJson) as { html?: string }).html ?? "";
-  } catch {
-    notFound();
-  }
-  if (!html) notFound();
+  if (!course || !lesson || !isCurrentStoredCourseware(lesson, course)) notFound();
 
   // 审计修复:单列流式页按 CLAUDE.md 容器档位取 760(1120 是内容网格页专用档)。
   return (
@@ -68,7 +74,7 @@ export default async function CoursePreviewPage({ params }: { params: Promise<{ 
       {/* 水印容器：不拦截交互（翻页/测验仍可体验），仅叠加半透明标识。 */}
       <div className="relative mt-5">
         {/* lessonId → 课件走独立同源文档路由(免登录试读:该节 isFree,路由允许匿名),不再受父页 CSP/nonce 约束。 */}
-        <HtmlCourseware html={html} lessonId={lesson.id} nonce={(await headers()).get("x-nonce") ?? undefined} />
+        <HtmlCourseware lessonId={lesson.id} renderEngine={lesson.renderEngine} nonce={(await headers()).get("x-nonce") ?? undefined} />
         <div
           aria-hidden
           className="mono pointer-events-none absolute right-4 top-12 z-10 select-none rounded-md bg-black/25 px-2.5 py-1 text-[10px] uppercase tracking-[0.18em] text-white/80"

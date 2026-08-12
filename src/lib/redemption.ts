@@ -1,4 +1,4 @@
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { AppError } from "./errors";

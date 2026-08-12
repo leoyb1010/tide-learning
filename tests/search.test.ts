@@ -21,7 +21,9 @@ let SERVER_UP = false;
 
 beforeAll(async () => {
   try {
-    const res = await fetch(`${BASE}/api/search?q=z`);
+    // 没有本地服务时，某些系统/代理环境的 fetch 不会立即 ECONNREFUSED，
+    // 而是一直等到 Vitest 10s hook 超时。探活必须自己有界，才能稳定地进入显式 skip。
+    const res = await fetch(`${BASE}/api/search?q=z`, { signal: AbortSignal.timeout(1_500) });
     SERVER_UP = res.ok || res.status === 429; // 429 也算「服务在跑」
   } catch {
     SERVER_UP = false;

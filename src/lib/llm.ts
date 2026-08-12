@@ -1,6 +1,8 @@
 import { AppError } from "./api";
+import { redactSensitiveText } from "./errors";
 import { SEARCH_KEYWORDS_SYSTEM, searchKeywordsUser } from "./ai/prompts";
 import { resolveModel, modelCredentials, hasUsableModel } from "./ai/models";
+import type { BillingReconciliationInput, Scene } from "./credits";
 
 /**
  * DeepSeek LLM 统一服务层（C 模块）。
@@ -19,6 +21,26 @@ export interface LlmUsageInfo {
   model: string; // v3.2：本次实际所用模型 key，供积分记账按 costWeight 折算
 }
 
+/** 成功响应的用量回调。计费属于交付契约，异步回调必须在正文返回前完成。 */
+export type LlmUsageCallback = (usage: LlmUsageInfo) => void | Promise<void>;
+
+/**
+ * 一次逻辑 chat 的耐久计费上下文。callKey 必须在所属 job/请求内唯一；后台生成应包含
+ * jobId + fencingToken + 阶段 + lessonId + 调用序号，租约接管后自然生成新键。
+ */
+export interface LlmBillingOptions {
+  userId: string;
+  scene: Scene;
+  callKey: string;
+  /** 同一次用户可见操作的稳定账务键；最终未交付时用于整组冲正。 */
+  operationKey?: string;
+  /** 可选硬预占额；省略时按输入字符上界 + maxTokens + 模型权重保守估算。 */
+  estimatedCredits?: number;
+  /** 实耗超出预占时允许补扣的硬上限；默认 0，余额绝不透支。 */
+  maxAdditionalCredits?: number;
+  ttlMs?: number;
+}
+
 export interface ChatOptions {
   system: string;
   user: string;
@@ -28,7 +50,9 @@ export interface ChatOptions {
   timeoutMs?: number; // 默认 45s（推理模型延迟更高）
   retries?: number; // 默认 1（仅 5xx/网络/超时重试）
   model?: string; // v3.2：本次调用用哪个模型（见 ai/models.ts）；缺省用默认模型
-  onUsage?: (usage: LlmUsageInfo) => void; // v2.3：成功返回后回调实际 Token 用量（供积分记账）
+  onUsage?: LlmUsageCallback; // v2.3：成功返回后回调实际 Token 用量（供积分记账）
+  /** 新生成主链使用：供应商调用前先冻结积分，成功结算、失败退款。 */
+  billing?: LlmBillingOptions;
 }
 
 interface DeepSeekResponse {
@@ -40,6 +64,19 @@ interface DeepSeekResponse {
 /** 是否已配置 AI —— 供 UI/降级判断，未配置时 AI 功能优雅缺席而非崩溃。 */
 export function isLLMConfigured(): boolean {
   return hasUsableModel();
+}
+
+/**
+ * 上层编排不得把计费/幂等保护错误降级成“模型内容无效”后继续调供应商。
+ * 这些 AppError 都要 fail-closed，由请求/任务边界做对账和恢复。
+ */
+export function isFailClosedLlmError(error: unknown): boolean {
+  return error instanceof AppError && (
+    error.retryable === false ||
+    error.status === 402 ||
+    error.status === 409 ||
+    error.status === 503
+  );
 }
 
 /** 统一 chat 调用。返回模型输出文本（已 trim）。 */
@@ -61,6 +98,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     timeoutMs = 60_000,
     retries = 1,
     onUsage,
+    billing,
   } = opts;
   // 空正文自动放大重试：v4-flash 思维链耗尽预算时 content 为空且 finish_reason=length。
   let effectiveMaxTokens = maxTokens;
@@ -77,6 +115,43 @@ export async function chat(opts: ChatOptions): Promise<string> {
       max_tokens: effectiveMaxTokens,
       ...(json ? { response_format: { type: "json_object" } } : {}),
     });
+    // 预占必须发生在真实供应商请求之前。每次 HTTP retry 都有独立 reservation；失败 attempt
+    // 在 finally 退款，下一 attempt 不复用已经退款的状态机行。
+    const billingAttemptKey = billing ? `${billing.callKey}:attempt:${attempt}` : null;
+    let reservationId: string | null = null;
+    let reservationSettled = false;
+    let providerRequestId: string | null = null;
+    let reconciliation: BillingReconciliationInput | null = null;
+    if (billing && billingAttemptKey) {
+      const { estimateCredits, reserveCredits } = await import("./credits");
+      // UTF-16 字符数作为 prompt token 的保守上界；不会低估中文，ASCII 会多冻结但成功后按真实 usage 退款。
+      // JavaScript length 统计 UTF-16 code units；astral 字符（emoji、部分生僻字）可能在
+      // 某些 tokenizer 中拆成更多 token。按 UTF-8 byteLength 做更保守的输入上界，
+      // 避免供应商已经成功返回后才发现真实用量超过预占、进而无法结算。
+      const promptTokenUpperBound = Buffer.byteLength(system, "utf8") + Buffer.byteLength(user, "utf8");
+      const estimatedTokens = Math.max(1, promptTokenUpperBound + effectiveMaxTokens);
+      const estimatedCredits = billing.estimatedCredits
+        ?? estimateCredits(billing.scene, estimatedTokens, modelEntry.key);
+      const reservation = await reserveCredits({
+        reservationKey: billingAttemptKey,
+        operationKey: billing.operationKey,
+        userId: billing.userId,
+        scene: billing.scene,
+        estimatedCredits,
+        maxAdditionalCredits: billing.maxAdditionalCredits,
+        ttlMs: billing.ttlMs,
+      });
+      // 同 reservationKey 的 active 行只是“首请求正在进行”，不是第二个
+      // provider-dispatch 许可。继续 fetch 会让平台付两次供应商成本，却只结算一次。
+      if (reservation.duplicate) {
+        throw new AppError("相同 AI 计费请求仍在处理，请等待原操作结果", 409, false);
+      }
+      if (reservation.status !== "active" || reservation.expiresAt.getTime() <= Date.now()) {
+        throw new AppError("本次 AI 计费凭据已使用，请重新发起", 409, false);
+      }
+      reservationId = reservation.id;
+    }
+
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     // timer 由 finally 统一清理：超时须覆盖到 body 完整读取（res.text()/res.json() 同受
@@ -91,12 +166,13 @@ export async function chat(opts: ChatOptions): Promise<string> {
         body,
         signal: controller.signal,
       });
+      providerRequestId = res.headers.get("x-request-id") || res.headers.get("request-id");
 
       if (!res.ok) {
         // 4xx 是客户端/配置问题，不重试；5xx 可重试
-        const upstreamText = await res.text().catch(() => "");
-        // 不泄露 upstream 细节给客户端，仅服务端日志
-        console.error(`[llm] upstream ${res.status}: ${upstreamText.slice(0, 300)}`);
+        await res.text().catch(() => "");
+        // 上游有时会回显 prompt 片段，日志只记状态码/请求 id，不保存原始错误体。
+        console.error(`[llm] upstream ${res.status}${providerRequestId ? ` request=${providerRequestId.slice(0, 120)}` : ""}`);
         if (res.status >= 400 && res.status < 500) {
           if (res.status === 429) throw new AppError("AI 请求过于频繁，请稍后再试", 429);
           // 上游 4xx（配置错/payload 超限/鉴权失效）折叠为客户端可见 502，但标记不可重试：
@@ -104,6 +180,14 @@ export async function chat(opts: ChatOptions): Promise<string> {
           throw new AppError("AI 服务暂时不可用", 502, false);
         }
         // 5xx → 落入重试
+        if (billingAttemptKey) {
+          reconciliation = {
+            attemptKey: billingAttemptKey,
+            reasonCode: "provider_5xx",
+            providerStatus: res.status,
+            providerRequestId,
+          };
+        }
         lastErr = new AppError("AI 服务暂时不可用", 502);
         if (attempt < retries) {
           await sleep(500 * (attempt + 1));
@@ -116,6 +200,28 @@ export async function chat(opts: ChatOptions): Promise<string> {
       const choice = data.choices?.[0];
       const content = choice?.message?.content;
       if (!content || !content.trim()) {
+        // 某些推理模型会耗完预算只返回 reasoning/usage 而没有正文。供应商已经明确报告成本时，
+        // 先结算这一 attempt 再放大预算重试；不能把真实成本当“未交付所以退款”。
+        if (billing && reservationId && billingAttemptKey && data.usage) {
+          try {
+            const { settleLlmUsage } = await import("./credits");
+            await settleLlmUsage(reservationId, providerUsage(data.usage, modelEntry.key), `${billingAttemptKey}:usage`);
+            reservationSettled = true;
+          } catch (billingError) {
+            reconciliation = {
+              attemptKey: billingAttemptKey,
+              reasonCode: "settlement_failed",
+              providerStatus: 200,
+              providerRequestId,
+              usage: providerUsage(data.usage, modelEntry.key),
+            };
+            console.error(
+              "[llm] billing settlement failed:",
+              redactSensitiveText(billingError instanceof Error ? billingError.message : billingError),
+            );
+            throw new AppError("AI 费用结算失败，请稍后重试", 503, false);
+          }
+        }
         // 推理模型专属：思维链耗尽 token 预算导致正文空（finish_reason=length）。
         // 放大预算重试一次，而非直接失败。
         const truncated = choice?.finish_reason === "length" || Boolean(choice?.message?.reasoning_content);
@@ -125,19 +231,53 @@ export async function chat(opts: ChatOptions): Promise<string> {
           await sleep(300);
           continue;
         }
+        if (billingAttemptKey && !data.usage) {
+          reconciliation = {
+            attemptKey: billingAttemptKey,
+            reasonCode: "empty_response",
+            providerStatus: 200,
+            providerRequestId,
+          };
+        }
         throw new AppError("AI 返回为空", 502);
       }
-      // v2.3：上报实际 Token 用量供积分记账（失败不影响正文返回）
-      if (onUsage && data.usage) {
+      const usage: LlmUsageInfo = data.usage
+        ? providerUsage(data.usage, modelEntry.key)
+        : approximateUsage(system, user, content, modelEntry.key);
+
+      // 耐久计费是交付前置条件：结算失败不能把已生成正文当免费成功，也绝不能触发供应商重试。
+      if (billing && reservationId && billingAttemptKey) {
         try {
-          onUsage({
-            promptTokens: data.usage.prompt_tokens ?? 0,
-            completionTokens: data.usage.completion_tokens ?? 0,
-            totalTokens: data.usage.total_tokens ?? 0,
-            model: modelEntry.key,
-          });
-        } catch {
-          /* 记账回调异常不影响 AI 返回 */
+          const { settleLlmUsage } = await import("./credits");
+          await settleLlmUsage(reservationId, usage, `${billingAttemptKey}:usage`);
+          reservationSettled = true;
+        } catch (billingError) {
+          reconciliation = {
+            attemptKey: billingAttemptKey,
+            reasonCode: "settlement_failed",
+            providerStatus: 200,
+            providerRequestId,
+            usage,
+          };
+          console.error(
+            "[llm] billing settlement failed:",
+            redactSensitiveText(billingError instanceof Error ? billingError.message : billingError),
+          );
+          throw new AppError("AI 费用结算失败，请稍后重试", 503, false);
+        }
+      }
+
+      // 通用用量回调仍是成功响应的一部分：必须 await，确保分析/兼容记账完成。
+      // 回调失败单独折叠并记录，不能落入外层 LLM retry——上游已经成功，再请求一次只会
+      // 产生重复内容、重复供应商成本，甚至在部分记账成功时造成双扣。
+      if (onUsage) {
+        try {
+          await onUsage(usage);
+        } catch (usageError) {
+          console.error(
+            "[llm] usage callback failed:",
+            redactSensitiveText(usageError instanceof Error ? usageError.message : usageError),
+          );
         }
       }
       return content.trim();
@@ -148,10 +288,24 @@ export async function chat(opts: ChatOptions): Promise<string> {
         if ((e.status >= 400 && e.status < 500) || e.retryable === false) throw e;
         lastErr = e;
       } else if (e instanceof Error && e.name === "AbortError") {
+        if (billingAttemptKey && !reconciliation) {
+          reconciliation = { attemptKey: billingAttemptKey, reasonCode: "provider_timeout", providerRequestId };
+        }
         lastErr = new AppError("AI 响应超时，请重试", 504);
       } else {
-        console.error("[llm] fetch error:", e);
+        if (billingAttemptKey && !reconciliation) {
+          reconciliation = { attemptKey: billingAttemptKey, reasonCode: "provider_network", providerRequestId };
+        }
+        console.error(
+          "[llm] fetch error:",
+          redactSensitiveText(e instanceof Error ? e.message : e),
+        );
         lastErr = new AppError("AI 服务暂时不可用", 502);
+      }
+      // HTTP 请求已发出但网络中断/超时/5xx 时，供应商可能已消耗 token 却没有 usage。
+      // 不伪造 token 扣费；finally 会把耐久对账事件与退预占放在同一 DB 事务。
+      if (billing && reservationId && !reservationSettled) {
+        console.warn(`[llm] provider attempt requires billing reconciliation: ${billingAttemptKey ?? "unknown"}`);
       }
       if (attempt < retries) {
         await sleep(500 * (attempt + 1));
@@ -161,9 +315,46 @@ export async function chat(opts: ChatOptions): Promise<string> {
     } finally {
       // 成功 / 失败 / continue 重试各路径统一清理，避免定时器泄漏或误伤下一次尝试
       clearTimeout(timer);
+      if (reservationId && !reservationSettled) {
+        try {
+          const { refundCreditReservation, refundCreditReservationForReconciliation } = await import("./credits");
+          if (reconciliation) {
+            await refundCreditReservationForReconciliation(reservationId, reconciliation);
+          } else {
+            await refundCreditReservation(reservationId, "LLM 供应商调用未成功交付");
+          }
+        } catch (refundError) {
+          console.error(
+            "[llm] billing reservation refund failed:",
+            redactSensitiveText(refundError instanceof Error ? refundError.message : refundError),
+          );
+          // 预占退款/待对账事件没有耐久落库时，绝不能继续下一次供应商 retry：
+          // 否则同一逻辑请求会叠加第二笔未知供应商成本与第二笔冻结。finally 抛错会
+          // 覆盖上方 continue，明确停在可恢复状态；过期预占仍由后台 sweep 兜底释放。
+          throw new AppError("AI 费用状态待恢复，请稍后重试", 503, false);
+        }
+      }
     }
   }
   throw lastErr ?? new AppError("AI 服务暂时不可用", 502);
+}
+
+/** 上游极少数成功响应不返回 usage 时，按真实请求/正文字符数保守记量，绝不静默免单。 */
+function approximateUsage(system: string, user: string, content: string, model: string): LlmUsageInfo {
+  const promptTokens = Math.max(1, Math.ceil((system.length + user.length) / 3));
+  const completionTokens = Math.max(1, Math.ceil(content.length / 3));
+  return { promptTokens, completionTokens, totalTokens: promptTokens + completionTokens, model };
+}
+
+function providerUsage(usage: NonNullable<DeepSeekResponse["usage"]>, model: string): LlmUsageInfo {
+  const promptTokens = Math.max(0, usage.prompt_tokens ?? 0);
+  const completionTokens = Math.max(0, usage.completion_tokens ?? 0);
+  return {
+    promptTokens,
+    completionTokens,
+    totalTokens: Math.max(promptTokens + completionTokens, usage.total_tokens ?? 0),
+    model,
+  };
 }
 
 /**
@@ -214,7 +405,9 @@ export async function chatJson<T>(opts: Omit<ChatOptions, "json">): Promise<T> {
   const raw = await chat({ ...opts, json: true });
   const parsed = extractJson<T>(raw);
   if (parsed !== undefined) return parsed;
-  console.error("[llm] JSON parse failed:", raw.slice(0, 300));
+  // 模型输出可能回显用户导入资料/私有课件；格式失败时只记机械元数据，
+  // 不把原文片段落入通用服务日志。
+  console.error(`[llm] JSON parse failed (chars=${raw.length})`);
   throw new AppError("AI 返回格式异常，请重试", 502);
 }
 

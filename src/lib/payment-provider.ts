@@ -1,4 +1,4 @@
-import { createHmac, timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
  * D1：支付渠道抽象。mock 为其中一个 provider（开发/演示用），

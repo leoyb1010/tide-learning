@@ -4,6 +4,7 @@ import {
   splitCoursewareLint,
   normalizeCoursewareStyle,
   injectBespokeAdapter,
+  sanitizeBespokeHtml,
   scoreCoursewareVisual,
 } from "@/lib/ai/courseware-html";
 import { scanContentSafety } from "@/lib/content-safety";
@@ -97,6 +98,13 @@ describe("协议壳注入(A5)", () => {
     expect(html).not.toContain("type:'ct-ready'");
   });
 
+  it("bespoke 判分 UI 不信任模型 data-answer，只消费宿主 ct-quiz-result", () => {
+    const html = injectBespokeAdapter('<body><div class="quiz" data-answer="0" data-bid="q1"><button class="opt">A</button><button class="opt">B</button></div></body>');
+    expect(html).toContain("ct-quiz-result");
+    expect(html).toContain("correctAnswerIndex");
+    expect(html).not.toContain("getAttribute('data-answer')");
+  });
+
   it("存量 v1 适配器会被替换为 v2，而不是因旧标记被跳过", () => {
     const old = '<body>x<script data-ct-bespoke-adapter>window.__ctBespokeAdapter=true;</script></body>';
     const html = injectBespokeAdapter(old);
@@ -104,6 +112,35 @@ describe("协议壳注入(A5)", () => {
     expect(html).toContain("__ctBespokeAdapterV2");
     expect(html).not.toContain("window.__ctBespokeAdapter=true");
     expect((html.match(/data-ct-bespoke-adapter/g) || []).length).toBe(1);
+  });
+
+  it("历史恶意 LLM HTML 的自发平台消息/内联事件被清空，只剩可信 adapter", () => {
+    const hostile = `<!doctype html><html><head>
+      <meta http-equiv="refresh" content="0;url=javascript:alert(1)">
+      <script>window.__evil=1;parent.postMessage({type:'ct-page',index:999,total:1},'*')</script>
+      </head><body onload="parent.postMessage({type:'ct-complete'},'*')">
+      <iframe srcdoc="<script>parent.postMessage({type:'ct-quiz'},'*')</script>"></iframe>
+      <a href="jav&#x61;script:alert(1)">链接</a><button onclick="window.__evil=2">点击</button>
+      <section data-ct-target="lesson_ok">声明式交互</section></body></html>`;
+    const sanitized = sanitizeBespokeHtml(hostile);
+    expect(sanitized).not.toMatch(/<script\b/i);
+    expect(sanitized).not.toMatch(/\sonload=|\sonclick=|\ssrcdoc=|\shref=/i);
+    expect(sanitized).not.toMatch(/<(?:iframe|meta\b[^>]*http-equiv)/i);
+
+    const injected = injectBespokeAdapter(hostile);
+    expect(injected).not.toContain("window.__evil");
+    expect(injected).not.toContain("type:'ct-page'");
+    expect((injected.match(/<script\b/g) || []).length).toBe(1);
+    expect((injected.match(/data-ct-bespoke-adapter/g) || []).length).toBe(1);
+    expect(injected).toContain('data-ct-target="lesson_ok"');
+  });
+
+  it("读路径可只给平台 adapter 注入响应级 CSP nonce", () => {
+    const nonce = "abcdefghijklmnop12345678";
+    const injected = injectBespokeAdapter("<body><script>window.evil=1</script>x</body>", nonce);
+    expect(injected).not.toContain("window.evil");
+    expect(injected).toContain(`<script nonce="${nonce}" data-ct-bespoke-adapter="2">`);
+    expect((injected.match(/\bnonce=/g) || []).length).toBe(1);
   });
 });
 

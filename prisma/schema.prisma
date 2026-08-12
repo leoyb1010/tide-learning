@@ -50,6 +50,7 @@ model User {
   focusSessions          FocusSession[]
   creditAccount          CreditAccount?
   creditLedger           CreditLedger[]
+  creditReservations     CreditReservation[]
   llmUsage               LlmUsage[]
   postComments           PostComment[]
   exams                  Exam[]
@@ -59,11 +60,11 @@ model User {
   devices                Device[]
   courseReviews          CourseReview[]
   coursePurchases        CoursePurchase[]
-  inviteCode             InviteCode?        @relation("InviteCodeOwner")
-  referralsMade          Referral[]         @relation("ReferralInviter")
-  referralReceived       Referral?          @relation("ReferralInvitee")
+  inviteCode             InviteCode?         @relation("InviteCodeOwner")
+  referralsMade          Referral[]          @relation("ReferralInviter")
+  referralReceived       Referral?           @relation("ReferralInvitee")
   redemptions            RedemptionRecord[]
-  createdRedemptionCodes RedemptionCode[]   @relation("RedemptionCodeCreator")
+  createdRedemptionCodes RedemptionCode[]    @relation("RedemptionCodeCreator")
   assets                 Asset[]
   creatorTemplates       Template[]
   creatorThemes          Theme[]
@@ -140,11 +141,13 @@ model Course {
   qualityTier              String    @default("standard") // v6 内容研究深度：standard / premium；用户课视觉均优先原创 HTML
   blueprintJson            String? // L1 课程蓝图（专业模式）：{audience,tone,length,blockPrefs[],referenceText}，透传进大纲/逐节 prompt 定制 + grounding
   contentBriefJson         String? // v6 内容总纲：保留用户原始需求、课程承诺、范围边界与成果任务，逐节作者始终据此写作
+  generationQualityJson    String? // 整课发布终审档案：含版本、输入指纹、verdict；仅匹配当前内容且 passed 才允许 ready
   customTemplateId         String? // 创作者保存/复用的课程结构模板（软引用 Template.id）
   customThemeId            String? // 创作者显式应用的自定义皮肤（软引用 Theme.id）
   navigationMode           String    @default("linear") // linear / graph；graph 时 LessonEdge 为导航真值
   premiumRenderCount       Int       @default(0) // 成功命中 bespoke 的章节数
   deterministicRenderCount Int       @default(0) // 确定性渲染或回落的章节数
+  presentationRevision     Int       @default(0) // 表现层 mutation fence；换肤/单节重渲每次原子 +1，旧操作不得落库或恢复 ready
   designJson               String? // v3.3 课级设计系统（艺术方向 + 配色/字体 token + 动效旋钮）JSON，供 HTML 课件生成注入（见 src/lib/ai/courseware-design.ts）
   sourceDemandId           String? // 由某共创需求生成（闭环追溯）
   instructorName           String?
@@ -948,9 +951,17 @@ model GenerationJob {
   userId           String
   user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   type             String // course_outline / course_lesson / import_structure
+  // 稳定业务幂等键，由 generationJobDedupeKey(type, resultRef/业务键) 生成。
+  // nullable 保证历史 job 无需危险回填；SQLite 的 UNIQUE 允许多行 NULL，新协议任务则数据库强制一键一行。
+  dedupeKey        String?   @unique
   status           String    @default("queued") // queued / running / done / failed
   inputJson        String    @default("{}")
   resultRef        String? // 产出的 courseId / lessonId
+  // 可续租所有权：每次 acquire/takeover 原子递增 fencingToken；旧 token 无权 renew/finish 新租约。
+  // 三列均 nullable 以兼容迁移前历史行；新协议 acquire 后必为非空。
+  leaseUntil       DateTime?
+  heartbeatAt      DateTime?
+  fencingToken     Int?
   promptTokens     Int       @default(0)
   completionTokens Int       @default(0)
   errorMessage     String?
@@ -959,6 +970,7 @@ model GenerationJob {
   finishedAt       DateTime?
 
   @@index([userId, status])
+  @@index([status, leaseUntil])
   @@index([type, resultRef, createdAt]) // getGenJobsFor:前端 8 秒轮询的热路径,此前全表 SCAN
 }
 
@@ -1149,21 +1161,93 @@ model CreditLedger {
 }
 
 /**
+ * LLM 积分预占：先从可用余额冻结估算积分，供应商成功后按真实 usage 结算并退款未用部分。
+ * 一条 reservation 对应一次供应商调用；reservationKey 是调用方稳定幂等键。
+ */
+model CreditReservation {
+  id                   String    @id @default(cuid())
+  reservationKey       String    @unique
+  // 一次用户可见 AI 操作可包含多次供应商调用；操作最终未交付时按此键整组冲正。
+  operationKey         String?
+  userId               String
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scene                String
+  estimatedCredits     Int
+  remainingCredits     Int
+  actualCredits        Int       @default(0)
+  maxAdditionalCredits Int       @default(0)
+  additionalCredits    Int       @default(0)
+  status               String    @default("active") // active / settled / refunded / expired / reversed
+  expiresAt            DateTime
+  settledAt            DateTime?
+  reversedAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  usages LlmUsage[]
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([operationKey, status])
+}
+
+/**
+ * AI 操作冲正墓碑。operationKey 一旦出现，同操作的迟到预占必须 fail-closed。
+ * 只存账务标识与审计原因，不存 prompt、课程正文或模型产物。
+ */
+model LlmBillingOperationReversal {
+  operationKey String   @id
+  userId       String
+  scene        String
+  reason       String?
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+/**
  * LLM Token 用量原始记录（积分折算依据）。
  */
 model LlmUsage {
-  id               String   @id @default(cuid())
+  id               String             @id @default(cuid())
   userId           String
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user             User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   scene            String // generate_course / generate_lesson / companion / note_transform / note_summary / import_source / generate_exam / search_expand
-  promptTokens     Int      @default(0)
-  completionTokens Int      @default(0)
-  totalTokens      Int      @default(0)
-  creditCost       Int      @default(0) // 本次折算并扣除的积分
-  createdAt        DateTime @default(now())
+  promptTokens     Int                @default(0)
+  completionTokens Int                @default(0)
+  totalTokens      Int                @default(0)
+  creditCost       Int                @default(0) // 本次折算并扣除的积分
+  // nullable 兼容普通非预占计费与历史 usage；预占路径必须提供唯一键，重复回调只结算一次。
+  idempotencyKey   String?            @unique
+  reservationId    String?
+  reservation      CreditReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  createdAt        DateTime           @default(now())
 
   @@index([userId, createdAt])
   @@index([scene])
+  @@index([reservationId])
+}
+
+/**
+ * 供应商请求已发出，但因超时/5xx/本地结算故障无法确认真实 usage 的耐久对账事件。
+ * 不保存 prompt/课程正文；reservationId 一次一行，与用户退预占在同一事务落库。
+ */
+model LlmBillingReconciliation {
+  id                String    @id @default(cuid())
+  reservationId     String    @unique
+  userId            String
+  scene             String
+  attemptKey        String    @unique
+  reasonCode        String // provider_timeout / provider_network / provider_5xx / settlement_failed / empty_response
+  providerStatus    Int?
+  providerRequestId String?
+  usageJson         String? // 仅 token 计数 + model，不存任何 prompt/content
+  status            String    @default("pending") // pending / resolved / waived
+  createdAt         DateTime  @default(now())
+  resolvedAt        DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
 }
 
 /**

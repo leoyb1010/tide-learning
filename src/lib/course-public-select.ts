@@ -34,6 +34,7 @@ export const COURSE_PUBLIC_SELECT = {
 /** 大纲只含导航字段；正文、HTML、媒体与生成脚本永远不得进入嵌套课程对象。 */
 export const LESSON_OUTLINE_SELECT = {
   id: true,
+  status: true,
   title: true,
   summary: true,
   contentType: true,

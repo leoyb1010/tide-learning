@@ -43,6 +43,12 @@ describe("生产配置 fail-fast", () => {
     expect(() => validateProductionEnv()).toThrow(/APPLE_BUNDLE_ID[\s\S]*Sandbox 或 Production/);
   });
 
+  it("拒绝含糊的生成恢复 worker 开关和过密轮询", () => {
+    vi.stubEnv("GENERATION_WORKER_ENABLED", "yes");
+    vi.stubEnv("GENERATION_WORKER_INTERVAL_MS", "1000");
+    expect(() => validateProductionEnv()).toThrow(/GENERATION_WORKER_ENABLED[\s\S]*GENERATION_WORKER_INTERVAL_MS/);
+  });
+
   it("显式本地生产预览可使用本地 URL，但仍禁止 mock-pay 开关", () => {
     vi.stubEnv("ALLOW_LOCAL_PRODUCTION", "1");
     vi.stubEnv("NEXT_PUBLIC_PAY_CHANNEL", "mock");

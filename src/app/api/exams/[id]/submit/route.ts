@@ -1,10 +1,11 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { assertCanSpend } from "@/lib/credits";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
 
@@ -151,7 +152,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         }
       } else {
         await assertCanSpend(user.id);
-        for (const { q, userAnswer } of shortToGrade) {
+        const billingRequestId = randomUUID();
+        for (const [gradeIndex, { q, userAnswer }] of shortToGrade.entries()) {
           let s = 0;
           let comment = "";
           try {
@@ -172,12 +174,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
               user: userMsg,
               temperature: 0.2,
               maxTokens: 1200,
-              onUsage: creditingOnUsage(user.id, "generate_exam"),
+              billing: {
+                userId: user.id,
+                scene: "generate_exam",
+                callKey: `exam-submit:${exam.id}:${billingRequestId}:short-grade:${gradeIndex}:${q.id}`,
+              },
             });
             const raw = Number(result?.score);
             s = Number.isFinite(raw) ? Math.min(SHORT_MAX, Math.max(0, Math.round(raw))) : 0;
             comment = typeof result?.comment === "string" ? result.comment.trim().slice(0, 300) : "";
-          } catch {
+          } catch (error) {
+            // 余额不足是硬门，不能降级成免费保底分；其余阅卷故障仍保留原有宽容策略。
+            if (error instanceof AppError && error.status === 402) throw error;
             // 判分失败：给保底分（宽容），不因判卷故障而零分冤枉学员
             s = Math.min(SHORT_MAX, 5);
             comment = "自动判分暂不可用，已给予保底分，可参考下方参考答案自评。";

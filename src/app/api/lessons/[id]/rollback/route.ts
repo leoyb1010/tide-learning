@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
  *
  * body: { revisionId }。把目标版本的 blocksJson 经唯一写入口 writeLessonBlocks 写回：
  *   它会先把「当前版本」存为新 revision（后悔药可叠加）、清派生 HTML 层、shared 课回 pending 重审。
- * 回滚后本节 htmlJson 被清空，学员端暂回落块渲染；如需恢复精品 HTML 可再触发换肤/精修（有成本）。
+ * 回滚后本节 htmlJson 被清空，课程进入复核，学习端暂用基础块课件。
+ * 本路由不自动重排、不调用 LLM；后续“继续生成”会让 AI 重新复核，并可能改写已恢复的内容。
  * 无 LLM 花费 → 只需 requireUser + 归属校验，不走 canUseLLM 权益门。
  * 越权/IDOR 铁律：assertSameOrigin + authorUserId===user.id + revision.lessonId===路由 id + blocksJson 非空。
  */
@@ -27,10 +28,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const lesson = await prisma.lesson.findUnique({
       where: { id },
-      select: { id: true, course: { select: { id: true, authorUserId: true, template: true } } },
+      select: {
+        id: true,
+        course: {
+          select: { id: true, authorUserId: true, template: true, status: true, genStatus: true, presentationRevision: true },
+        },
+      },
     });
     if (!lesson || !lesson.course) return fail("章节不存在", 404);
     if (lesson.course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
+    if (lesson.course.status === "archived") return fail("已归档课程不能回滚", 409);
+    if (["generating", "paused", "outline_draft"].includes(lesson.course.genStatus ?? "")) {
+      return fail("课程正在生成或暂停中，请先等待任务收敛", 409);
+    }
 
     const revision = await prisma.lessonRevision.findUnique({
       where: { id: revisionId },
@@ -46,7 +56,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const parsed = JSON.parse(revision.blocksJson) as { blocks?: { type: string }[] };
       const blocks = Array.isArray(parsed?.blocks) ? parsed.blocks : [];
       const q = scoreLesson(blocks, lesson.course.template);
-      qualityJson = JSON.stringify({ score: q.score, passed: q.passed, flags: q.flags, rolledBack: true });
+      qualityJson = JSON.stringify({
+        score: q.score,
+        passed: false,
+        status: "manual_review_required",
+        rulePassed: q.passed,
+        flags: q.flags,
+        rolledBack: true,
+      });
     } catch {
       /* 脏 blocksJson 理论上不会入档；兜底空档案，不阻塞回滚 */
     }
@@ -57,8 +74,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       blocksJson: revision.blocksJson,
       qualityJson,
       reason: "manual",
+      expectedPresentationRevision: lesson.course.presentationRevision,
     });
 
-    return ok({ rolledBack: true, lessonId: id });
+    return ok({
+      rolledBack: true,
+      lessonId: id,
+      requiresReview: true,
+      presentationStatus: "incomplete" as const,
+    });
   });
 }

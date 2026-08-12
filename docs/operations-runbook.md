@@ -65,6 +65,32 @@ find /tmp/tide-restore-data/media -type f | wc -l
 4. 若迁移本身不可向前兼容，必须另写补偿迁移并在隔离副本演练，不能手工改生产表。
 5. 发布后验证登录、课程访问、支付回调、私有媒体 Range、账号注销和后台需求状态流。
 
-## 6. 监控与值班闸门
+## 6. AI 生成 worker 与资金真值
 
-最低告警：连续 5xx、登录失败率突增、支付回调失败/积压、备份缺失或上传失败、磁盘空间、恢复校验失败、APNs/邮件发送失败。部署方必须配置监控平台、值班人和升级电话；仓库内日志轮转不能替代外部告警。
+生产 Node + SQLite 默认由 instrumentation 启动生成恢复 worker。发布环境必须明确配置并记录：
+
+```bash
+# 默认启用；只有故障隔离时才显式置 0
+GENERATION_WORKER_ENABLED=1
+# 10 秒到 1 小时，默认 60 秒
+GENERATION_WORKER_INTERVAL_MS=60000
+```
+
+- worker 不能靠“心跳大于 N 分钟”直接宣告任务死亡。必须先在数据库原子获得 `GenerationJob` lease，旧 fencing token 不得继续写进度、内容或终态。
+- 应告警：过期 `running` job 数、连续接管失败、课程 `generating` 但无 job、Course/Job 终态分叉、`ready` 但表现层 incomplete。
+- 每个计费 LLM 调用必须先有 `CreditReservation`。应告警：过期 active reservation、`LlmBillingReconciliation.status=pending`、结算/退款失败和任何负余额。
+- `LlmBillingReconciliation` 只保存调用键、原因、供应商 request id 与 token 计数，不得写入 prompt、用户资料或模型正文。值班人需按 provider 账单处理 pending 事件并留审计记录。
+- 暂停是协作式的：不强行撤销正在付费调用的 lease。当前阶段完成后在边界收敛 `paused`；进程死亡留下的 paused + expired running job 由 worker 免费收尾，不开新 LLM 阶段。
+
+发布后的快速数据库核对（字段以当前 schema 为准）：
+
+```sql
+SELECT status, COUNT(*) FROM GenerationJob GROUP BY status;
+SELECT status, COUNT(*) FROM CreditReservation GROUP BY status;
+SELECT status, COUNT(*) FROM LlmBillingReconciliation GROUP BY status;
+SELECT genStatus, COUNT(*) FROM Course GROUP BY genStatus;
+```
+
+## 7. 监控与值班闸门
+
+最低告警：连续 5xx、登录失败率突增、支付回调失败/积压、生成任务与积分对账异常、备份缺失或上传失败、磁盘空间、恢复校验失败、APNs/邮件发送失败。部署方必须配置监控平台、值班人和升级电话；仓库内日志轮转不能替代外部告警。

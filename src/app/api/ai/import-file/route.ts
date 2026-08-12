@@ -1,13 +1,24 @@
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
-import { assertUserRateLimit } from "@/lib/rate-limit";
+import { assertUniqueRequestAdmission, assertUserRateLimit } from "@/lib/rate-limit";
 import { requireCourseGenAccess } from "@/lib/ai-guard";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
 import { paragraphizePlainText } from "@/lib/note-structure";
-import { structureImportedTextIntoCourse, MIN_IMPORT_TEXT, MAX_IMPORT_TEXT } from "@/lib/course-import";
+import { structureImportedTextIntoCourse, MIN_IMPORT_TEXT, MAX_FILE_IMPORT_TEXT } from "@/lib/course-import";
 import { isValidTemplate } from "@/lib/ai/templates";
 import { selectModelFor } from "@/lib/ai/models";
 import { createPresentationCourse, createScormCourse } from "@/lib/import-faithful";
+import { requireUser } from "@/lib/session";
+import {
+  importContentSha256,
+  importPayloadHash,
+  ImportReversalPendingError,
+  inspectImportOperation,
+  reconcileImportOperationFailure,
+  startImportOperation,
+  validateImportRequestId,
+  type ImportOperation,
+} from "@/lib/import-operation";
 
 // Node 运行时：pdf-parse / mammoth 依赖 Buffer 与 node 内建。
 export const runtime = "nodejs";
@@ -107,91 +118,155 @@ async function extractText(kind: "pdf" | "docx" | "text", bytes: Buffer): Promis
 export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
-    const { user, snapshot } = await requireCourseGenAccess({
-      deniedMessage: "AI 导入为订阅会员权益，订阅后即可使用",
-      spendScene: "import_source",
+    const user = await requireUser();
+    const ctype = req.headers.get("content-type") ?? "";
+    if (!ctype.includes("multipart/form-data")) return fail("请以文件表单方式上传（multipart/form-data）");
+    const form = await req.formData().catch(() => null);
+    if (!form) return fail("表单解析失败");
+    const file = form.get("file");
+    if (!file || typeof file === "string") return fail("请选择要导入的文件");
+    const blob = file as File;
+    if (blob.size === 0) return fail("文件内容为空");
+    if (blob.size > MAX_FILE_BYTES) return fail("文件过大（上限 100MB）", 413);
+
+    const filename = "name" in blob && typeof blob.name === "string" ? blob.name : null;
+    const kind = EXT_KIND[extFromName(filename)];
+    if (!kind) return fail("暂不支持该格式，请上传 PDF / DOCX / TXT / Markdown / PPTX / Keynote / SCORM 文件");
+    const textKind = kind === "pdf" || kind === "docx" || kind === "text";
+    if (textKind && blob.size > MAX_TEXT_FILE_BYTES) return fail("文本文档过大（上限 15MB）", 413);
+
+    const bytes = Buffer.from(await blob.arrayBuffer());
+    const title = ((form.get("title") as string | null)?.trim() || titleFromFilename(filename)).slice(0, 120);
+    const template = (form.get("template") as string | null)?.trim() || undefined;
+    const requestedModel = (form.get("model") as string | null)?.trim();
+    const qualityTier = (form.get("qualityTier") as string | null)?.trim() === "premium" ? "premium" : "standard";
+    const checkpoint = form.get("checkpoint") === "true";
+    if (textKind && !isValidTemplate(template)) return fail("未知的课件模板");
+    const requestId = validateImportRequestId(form.get("requestId"));
+    const payloadHash = importPayloadHash(textKind ? {
+      scope: "file",
+      contentSha256: importContentSha256(bytes),
+      kind,
+      title,
+      template: template ?? null,
+      requestedModel: requestedModel ?? null,
+      qualityTier,
+      checkpoint,
+    } : {
+      scope: "file",
+      contentSha256: importContentSha256(bytes),
+      kind,
+      title,
+      fileName: filename ?? null,
     });
 
-    if (!acquireInflight("course_gen", user.id)) {
-      return fail("已有生成任务进行中，请稍后再试", 409);
-    }
+    let prior;
     try {
-      // 文件解析成本较高，按用户日限 5 次（与粘贴导入共用同一配额）。
+      prior = await inspectImportOperation({ userId: user.id, requestId, payloadHash });
+    } catch (error) {
+      if (error instanceof ImportReversalPendingError) return importRunning(error.message, error.status);
+      throw error;
+    }
+    if (prior?.status === "replay") return ok(prior.response);
+    if (prior?.status === "running") return importRunning("同一次导入仍在进行，请稍后原样重试");
+    if (prior?.status === "failed") return fail("该 requestId 的导入已失败并收敛，请重新发起", 409);
+
+    // 与粘贴导入共用每日 15 个唯一 requestId 的非业务 DB 准入桶。
+    // 超限的新 ID 在 atomic start 前直接拒绝，不留 job/reversal 墓碑。
+    assertUniqueRequestAdmission(user.id, "ai_import", requestId, 15, 86_400_000);
+
+    // 跨实例竞争下，首查为空不代表本实例是 owner。先用 DB 原子 start 定胜负，
+    // replay/running/failed 直接返回；只有 acquired 赢家才消耗权益、模型、进程锁与限流。
+    let started;
+    try {
+      started = await startImportOperation({ userId: user.id, requestId, payloadHash });
+    } catch (error) {
+      if (error instanceof ImportReversalPendingError) return importRunning(error.message, error.status);
+      throw error;
+    }
+    if (started.status === "replay") return ok(started.response);
+    if (started.status === "running") return importRunning("同一次导入仍在进行，请稍后原样重试");
+    if (started.status === "failed") return fail("该 requestId 的导入已失败并收敛，请重新发起", 409);
+
+    const operation: ImportOperation = started.operation;
+    let completed = false;
+    let inflightAcquired = false;
+    try {
+      const access = await requireCourseGenAccess({
+        deniedMessage: "AI 导入为订阅会员权益，订阅后即可使用",
+        spendScene: "import_source",
+      });
+      if (access.user.id !== user.id) throw new AppError("登录状态已变化，请重新发起", 401, false);
+      const snapshot = access.snapshot;
+      const modelEntry = textKind ? selectModelFor(requestedModel, snapshot.isSubscriber) : null;
+      if (textKind && !modelEntry) {
+        throw new AppError(
+          requestedModel ? "该模型为会员专享或暂不可用，请升级订阅或换用默认模型" : "AI 服务未配置",
+          requestedModel ? 402 : 503,
+          false,
+        );
+      }
+      if (textKind && qualityTier === "premium" && !snapshot.isSubscriber) {
+        throw new AppError("精修排版为会员专享，请升级订阅或使用标准排版", 402, false);
+      }
+      if (!acquireInflight("course_gen", user.id)) {
+        throw new AppError("已有生成任务进行中，请稍后再试", 409, false);
+      }
+      inflightAcquired = true;
       assertUserRateLimit(user.id, "ai_import", 5, 86_400_000);
 
-      const ctype = req.headers.get("content-type") ?? "";
-      if (!ctype.includes("multipart/form-data")) {
-        return fail("请以文件表单方式上传（multipart/form-data）");
-      }
-      const form = await req.formData().catch(() => null);
-      if (!form) return fail("表单解析失败");
-      const file = form.get("file");
-      if (!file || typeof file === "string") return fail("请选择要导入的文件");
-      const blob = file as File;
-      if (blob.size === 0) return fail("文件内容为空");
-      if (blob.size > MAX_FILE_BYTES) return fail("文件过大（上限 100MB）", 413);
-
-      const filename = "name" in blob && typeof blob.name === "string" ? blob.name : null;
-      const ext = extFromName(filename);
-      const kind = EXT_KIND[ext];
-      if (!kind) {
-        return fail("暂不支持该格式，请上传 PDF / DOCX / TXT / Markdown / PPTX / Keynote / SCORM 文件");
-      }
-      if (["pdf", "docx", "text"].includes(kind) && blob.size > MAX_TEXT_FILE_BYTES) return fail("文本文档过大（上限 15MB）", 413);
-
-      const bytes = Buffer.from(await blob.arrayBuffer());
-      const title = (form.get("title") as string | null)?.trim() || titleFromFilename(filename);
-
-      // 演示文稿与 SCORM 不走“抽文本重写”：保留原页面坐标/图片或原包运行时，直接产出 ready 课程。
+      let result;
       if (kind === "pptx" || kind === "key") {
-        return ok(await createPresentationCourse({ userId: user.id, title, bytes, kind }));
+        result = await createPresentationCourse({ userId: user.id, title, bytes, kind, operation });
+      } else if (kind === "scorm") {
+        result = await createScormCourse({
+          userId: user.id,
+          title,
+          bytes,
+          fileName: filename || `${title}.scorm`,
+          operation,
+        });
+      } else {
+        const rawText = (await extractText(kind, bytes)).trim();
+        if (!rawText) throw new AppError("未能从文件中提取到可用文本（可能是纯图片扫描件）", 422);
+        if (rawText.length < MIN_IMPORT_TEXT) throw new AppError(`文件文本过短，无法结构化成课程（至少 ${MIN_IMPORT_TEXT} 字）`, 400);
+        if (rawText.length > MAX_FILE_IMPORT_TEXT) {
+          throw new AppError(`文件提取文本超过 ${MAX_FILE_IMPORT_TEXT} 字，请拆分后导入；系统不会静默丢弃尾部内容`, 413);
+        }
+        result = await structureImportedTextIntoCourse({
+          userId: user.id,
+          operation,
+          rawText,
+          kind: `file_${kind}`,
+          title,
+          template,
+          model: modelEntry!.key,
+          qualityTier,
+          checkpoint,
+        });
       }
-      if (kind === "scorm") {
-        return ok(await createScormCourse({ userId: user.id, title, bytes, fileName: filename || `${title}.scorm` }));
-      }
-
-      let rawText = (await extractText(kind, bytes)).trim();
-
-      if (!rawText) return fail("未能从文件中提取到可用文本（可能是纯图片扫描件）", 422);
-      if (rawText.length < MIN_IMPORT_TEXT) {
-        return fail(`文件文本过短，无法结构化成课程（至少 ${MIN_IMPORT_TEXT} 字）`);
-      }
-      // 过长直接截断（与粘贴导入口径一致，避免超长 payload 撑爆切章）。
-      if (rawText.length > MAX_IMPORT_TEXT) {
-        rawText = rawText.slice(0, MAX_IMPORT_TEXT);
-      }
-
-      // v3.2 模板/模型（multipart 字段）：模板全员免费，非法即拒；模型须在可用集内。
-      const template = (form.get("template") as string | null)?.trim() || undefined;
-      if (!isValidTemplate(template)) return fail("未知的课件模板");
-      const requestedModel = (form.get("model") as string | null)?.trim();
-      const modelEntry = selectModelFor(requestedModel, snapshot.isSubscriber);
-      if (!modelEntry) {
-        return requestedModel
-          ? fail("该模型为会员专享或暂不可用，请升级订阅或换用默认模型", 402)
-          : fail("AI 服务未配置", 503);
-      }
-
-      const qualityTierRaw = (form.get("qualityTier") as string | null)?.trim();
-      const qualityTier = qualityTierRaw === "premium" ? "premium" : "standard";
-      if (qualityTier === "premium" && !snapshot.isSubscriber) {
-        return fail("精修排版为会员专享，请升级订阅或使用标准排版", 402);
-      }
-
-      const result = await structureImportedTextIntoCourse({
-        userId: user.id,
-        rawText,
-        kind: `file_${kind}`,
-        title,
-        template,
-        model: modelEntry.key,
-        qualityTier,
-        checkpoint: form.get("checkpoint") === "true",
-      });
-
+      completed = true;
       return ok(result);
+    } catch (error) {
+      if (!completed) {
+        try {
+          await reconcileImportOperationFailure(operation, error instanceof Error ? error.message : "file import failed");
+        } catch (settlementError) {
+          console.error("[import-file] failure settlement deferred:", settlementError);
+          return importRunning("导入状态正在收敛，请稍后原样重试", 503);
+        }
+      }
+      throw error;
     } finally {
-      releaseInflight("course_gen", user.id);
+      if (inflightAcquired) releaseInflight("course_gen", user.id);
     }
   });
+}
+
+function importRunning(message: string, status = 409): NextResponse {
+  return NextResponse.json({
+    ok: false,
+    error: message,
+    data: { code: "IMPORT_RUNNING", preserveRequestId: true },
+  }, { status });
 }

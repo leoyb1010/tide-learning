@@ -12,7 +12,7 @@
  * 纯客户端；所有写操作走既有同源 API（服务端已做越权/IDOR/计费闸门）。动效沿用站内 studio-* / 现有 Toast。
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Palette, PencilSimple, ClockCounterClockwise, Sparkle, ArrowClockwise, Check, ListBullets, Plus, Stack, ShareNetwork,
 } from "@phosphor-icons/react";
@@ -23,6 +23,11 @@ import { BlockEditor } from "@/components/BlockEditor";
 import { CreatorLibraryDialog } from "@/components/CreatorLibraryDialog";
 import { LessonGraphDialog } from "@/components/LessonGraphDialog";
 import { track } from "@/lib/analytics-client";
+import {
+  bindPresentationRequestId,
+  clearPresentationRequestId,
+  getOrCreatePresentationRequestId,
+} from "@/lib/presentation-request-id";
 
 /** 换肤可选的艺术方向（key 与服务端 ART_DIRECTIONS 一致；此处只需 key+label，避免打包服务端 token 数据）。 */
 const ART_SKINS: { key: string; label: string }[] = [
@@ -268,6 +273,8 @@ function RewriteDialog({
   const [instruction, setInstruction] = useState("");
   const [busy, setBusy] = useState(false);
   const [refineBusy, setRefineBusy] = useState(false);
+  // 网络丢包后保留同一键：用户再点一次只回放已有结果，不再调模型/扣费。
+  const refineRequestId = useRef<string | null>(null);
 
   async function rewrite() {
     if (busy) return;
@@ -301,20 +308,45 @@ function RewriteDialog({
     if (refineBusy) return;
     setRefineBusy(true);
     track("courseware_lesson_refine", { course_id: courseId, lesson_id: lesson.id });
+    const requestScope = `lesson:${courseId}:${lesson.id}`;
+    const requestId = refineRequestId.current ?? getOrCreatePresentationRequestId(requestScope);
+    refineRequestId.current = requestId;
     try {
       const r = await fetch(`/api/ai/generate-lesson-html`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "same-origin",
-        body: JSON.stringify({ lessonId: lesson.id, enhance: true }),
+        body: JSON.stringify({ lessonId: lesson.id, enhance: true, requestId }),
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
+        clearPresentationRequestId(requestScope, requestId);
+        refineRequestId.current = null;
         toast(j.data?.engine === "llm" ? "本节已精修排版" : "已重排（本次未走精修）", { tone: "success" });
         onClose();
       } else if (r.status === 402) {
+        clearPresentationRequestId(requestScope, requestId);
+        refineRequestId.current = null;
         toast("精修排版为会员专享", { tone: "warn" });
+      } else if (r.status === 409 && j?.data?.code === "COURSE_PRESENTATION_BUSY") {
+        const targets = Array.isArray(j.data.targets) ? j.data.targets : [];
+        const canonical = j.data.kind === "lesson_html" && targets.length === 1 && targets[0] === lesson.id &&
+          typeof j.data.activeRequestId === "string"
+          ? bindPresentationRequestId(requestScope, j.data.activeRequestId)
+          : null;
+        if (canonical) {
+          // 另一标签页已先认领同一节：改绑服务端规范键，下次只会
+          // 轮询/回放原操作，不会以本标签页的新键再调一次供应商。
+          refineRequestId.current = canonical;
+        }
+        // 不同节/主题操作也是暂时忙，保留本地意图但不自动重试。
+        toast(j?.error || "另一课件操作正在进行", { tone: "warn" });
       } else {
+        // running 不换键，继续轮询原操作；已收到的其它失败是终态，下次明确新建。
+        if (!String(j?.error ?? "").includes("仍在进行")) {
+          clearPresentationRequestId(requestScope, requestId);
+          refineRequestId.current = null;
+        }
         toast(j?.error || "精修失败，请稍后再试", { tone: "warn" });
       }
     } catch {
@@ -403,7 +435,7 @@ function HistoryDialog({ lesson, onClose }: { lesson: ManagerLesson; onClose: ()
       });
       const j = await r.json().catch(() => null);
       if (r.ok && j?.ok) {
-        toast("已回滚到该版本", { tone: "success" });
+        toast("已恢复内容版本，课程进入复核；学习端暂用基础块课件。继续生成会让 AI 复核并可能改写。", { tone: "info" });
         onClose();
       } else {
         toast(j?.error || "回滚失败，请稍后再试", { tone: "warn" });
@@ -449,7 +481,9 @@ function HistoryDialog({ lesson, onClose }: { lesson: ManagerLesson; onClose: ()
           ))}
         </ul>
       )}
-      <p className="mt-3 text-[11px] text-[var(--ink4)]">仅保留最近 3 版；回滚后本节课件会重排，学员端即时更新。</p>
+      <p className="mt-3 text-[11px] text-[var(--ink4)]">
+        仅保留最近 3 版。回滚只恢复内容，课程会进入复核，学习端暂用基础块课件；继续生成会让 AI 复核并可能改写。
+      </p>
     </Dialog>
   );
 }

@@ -5,7 +5,8 @@ import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { resolveCourseDesign, serializeCourseDesign, getArtDirection } from "@/lib/ai/courseware-design";
 import { resolveCoursewareMode } from "@/lib/ai/courseware-catalog";
-import { renderAndStoreLessonHtml } from "@/lib/ai/courseware-gen";
+import { CoursePresentationMutationLostError, renderAndStoreLessonHtml } from "@/lib/ai/courseware-gen";
+import { beginCoursePresentationMutation, settleExternalCoursePresentation } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -42,7 +43,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // 换肤被忽略）。清 brief 后序列化落传统 artKey 格式,用户选择生效。
     const cur = resolveCourseDesign(course);
     const nextDesign = { ...cur, art: getArtDirection(artKey), brief: undefined };
-    await prisma.course.update({ where: { id: course.id }, data: { designJson: serializeCourseDesign(nextDesign) } });
+    const mutation = await beginCoursePresentationMutation(course.id);
+    if (!mutation.ok) {
+      if (mutation.reason === "faithful_import") return fail("忠实导入课件不能用普通换肤覆盖", 409);
+      if (mutation.reason === "archived") return fail("已归档课程不能换肤", 409);
+      if (mutation.reason === "active_generation") return fail("课程正在生成或暂停中，请先等待任务收敛", 409);
+      return fail("课程暂无可重排的课节", mutation.reason === "not_found" ? 404 : 400);
+    }
+    const designStored = await prisma.course.updateMany({
+      where: { id: course.id, presentationRevision: mutation.revision, genStatus: "failed" },
+      data: { designJson: serializeCourseDesign(nextDesign) },
+    });
+    if (designStored.count !== 1) return fail("已有新的换肤操作，本次结果已丢弃", 409);
 
     // 逐节确定性重渲（仅有内容块的节）。mode 随新 artKey 反推，保证风格与 art token 同源。
     const mode = resolveCoursewareMode({ title: course.title, template: course.template, artKey });
@@ -52,21 +64,35 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       // designJson/renderEngine 必须带上(2026-07-21 审查 M 修复):v6 起 lesson.designJson 存逐节原创
       // 设计 token,select 漏掉会让 renderAndStoreLessonHtml 落库时把它静默清空——用户换个固定皮肤,
       // 整课花钱精修出的逐节设计全没了,回 bespoke 时还得重烧 LLM。
-      select: { id: true, title: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true },
+      select: { id: true, title: true, summary: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true },
     });
 
     let rendered = 0;
     let skipped = 0;
     for (const l of lessons) {
       try {
-        const r = await renderAndStoreLessonHtml(course.id, l, nextDesign, mode, { enhance: false, userId: user.id, force: true });
+        const r = await renderAndStoreLessonHtml(course.id, l, nextDesign, mode, {
+          enhance: false,
+          userId: user.id,
+          force: true,
+          presentationRevision: mutation.revision,
+          billingKey: `presentation:${course.id}:r${mutation.revision}:${l.id}`,
+        });
         if (r.engine === "deterministic" || r.engine === "llm") rendered += 1;
         else skipped += 1; // engine:'none' —— 被并发渲染 claim 占用或无块
-      } catch {
+      } catch (error) {
+        if (error instanceof CoursePresentationMutationLostError) {
+          return fail("已有新的换肤操作，本次结果已丢弃", 409);
+        }
         skipped += 1;
       }
     }
 
-    return ok({ artKey, rendered, skipped, total: lessons.length });
+    const presentation = await settleExternalCoursePresentation(course.id, mutation.revision);
+    if (!presentation.settled) return fail("课件表现层已发生并发变更，请重试", 409);
+    if (!presentation.contentReady || presentation.status === "incomplete" || skipped > 0) {
+      return fail(`换肤未完整交付（${presentation.ready}/${presentation.total}），课程已保持为不可发布状态，可免费重试`, 409);
+    }
+    return ok({ artKey, rendered, skipped, total: lessons.length, presentationStatus: presentation.status });
   });
 }

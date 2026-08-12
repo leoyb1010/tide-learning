@@ -6,8 +6,7 @@
  */
 
 import { blocksToPlainText, type Block } from "../blocks";
-import { creditingOnUsage } from "../credits";
-import { chatJson } from "../llm";
+import { chatJson, isFailClosedLlmError } from "../llm";
 import { contrastRatio, oklchToRgb, rgbToHex } from "./color-oklch";
 import { bespokeTimeoutMs, type LlmModelEntry } from "./models";
 
@@ -403,6 +402,8 @@ export async function generateLessonCreativeDesign(input: {
   previousDesigns?: LessonCreativeDesign[];
   familyAnchor?: LessonCreativeDesign;
   userId: string;
+  billingKey?: string;
+  billingOperationKey?: string;
   model: LlmModelEntry;
 }): Promise<{ design: LessonCreativeDesign | null; issues: string[] }> {
   const content = blocksToPlainText(input.blocks).slice(0, 7000);
@@ -457,13 +458,21 @@ export async function generateLessonCreativeDesign(input: {
         timeoutMs: bespokeTimeoutMs(input.model),
         retries: 1,
         model: input.model.key,
-        onUsage: creditingOnUsage(input.userId, "generate_lesson_html"),
+        ...(input.billingKey ? {
+          billing: {
+            userId: input.userId,
+            scene: "generate_lesson_html" as const,
+            callKey: `${input.billingKey}:creative-design:${attempt}`,
+            ...(input.billingOperationKey ? { operationKey: input.billingOperationKey } : {}),
+          },
+        } : {}),
       });
       const checked = validateCreativeDesign(raw, { requireConcept: true });
       if (checked.ok && checked.design) return { design: checked.design, issues: [] };
       lastIssues = checked.issues;
       feedback = `\n上一版未通过安全可读性闸门。请保留方向但重新计算整套色板，所有对比度留出至少 1:1 安全余量：${lastIssues.join("；").slice(0, 900)}`;
     } catch (error) {
+      if (isFailClosedLlmError(error)) throw error;
       lastIssues = [error instanceof Error ? error.message : "设计 Agent 调用失败"];
       feedback = `\n上一轮返回失败，请完整重做合法 JSON：${lastIssues.join("；").slice(0, 500)}`;
     }

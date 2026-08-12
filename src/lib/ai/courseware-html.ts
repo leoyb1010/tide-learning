@@ -10,7 +10,7 @@
  * 含 prefers-reduced-motion 分支、动画只动 transform/opacity。这些由 validateCoursewareHtml 机检。
  */
 
-import { createHash } from "crypto";
+import { createHash } from "node:crypto";
 import type { Block } from "../blocks";
 import { renderMarkdown } from "../markdown";
 import type { CourseDesign, ArtDirection } from "./courseware-design";
@@ -276,6 +276,11 @@ body.ct-paged .opener--poster{min-height:0}
   border-radius:calc(var(--ct-radius) - 4px);padding:12px 14px;max-height:0;overflow:hidden;opacity:0;
   transition:max-height .4s var(--ct-ease),opacity .35s var(--ct-ease),padding .4s var(--ct-ease);padding-top:0;padding-bottom:0}
 .quiz.answered .exp{max-height:400px;opacity:1;padding-top:12px;padding-bottom:12px}
+/* 热点只做 iframe 内形成性反馈；绿/红态仅在整题有显式 correct 键时出现。 */
+.ct-hotspot-card [data-ct-hotspot]{transition:box-shadow .2s var(--ct-ease),filter .2s var(--ct-ease)}
+.ct-hotspot-card [data-ct-hotspot].ct-hotspot-selected{box-shadow:0 0 0 4px var(--ct-accent-soft);filter:brightness(1.08)}
+.ct-hotspot-card [data-ct-hotspot].ct-hotspot-correct{background:#1f9e6e!important;border-color:#fff!important;color:#fff!important;box-shadow:0 0 0 4px rgba(31,158,110,.24)}
+.ct-hotspot-card [data-ct-hotspot].ct-hotspot-incorrect{background:#c9403f!important;border-color:#fff!important;color:#fff!important;box-shadow:0 0 0 4px rgba(201,64,63,.22)}
 /* —— flashcard —— */
 .fc{perspective:1200px;cursor:pointer}
 .fc .inner{position:relative;transition:transform .6s var(--ct-ease);transform-style:preserve-3d;min-height:120px}
@@ -443,7 +448,7 @@ const RUNTIME_SCRIPT = `
   document.documentElement.classList.add('ct-js');
   var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var secs = Array.prototype.slice.call(document.querySelectorAll('main.deck > section'));
-  var mode = 'paged'; // 默认翻页；父页可发 {type:'ct-mode', mode:'scroll'} 切竖向长滚动
+  var mode = null; // setMode('paged') 完成首次初始化；父页可切竖向长滚动
   var cur = 0;
 
   // 每页内容包进 .ct-fit，供翻页模式等比缩放到一屏（transform 不改布局，滚动模式零影响）。
@@ -463,7 +468,8 @@ const RUNTIME_SCRIPT = `
   var progress = document.createElement('div'); progress.className = 'ct-progress';
   document.body.appendChild(progress);
   var pager = null, prevBtn = null, nextBtn = null, count = null;
-  if (secs.length > 1) {
+  // 即使只有一页也保留页脚：“看到末页”不等于“完成本节”，必须由学员显式确认。
+  if (secs.length > 0) {
     pager = document.createElement('div'); pager.className = 'ct-pager';
     prevBtn = document.createElement('button'); prevBtn.type = 'button'; prevBtn.textContent = '\\u2039 上一页'; prevBtn.setAttribute('aria-label','上一页');
     count = document.createElement('span'); count.className = 'ct-count';
@@ -498,7 +504,8 @@ const RUNTIME_SCRIPT = `
           q.querySelectorAll('.opt').forEach(function(o,j){ if(j===ans) o.classList.add('ok'); });
           if(i!==ans) opt.classList.add('no');
           // 蓝图 D2：作答结果回传宿主（进错题本/复习卡/学习数据）。沙箱内无网络，只能走 postMessage。
-          try{ parent.postMessage({type:'ct-quiz', bid:q.getAttribute('data-bid')||null, answer:i, correct:i===ans}, '*'); }catch(e){}
+          // 客户端只上报“选了哪项”；正误由服务端按 blocks 教学真值重算。
+          try{ parent.postMessage({type:'ct-quiz', bid:q.getAttribute('data-bid')||null, answer:i}, '*'); }catch(e){}
         });
       });
     });
@@ -513,12 +520,28 @@ const RUNTIME_SCRIPT = `
     });
   }
   function branches(){
-    document.querySelectorAll('[data-ct-target],[data-ct-feedback]').forEach(function(el){
+    document.querySelectorAll('[data-ct-target],[data-ct-feedback],[data-ct-hotspot]').forEach(function(el){
       el.addEventListener('click',function(){
         var feedback = el.getAttribute('data-ct-feedback');
         var host = el.closest ? el.closest('.ct-route-card,.ct-hotspot-card') : null;
         var output = host && host.querySelector ? host.querySelector('.ct-route-feedback') : null;
-        if(output && feedback){ output.textContent = feedback; output.hidden = false; }
+        if(el.hasAttribute('data-ct-hotspot')){
+          var peers = host && host.querySelectorAll ? host.querySelectorAll('[data-ct-hotspot]') : [];
+          for(var hi=0;hi<peers.length;hi++){
+            peers[hi].setAttribute('aria-pressed','false');
+            peers[hi].classList.remove('ct-hotspot-selected','ct-hotspot-correct','ct-hotspot-incorrect');
+          }
+          el.setAttribute('aria-pressed','true'); el.classList.add('ct-hotspot-selected');
+          var label = el.getAttribute('aria-label') || '';
+          // data-ct-correct 只有在整题至少标注了一个 correct 时才会渲染。
+          // 无正确键的热点是探索导览，显示标签/反馈但绝不伪造对错事件。
+          if(el.hasAttribute('data-ct-correct')){
+            var correct = el.getAttribute('data-ct-correct') === 'true';
+            el.classList.add(correct ? 'ct-hotspot-correct' : 'ct-hotspot-incorrect');
+            if(output){ output.textContent = feedback || (correct ? '正确位置：' : '再观察一下：') + label; output.hidden = false; }
+            try{ parent.postMessage({type:'ct-practice', contract:1, kind:'hotspot', bid:el.getAttribute('data-bid')||null, correct:correct}, '*'); }catch(e){}
+          } else if(output){ output.textContent = feedback || ('已查看：' + label); output.hidden = false; }
+        } else if(output && feedback){ output.textContent = feedback; output.hidden = false; }
         var target = el.getAttribute('data-ct-target');
         if(target && /^[A-Za-z0-9_-]{1,80}$/.test(target)){
           try{ parent.postMessage({type:'ct-branch', targetLessonId:target, bid:el.getAttribute('data-bid')||null}, '*'); }catch(e){}
@@ -557,8 +580,13 @@ const RUNTIME_SCRIPT = `
   }
   function updateNav(){
     if (prevBtn) prevBtn.disabled = cur === 0;
-    // 末页且本页 frag 已揭完才禁用「下一页」；否则「下一页」还要用于逐条揭示。
-    if (nextBtn) nextBtn.disabled = (cur === secs.length - 1) && !(fragEls && fragIdx < fragEls.length);
+    if (nextBtn) {
+      var hasFragment = !!(fragEls && fragIdx < fragEls.length);
+      var atLast = cur === secs.length - 1;
+      nextBtn.disabled = false;
+      nextBtn.textContent = atLast && !hasFragment ? '完成本节' : hasFragment ? '下一步 \\u203a' : '下一页 \\u203a';
+      nextBtn.setAttribute('aria-label', atLast && !hasFragment ? '完成本节' : hasFragment ? '揭示下一步' : '下一页');
+    }
   }
   function show(i, revealAll){
     if (!secs.length) return;
@@ -595,10 +623,19 @@ const RUNTIME_SCRIPT = `
     if (mode !== 'paged') return;
     // 前进时：本页还有未揭示的 frag → 先揭下一条（不翻页）；否则翻页。回看(←)直接整页全显。
     if (d === 1 && fragEls && fragIdx < fragEls.length) { fragEls[fragIdx].classList.add('frag-in'); fragIdx++; updateNav(); fit(); return; }
+    // 单页、续读直达末页、末页 fragment：都只在最后一次显式前进动作后发完课信号。
+    if (d === 1 && cur === secs.length - 1) {
+      // 允许用户再次点击重试失败的网络写入；宿主在请求中/成功后做幂等。
+      try{ parent.postMessage({type:'ct-complete', index:cur, total:secs.length, contract:2}, '*'); }catch(e){}
+      return;
+    }
     show(cur + d, d < 0);
   }
   function setMode(m){
     if (m !== 'paged' && m !== 'scroll') return;
+    // ct-ready 会延时重播，宿主也会重发 ct-mode。同模式握手必须幂等，
+    // 否则每次 show(cur) 都会把已揭示的 fragments 重置，移动端首击/连续点击被吞。
+    if (mode === m) { if (m === 'scroll') postHeight(); return; }
     mode = m;
     document.body.classList[m === 'paged' ? 'add' : 'remove']('ct-paged');
     if (m === 'paged') { show(cur); }
@@ -646,9 +683,9 @@ const RUNTIME_SCRIPT = `
   window.addEventListener('message', function(e){
     var d = e.data || {};
     if (d.type === 'ct-mode') setMode(d.mode);
-    else if (d.type === 'ct-nav') nav(d.dir === -1 ? -1 : 1);
+    else if (d.type === 'ct-nav' && (d.dir === -1 || d.dir === 1)) nav(d.dir);
     // v4.2 续读:宿主在握手后下发上次读到的页(0-indexed);越界钳制,revealAll 立即整页显示不走逐条。
-    else if (d.type === 'ct-goto' && typeof d.page === 'number') { if (mode === 'paged') show(d.page, true); }
+    else if (d.type === 'ct-goto' && Number.isInteger(d.page) && d.page >= 0 && d.page < secs.length) { if (mode === 'paged') show(d.page, true); }
     else if (d.type === 'ct-hello') announce();
   });
 
@@ -848,14 +885,19 @@ function renderBlock(b: IdBlock, i: number, design: CourseDesign, v: LessonVaria
     }
     case "fillblank":
     case "dragwords":
-      // v4.3 交互块(H5P 式):填空/拖词,判分经 ct-quiz 回传宿主进错题闭环(见 courseware-interactive)。
+      // v4.3 交互块(H5P 式):填空/拖词是本地形成性练习，不冒充服务端掌握度(见 courseware-interactive)。
       return `<section ${rv}>${interactiveHtml(b)}</section>`;
     case "choice":
       return `<section ${rv}><div class="card ct-route-card"><span class="pill">学习选择</span><div class="q" style="margin-top:12px">${escapeHtml(b.prompt)}</div><div class="opts">${b.choices.map((choice, index) => `<button class="opt" data-bid="${escapeHtml(b.id)}"${choice.targetLessonId ? ` data-ct-target="${escapeHtml(choice.targetLessonId)}"` : ""}${choice.feedback ? ` data-ct-feedback="${escapeHtml(choice.feedback)}"` : ""}><span class="ol">${index + 1}</span><span>${escapeHtml(choice.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
     case "branch":
       return `<section ${rv}><div class="card ct-route-card"><span class="pill">路径分支</span><div class="q" style="margin-top:12px">${escapeHtml(b.prompt)}</div><div class="opts">${b.options.map((option, index) => `<button class="opt" data-bid="${escapeHtml(b.id)}" data-ct-target="${escapeHtml(option.targetLessonId)}"${option.condition ? ` data-ct-feedback="${escapeHtml(option.condition)}"` : ""}><span class="ol">${index + 1}</span><span>${escapeHtml(option.label)}</span></button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite"></p></div></section>`;
-    case "hotspot":
-      return `<section ${rv}><div class="ct-hotspot-card">${b.prompt ? `<div class="q" style="margin-bottom:12px">${escapeHtml(b.prompt)}</div>` : ""}<div style="position:relative;overflow:hidden;border-radius:var(--ct-radius);background:var(--ct-surface)"><img src="${escapeHtml(b.imageSrc)}" alt="${escapeHtml(b.prompt || "互动热点图")}" style="display:block;width:100%;height:auto">${b.spots.map((spot, index) => `<button type="button" aria-label="${escapeHtml(spot.label)}" title="${escapeHtml(spot.label)}" data-bid="${escapeHtml(b.id)}"${spot.targetLessonId ? ` data-ct-target="${escapeHtml(spot.targetLessonId)}"` : ""}${spot.feedback ? ` data-ct-feedback="${escapeHtml(spot.feedback)}"` : ""} style="position:absolute;left:${spot.x}%;top:${spot.y}%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:3px solid var(--ct-bg);background:var(--ct-accent);color:var(--ct-accent-ink);font-weight:800;cursor:pointer">${index + 1}</button>`).join("")}</div><p class="ct-route-feedback" hidden aria-live="polite" style="margin-top:10px;color:var(--ct-ink)"></p></div></section>`;
+    case "hotspot": {
+      const hasAnswerKey = b.spots.some((spot) => spot.correct === true);
+      const spots = b.spots.map((spot, index) =>
+        `<button type="button" aria-label="${escapeHtml(spot.label)}" title="${escapeHtml(spot.label)}" aria-pressed="false" data-ct-hotspot data-bid="${escapeHtml(b.id)}"${hasAnswerKey ? ` data-ct-correct="${spot.correct === true ? "true" : "false"}"` : ""}${spot.targetLessonId ? ` data-ct-target="${escapeHtml(spot.targetLessonId)}"` : ""}${spot.feedback ? ` data-ct-feedback="${escapeHtml(spot.feedback)}"` : ""} style="position:absolute;left:${spot.x}%;top:${spot.y}%;transform:translate(-50%,-50%);width:34px;height:34px;border-radius:50%;border:3px solid var(--ct-bg);background:var(--ct-accent);color:var(--ct-accent-ink);font-weight:800;cursor:pointer">${index + 1}</button>`,
+      ).join("");
+      return `<section ${rv}><div class="ct-hotspot-card">${b.prompt ? `<div class="q" style="margin-bottom:12px">${escapeHtml(b.prompt)}</div>` : ""}<div style="position:relative;overflow:hidden;border-radius:var(--ct-radius);background:var(--ct-surface)"><img src="${escapeHtml(b.imageSrc)}" alt="${escapeHtml(b.prompt || "互动热点图")}" style="display:block;width:100%;height:auto">${spots}</div><p class="ct-route-feedback" hidden aria-live="polite" style="margin-top:10px;color:var(--ct-ink)"></p></div></section>`;
+    }
     default:
       return "";
   }
@@ -1180,7 +1222,25 @@ const BESPOKE_ADAPTER_SCRIPT = `
   function h(){ try{ return Math.max(document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0); }catch(e){ return 0; } }
   function post(m){ try{ parent.postMessage(m, '*'); }catch(e){} }
   function announce(){ post({type:'ct-scroll-ready', contract:1}); var v = h(); if (v > 0) post({type:'ct-height', height: v}); }
-  window.addEventListener('message', function(e){ var d = e.data || {}; if (d.type === 'ct-hello' || d.type === 'ct-mode') announce(); });
+  window.addEventListener('message', function(e){
+    var d = e.data || {};
+    if (d.type === 'ct-hello' || d.type === 'ct-mode') { announce(); return; }
+    // bespoke DOM 的 data-answer 也是模型输出，不是教学真值。只按宿主返回的服务端判分渲染反馈。
+    if (d.type === 'ct-quiz-result' && typeof d.bid === 'string' && Number.isInteger(d.answer)) {
+      var quizzes = document.querySelectorAll('.quiz[data-bid]'); var q = null;
+      for (var qi = 0; qi < quizzes.length; qi++) if (quizzes[qi].getAttribute('data-bid') === d.bid) { q = quizzes[qi]; break; }
+      if (!q) return;
+      q.__ctPending = false; q.removeAttribute('aria-busy');
+      if (d.ok !== true || !Number.isInteger(d.correctAnswerIndex)) return;
+      var opts = q.querySelectorAll('.opt');
+      if (d.answer < 0 || d.answer >= opts.length || d.correctAnswerIndex < 0 || d.correctAnswerIndex >= opts.length) return;
+      q.__ctReported = true; q.classList.add('answered');
+      for (var j = 0; j < opts.length; j++) {
+        if (j === d.correctAnswerIndex) opts[j].classList.add('ok');
+        if (j === d.answer && j !== d.correctAnswerIndex) opts[j].classList.add('no');
+      }
+    }
+  });
   window.addEventListener('load', announce);
   if ('ResizeObserver' in window) { try{ new ResizeObserver(announce).observe(document.documentElement); }catch(e){} }
   setTimeout(announce, 300); setTimeout(announce, 1200);
@@ -1188,33 +1248,66 @@ const BESPOKE_ADAPTER_SCRIPT = `
     var t = ev.target;
     while (t && t !== document && !(t.classList && t.classList.contains('opt'))) t = t.parentNode;
     if (!t || t === document) return;
-    var q = t.closest ? t.closest('.quiz[data-answer]') : null;
-    if (!q || q.__ctReported) return;
+    var q = t.closest ? t.closest('.quiz[data-bid]') : null;
+    if (!q || q.__ctReported || q.__ctPending) return;
     var opts = q.querySelectorAll('.opt'); var idx = -1;
     for (var i = 0; i < opts.length; i++) if (opts[i] === t) idx = i;
-    var ans = parseInt(q.getAttribute('data-answer'), 10);
-    if (idx >= 0 && !isNaN(ans)) { q.__ctReported = true; post({type:'ct-quiz', bid: q.getAttribute('data-bid') || null, answer: idx, correct: idx === ans}); }
+    if (idx >= 0) {
+      q.__ctPending = true; q.setAttribute('aria-busy','true');
+      post({type:'ct-quiz', bid: q.getAttribute('data-bid') || null, answer: idx});
+    }
   }, true);
   document.addEventListener('click', function(ev){
     var t = ev.target && ev.target.closest ? ev.target.closest('[data-ct-target]') : null;
     if (!t) return;
     var target = t.getAttribute('data-ct-target');
+    var feedback = t.getAttribute('data-ct-feedback');
+    var host = t.closest ? t.closest('.ct-route-card,.ct-hotspot-card') : null;
+    var output = host && host.querySelector ? host.querySelector('.ct-route-feedback') : null;
+    if (output && feedback) { output.textContent = feedback; output.hidden = false; }
     if (target && /^[A-Za-z0-9_-]{1,80}$/.test(target)) post({type:'ct-branch', targetLessonId:target, bid:t.getAttribute('data-bid') || null});
   }, true);
   document.addEventListener('click', function(ev){
     var t = ev.target && ev.target.closest ? ev.target.closest('.fc') : null;
-    if (t && !t.__ctFlipped) { t.__ctFlipped = true; post({type:'ct-flash', bid: t.getAttribute('data-bid') || null}); }
+    if (t) {
+      t.classList.toggle('flip');
+      if (!t.__ctFlipped) { t.__ctFlipped = true; post({type:'ct-flash', bid: t.getAttribute('data-bid') || null}); }
+    }
   }, true);
 })();
 `;
 
-/** 给 bespoke HTML 注入协议壳（幂等；无 </body> 时追加到尾部）。在 enforceTrustedCsp 之后调用。 */
-export function injectBespokeAdapter(html: string): string {
-  const h = html || "";
-  if (h.includes("__ctBespokeAdapterV2")) return h;
-  // 存量 v1 适配器不会声明长滚动协议。重新渲染/复用旧 LLM HTML 时先移除旧壳，再注入 v2。
-  const migrated = h.replace(/<script\b[^>]*data-ct-bespoke-adapter[^>]*>[\s\S]*?<\/script>/gi, "");
-  const tag = `<script data-ct-bespoke-adapter="2">${BESPOKE_ADAPTER_SCRIPT}</script>`;
+/**
+ * LLM 表现层净化：只保留静态 HTML/CSS/声明式 data-* 状态。
+ *
+ * 不信任模型输出中任何脚本，包括存量已注入的平台 adapter：每次都全部删除，
+ * 再由 injectBespokeAdapter 在末尾注入当前版本的可信 adapter。这样历史库内 HTML 与
+ * 新生成 HTML 走同一条策略，不会因为模型自发 ct-page/ct-quiz/ct-branch 成为混淆代理。
+ */
+export function sanitizeBespokeHtml(html: string): string {
+  let h = html || "";
+  // 未闭合 script 也把后续内容一并丢弃：宁可降级展示，不可让浏览器补全后执行。
+  h = h.replace(/<script\b[\s\S]*?(?:<\/script\s*>|$)/gi, "");
+  // 移除可建立第二执行上下文或重定向的元素。
+  h = h.replace(/<(iframe|frameset|object|applet)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  h = h.replace(/<\/?(?:iframe|frame|frameset|object|embed|applet|base|link|form)\b[^>]*>/gi, "");
+  h = h.replace(/<meta\b[^>]*http-equiv\s*=\s*(?:["'][^"']*["']|[^\s>]+)[^>]*>/gi, "");
+  // 内联事件属性与 srcdoc 都是脚本的另一个入口。
+  h = h.replace(/\s+on[a-z][\w:.-]*\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  h = h.replace(/\s+srcdoc\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  // bespoke 课件不需要可执行链接；全移除可导航属性，同时避免 HTML entity 绕过 javascript: 识别。
+  h = h.replace(/\s+(?:href|xlink:href|action|formaction)\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "");
+  return h;
+}
+
+/** 给 bespoke HTML 注入唯一可信协议壳（幂等；无 </body> 时追加到尾部）。 */
+export function injectBespokeAdapter(html: string, scriptNonce?: string): string {
+  // 先清空全部模型/历史脚本，再重建可信 CSP。调用者无需了解正确顺序。
+  const migrated = enforceTrustedCsp(sanitizeBespokeHtml(html));
+  const nonceAttr = scriptNonce && /^[A-Za-z0-9+/=_-]{16,128}$/.test(scriptNonce)
+    ? ` nonce="${scriptNonce}"`
+    : "";
+  const tag = `<script${nonceAttr} data-ct-bespoke-adapter="2">${BESPOKE_ADAPTER_SCRIPT}</script>`;
   return /<\/body>/i.test(migrated) ? migrated.replace(/<\/body>/i, `${tag}</body>`) : migrated + tag;
 }
 

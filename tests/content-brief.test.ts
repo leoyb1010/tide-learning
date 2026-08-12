@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  assessmentNeedForLesson,
   contentBriefPrompt,
   createCourseContentBrief,
   readCourseContentBrief,
   serializeCourseContentBrief,
+  withConfirmedCourseOutline,
 } from "@/lib/ai/content-brief";
 
 describe("课程内容总纲", () => {
@@ -28,5 +30,30 @@ describe("课程内容总纲", () => {
     const brief = createCourseContentBrief({ request: `需求\n${"x".repeat(3000)}` });
     expect(brief.request.length).toBeLessThanOrEqual(2000);
     expect(brief.request).not.toContain("\n");
+  });
+
+  it("检查点大纲成为后续导演与作者的优先执行真值", () => {
+    const original = createCourseContentBrief({
+      request: "学习 Python 装饰器",
+      plan: { capstone: "实现一个 Python 权限装饰器" },
+    });
+    const updated = withConfirmedCourseOutline(original, [
+      { title: "JS 闭包", summary: "能解释词法作用域" },
+      { title: "闭包实战", summary: "实现一个状态封装器" },
+    ]);
+    const prompt = contentBriefPrompt(updated);
+    expect(prompt).toContain("用户确认的执行大纲");
+    expect(prompt).toContain("JS 闭包");
+    expect(prompt).toContain("以用户确认大纲为准");
+    expect(assessmentNeedForLesson(updated, { title: "闭包实战", index: 1 })).toBe("adaptive");
+  });
+
+  it("保留旧 job/title 回填的非用户 provenance，防止后续把日期洗白", () => {
+    const legacy = createCourseContentBrief({
+      request: "截至 2026-08-12 的历史价格课",
+      requestProvenance: "legacy_job",
+    });
+    expect(readCourseContentBrief(serializeCourseContentBrief(legacy))?.requestProvenance).toBe("legacy_job");
+    expect(withConfirmedCourseOutline(legacy, [{ title: "计费", summary: "费率" }]).requestProvenance).toBe("legacy_job");
   });
 });

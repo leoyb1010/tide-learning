@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest, after } from "next/server";
 import { prisma } from "@/lib/db";
 import { recordActivity } from "@/lib/gamification";
@@ -5,7 +6,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { assertCanSpend } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { scheduleFsrs, isGrade, rememberedToGrade, Grade, DAY_MS, type GradeValue } from "@/lib/srs";
@@ -85,7 +86,11 @@ export async function POST(req: NextRequest) {
         user: userMsg,
         temperature: 0.4,
         maxTokens: 6000,
-        onUsage: creditingOnUsage(user.id, "review_card"),
+        billing: {
+          userId: user.id,
+          scene: "review_card",
+          callKey: `review-card:${user.id}:batch:${randomUUID()}`,
+        },
       });
 
       const cards = (Array.isArray(result?.flashcards) ? result.flashcards : [])

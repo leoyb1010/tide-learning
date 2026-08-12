@@ -20,6 +20,8 @@ interface ThemeRow extends TemplateRow {
   preview: null | { direction: string; background: string; surface: string; ink: string; accent: string; motif: string };
 }
 
+class CreatorApiResponseError extends Error {}
+
 export function CreatorLibraryDialog({
   courseId,
   lessons,
@@ -69,7 +71,7 @@ export function CreatorLibraryDialog({
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     });
     const json = await response.json().catch(() => null);
-    if (!response.ok || !json?.ok) throw new Error(json?.error || "操作失败");
+    if (!response.ok || !json?.ok) throw new CreatorApiResponseError(json?.error || "操作失败");
     return json.data;
   }
 
@@ -112,18 +114,6 @@ export function CreatorLibraryDialog({
       toast(error instanceof Error ? error.message : "创建失败", { tone: "warn" });
       setBusy(null);
     }
-  }
-
-  async function applyTheme(theme: ThemeRow) {
-    if (busy) return;
-    setBusy(theme.id);
-    try {
-      const data = await write(`/api/creator/themes/${theme.id}/apply`, "POST", { courseId });
-      toast(`已应用到 ${data.affected} 节，${data.rendered} 节完成原创重排`, { tone: "success" });
-      await refresh();
-    } catch (error) {
-      toast(error instanceof Error ? error.message : "应用失败", { tone: "warn" });
-    } finally { setBusy(null); }
   }
 
   async function cloneTheme(theme: ThemeRow) {
@@ -242,8 +232,13 @@ export function CreatorLibraryDialog({
                     {busy === item.id ? <Spinner size={11} /> : <Copy size={12} />} 用它建课
                   </button>
                 ) : (
-                  <button type="button" onClick={() => void applyTheme(item as ThemeRow)} disabled={!!busy} className="inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-3 py-1.5 text-[11px] font-semibold text-[var(--surface)] disabled:opacity-50">
-                    {busy === item.id ? <Spinner size={11} /> : <Palette size={12} />} 应用到整课
+                  <button
+                    type="button"
+                    disabled
+                    title="整课 AI 主题正在升级总预算保护"
+                    className="inline-flex items-center gap-1 rounded-full bg-[var(--ink)] px-3 py-1.5 text-[11px] font-semibold text-[var(--surface)] opacity-50"
+                  >
+                    <Palette size={12} /> 整课应用升级中
                   </button>
                 )}
                 {scope === "market" && kind === "themes" && (

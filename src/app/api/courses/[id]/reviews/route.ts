@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
 async function resolveViewableCourse(idOrSlug: string, viewerId: string | null) {
   const course = await prisma.course.findFirst({
     where: { OR: [{ id: idOrSlug }, { slug: idOrSlug }] },
-    select: { id: true, visibility: true, authorUserId: true, sharedStatus: true, learnersCount: true },
+    select: { id: true, visibility: true, authorUserId: true, sharedStatus: true, status: true, learnersCount: true },
   });
   if (!course) return null;
   const owned = await hasPurchasedCourse(course.id, viewerId);

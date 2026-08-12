@@ -26,6 +26,21 @@ export type TopicType =
   | "social" // 社会议题：有真实分歧
   | "current"; // 时事：证据仍在演进
 
+const TOPIC_TYPES = new Set<TopicType>([
+  "skill",
+  "tech",
+  "academic",
+  "history",
+  "person",
+  "industry",
+  "social",
+  "current",
+]);
+
+export function isTopicType(value: unknown): value is TopicType {
+  return typeof value === "string" && TOPIC_TYPES.has(value as TopicType);
+}
+
 export interface TopicProfile {
   type: TopicType;
   label: string;

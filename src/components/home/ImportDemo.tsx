@@ -152,7 +152,7 @@ export function ImportDemo() {
               exit={{ opacity: 0 }}
             >
               <MagicWand size={11} weight="fill" style={{ color: "var(--red)" }} />
-              {stage === "scan" ? "AI 正在通读…" : stage === "split" ? "拆分章节…" : "配测验与复习卡…"}
+              {stage === "scan" ? "AI 正在通读…" : stage === "split" ? "拆分章节…" : "匹配要点与练习…"}
             </motion.span>
           )}
         </AnimatePresence>

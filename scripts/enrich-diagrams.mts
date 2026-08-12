@@ -89,19 +89,12 @@ async function main() {
       id: true,
       title: true,
       blocksJson: true,
-      course: { select: { id: true, title: true, template: true } },
+      course: { select: { id: true, title: true, template: true, presentationRevision: true } },
     },
     orderBy: { createdAt: "asc" },
     take: limit,
   });
   console.log(`候选 ${lessons.length} 节`);
-
-  // 运营侧批量富化不应把在售集市课打下架:快照上架态,跑完恢复。
-  // (writeLessonBlocks 的 shared→pending 复审策略针对作者改写;本脚本产出源自已过审文本
-  //  且过了安全扫描,由运营验收统一背书——恢复动作在日志里留痕。)
-  const sharedBefore = new Set(
-    (await prisma.course.findMany({ where: { sharedStatus: "shared" }, select: { id: true } })).map((c) => c.id),
-  );
 
   let added = 0, skippedHas = 0, skippedNull = 0, failed = 0;
 
@@ -148,6 +141,7 @@ async function main() {
             safety: { level: safety.level, hits: safety.hits.map((h) => h.word).slice(0, 10) },
           }),
           reason: "regen",
+          expectedPresentationRevision: l.course.presentationRevision,
         });
         added++;
         console.log(`  ✓ ${dg.kind}@${at + 1}  ${tag}`);
@@ -159,17 +153,8 @@ async function main() {
   }
   await Promise.all(Array.from({ length: CONC }, worker));
 
-  const demoted = await prisma.course.findMany({
-    where: { id: { in: [...sharedBefore] }, sharedStatus: "pending" },
-    select: { id: true, title: true },
-  });
-  for (const c of demoted) {
-    await prisma.course.update({ where: { id: c.id }, data: { sharedStatus: "shared" } });
-    console.log(`  ↺ 恢复上架(运营富化,内容源自已过审文本):${c.title}`);
-  }
-
   console.log(`完成:新增图示 ${added} · 已有跳过 ${skippedHas} · 无关系 ${skippedNull} · 失败 ${failed}`);
-  console.log("下一步:npx tsx scripts/rerender-courseware.mts 重出 HTML");
+  console.log("修改过的课程会保持待复核/不可发布；复核后再运行 rerender-courseware 重出确定性 HTML，禁止脚本直接恢复上架。");
   await prisma.$disconnect();
 }
 

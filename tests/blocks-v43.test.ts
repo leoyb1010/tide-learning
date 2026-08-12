@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateBlocks, blocksToPlainText } from "@/lib/blocks";
+import { validateBlocks, blocksToPlainText, LOCAL_FORMATIVE_BLOCK_TYPES, SERVER_SCORED_BLOCK_TYPES } from "@/lib/blocks";
 import { renderFormula } from "@/lib/ai/courseware-math";
 import { interactiveHtml, INTERACTIVE_RUNTIME } from "@/lib/ai/courseware-interactive";
 
@@ -109,7 +109,10 @@ describe("交互块渲染纪律", () => {
     if (b.type !== "fillblank") throw new Error("type");
     expect(interactiveHtml(b)).not.toContain("<img");
   });
-  it("runtime 判分脚本回传 ct-quiz（进错题闭环）", () => {
-    expect(INTERACTIVE_RUNTIME).toContain("ct-quiz");
+  it("runtime 只上报本地练习事件，不冒充 quiz 进掌握度", () => {
+    expect(INTERACTIVE_RUNTIME).toContain("ct-practice");
+    expect(INTERACTIVE_RUNTIME).not.toContain("ct-quiz");
+    expect([...SERVER_SCORED_BLOCK_TYPES]).toEqual(["quiz"]);
+    expect([...LOCAL_FORMATIVE_BLOCK_TYPES]).toEqual(["fillblank", "dragwords", "hotspot"]);
   });
 });

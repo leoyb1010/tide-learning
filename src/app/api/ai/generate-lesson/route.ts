@@ -1,10 +1,12 @@
 import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { requireLessonGenAccess } from "@/lib/ai-guard";
-import { generateLessonCore } from "@/lib/course-gen";
+import { claimCourseGenerationStart, failGenJobLease, finishGenJobLeaseOnly, generateLessonCore, initGenJob, runCourseGenBackground } from "@/lib/course-gen";
+import { after } from "next/server";
 
 export const dynamic = "force-dynamic";
 
@@ -33,22 +35,62 @@ export async function POST(req: NextRequest) {
     // 其余仍走会员门。余额预检按 generate_lesson 最坏成本，扣费在内核按真实 token 记。
     const target = await prisma.lesson.findUnique({
       where: { id: lessonId },
-      select: { course: { select: { authorUserId: true } } },
+      select: {
+        courseId: true,
+        course: { select: { authorUserId: true, status: true, genStatus: true, presentationRevision: true } },
+      },
     });
-    const { user } = await requireLessonGenAccess(target?.course?.authorUserId, { spendScene: "generate_lesson" });
+    if (!target) return fail("章节不存在", 404);
+    if (target.course?.authorUserId !== preUser.id) throw new AppError("无权操作该课程", 403);
+    if (target.course.status === "archived") return fail("已归档课程不能生成课节", 409);
+    if (target.course.genStatus === "outline_draft") {
+      return fail("请先在大纲检查点确认课程，不能绕过来源与截至日期审核直接生成", 409);
+    }
+    const { user } = await requireLessonGenAccess(target.course.authorUserId, { spendScene: "generate_lesson" });
+    const total = await prisma.lesson.count({ where: { courseId: target.courseId } });
+    const lease = await initGenJob(target.courseId, user.id, total, {}, { allowCompletedReopen: true });
+    if (!lease) return fail("该课程正在生成中，请稍后重试", 409);
+    const started = await claimCourseGenerationStart({
+      courseId: target.courseId,
+      userId: user.id,
+      lease,
+      expectedGenStatus: target.course.genStatus,
+      expectedPresentationRevision: target.course.presentationRevision,
+    });
+    if (!started) {
+      await finishGenJobLeaseOnly(lease, "lesson generation state changed");
+      return fail("该课程状态已变更，请刷新后重试", 409);
+    }
 
     // 内核负责：越权校验 / LLM 生成 / 校验重试 / 降级 / 扣费 / 写库 / genStatus 收尾。
     // 结构性错误（章节不存在 / 越权）以 Error 抛出，这里映射为 4xx。
     let result;
     try {
-      result = await generateLessonCore(lessonId, user.id);
+      result = await generateLessonCore(lessonId, user.id, { jobLease: lease });
     } catch (e) {
+      await failGenJobLease(
+        target.courseId,
+        lease,
+        e instanceof Error ? e.message : "lesson generation failed",
+        { genStatus: "generating" },
+      );
       const msg = e instanceof Error ? e.message : "";
       if (msg === "章节不存在") return fail("章节不存在", 404);
       if (msg === "无权操作该课程") throw new AppError("无权操作该课程", 403);
       throw e; // 其余交由 handle 折叠为 500
     }
 
-    return ok({ lessonId, blocks: result.blocks, allReady: result.allReady });
+    const data = { lessonId, ...result };
+    // 内核已写入占位/最佳努力稿不等于质量成功；必须保留 ok/failed 并返回非 2xx，
+    // 否则前端仅看 HTTP/envelope 就会把失败节标成完成。
+    if (!result.ok || result.failed) {
+      await failGenJobLease(target.courseId, lease, "lesson quality gate failed", { genStatus: "generating" });
+      return NextResponse.json(
+        { ok: false, error: "本节未通过生成质量检查，请重试", data },
+        { status: 422 },
+      );
+    }
+    after(() => runCourseGenBackground(target.courseId, user.id, lease));
+    return ok(data);
   });
 }

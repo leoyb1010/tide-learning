@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { courseOutlinePrompt, selectRelevantSourceText } from "@/lib/ai/prompts";
+import { courseOutlinePrompt, selectImportOutlineSourceText, selectRelevantSourceText } from "@/lib/ai/prompts";
 
 describe("逐节资料检索", () => {
   const section = (title: string, word: string) => `# ${title}\n${word.repeat(900)}\n\n`;
@@ -28,5 +28,21 @@ describe("逐节资料检索", () => {
     expect(prompt.system).not.toContain("轻松入门、建立信心");
     expect(prompt.user).toContain("可在 3-10 节内按内容调整");
     expect(prompt.user).not.toContain("5-8 节");
+  });
+
+  it("长文件大纲取样保留文末更正，不再静默只看前 50k", () => {
+    const source = `开头结论：药物 X 可长期使用。${"普通正文".repeat(15_000)}\n\n关键更正：前述结论作废，药物 X 不得长期使用。`;
+    const sampled = selectImportOutlineSourceText(source, 12_000);
+    expect(sampled).toContain("开头结论");
+    expect(sampled).toContain("前述结论作废");
+    expect(sampled.length).toBeLessThanOrEqual(12_000);
+  });
+
+  it("逐节召回把显式更正作为事实安全片段保留", () => {
+    const source = `药物 X 安全，可长期使用。${"无关铺垫".repeat(9_000)}\n\n前述结论作废：药物 X 不得长期使用，可能造成严重肝损伤。`;
+    const picked = selectRelevantSourceText(source, { query: "药物 X 是否安全", lessonIndex: 0, lessonCount: 1 }, 4_000);
+    expect(picked).toContain("可长期使用");
+    expect(picked).toContain("前述结论作废");
+    expect(picked).toContain("严重肝损伤");
   });
 });
