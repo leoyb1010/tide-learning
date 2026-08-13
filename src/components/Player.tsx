@@ -36,7 +36,8 @@ interface LessonData {
   liveStartAt?: string | null; liveSeatLimit?: number | null;
   subtitles?: SubtitleCue[];
   blocksJson?: string | null; // ai_block 类型：结构化块课件 JSON 字符串
-  htmlJson?: string | null; // v3.3 ai_html 类型：自包含 HTML 课件渲染契约 {html, hasScript, checksum, ...}
+  hasHtmlCourseware?: boolean; // HTML 正文仅由独立鉴权路由返回；这里只传 current-hash 可用性
+  renderEngine?: string | null; // llm=原创表现；deterministic=安全基础排版（顶栏必须如实标注）
   videoGenStatus?: string | null; // v3.1 视频课件生成态：null / pending / generating / ready / failed
   videoDurationSec?: number | null; // v3.1 视频课件时长（秒）：与图文阅读语义的 durationSec 隔离，仅驱动「视频」Tab 的时间轴/续播
 }
@@ -410,12 +411,9 @@ export function Player({
   // 时间轴百分比用有效播放时长：块课视频视图取 videoDurationSec，其余取 durationSec。
   const progress = playbackDurationSec > 0 ? time / playbackDurationSec : 0;
 
-  // v3.3 多样化 HTML 课件：只要本节有渲染契约 htmlJson 就用沙箱 iframe 渲染（HtmlCourseware）。
-  // 关键：以「htmlJson 是否存在」为准而非 contentType——课仍保持 contentType=ai_block，
-  // 于是 Web 渲染 HTML 课件、iOS 原生按 blocks 渲染（不认 htmlJson 字段），iOS 零破坏。
-  // 门控随 access（付费节无权益时 htmlJson 为 null）；契约脏/无 html 时回落到块渲染。
-  const htmlContract = safeParseJson(lesson.htmlJson) as { html?: string } | null;
-  const isHtmlLesson = Boolean(htmlContract && typeof htmlContract.html === "string" && htmlContract.html);
+  // HTML 正文不进入 RSC；服务端只给出经过 contract+current-hash 校验的布尔真值，
+  // iframe 再从独立鉴权路由读取正文。无效/过期表现层回落块课件。
+  const isHtmlLesson = lesson.hasHtmlCourseware === true;
   const isScormLesson = lesson.contentType === "scorm" && Boolean(lesson.articleMd);
 
   // ai_block 块课件：解析并校验块数组（validateBlocks 永不抛错，脏数据归空数组）。
@@ -433,22 +431,25 @@ export function Player({
 
   // 翻页课件进度上报：块课无时间轴，用「当前页 / 总页」映射为进度。
   // 页进度落到独立的 lastSlideIndex（kind:"slide"），与视频/模拟播放的 progressSec 隔离，
-  // 两个视图的续读锚点互不覆盖。completed 在末页触发，落库为完课。翻页去抖：仅在页码变化时上报。
+  // 两个视图的续读锚点互不覆盖。页进度只记“最远读到”，完课由独立的可信完成动作上报。
   const blockPageRef = useRef(initialSlidePage);
   // 本节是否已上报过完课（翻页到末页 / 滚动读到末块）。翻页与滚动两模式共享此哨兵，
   // 保证同一节课的 completed 只 POST 一次，避免切换排布方式时重复上报完课。
   const blockCompletedRef = useRef(false);
+  useEffect(() => {
+    blockPageRef.current = initialSlidePage;
+    blockCompletedRef.current = false;
+  }, [initialSlidePage, lesson.id]);
   const reportBlockPage = useCallback((pageIndex: number, totalPages: number) => {
     if (!isLoggedIn || !access) return;
+    if (!Number.isInteger(pageIndex) || !Number.isInteger(totalPages) || totalPages < 1 || pageIndex < 0 || pageIndex >= totalPages) return;
     const page = pageIndex + 1; // 1-indexed
-    if (page === blockPageRef.current) return; // 同页重复上报去抖
+    if (page <= blockPageRef.current) return; // 回看/竞态旧帧不得把“最远读到”回退
+    const previousPage = blockPageRef.current;
     blockPageRef.current = page;
-    const reachedEnd = page >= totalPages && totalPages > 0;
-    // completed 仅在首次到末页时置真：已上报过则本次只更新页序、不再重复 POST completed。
-    const completed = reachedEnd && !blockCompletedRef.current;
-    if (reachedEnd) blockCompletedRef.current = true;
-    void postProgress({ lessonId: lesson.id, progressSec: page, completed, kind: "slide" }).then((ok) => {
-      if (!ok && completed) blockCompletedRef.current = false; // 回滚:完课未落库,下次翻到末页可重试
+    void postProgress({ lessonId: lesson.id, progressSec: page, completed: false, kind: "slide" }).then((ok) => {
+      // 只在没有更新的前进已发生时回滚，避免旧请求失败覆盖新页。
+      if (!ok && blockPageRef.current === page) blockPageRef.current = previousPage;
     });
     track("lesson_slide_advance", { lesson_id: lesson.id, page, total: totalPages });
   }, [isLoggedIn, access, lesson.id, postProgress]);
@@ -459,6 +460,23 @@ export function Player({
     setNextCountdown(3);
     setShowNextCard(true);
   }, [nextHref]);
+
+  /** 完课只接受可信平台动作，且完课写入不得降低已有页序。 */
+  const reportTrustedBlockComplete = useCallback(async (progressHint?: number): Promise<boolean> => {
+    if (!isLoggedIn || !access) return false;
+    if (blockCompletedRef.current) return true;
+    blockCompletedRef.current = true;
+    const hint = Number.isInteger(progressHint) && (progressHint as number) > 0 ? (progressHint as number) : 1;
+    const progressSec = Math.max(1, blockPageRef.current, hint);
+    blockPageRef.current = progressSec;
+    const ok = await postProgress({ lessonId: lesson.id, progressSec, completed: true, kind: "slide" });
+    if (!ok) {
+      blockCompletedRef.current = false;
+      return false;
+    }
+    onBlockComplete();
+    return true;
+  }, [access, isLoggedIn, lesson.id, onBlockComplete, postProgress]);
 
   // v4.2:article/mixed 的「标记读完」——与块课完课同语义落库(kind:slide/completed),弹下一节卡。
   // 初始已读态:article 课历史完课会把 lastSlideIndex 写为 1(initialSlidePage>0 即已读过)。
@@ -477,16 +495,10 @@ export function Player({
   // 滚动模式完课：滚动读到末块（BlockRenderer.onReachEnd）时上报一次完课并弹下一节卡，
   // 与翻页模式末页完课语义一致。与翻页共享 blockCompletedRef 去抖：本节已上报过完课
   // （翻页到末页 / 已滚到末块）则跳过，保证同节不重复 POST completed。
-  // 走 kind:"slide" 落 completedAt 且不污染视频 progressSec；progressSec:1 仅作占位（末块无页序语义）。
+  // 走 kind:"slide" 落 completedAt 且不污染视频 progressSec；完成请求复用当前最远页序，绝不回写 1。
   const reportScrollComplete = useCallback(() => {
-    if (!isLoggedIn || !access) return;
-    if (blockCompletedRef.current) return; // 本节已上报过完课，去抖
-    blockCompletedRef.current = true;
-    void postProgress({ lessonId: lesson.id, progressSec: 1, completed: true, kind: "slide" }).then((ok) => {
-      if (!ok) blockCompletedRef.current = false; // 回滚:下次滚到末块可重试
-    });
-    onBlockComplete();
-  }, [isLoggedIn, access, lesson.id, onBlockComplete, postProgress]);
+    void reportTrustedBlockComplete();
+  }, [reportTrustedBlockComplete]);
 
   // 工具按钮命中区扩展：透明 44x44 伪元素外扩，视觉尺寸不变（WCAG 2.5.5 目标尺寸）。
   const hit44 = "relative after:absolute after:left-1/2 after:top-1/2 after:h-[44px] after:w-[44px] after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']";
@@ -869,15 +881,17 @@ export function Player({
               // onPage 接页序进度上报(蓝图 D1 补口:此前 HTML 课件零进度、streak 恒空),末页触发下一节卡。
               <HtmlCourseware
                 key={lesson.id}
-                html={htmlContract!.html as string}
+                html=""
                 lessonId={lesson.id}
                 courseSlug={courseSlug}
+                renderEngine={lesson.renderEngine}
                 nonce={cspNonce}
                 initialPage={initialSlidePage > 1 ? initialSlidePage - 1 : 0}
                 onPage={(i, t) => {
                   reportBlockPage(i, t);
-                  if (t > 0 && i + 1 >= t) onBlockComplete();
                 }}
+                onComplete={(total) => { void reportTrustedBlockComplete(total); }}
+                onScrollComplete={reportScrollComplete}
               />
             ) : isBlockLesson ? (
               // 块课件：左侧内容区渲染块。v3.1 若有视频课件（ready/生成中），先给出「图文 / 视频」切换 Tab。
@@ -954,18 +968,19 @@ export function Player({
                       // 翻页课件：黑板式单屏，左右翻页 + 页序进度上报 + 末页完课。
                       // initialIndex 用上次读到的页码(1-indexed)-1 恢复续读位置；BlockSlideshow 内部再 clamp。
                       <BlockSlideshow
+                        key={lesson.id}
                         blocks={blocks}
                         courseId={courseId}
                         sceneBg={sceneBgSrc}
                         initialIndex={initialSlidePage > 0 ? initialSlidePage - 1 : 0}
                         onSlideChange={reportBlockPage}
-                        onComplete={onBlockComplete}
+                        onComplete={reportTrustedBlockComplete}
                         notePanel={canCreateNote ? slideNoteEditor : undefined}
                       />
                     ) : (
                       // 滚动模式：保留原长列表叙事（Reveal 交错浮现）+ 末块进视口完课上报（与翻页完课语义一致）
                       <div className="rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)] sm:p-6">
-                        <BlockRenderer blocks={blocks} courseId={courseId} sceneBg={sceneBgSrc} onReachEnd={reportScrollComplete} />
+                        <BlockRenderer key={lesson.id} blocks={blocks} courseId={courseId} sceneBg={sceneBgSrc} onReachEnd={reportScrollComplete} />
                       </div>
                     )}
                   </div>

@@ -71,6 +71,7 @@ async function main() {
         contributorName: "网易有道", updateCadence: "按题季更新",
         qualityTier: "standard", template: m.template ?? null,
         designJson: serializeCourseDesign(design),
+        genStatus: "failed",
         disclaimer: "本课程内容基于有道同名产品的教学方法与真实课程结构整理，供体验学习参考。",
         isFeatured: m.featured ?? false, publishedAt: new Date(), lastUpdatedAt: new Date(),
       },
@@ -93,18 +94,24 @@ async function main() {
           durationSec: dur, isFree: l.isFree === true || i === 0,
           status: "published", publishedAt: new Date(),
         },
-        select: { id: true, title: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true },
+        select: { id: true, title: true, summary: true, sortOrder: true, blocksJson: true, htmlJson: true, renderSourceHash: true },
       });
       // 确定性精美渲染(不 enhance → 纯确定性，无 LLM、无超时)
       htmlTotal++;
       try {
-        const r = await renderAndStoreLessonHtml(course.id, lesson, design, mode);
+        const r = await renderAndStoreLessonHtml(course.id, lesson, design, mode, {
+          enhance: false,
+          presentationRevision: 0,
+        });
         if (r.ok && r.contract) htmlOk++;
       } catch (e) {
         console.error(`  [${a.key}] L${i} 渲染失败:`, e instanceof Error ? e.message : e);
       }
     }
-    await prisma.course.update({ where: { id: course.id }, data: { totalDurationSec: totalDuration, deterministicRenderCount: htmlOk } });
+    await prisma.course.update({
+      where: { id: course.id },
+      data: { totalDurationSec: totalDuration, deterministicRenderCount: htmlOk, genStatus: "ready" },
+    });
     ok++;
     console.log(`✓ ${m.name} (${slug}) · ${m.category} · ${lessons.length}节 · art=${design.art.key}`);
   }

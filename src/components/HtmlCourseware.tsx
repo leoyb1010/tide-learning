@@ -16,13 +16,19 @@ import { useRouter } from "next/navigation";
  * 全部在 iframe 内的运行时脚本里；本组件只负责：模式切换 UI（默认翻页，localStorage 记忆偏好）、
  * 按模式定 iframe 高度（翻页=固定视口档；滚动=postMessage 上报的全高）、全屏、键盘转发。
  * 协议（postMessage，均校验 event.source）：
- *   iframe → 父：ct-ready{pages}（运行时具备翻页能力）· ct-page{index,total} · ct-height{height}（仅滚动模式）
+ *   iframe → 父：ct-ready{pages}（运行时具备翻页能力）· ct-page{index,total} · ct-scroll-ready（仅长滚动能力）· ct-height{height}
  *   父 → iframe：ct-mode{mode} · ct-nav{dir}（键盘转发）
  * 旧课件（无新运行时）不会发 ct-ready → 不显示切换 UI，按滚动模式用上报高度渲染，零破坏。
  */
 
 type ViewMode = "paged" | "scroll";
 const VIEW_PREF_KEY = "tide-courseware-view";
+const SCROLL_PROGRESS_STEPS = 20;
+const MAX_PROTOCOL_PAGES = 1_000;
+
+function isProtocolInt(value: unknown, min: number, max: number): value is number {
+  return typeof value === "number" && Number.isFinite(value) && Number.isInteger(value) && value >= min && value <= max;
+}
 
 /**
  * 审计修复(P0)：middleware 的 CSP 是 `script-src 'self' 'nonce-…'`,而 **srcdoc iframe 继承父文档 CSP**,
@@ -39,27 +45,47 @@ export function HtmlCourseware({
   html,
   lessonId,
   courseSlug,
+  renderEngine,
   nonce,
   onPage,
+  onComplete,
+  onScrollComplete,
   initialPage,
 }: {
-  html: string;
+  /** 仅无 lessonId 的独立/测试 srcDoc 场景需要；App 学习链正文一律由鉴权路由读取。 */
+  html?: string;
   lessonId?: string;
   /** 分支块跳转必须绑定当前课程 slug；目标课节由服务端再次校验同课归属。 */
   courseSlug?: string;
+  /** 表现层真值：llm=原创课件，deterministic=安全基础排版；未知引擎只显示中性标签。 */
+  renderEngine?: string | null;
   /** 父页 CSP nonce(middleware x-nonce)。不传则不注入——独立/测试渲染场景仍可用。 */
   nonce?: string;
   /** 翻页课件页码变化回调(index 0 起, total 总页数)。宿主用它接进度上报(蓝图 D1 补口)。 */
   onPage?: (index: number, total: number) => void;
+  /** 学员在末页消费完 fragments 后显式执行“完成本节”。 */
+  onComplete?: (total: number) => void;
+  /** bespoke 长滚动课件抵达宿主侧尾部哨兵时回调；与块课滚动完课共用语义。 */
+  onScrollComplete?: () => void;
   /** v4.2 续读:上次读到的页(0-indexed)。收到 ct-ready 后一次性下发 ct-goto 恢复位置。 */
   initialPage?: number;
 }) {
+  const normalizedInitialPage = isProtocolInt(initialPage, 0, MAX_PROTOCOL_PAGES - 1) ? initialPage : 0;
+  const presentationLabel = renderEngine === "llm"
+    ? "原创课件"
+    : renderEngine === "deterministic"
+      ? "安全基础排版"
+      : "互动课件";
   const router = useRouter();
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState<number>(560);
   const [fullscreen, setFullscreen] = useState(false);
   const [mode, setMode] = useState<ViewMode>("paged");
   const [pagedReady, setPagedReady] = useState(false); // 收到 ct-ready 才认翻页能力（旧课件回落滚动）
+  const [scrollOnlyReady, setScrollOnlyReady] = useState(false); // bespoke 长滚动能力；由宿主观察阅读进度
+  // 滚动进度/完课必须等 iframe 在当前滚动布局下回传过有效全高。
+  // 否则仅点“滚动”时，旧的 560px 框高可能让底部哨兵瞬间进入视口并误完课。
+  const [scrollLayoutReady, setScrollLayoutReady] = useState(false);
   /**
    * 课件承载失败兜底（2026-07-21）：iframe 此前无 onError、无超时兜底,课件路由 404 时
    * 用户看到的是一整块纯白(暗色下刺眼白板)或孤零零的英文 "Not Found",无从判断是没权限、
@@ -68,7 +94,11 @@ export function HtmlCourseware({
   const [loadFailed, setLoadFailed] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [page, setPage] = useState<{ index: number; total: number } | null>(null);
+  // 有续读位置时，在 ct-goto 的 ct-page 回执到达前禁用 iframe 点击，
+  // 防止移动端用户首击被“先跳续读页”的竞态吞掉。
+  const [resumeSettled, setResumeSettled] = useState(normalizedInitialPage === 0);
   const rootRef = useRef<HTMLDivElement>(null);
+  const scrollEndRef = useRef<HTMLDivElement>(null);
   const modeRef = useRef<ViewMode>("paged");
   modeRef.current = mode;
   // 课件是否在视口内——键盘翻页只在可见时劫持，避免课件滚出屏幕后仍吞掉 ←/→/空格。
@@ -76,22 +106,38 @@ export function HtmlCourseware({
   // 蓝图 D2：已上报过的 quiz 块（同一次会话内去重，服务端 upsert 兜底幂等）。
   // 注：Player 侧以 key={lesson.id} 挂载本组件,换课必重挂,Set 不会跨课残留(审计修复 H1)。
   const reportedQuizRef = useRef<Set<string>>(new Set());
+  const scrollProgressRef = useRef(-1);
+  const sentScrollResumeRef = useRef(false);
+  const sentGotoRef = useRef(false);
+  const expectedResumePageRef = useRef<number | null>(normalizedInitialPage > 0 ? normalizedInitialPage : null);
+  const resumePendingRef = useRef(normalizedInitialPage > 0);
+  const pagedPagesRef = useRef<number | null>(null);
+  const scrollReadyRef = useRef(false);
   // 承载超时兜底(2026-07-21):12s 内既无 ct-ready、也无任何高度上报 → 认定课件没起来,
   // 给中文可操作提示而不是把纯白/英文 404 留给用户。reloadKey 变化时重新计时。
   const sawSignalRef = useRef(false);
   useEffect(() => {
     if (!lessonId) return;
     sawSignalRef.current = false;
+    scrollProgressRef.current = -1;
+    sentScrollResumeRef.current = false;
+    sentGotoRef.current = false;
+    expectedResumePageRef.current = normalizedInitialPage > 0 ? normalizedInitialPage : null;
+    resumePendingRef.current = normalizedInitialPage > 0;
+    pagedPagesRef.current = null;
+    scrollReadyRef.current = false;
+    setPagedReady(false);
+    setPage(null);
+    setResumeSettled(normalizedInitialPage === 0);
+    setScrollOnlyReady(false);
+    setScrollLayoutReady(false);
     setLoadFailed(false);
     const t = window.setTimeout(() => {
       if (!sawSignalRef.current) setLoadFailed(true);
     }, 12_000);
     return () => window.clearTimeout(t);
-  }, [lessonId, reloadKey]);
-
-  // 续读 ct-goto 只发一次(ct-ready 会重播)。
-  const sentGotoRef = useRef(false);
-  const srcdocHtml = useMemo(() => injectNonce(html, nonce), [html, nonce]);
+  }, [lessonId, reloadKey, normalizedInitialPage]);
+  const srcdocHtml = useMemo(() => injectNonce(html ?? "", nonce), [html, nonce]);
 
   // 视图偏好：默认翻页；用户切过则记住（挂载时读一次）。
   useEffect(() => {
@@ -114,54 +160,166 @@ export function HtmlCourseware({
       if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
       const d = e.data;
       if (!d || typeof d !== "object") return;
-      // 收到本 iframe 的任何合法消息 = 课件运行时活着,撤销超时兜底(2026-07-21)。
-      sawSignalRef.current = true;
-      if (d.type === "ct-height" && typeof d.height === "number") {
+      // 只有“类型+字段+范围+能力顺序”都合法的协议帧才能清除超时错误。
+      // 一个任意 object / NaN / 伪造页码不得把坏课件标记为健康。
+      const markHealthy = () => {
+        sawSignalRef.current = true;
+        setLoadFailed(false);
+      };
+      if (d.type === "ct-scroll-ready" && d.contract === 1) {
+        // bespoke HTML 明确声明自己是长滚动课件。它不冒充翻页，但仍必须进入续读/完课闭环。
+        markHealthy();
+        scrollReadyRef.current = true;
+        setScrollOnlyReady(true);
+        resumePendingRef.current = false;
+        setResumeSettled(true);
+      } else if (
+        d.type === "ct-height" &&
+        (scrollReadyRef.current || pagedPagesRef.current !== null) &&
+        typeof d.height === "number" &&
+        Number.isFinite(d.height) &&
+        d.height > 0 &&
+        d.height <= 200_000
+      ) {
         // clamp：防异常极值；上限给足长课件，下限保证不塌陷。
+        markHealthy();
         setHeight(Math.max(240, Math.min(20000, Math.round(d.height))));
-      } else if (d.type === "ct-ready") {
+        // bespoke 天生是长滚动；contract-2 只在宿主已切到 scroll 时认这次高度握手。
+        // modeRef 在 switchMode 内同步更新，可拒绝切回 paged 后才到的延迟高度帧。
+        if (scrollReadyRef.current || (pagedPagesRef.current !== null && modeRef.current === "scroll")) {
+          setScrollLayoutReady(true);
+        }
+      } else if (d.type === "ct-ready" && d.contract === 2 && isProtocolInt(d.pages, 1, MAX_PROTOCOL_PAGES)) {
+        markHealthy();
+        const pages = d.pages;
+        pagedPagesRef.current = pages;
         // ct-ready 会重播（对抗 hydration 竞态），需幂等：不覆盖已有页码。
         setPagedReady(true);
-        if (typeof d.pages === "number" && d.pages > 0) {
-          setPage((p) => p ?? { index: 0, total: d.pages as number });
-        }
+        setPage((p) => (p?.total === pages ? p : { index: 0, total: pages }));
         // 运行时就绪后同步当前模式（覆盖 iframe 内的默认翻页，比如用户偏好是滚动）。
         postToFrame({ type: "ct-mode", mode: modeRef.current });
-        // v4.2 续读:一次性恢复上次读到的页(ct-ready 重播时靠 ref 幂等,不反复跳页打断用户)。
-        if (initialPage && initialPage > 0 && !sentGotoRef.current) {
-          sentGotoRef.current = true;
-          postToFrame({ type: "ct-goto", page: initialPage });
+        const expected = Math.min(normalizedInitialPage, pages - 1);
+        expectedResumePageRef.current = expected > 0 ? expected : null;
+        // 续读必须等 ct-page 回执后再放行交互；滚动模式由宿主滚动锚点恢复。
+        if (modeRef.current === "paged" && expected > 0) {
+          if (!sentGotoRef.current) {
+            sentGotoRef.current = true;
+            resumePendingRef.current = true;
+            setResumeSettled(false);
+          }
+          // 在每次 ct-ready 重播时重发，直到收到目标 ct-page 回执；避免单次消息丢失后永久锁住触控。
+          if (resumePendingRef.current) postToFrame({ type: "ct-goto", page: expected });
+        } else if (modeRef.current !== "paged" || expected === 0) {
+          resumePendingRef.current = false;
+          setResumeSettled(true);
         }
-      } else if (d.type === "ct-page" && typeof d.index === "number" && typeof d.total === "number") {
+      } else if (
+        d.type === "ct-page" &&
+        pagedPagesRef.current !== null &&
+        isProtocolInt(d.total, 1, MAX_PROTOCOL_PAGES) &&
+        d.total === pagedPagesRef.current &&
+        isProtocolInt(d.index, 0, d.total - 1)
+      ) {
+        markHealthy();
         setPage({ index: d.index, total: d.total });
+        if (resumePendingRef.current) {
+          if (d.index !== expectedResumePageRef.current) return;
+          // 这一帧只是对已持久化续读位置的确认，不重复上报页进度。
+          resumePendingRef.current = false;
+          setResumeSettled(true);
+          return;
+        }
         // 蓝图 D1 补口：HTML 课件此前只更新页码 UI、从不上报进度——主力课型的 streak/完课恒空。
         onPage?.(d.index, d.total);
-      } else if (d.type === "ct-flash" && lessonId) {
+      } else if (
+        d.type === "ct-complete" &&
+        d.contract === 2 &&
+        pagedPagesRef.current !== null &&
+        d.total === pagedPagesRef.current &&
+        isProtocolInt(d.index, 0, d.total - 1) &&
+        d.index === d.total - 1 &&
+        !resumePendingRef.current
+      ) {
+        markHealthy();
+        onComplete?.(d.total);
+      } else if (d.type === "ct-flash" && lessonId && typeof d.bid === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(d.bid)) {
+        markHealthy();
         // 审计修复：ct-flash 此前是无人接收的死信号——翻卡行为记入前端埋点(复习意愿信号,不落业务表)。
-        track("courseware_flashcard_flip", { lesson_id: lessonId, block_id: typeof d.bid === "string" ? d.bid : null });
-      } else if (d.type === "ct-quiz" && lessonId && typeof d.correct === "boolean") {
+        track("courseware_flashcard_flip", { lesson_id: lessonId, block_id: d.bid });
+      } else if (
+        d.type === "ct-practice" &&
+        lessonId &&
+        d.contract === 1 &&
+        (d.kind === "fillblank" || d.kind === "dragwords" || d.kind === "hotspot") &&
+        typeof d.bid === "string" &&
+        /^[A-Za-z0-9_-]{1,64}$/.test(d.bid) &&
+        typeof d.correct === "boolean"
+      ) {
+        markHealthy();
+        // 填空/选词/热点是本地形成性练习：可记录练习行为，但不写 LessonQuizResult/错题本。
+        // 它们没有 quiz 的 answerIndex 服务端真值，绝不信任 iframe 的 correct 去伪造掌握度。
+        track("courseware_local_practice", {
+          lesson_id: lessonId,
+          block_id: d.bid,
+          practice_kind: d.kind,
+          locally_correct: d.correct,
+        });
+      } else if (
+        d.type === "ct-quiz" &&
+        lessonId &&
+        typeof d.bid === "string" &&
+        /^[A-Za-z0-9_-]{1,64}$/.test(d.bid) &&
+        isProtocolInt(d.answer, 0, 31)
+      ) {
+        markHealthy();
         // 蓝图 D2（审查 P0-6）：课件内答题结果落库——进掌握度表，答错自动转错题复习卡。
         // 沙箱 connect-src 'none'，课件自身无法发请求，必须由宿主代发。失败静默（学习主链不受影响）。
-        const bid = typeof d.bid === "string" && d.bid ? d.bid : null;
+        const bid = d.bid;
         if (bid && !reportedQuizRef.current.has(bid)) {
           // 去抖标记先置位防同题连点重复上报;但**失败必须回滚**(2026-07-21 修复):
           // 此前失败即永久丢弃该题结果 —— 掌握度不涨、答错也不进错题复习卡,用户「明明做了题」。
           reportedQuizRef.current.add(bid);
-          const answerIndex = typeof d.answer === "number" ? d.answer : 0;
-          const correct = d.correct;
+          const answerIndex = d.answer;
           void fetch(`/api/lessons/${lessonId}/quiz-result`, {
             method: "POST",
             headers: { "content-type": "application/json" },
-            body: JSON.stringify({ blockId: bid, answerIndex, correct }),
+            body: JSON.stringify({ blockId: bid, answerIndex }),
           })
-            .then((res) => {
-              if (!res.ok) reportedQuizRef.current.delete(bid); // 允许重答时重试
+            .then(async (res) => {
+              const json = (await res.json().catch(() => null)) as {
+                ok?: boolean;
+                data?: { answerIndex?: unknown; correct?: unknown; correctAnswerIndex?: unknown };
+              } | null;
+              const correctAnswerIndex = json?.data?.correctAnswerIndex;
+              if (
+                !res.ok ||
+                json?.ok !== true ||
+                json.data?.answerIndex !== answerIndex ||
+                typeof json.data?.correct !== "boolean" ||
+                !isProtocolInt(correctAnswerIndex, 0, 31)
+              ) {
+                reportedQuizRef.current.delete(bid); // 允许重答时重试
+                postToFrame({ type: "ct-quiz-result", ok: false, bid, answer: answerIndex });
+                return;
+              }
+              postToFrame({
+                type: "ct-quiz-result",
+                ok: true,
+                bid,
+                answer: answerIndex,
+                correct: json.data.correct,
+                correctAnswerIndex,
+              });
             })
-            .catch(() => reportedQuizRef.current.delete(bid));
+            .catch(() => {
+              reportedQuizRef.current.delete(bid);
+              postToFrame({ type: "ct-quiz-result", ok: false, bid, answer: answerIndex });
+            });
         }
       } else if (d.type === "ct-branch" && courseSlug && typeof d.targetLessonId === "string") {
         const target = d.targetLessonId.trim();
         if (/^[A-Za-z0-9_-]{1,80}$/.test(target)) {
+          markHealthy();
           track("courseware_branch_navigate", { lesson_id: lessonId ?? null, target_lesson_id: target });
           router.push(`/courses/${encodeURIComponent(courseSlug)}/learn/${encodeURIComponent(target)}`);
         }
@@ -169,10 +327,75 @@ export function HtmlCourseware({
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
-  }, [postToFrame, lessonId, courseSlug, router, onPage, initialPage]);
+  }, [postToFrame, lessonId, courseSlug, router, onPage, onComplete, normalizedInitialPage]);
+
+  // bespoke 长文档，以及确定性课件主动切到“滚动”后，都由可信宿主观察可见进度。
+  // 将连续滚动量化为 20 个稳定步进，复用现有 slide 进度接口；第 20 步只由底部哨兵触发完课。
+  useEffect(() => {
+    const scrollTrackingActive = scrollLayoutReady && (scrollOnlyReady || (pagedReady && mode === "scroll"));
+    if (!scrollTrackingActive || loadFailed || fullscreen) return;
+    const root = rootRef.current;
+    if (!root) return;
+    let raf = 0;
+    const update = () => {
+      raf = 0;
+      const rect = root.getBoundingClientRect();
+      const viewport = Math.max(1, window.innerHeight);
+      const travel = Math.max(1, rect.height + viewport * 0.65);
+      const progress = Math.max(0, Math.min(1, (viewport * 0.82 - rect.top) / travel));
+      const index = Math.min(SCROLL_PROGRESS_STEPS - 2, Math.floor(progress * SCROLL_PROGRESS_STEPS));
+      if (index !== scrollProgressRef.current) {
+        scrollProgressRef.current = index;
+        onPage?.(index, SCROLL_PROGRESS_STEPS);
+      }
+    };
+    const schedule = () => {
+      if (!raf) raf = window.requestAnimationFrame(update);
+    };
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    schedule();
+
+    // 续读只执行一次：把上次 20 步进锚点恢复到视口中部。没有历史进度时绝不主动抢滚动位置。
+    if (initialPage && initialPage > 0 && !sentScrollResumeRef.current) {
+      sentScrollResumeRef.current = true;
+      window.requestAnimationFrame(() => {
+        const current = root.getBoundingClientRect();
+        const ratio = Math.max(0, Math.min(1, initialPage / (SCROLL_PROGRESS_STEPS - 1)));
+        const top = window.scrollY + current.top + ratio * Math.max(0, current.height - window.innerHeight * 0.45);
+        window.scrollTo({ top: Math.max(0, top), behavior: "auto" });
+      });
+    }
+
+    return () => {
+      if (raf) window.cancelAnimationFrame(raf);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+  }, [scrollLayoutReady, scrollOnlyReady, pagedReady, mode, loadFailed, fullscreen, initialPage, onPage]);
+
+  // 完课必须由真实抵达底部证明，不能仅凭 HTML 已加载。哨兵位于 iframe 之后，观察发生在父页面，
+  // 因而不受“iframe 高度等于全文、内部没有 scroll 事件”的结构限制。Player 侧已有幂等哨兵。
+  useEffect(() => {
+    const scrollTrackingActive = scrollLayoutReady && (scrollOnlyReady || (pagedReady && mode === "scroll"));
+    if (!scrollTrackingActive || loadFailed || fullscreen || typeof IntersectionObserver === "undefined") return;
+    const end = scrollEndRef.current;
+    if (!end) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) onScrollComplete?.();
+      },
+      { threshold: 0.5 },
+    );
+    observer.observe(end);
+    return () => observer.disconnect();
+  }, [scrollLayoutReady, scrollOnlyReady, pagedReady, mode, loadFailed, fullscreen, onScrollComplete]);
 
   const switchMode = useCallback(
     (m: ViewMode) => {
+      // 先关闭旧哨兵，再让 iframe 以新布局回传 ct-height；单纯切换永远不是完课证据。
+      modeRef.current = m;
+      setScrollLayoutReady(false);
       setMode(m);
       try {
         localStorage.setItem(VIEW_PREF_KEY, m);
@@ -180,8 +403,22 @@ export function HtmlCourseware({
         /* 存不了不影响本次使用 */
       }
       postToFrame({ type: "ct-mode", mode: m });
+      if (m === "scroll") {
+        resumePendingRef.current = false;
+        setResumeSettled(true);
+      } else if (pagedPagesRef.current !== null && !sentGotoRef.current) {
+        const expected = Math.min(normalizedInitialPage, pagedPagesRef.current - 1);
+        if (expected > 0) {
+          expectedResumePageRef.current = expected;
+          resumePendingRef.current = true;
+          setResumeSettled(false);
+          // ct-mode 与 ct-goto 同一 contentWindow 上 FIFO：先切翻页，再定位。
+          sentGotoRef.current = true;
+          postToFrame({ type: "ct-goto", page: expected });
+        }
+      }
     },
-    [postToFrame],
+    [normalizedInitialPage, postToFrame],
   );
 
   // 课件可见性：滚出视口后不再劫持键盘（否则用户在页面别处按空格会被课件吞掉）。
@@ -201,7 +438,7 @@ export function HtmlCourseware({
   // 键盘转发（iframe 未获焦时也能 ←/→/空格 翻页）。不劫持的场景：
   // 焦点在输入元件 / 按钮 / 链接 / 可编辑区（否则空格会翻页而非激活按钮），或课件已滚出视口。
   useEffect(() => {
-    if (!(pagedReady && mode === "paged")) return;
+    if (!(pagedReady && mode === "paged" && resumeSettled)) return;
     const onKey = (e: KeyboardEvent) => {
       if (!visibleRef.current) return;
       const target = e.target as HTMLElement | null;
@@ -218,14 +455,21 @@ export function HtmlCourseware({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pagedReady, mode, postToFrame]);
+  }, [pagedReady, mode, postToFrame, resumeSettled]);
 
   const toggleFullscreen = useCallback(async () => {
     const el = rootRef.current;
     if (!el) return;
+    if (typeof el.requestFullscreen !== "function" || typeof document.exitFullscreen !== "function") {
+      setFullscreen((v) => !v);
+      return;
+    }
     try {
-      if (!document.fullscreenElement) await el.requestFullscreen?.();
-      else await document.exitFullscreen?.();
+      if (!document.fullscreenElement) {
+        await el.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
     } catch {
       setFullscreen((v) => !v);
     }
@@ -256,7 +500,7 @@ export function HtmlCourseware({
       {/* 顶栏：标识 + 页码 + 翻页/滚动切换 + 全屏。极简，不抢课件本身。 */}
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border)] px-3.5 py-2">
         <span className="mono inline-flex items-center gap-1.5 text-[10px] uppercase tracking-[0.16em] text-[var(--ink3)]">
-          <Sparkle size={12} weight="fill" className="text-[var(--red)]" /> 精品课件
+          <Sparkle size={12} weight="fill" className="text-[var(--red)]" /> {presentationLabel}
         </span>
         <div className="flex items-center gap-2">
           {paged && page && page.total > 1 && (
@@ -281,11 +525,12 @@ export function HtmlCourseware({
                   type="button"
                   role="tab"
                   aria-selected={mode === m}
+                  disabled={fullscreen && m === "scroll"}
                   onClick={() => switchMode(m)}
                   className={`studio-press rounded-[7px] px-2.5 py-1 text-[11px] font-semibold transition-colors ${
                     mode === m
                       ? "bg-[var(--surface)] text-[var(--ink)] shadow-[var(--card)]"
-                      : "text-[var(--ink3)] hover:text-[var(--ink)]"
+                      : "text-[var(--ink3)] hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
                   }`}
                 >
                   {label}
@@ -296,9 +541,10 @@ export function HtmlCourseware({
           <button
             type="button"
             onClick={toggleFullscreen}
-            className="studio-press grid h-8 w-8 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors hover:text-[var(--ink)]"
-            aria-label={fullscreen ? "退出全屏" : "全屏"}
-            title={fullscreen ? "退出全屏" : "全屏"}
+            disabled={scrollOnlyReady || mode === "scroll"}
+            className="studio-press grid h-8 w-8 place-items-center rounded-[10px] border border-[var(--border)] bg-[var(--surface)] text-[var(--ink3)] transition-colors hover:text-[var(--ink)] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={scrollOnlyReady || mode === "scroll" ? "滚动视图不支持全屏" : fullscreen ? "退出全屏" : "全屏"}
+            title={scrollOnlyReady || mode === "scroll" ? "请切换到翻页视图后全屏" : fullscreen ? "退出全屏" : "全屏"}
           >
             {fullscreen ? <CornersIn size={15} /> : <CornersOut size={15} />}
           </button>
@@ -330,14 +576,23 @@ export function HtmlCourseware({
         // 安全核心：只给 allow-scripts；绝不给 allow-same-origin / allow-top-navigation / allow-popups / allow-forms。
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
-        loading="lazy"
+        // 课件是学习页主内容，不能懒加载到 12s 健康计时器之后才启动。
+        loading="eager"
         title="AI 课件"
+        aria-busy={!resumeSettled || undefined}
         className="block w-full border-0 bg-white"
-        style={{ height: frameHeight, display: loadFailed ? "none" : undefined }}
+        style={{
+          height: frameHeight,
+          display: loadFailed ? "none" : undefined,
+          pointerEvents: resumeSettled ? undefined : "none",
+        }}
         // 握手兜底：若运行时的 ct-ready 早于本组件挂监听（SSR/hydration 竞态），load 后再要一次。
         onLoad={() => postToFrame({ type: "ct-hello" })}
         onError={() => setLoadFailed(true)}
       />
+      {scrollLayoutReady && (scrollOnlyReady || (pagedReady && mode === "scroll")) && !fullscreen && (
+        <div ref={scrollEndRef} className="h-px w-full" aria-hidden="true" />
+      )}
     </div>
   );
 }

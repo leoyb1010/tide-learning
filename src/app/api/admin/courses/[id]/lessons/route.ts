@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
-import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
+import { AppError, ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { readPrivateMedia } from "@/lib/private-media";
+import { claimCourseContentMutation } from "@/lib/course-gen";
 
 // POST /api/admin/courses/:id/lessons — 新增章节
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,6 +12,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const admin = await requirePermission("course:write");
     assertSameOrigin(req);
     const { id: courseId } = await params;
+    const course = await prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, status: true, genStatus: true, presentationRevision: true },
+    });
+    if (!course) return fail("课程不存在", 404);
+    if (course.status === "archived") return fail("已归档课程不能新增课节", 409);
     const body = (await req.json()) as {
       title: string;
       summary?: string;
@@ -33,9 +40,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       requiresVideo
         ? (requestedAssetId || `asset_${courseId}_${Date.now()}`)
         : null;
-    const maxOrder = await prisma.lesson.aggregate({ where: { courseId }, _max: { sortOrder: true } });
-    const lesson = await prisma.lesson.create({
-      data: {
+    const lesson = await prisma.$transaction(async (tx) => {
+      const presentationRevision = await claimCourseContentMutation(tx, {
+        courseId,
+        expectedPresentationRevision: course.presentationRevision,
+      });
+      const maxOrder = await tx.lesson.aggregate({ where: { courseId }, _max: { sortOrder: true } });
+      const created = await tx.lesson.create({ data: {
         courseId,
         title: body.title.trim(),
         summary: body.summary,
@@ -47,13 +58,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         sortOrder: (maxOrder._max.sortOrder ?? -1) + 1,
         status: "published",
         publishedAt: new Date(),
-      },
-    });
-    // 更新课程总时长
-    const agg = await prisma.lesson.aggregate({ where: { courseId }, _sum: { durationSec: true } });
-    await prisma.course.update({
-      where: { id: courseId },
-      data: { totalDurationSec: agg._sum.durationSec ?? 0, lastUpdatedAt: new Date() },
+      } });
+      const agg = await tx.lesson.aggregate({ where: { courseId }, _sum: { durationSec: true } });
+      const total = await tx.course.updateMany({
+        where: { id: courseId, presentationRevision },
+        data: { totalDurationSec: agg._sum.durationSec ?? 0 },
+      });
+      if (total.count !== 1) throw new AppError("课程已变更，请刷新后重试", 409);
+      return created;
     });
     await audit({ operatorId: admin.id, action: "lesson.create", targetType: "lesson", targetId: lesson.id, detail: lesson.title });
     return ok(lesson);

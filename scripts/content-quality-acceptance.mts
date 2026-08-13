@@ -1,10 +1,10 @@
 /**
- * v6 内容验收：真实模型为同一门课连续写三节，必须保留原始需求、避免重复，并通过内容/教学双评审。
+ * v7 内容验收：真实模型为同一门课连续写三节，必须保留原始需求、避免重复，并通过内容/教学双评审。
  * 临时用户、积分账户、课程与用量记录在结束时级联清理；KEEP_ACCEPTANCE_COURSE=1 可保留现场。
  */
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
-import { generateLessonCore } from "../src/lib/course-gen";
+import { failGenJobLease, generateLessonCore, initGenJob } from "../src/lib/course-gen";
 import { createCourseContentBrief, serializeCourseContentBrief } from "../src/lib/ai/content-brief";
 import { validateBlocks } from "../src/lib/blocks";
 
@@ -90,9 +90,15 @@ await prisma.lesson.create({
   },
 });
 
+const lease = await initGenJob(course.id, user.id, specs.length + 1, {
+  prompt: brief.request,
+  category: course.category,
+});
+if (!lease) throw new Error("内容验收任务未能取得数据库租约");
+
 try {
   for (const lesson of lessons) {
-    const result = await generateLessonCore(lesson.id, user.id);
+    const result = await generateLessonCore(lesson.id, user.id, { jobLease: lease });
     if (!result.ok) console.warn(`[accept:content] ${lesson.title} 未通过：quality=${result.qualityScore}`);
   }
 
@@ -145,6 +151,7 @@ try {
     process.exitCode = 1;
   }
 } finally {
+  await failGenJobLease(course.id, lease, "content acceptance finished").catch(() => false);
   if (process.env.KEEP_ACCEPTANCE_COURSE !== "1") {
     await prisma.course.delete({ where: { id: course.id } }).catch(() => {});
     await prisma.user.delete({ where: { id: user.id } }).catch(() => {});

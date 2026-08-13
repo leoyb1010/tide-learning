@@ -15,18 +15,31 @@ export async function POST(req: NextRequest) {
     // P2 写门：补同源校验（对 Bearer/native 放行）
     assertSameOrigin(req);
     const user = await requireUser();
-    const { lessonId, progressSec, completed, kind } = (await req.json()) as {
-      lessonId: string;
-      progressSec: number;
-      completed?: boolean;
+    const body = (await req.json().catch(() => null)) as {
+      lessonId?: unknown;
+      progressSec?: unknown;
+      completed?: unknown;
       // 进度语义区分：video（默认，秒数锚点）/ slide（翻页课件的「已读到第几页」，1-indexed）。
       // 两者落在不同字段，块课翻页与视频播放的续读锚点互不覆盖。
-      kind?: "video" | "slide";
-    };
+      kind?: unknown;
+    } | null;
 
-    // P3 数值校验：progressSec 必须是有限数，clamp 到 [0, MAX_PROGRESS]，挡住 NaN/负数/溢出脏写。
-    if (!Number.isFinite(progressSec)) return fail("进度数值非法");
-    const safeProgress = Math.min(Math.max(0, Math.floor(progressSec)), MAX_PROGRESS);
+    if (!body || typeof body !== "object") return fail("请求体非法");
+    const lessonId = typeof body.lessonId === "string" ? body.lessonId.trim() : "";
+    if (!/^[A-Za-z0-9_-]{1,80}$/.test(lessonId)) return fail("lessonId 非法");
+    // 分 kind 的容错边界（兼容已发布客户端 × 保住 slide 协议真值，与嵌入 E2E 断言一致）：
+    // - kind 缺省 → video（已发布 iOS/Mac 端不发 kind 字段）；显式未知字符串是协议错误，400。
+    // - video：秒数来自播放器，溢出/负数取整很常见（86401、-0.5），只拒非数值/NaN/Infinity，
+    //   越界 clamp 到 [0, MAX_PROGRESS]——老客户端 fire-and-forget，硬拒会静默丢续读点。
+    // - slide：页序协议由同版本 Web 宿主发出，无旧端包袱；-4/2.5 等非法页序必须 400 且不落库，
+    //   否则会污染 lastSlideIndex 的单调「最远读到」真值。
+    if (body.kind !== undefined && body.kind !== "video" && body.kind !== "slide") return fail("进度类型非法");
+    const kind = body.kind === "slide" ? "slide" : "video";
+    if (typeof body.progressSec !== "number" || !Number.isFinite(body.progressSec)) return fail("进度数值非法");
+    if (kind === "slide" && (!Number.isSafeInteger(body.progressSec) || body.progressSec < 0 || body.progressSec > MAX_PROGRESS)) {
+      return fail("进度数值超出范围");
+    }
+    const safeProgress = Math.min(Math.max(0, Math.floor(body.progressSec)), MAX_PROGRESS);
 
     // P2 归属+付费双门：getLessonForUser 已内置 canViewCourse（他人私有课视为不存在→null）
     // 与 canAccessLesson（付费节需订阅→access）。null 即无权可见，403。
@@ -40,46 +53,60 @@ export async function POST(req: NextRequest) {
 
     // 翻页进度写 lastSlideIndex，视频/模拟播放进度写 progressSec；二者隔离，互不污染另一视图的续读点。
     const isSlide = kind === "slide";
-    // 到此 view.access 必为 true（上方已挡）；completed 直接以入参为准。
-    const canComplete = completed === true;
+    // 到此 view.access 必为 true（上方已挡）；completed 接受 true/1，其余（含 0/缺省/脏值）视为未完成。
+    const canComplete = body.completed === true || body.completed === 1;
 
-    // 蓝图 D1：取写前进度，供激励水位按「前进量」保守折算（防高频上报刷水位）。
-    const prevProgress = await prisma.learningProgress.findUnique({
-      where: { userId_lessonId: { userId: user.id, lessonId } },
-      select: { progressSec: true, lastSlideIndex: true },
+    // 页序是“最远读到”而不是当前光标。读旧值+写 max 放在同一事务，
+    // 使长滚动完成上报或并发旧请求不能把 lastSlideIndex 从 16 写回 1。
+    const now = new Date();
+    const persisted = await prisma.$transaction(async (tx) => {
+      const prev = await tx.learningProgress.findUnique({
+        where: { userId_lessonId: { userId: user.id, lessonId } },
+        select: { progressSec: true, lastSlideIndex: true, completedAt: true },
+      });
+      const slideProgress = isSlide ? Math.max(prev?.lastSlideIndex ?? 0, safeProgress) : null;
+      const saved = await tx.learningProgress.upsert({
+        where: { userId_lessonId: { userId: user.id, lessonId } },
+        create: {
+          userId: user.id,
+          courseId: view.course.id,
+          lessonId,
+          progressSec: isSlide ? 0 : safeProgress,
+          lastSlideIndex: slideProgress,
+          completedAt: canComplete ? now : null,
+        },
+        update: {
+          ...(isSlide ? { lastSlideIndex: slideProgress } : { progressSec: safeProgress }),
+          lastPlayedAt: now,
+          ...(canComplete && !prev?.completedAt ? { completedAt: now } : {}),
+        },
+        select: { progressSec: true, lastSlideIndex: true, completedAt: true },
+      });
+      return { prev, saved };
     });
-
-    await prisma.learningProgress.upsert({
-      where: { userId_lessonId: { userId: user.id, lessonId } },
-      create: {
-        userId: user.id,
-        courseId: view.course.id,
-        lessonId,
-        progressSec: isSlide ? 0 : safeProgress,
-        lastSlideIndex: isSlide ? safeProgress : null,
-        completedAt: canComplete ? new Date() : null,
-      },
-      update: {
-        ...(isSlide ? { lastSlideIndex: safeProgress } : { progressSec: safeProgress }),
-        lastPlayedAt: new Date(),
-        ...(canComplete ? { completedAt: new Date() } : {}),
-      },
-    });
+    const savedProgress = isSlide ? (persisted.saved.lastSlideIndex ?? 0) : persisted.saved.progressSec;
+    const newlyCompleted = canComplete && !persisted.prev?.completedAt && Boolean(persisted.saved.completedAt);
     await track({
-      eventName: canComplete ? "lesson_complete" : "lesson_progress",
+      eventName: newlyCompleted ? "lesson_complete" : "lesson_progress",
       userId: user.id,
-      properties: { course_id: view.course.id, lesson_id: lessonId, progress_sec: safeProgress, kind: isSlide ? "slide" : "video" },
+      properties: { course_id: view.course.id, lesson_id: lessonId, progress_sec: savedProgress, kind: isSlide ? "slide" : "video" },
     });
     // 蓝图 D1（审查 P0-7）：学习进度接线激励系统——此前 recordActivity 全仓零调用，
     // streak/潮汐日历/成就对真实用户恒为空。minutes 按前进量折算（回看/重复上报记 0，仅点亮当日）；
     // 完课至少记 1 分钟。after() 响应后执行，失败静默，不影响进度写入主链。
     const advancedMinutes = isSlide
-      ? (safeProgress > (prevProgress?.lastSlideIndex ?? 0) ? 1 : 0)
-      : Math.min(30, Math.max(0, Math.round((safeProgress - (prevProgress?.progressSec ?? 0)) / 60)));
+      ? (savedProgress > (persisted.prev?.lastSlideIndex ?? 0) ? 1 : 0)
+      : Math.min(30, Math.max(0, Math.round((savedProgress - (persisted.prev?.progressSec ?? 0)) / 60)));
     after(() =>
-      recordActivity(user.id, { minutes: canComplete ? Math.max(1, advancedMinutes) : advancedMinutes }).catch(() => {}),
+      recordActivity(user.id, { minutes: newlyCompleted ? Math.max(1, advancedMinutes) : advancedMinutes }).catch(() => {}),
     );
-    return ok({ saved: true });
+    return ok({
+      saved: true,
+      kind: isSlide ? "slide" : "video",
+      progressSec: savedProgress,
+      completed: Boolean(persisted.saved.completedAt),
+      newlyCompleted,
+    });
   });
 }
 

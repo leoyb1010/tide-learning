@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser, verifyPassword, destroySession } from "@/lib/session";
-import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
+import { AppError, ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { audit } from "@/lib/audit";
 import { unlink } from "node:fs/promises";
@@ -39,6 +39,27 @@ export async function POST(req: NextRequest) {
 
     // 越权铁律：每张表都以当前 user.id 收敛；财务记录只保留到匿名账户壳。
     await prisma.$transaction(async (tx) => {
+      // 注销与 AI/账务收敛必须共用同一个用户行写顺序。不先取得这个写锁，
+      // 供应商调用可在注销事务读完后结算，造成“已注销账户又产生用量/退款”。
+      const locked = await tx.user.updateMany({
+        where: { id: user.id, deletedAt: null },
+        data: { updatedAt: new Date() },
+      });
+      if (locked.count !== 1) throw new AppError("账号状态已变更，请刷新后重试", 409);
+
+      const liveJobs = await tx.generationJob.count({
+        where: { userId: user.id, status: "running" },
+      });
+      const unsettledReservations = await tx.creditReservation.count({
+        where: { userId: user.id, status: { in: ["active", "settling", "refunding"] } },
+      });
+      const pendingReconciliations = await tx.llmBillingReconciliation.count({
+        where: { userId: user.id, status: "pending" },
+      });
+      if (liveJobs > 0 || unsettledReservations > 0 || pendingReconciliations > 0) {
+        throw new AppError("AI 任务或账务正在收敛，请稍后再注销账号", 409);
+      }
+
       await tx.session.deleteMany({ where: { userId: user.id } });
       await tx.passwordReset.deleteMany({ where: { userId: user.id } });
       await tx.device.deleteMany({ where: { userId: user.id } });
@@ -64,7 +85,8 @@ export async function POST(req: NextRequest) {
       await tx.chatThread.deleteMany({ where: { userId: user.id } });
       await tx.importedSource.deleteMany({ where: { userId: user.id } });
       await tx.generationJob.deleteMany({ where: { userId: user.id } });
-      await tx.llmUsage.deleteMany({ where: { userId: user.id } });
+      // LlmUsage 只存 token/积分与预占关联，不存 prompt/课程正文。它与积分流水一样
+      // 是退款、对账和反欺诈的必要证据，随匿名账户壳保留，不得单独删除。
 
       await tx.postComment.deleteMany({ where: { userId: user.id } });
       await tx.postLike.deleteMany({ where: { userId: user.id } });

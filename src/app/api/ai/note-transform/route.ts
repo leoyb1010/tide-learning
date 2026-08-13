@@ -1,9 +1,10 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
-import { assertCanSpend, creditingOnUsage } from "@/lib/credits";
+import { assertCanSpend } from "@/lib/credits";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 
@@ -131,7 +132,11 @@ export async function POST(req: NextRequest) {
       user: userMsg,
       temperature: 0.4,
       maxTokens: 5000,
-      onUsage: creditingOnUsage(user.id, "note_transform"),
+      billing: {
+        userId: user.id,
+        scene: "note_transform",
+        callKey: `note-transform:${user.id}:${action}:${randomUUID()}`,
+      },
     });
 
     // 规整输出：行动项类返回 items，其余返回 markdown

@@ -1,13 +1,16 @@
 /**
  * 渲染烟囱测试（蓝图 C3）—— 对库内最近 N 节课件做 headless 机检，异常清单落 report/render-check.json。
  *
- * 检查项（DOM 级，确定性、零像素依赖）：
+ * 检查项（DOM + 真实截图证据）：
  *  - overflowX：页面横向溢出（scrollWidth > clientWidth+2）—— 硬伤，计为 fail；
  *  - blankRatio：翻页模式前 3 页的「可见文本覆盖率」，一页 < 1.5% 记空白页；≥2 页计为 fail。
  *    阈值按真实语料校准：健康的纯文字页（objectives/对话首步）覆盖率约 2-5%，大标题页 8%+；
  *    低于 1.5% 意味着页面近乎无可见内容（渲染断裂/全被隐藏），此为「真空白」判据；
  *  - contrast：正文与背景的相对亮度比 < 3.5 计为 fail（可读性底线）；
- *  - textLen：全文可见文字 < 200 字提示（观察项，不 fail）。
+ *  - mobileOverflowX：390×844 窄屏横向溢出；
+ *  - consoleErrors：浏览器 console/page error；
+ *  - textLen：全文可见文字 < 200 字提示（观察项，不 fail）；
+ *  - screenshots：每节桌面 + 手机两张真实截图，供视觉评审查看。
  *
  * 运行：npm run check:render [-- N]（默认 20 节）。退出码非 0 = 有 fail 项。
  */
@@ -18,6 +21,7 @@ import { prisma } from "../src/lib/db";
 
 const OUT_DIR = join(process.cwd(), "report");
 const TMP = join(OUT_DIR, "render-check-tmp");
+const SCREENSHOTS = join(OUT_DIR, "render-check-screenshots");
 
 interface CheckResult {
   lessonId: string;
@@ -25,10 +29,13 @@ interface CheckResult {
   lesson: string;
   engine: string | null;
   overflowX: boolean;
+  mobileOverflowX: boolean;
   blankPages: number;
   pagesChecked: number;
   contrastRatio: number;
   textLen: number;
+  consoleErrors: string[];
+  screenshots: string[];
   fail: boolean;
   notes: string[];
 }
@@ -76,6 +83,7 @@ async function checkPageCoverage(page: Page): Promise<number> {
 async function main() {
   const n = Number(process.argv[2]) || 20;
   mkdirSync(TMP, { recursive: true });
+  mkdirSync(SCREENSHOTS, { recursive: true });
 
   const lessons = await prisma.lesson.findMany({
     where: { htmlJson: { not: null } },
@@ -89,7 +97,6 @@ async function main() {
   }
 
   const browser = await chromium.launch();
-  const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
   const results: CheckResult[] = [];
 
   for (const l of lessons) {
@@ -100,14 +107,25 @@ async function main() {
       /* 契约损坏按空处理 */
     }
     const notes: string[] = [];
+    const screenshots: string[] = [];
     if (!html) {
-      results.push({ lessonId: l.id, course: l.course.title, lesson: l.title, engine: l.renderEngine, overflowX: false, blankPages: 0, pagesChecked: 0, contrastRatio: 21, textLen: 0, fail: true, notes: ["htmlJson 契约损坏"] });
+      results.push({ lessonId: l.id, course: l.course.title, lesson: l.title, engine: l.renderEngine, overflowX: false, mobileOverflowX: false, blankPages: 0, pagesChecked: 0, contrastRatio: 21, textLen: 0, consoleErrors: [], screenshots, fail: true, notes: ["htmlJson 契约损坏"] });
       continue;
     }
+    const page = await browser.newPage({ viewport: { width: 1280, height: 800 }, reducedMotion: "reduce" });
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text().slice(0, 300));
+    });
+    page.on("pageerror", (error) => consoleErrors.push(error.message.slice(0, 300)));
     const file = join(TMP, `${l.id}.html`);
     writeFileSync(file, html);
     await page.goto(`file://${file}`, { waitUntil: "load" });
     await page.waitForTimeout(300);
+
+    const desktopShot = join(SCREENSHOTS, `${l.id}--1280x800.png`);
+    await page.screenshot({ path: desktopShot, fullPage: l.renderEngine === "llm" });
+    screenshots.push(desktopShot);
 
     const overflowX = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
     // textContent 而非 innerText：翻页模式下非当前页 display:none，innerText 只剩单页字数会误报「过短」。
@@ -140,14 +158,26 @@ async function main() {
       if (!after || after === advanced) break; // 无翻页运行时或已到末页
     }
 
+    // 手机窄屏独立验收；回到文档起点，避免截图落在上一轮翻页的第 3 页。
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: "load" });
+    await page.waitForTimeout(300);
+    const mobileOverflowX = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
+    const mobileShot = join(SCREENSHOTS, `${l.id}--390x844.png`);
+    await page.screenshot({ path: mobileShot, fullPage: l.renderEngine === "llm" });
+    screenshots.push(mobileShot);
+
     if (overflowX) notes.push("横向溢出");
+    if (mobileOverflowX) notes.push("390px 横向溢出");
     if (blankPages >= 2) notes.push(`空白页×${blankPages}`);
     if (contrastRatio < 3.5) notes.push(`对比度 ${contrastRatio.toFixed(1)}`);
     if (textLen < 200) notes.push(`全文过短 ${textLen} 字`);
-    const fail = overflowX || blankPages >= 2 || contrastRatio < 3.5;
+    if (consoleErrors.length) notes.push(`浏览器错误×${consoleErrors.length}`);
+    const fail = overflowX || mobileOverflowX || blankPages >= 2 || contrastRatio < 3.5 || consoleErrors.length > 0;
 
-    results.push({ lessonId: l.id, course: l.course.title, lesson: l.title, engine: l.renderEngine, overflowX, blankPages, pagesChecked, contrastRatio: Math.round(contrastRatio * 10) / 10, textLen, fail, notes });
+    results.push({ lessonId: l.id, course: l.course.title, lesson: l.title, engine: l.renderEngine, overflowX, mobileOverflowX, blankPages, pagesChecked, contrastRatio: Math.round(contrastRatio * 10) / 10, textLen, consoleErrors, screenshots, fail, notes });
     console.log(`${fail ? "FAIL" : "ok  "} ${l.course.title} · ${l.title}${notes.length ? `  [${notes.join(" / ")}]` : ""}`);
+    await page.close();
   }
 
   await browser.close();

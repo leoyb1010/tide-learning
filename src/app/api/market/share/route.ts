@@ -8,6 +8,7 @@ import { track } from "@/lib/analytics";
 import { notify } from "@/lib/notify";
 import { scanContentSafety } from "@/lib/content-safety";
 import { USER_AUTHORED_ORIGINS } from "@/lib/course-origin";
+import { assessCourseGenerationPublication } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -167,6 +168,9 @@ export async function POST(req: NextRequest) {
         description: true,
         origin: true,
         sharedStatus: true,
+        genStatus: true,
+        status: true,
+        presentationRevision: true,
         priceCredits: true,
         authorUserId: true,
       },
@@ -175,11 +179,45 @@ export async function POST(req: NextRequest) {
     if (!SHARABLE_ORIGINS.includes(course.origin as (typeof SHARABLE_ORIGINS)[number])) {
       return fail("仅可分享你 AI 生成或导入的课程");
     }
+    if (course.status !== "published") return fail("只有已发布课程才能在集市上架", 409);
+    // 上架/经营共用生成真值：课级状态必须 ready，且每节 blocks+结构化质量档案均可发布。
+    // 同时必须有与当前总纲/blocks/质量真值指纹一致的整课终审 passed 档案。
+    const manualAuthoredReview = course.origin === "user_created";
+    const publication = manualAuthoredReview ? null : await assessCourseGenerationPublication(course.id);
+    if (!manualAuthoredReview && (course.genStatus !== "ready" || !publication?.ready)) {
+      return fail(
+        course.origin === "user_imported"
+          ? "导入课程尚未建立专用发布审核与表现档案，暂不能上架"
+          : "课程尚未通过生成质量与表现检查，暂不能分享",
+        course.origin === "user_imported" ? 422 : 409,
+      );
+    }
+    // Course.title 本身是整课终审输入；分享请求不能在通过门后再偷换标题。
+    if (displayData.title !== undefined && displayData.title !== course.title) {
+      return fail("课程标题变更后需重新完成质量与表现检查", 409);
+    }
 
     // 价格是否真的变化（null 与 0 同为免费，不算变化）。
     const oldPrice = course.priceCredits ?? null;
     const priceProvided = body?.priceCredits !== undefined;
     const priceChanged = priceProvided && (oldPrice ?? 0) !== (priceForDb ?? 0);
+    // 后续所有“经营/上架”写入都从同一审核快照 CAS：并发换肤、下架、
+    // 改文案/改价任一发生就 409，不用旧判决覆盖新状态或回报假 shared。
+    const publicationSnapshotWhere = {
+      id: course.id,
+      status: "published",
+      sharedStatus: course.sharedStatus,
+      genStatus: "ready",
+      origin: course.origin,
+      presentationRevision: manualAuthoredReview
+        ? course.presentationRevision
+        : publication!.presentationRevision!,
+      ...(manualAuthoredReview ? {} : { generationQualityJson: publication!.archiveJson! }),
+      title: course.title,
+      subtitle: course.subtitle,
+      description: course.description,
+      priceCredits: oldPrice,
+    };
 
     // 审计修复(2026-07-19 P2·审核 TOCTOU)：语义1/2 的改文案路径此前完全不复审——
     // 干净文案过审上架后,可改成违规/引流文案白嫖集市展示位。这两条路径的新文案先过
@@ -200,7 +238,8 @@ export async function POST(req: NextRequest) {
       const data: Record<string, unknown> = { ...displayData };
       if (priceProvided) data.priceCredits = priceForDb;
       if (Object.keys(data).length === 0) return fail("没有需要更新的字段");
-      await prisma.course.update({ where: { id: course.id }, data });
+      const updated = await prisma.course.updateMany({ where: publicationSnapshotWhere, data });
+      if (updated.count !== 1) return fail("课程状态、文案或表现已变更，请刷新后重试", 409);
       // 已上架课改价 → 通知已购用户（免费↔付费切换同样通知）；通知失败不阻断。
       if (priceChanged && course.sharedStatus === "shared") {
         await notifyPriceChange({
@@ -227,10 +266,10 @@ export async function POST(req: NextRequest) {
     if (course.sharedStatus === "shared") {
       const data: Record<string, unknown> = { ...displayData };
       if (priceProvided) data.priceCredits = priceForDb;
-      if (Object.keys(data).length === 0) {
-        return ok({ status: "shared", message: "这门课已在集市展示" });
-      }
-      await prisma.course.update({ where: { id: course.id }, data });
+      // 无字段变更时也做一次同行 no-op CAS，避免并发下架后仍回报 shared。
+      if (Object.keys(data).length === 0) data.sharedStatus = "shared";
+      const updated = await prisma.course.updateMany({ where: publicationSnapshotWhere, data });
+      if (updated.count !== 1) return fail("课程状态、文案或表现已变更，请刷新后重试", 409);
       if (priceChanged) {
         await notifyPriceChange({
           courseId: course.id,
@@ -327,14 +366,41 @@ export async function POST(req: NextRequest) {
       verdict = "pending";
       reason = "课程正文含需人工复核的表述";
     }
+    // 手工创建课没有 AI 生成链的双评审质量档案，不用历史 null 兼容冒充通过。
+    // 它可提交分享，但必须转人工 pending，不得由标题 LLM 自动上架。
+    if (manualAuthoredReview && verdict === "approved") {
+      verdict = "pending";
+      reason = "手工创建课程需人工复核";
+    }
 
     const sharedStatus = verdict === "approved" ? "shared" : verdict === "pending" ? "pending" : "rejected";
     // 定价随上架一并落库（rejected 也写：作者改文案重提时定价已在，无需二次填）。
     // 注意：未传 priceCredits 时保留原价（下架重新上架不用重填）。
-    await prisma.course.update({
-      where: { id: course.id },
-      data: priceProvided ? { sharedStatus, priceCredits: priceForDb } : { sharedStatus },
-    });
+    if (manualAuthoredReview) {
+      const shared = await prisma.course.updateMany({
+        where: {
+          ...publicationSnapshotWhere,
+          origin: "user_created",
+          title: effectiveTitle,
+          subtitle: effectiveSubtitle,
+        },
+        data: priceProvided ? { sharedStatus, priceCredits: priceForDb } : { sharedStatus },
+      });
+      if (shared.count !== 1) return fail("课程状态或表现已变更，请重新提交审核", 409);
+    } else {
+      // 完成上架也做精确档案 CAS：若审核期间 blocks/大纲被改写，内容写事务会清档，
+      // 此处 count=0 而绝不会用旧判决把新内容推到 shared。
+      const shared = await prisma.course.updateMany({
+        where: {
+          ...publicationSnapshotWhere,
+          origin: course.origin,
+          title: effectiveTitle,
+          subtitle: effectiveSubtitle,
+        },
+        data: priceProvided ? { sharedStatus, priceCredits: priceForDb } : { sharedStatus },
+      });
+      if (shared.count !== 1) return fail("课程内容已变更，请重新完成质量检查", 409);
+    }
     await track({ eventName: "market_share", userId: user.id, properties: { courseId: course.id, verdict } });
 
     if (verdict === "rejected") {

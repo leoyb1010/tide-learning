@@ -1,8 +1,9 @@
 import { cache } from "react";
-import { after } from "next/server";
+import { randomUUID } from "node:crypto";
+import { Prisma, type PrismaClient } from "@prisma/client";
 import { prisma } from "./db";
 import { AppError } from "./errors";
-import type { LlmUsageInfo } from "./llm";
+import type { LlmUsageCallback, LlmUsageInfo } from "./llm";
 import { costWeightOf } from "./ai/models";
 
 /**
@@ -21,6 +22,7 @@ const TOKENS_PER_CREDIT = 1000; // 1000 token = 1 积分（基准）
 // Scene 由此派生（keyof），call site 传入的 scene 编译期即校验，拼错/漏配无法通过 tsc。
 const SCENE_WEIGHT = {
   generate_course: 1.0,
+  generate_course_review: 1.0, // 整课发布终审：覆盖/推进/重复/capstone 对账
   generate_lesson: 1.0,
   generate_lesson_html: 1.5, // v3.3 HTML 课件 LLM 增强：token 重于逐节块生成，权重上调
   import_source: 1.0,
@@ -36,6 +38,93 @@ const SCENE_WEIGHT = {
 /** 记账场景：SCENE_WEIGHT 的键集合。新增出口须先在 SCENE_WEIGHT 补键，否则 call site 报错。 */
 export type Scene = keyof typeof SCENE_WEIGHT;
 
+export const DEFAULT_CREDIT_RESERVATION_TTL_MS = 30 * 60_000;
+const MAX_CREDIT_RESERVATION_TTL_MS = 24 * 60 * 60_000;
+
+/**
+ * 单次供应商调用的耐久积分冻结。
+ * estimatedCredits 已从 CreditAccount.balance 扣离可用余额；remainingCredits 是尚未结算/退款的冻结额。
+ */
+export interface CreditReservationSnapshot {
+  id: string;
+  reservationKey: string;
+  operationKey: string | null;
+  userId: string;
+  scene: Scene;
+  estimatedCredits: number;
+  remainingCredits: number;
+  actualCredits: number;
+  maxAdditionalCredits: number;
+  additionalCredits: number;
+  status: "active" | "settled" | "refunded" | "expired" | "reversed";
+  expiresAt: Date;
+  reversedAt: Date | null;
+  /** false 仅表示本调用创建了预占；true 表示同键已存在，调用方不得再发供应商请求。 */
+  duplicate: boolean;
+}
+
+export interface ReserveCreditsInput {
+  reservationKey: string;
+  /** 同一次用户可见操作的稳定键；操作未交付时可整组冲正。 */
+  operationKey?: string;
+  userId: string;
+  scene: Scene;
+  estimatedCredits: number;
+  /** 实耗超过预占时，最多允许再从可用余额补扣多少；默认 0，绝不无限透支。 */
+  maxAdditionalCredits?: number;
+  ttlMs?: number;
+  /** 仅用于确定性测试/受控恢复。 */
+  now?: Date;
+}
+
+export interface CreditSettlement {
+  reservationId: string;
+  usageId: string;
+  idempotencyKey: string;
+  actualCredits: number;
+  chargedFromReservation: number;
+  additionalCredits: number;
+  refundedCredits: number;
+  balanceAfter: number;
+  duplicate: boolean;
+}
+
+export interface ReverseCreditOperationInput {
+  operationKey: string;
+  userId: string;
+  scene: Scene;
+  reason?: string;
+  /** 仅用于确定性测试/受控恢复。 */
+  now?: Date;
+}
+
+export interface CreditOperationReversalResult {
+  operationKey: string;
+  reversedReservations: number;
+  refundedCredits: number;
+  /** 墓碑已存在；本次没有再次改动账户或流水。 */
+  duplicate: boolean;
+  balanceAfter: number | null;
+}
+
+export type BillingReconciliationReason =
+  | "provider_timeout"
+  | "provider_network"
+  | "provider_5xx"
+  | "settlement_failed"
+  | "empty_response";
+
+export interface BillingReconciliationInput {
+  attemptKey: string;
+  reasonCode: BillingReconciliationReason;
+  providerStatus?: number;
+  providerRequestId?: string | null;
+  /** 只允许 token 计数和 model；函数内部重新白名单序列化，不保存 prompt/content。 */
+  usage?: LlmUsageInfo | null;
+}
+
+type CreditsDb = PrismaClient;
+
 /**
  * 各场景「一次调用的典型输出 token 量」——仅用于预检门槛(estimateCredits/assertCanSpend)的最坏成本估算。
  * 修复(2026-07-12 P1-3)：此前预检写死 3000 token，严重低估逐节/HTML 精修的真实用量
@@ -44,6 +133,7 @@ export type Scene = keyof typeof SCENE_WEIGHT;
  */
 const SCENE_TYPICAL_TOKENS: Record<Scene, number> = {
   generate_course: 4000, // 大纲
+  generate_course_review: 3200, // 整课发布终审（按批复核 + 总编结论）
   generate_lesson: 8000, // 逐节块
   generate_lesson_html: 16000, // bespoke HTML 精修
   import_source: 6000,
@@ -199,6 +289,529 @@ export async function getBalanceFresh(userId: string): Promise<number> {
 }
 
 /**
+ * 原子冻结积分。余额条件与 decrement 位于同一条 UPDATE，两个进程争抢同一余额时至多一个成功。
+ * reservationKey 已存在时只返回原快照：参数必须完全匹配，不会再次扣款，也不会借同键串单。
+ */
+export async function reserveCredits(
+  input: ReserveCreditsInput,
+  db: CreditsDb = prisma,
+): Promise<CreditReservationSnapshot> {
+  const reservationKey = requiredCreditKey(input.reservationKey, "reservationKey");
+  const operationKey = input.operationKey === undefined
+    ? null
+    : requiredCreditKey(input.operationKey, "operationKey");
+  const userId = requiredCreditKey(input.userId, "userId");
+  const scene = validScene(input.scene);
+  const estimatedCredits = positiveCreditAmount(input.estimatedCredits, "estimatedCredits");
+  const maxAdditionalCredits = nonNegativeCreditAmount(input.maxAdditionalCredits ?? 0, "maxAdditionalCredits");
+  if (!Number.isSafeInteger(estimatedCredits + maxAdditionalCredits)) {
+    throw new TypeError("estimatedCredits + maxAdditionalCredits is too large");
+  }
+  const now = validCreditDate(input.now);
+  const ttlMs = validCreditTtl(input.ttlMs);
+  const expiresAt = new Date(now.getTime() + ttlMs);
+
+  try {
+    return await db.$transaction(async (tx) => {
+      // 首操作就是条件 INSERT：SQLite 上它同时获得写锁，与冲正墓碑的 INSERT
+      // 形成全序。若冲正先插入，迟到预占一行都不会创建；若预占先插入，
+      // 冲正会在同一事务看见它并释放全部冻结。不依赖进程内锁或先读后写。
+      const reservationId = randomUUID();
+      const inserted = await tx.$executeRaw(Prisma.sql`
+        INSERT INTO "CreditReservation" (
+          "id", "reservationKey", "operationKey", "userId", "scene",
+          "estimatedCredits", "remainingCredits", "actualCredits",
+          "maxAdditionalCredits", "additionalCredits", "status",
+          "expiresAt", "settledAt", "reversedAt", "createdAt", "updatedAt"
+        )
+        SELECT
+          ${reservationId}, ${reservationKey}, ${operationKey}, ${userId}, ${scene},
+          ${estimatedCredits}, ${estimatedCredits}, 0,
+          ${maxAdditionalCredits}, 0, 'active',
+          ${expiresAt}, NULL, NULL, ${now}, ${now}
+        WHERE ${operationKey} IS NULL
+           OR NOT EXISTS (
+             SELECT 1 FROM "LlmBillingOperationReversal" reversal
+             WHERE reversal."operationKey" = ${operationKey}
+           )
+        ON CONFLICT ("reservationKey") DO NOTHING
+      `);
+      if (inserted !== 1) {
+        const existing = await tx.creditReservation.findUnique({ where: { reservationKey } });
+        if (existing) {
+          assertMatchingReservation(existing, { operationKey, userId, scene, estimatedCredits, maxAdditionalCredits });
+          return normalizeReservation(existing, true);
+        }
+        throw new AppError("该 AI 操作已冲正，不能继续扣费", 409, false);
+      }
+      const reservation = await tx.creditReservation.findUniqueOrThrow({ where: { id: reservationId } });
+      // 注销不删 User 行，而是保留匿名财务壳。因此外键存在不能证明账户仍可计费；
+      // 这个检查必须放在本事务首个写之后，与注销事务的 User 行写形成 SQLite 全序。
+      const billableUser = await tx.user.findFirst({
+        where: { id: userId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!billableUser) throw new AppError("账号已注销，不能继续产生 AI 费用", 409, false);
+      if (operationKey) {
+        // 一个 operation 只能归属一个用户和一种计费场景。检查位于首个写之后，
+        // 并发首笔也会串行；发现串组则整个事务回滚，不留预占行。
+        const mismatched = await tx.creditReservation.findFirst({
+          where: {
+            operationKey,
+            id: { not: reservationId },
+            OR: [{ userId: { not: userId } }, { scene: { not: scene } }],
+          },
+          select: { id: true },
+        });
+        if (mismatched) throw new AppError("operationKey 已被不同用户或计费场景占用", 409, false);
+      }
+      // 条件扣减是余额闸门：绝不先读 balance 再无条件 decrement。
+      const frozen = await tx.creditAccount.updateMany({
+        where: { userId, balance: { gte: estimatedCredits } },
+        data: { balance: { decrement: estimatedCredits } },
+      });
+      if (frozen.count !== 1) throw new AppError("积分不足，无法预占本次 AI 费用", 402);
+
+      const account = await tx.creditAccount.findUniqueOrThrow({ where: { userId }, select: { balance: true } });
+      await tx.creditLedger.create({
+        data: {
+          userId,
+          delta: -estimatedCredits,
+          type: "llm_reserve",
+          refId: reservation.id,
+          balanceAfter: account.balance,
+          reason: `AI预占·${scene}·${reservationKey}`,
+        },
+      });
+      return normalizeReservation(reservation, false);
+    });
+  } catch (error) {
+    // 两个相同 reservationKey 并发：后者可能都在事务开始时看不到行，唯一约束由 DB 最终裁决。
+    // 回读已提交 winner 并严格核对参数，实现可重试幂等；不同参数复用同键仍拒绝。
+    if (isPrismaUniqueError(error)) {
+      const existing = await db.creditReservation.findUnique({ where: { reservationKey } });
+      if (existing) {
+        assertMatchingReservation(existing, { operationKey, userId, scene, estimatedCredits, maxAdditionalCredits });
+        return normalizeReservation(existing, true);
+      }
+    }
+    throw error;
+  }
+}
+
+/**
+ * 结算一笔预占的真实 LLM usage。
+ *
+ * - usage idempotencyKey 由数据库 UNIQUE 保证只消费一次；重复调用返回相同结算结果；
+ * - 实耗 <= 预占：消费实耗并把未用冻结额退回余额；
+ * - 实耗 > 预占：只在 maxAdditionalCredits 上限内、且当前可用余额足够时原子补扣；否则整笔回滚；
+ * - 余额永不为负，CreditAccount.totalSpent 只累计真实实耗，不累计冻结。
+ */
+export async function settleLlmUsage(
+  reservationId: string,
+  usage: LlmUsageInfo,
+  idempotencyKey: string,
+  db: CreditsDb = prisma,
+  nowInput?: Date,
+): Promise<CreditSettlement> {
+  const id = requiredCreditKey(reservationId, "reservationId");
+  const usageKey = requiredCreditKey(idempotencyKey, "idempotencyKey");
+  const now = validCreditDate(nowInput);
+  const normalizedUsage = validLlmUsage(usage);
+
+  try {
+    return await db.$transaction(async (tx) => {
+      // 首操作即条件写，既是状态机 CAS，也是 SQLite 写锁；并发 settle/refund 只有一个能把 active
+      // 推进到瞬时 settling。事务回滚时此状态也回滚，不会留下永久中间态。
+      const claimed = await tx.creditReservation.updateMany({
+        where: { id, status: "active", expiresAt: { gt: now } },
+        data: { status: "settling", updatedAt: now },
+      });
+      if (claimed.count !== 1) {
+        const duplicate = await readDuplicateSettlement(tx, id, usageKey);
+        if (duplicate) return duplicate;
+        const current = await tx.creditReservation.findUnique({ where: { id }, select: { status: true, expiresAt: true } });
+        if (!current) throw new AppError("积分预占不存在", 404);
+        if (current.status === "active" && current.expiresAt.getTime() <= now.getTime()) {
+          throw new AppError("积分预占已过期", 409);
+        }
+        throw new AppError("积分预占已结算或失效", 409);
+      }
+      const reservation = await tx.creditReservation.findUniqueOrThrow({ where: { id } });
+      const scene = validScene(reservation.scene);
+      const actualCredits = tokensToCredits(normalizedUsage, scene);
+      const chargedFromReservation = Math.min(actualCredits, reservation.remainingCredits);
+      const additionalCredits = actualCredits - chargedFromReservation;
+      if (additionalCredits > reservation.maxAdditionalCredits) {
+        throw new AppError("实际 AI 费用超过本次预占上限", 402);
+      }
+
+      if (additionalCredits > 0) {
+        const charged = await tx.creditAccount.updateMany({
+          where: { userId: reservation.userId, balance: { gte: additionalCredits } },
+          data: { balance: { decrement: additionalCredits } },
+        });
+        if (charged.count !== 1) throw new AppError("积分不足，无法结算超出预占的 AI 费用", 402);
+      }
+
+      const refundedCredits = reservation.remainingCredits - chargedFromReservation;
+      const account = await tx.creditAccount.update({
+        where: { userId: reservation.userId },
+        data: {
+          ...(refundedCredits > 0 ? { balance: { increment: refundedCredits } } : {}),
+          totalSpent: { increment: actualCredits },
+        },
+      });
+      const llmUsage = await tx.llmUsage.create({
+        data: {
+          userId: reservation.userId,
+          scene,
+          promptTokens: normalizedUsage.promptTokens,
+          completionTokens: normalizedUsage.completionTokens,
+          totalTokens: normalizedUsage.totalTokens,
+          creditCost: actualCredits,
+          idempotencyKey: usageKey,
+          reservationId: reservation.id,
+        },
+      });
+      await tx.creditReservation.update({
+        where: { id: reservation.id },
+        data: {
+          remainingCredits: 0,
+          actualCredits,
+          additionalCredits,
+          status: "settled",
+          settledAt: now,
+          updatedAt: now,
+        },
+      });
+
+      // reserve 行已经扣掉 estimated；这里只记录实际消费说明与资金真正发生变化的补扣/退款。
+      if (additionalCredits > 0) {
+        await tx.creditLedger.create({
+          data: {
+            userId: reservation.userId,
+            delta: -additionalCredits,
+            type: "llm_settle_extra",
+            refId: reservation.id,
+            balanceAfter: account.balance,
+            reason: `AI补扣·${scene}·${usageKey}`,
+          },
+        });
+      }
+      if (refundedCredits > 0) {
+        await tx.creditLedger.create({
+          data: {
+            userId: reservation.userId,
+            delta: refundedCredits,
+            type: "llm_reserve_refund",
+            refId: reservation.id,
+            balanceAfter: account.balance,
+            reason: `AI预占退款·${scene}·${usageKey}`,
+          },
+        });
+      }
+
+      return {
+        reservationId: reservation.id,
+        usageId: llmUsage.id,
+        idempotencyKey: usageKey,
+        actualCredits,
+        chargedFromReservation,
+        additionalCredits,
+        refundedCredits,
+        balanceAfter: account.balance,
+        duplicate: false,
+      };
+    });
+  } catch (error) {
+    // 同一 usageKey 并发结算：数据库唯一约束只允许一个 winner；回读 winner 作为幂等成功。
+    if (isPrismaUniqueError(error)) {
+      const duplicate = await readDuplicateSettlement(db, id, usageKey);
+      if (duplicate) return duplicate;
+    }
+    throw error;
+  }
+}
+
+/**
+ * 供应商未调用/失败时释放全部剩余冻结额。与 settle 互斥：仅 active 可退款；重复退款返回 false。
+ */
+export async function refundCreditReservation(
+  reservationId: string,
+  reason = "AI 调用未完成",
+  db: CreditsDb = prisma,
+  nowInput?: Date,
+): Promise<boolean> {
+  const id = requiredCreditKey(reservationId, "reservationId");
+  const now = validCreditDate(nowInput);
+  return db.$transaction(async (tx) => {
+    // 与 settle 同一 CAS 状态机：谁先把 active 推走，谁拥有本次余额变更权。
+    const claimed = await tx.creditReservation.updateMany({
+      where: { id, status: "active" },
+      data: { status: "refunding", updatedAt: now },
+    });
+    if (claimed.count !== 1) return false;
+    const reservation = await tx.creditReservation.findUniqueOrThrow({ where: { id } });
+    const refund = reservation.remainingCredits;
+    const expired = reservation.expiresAt.getTime() <= now.getTime();
+    const account = await tx.creditAccount.update({
+      where: { userId: reservation.userId },
+      data: refund > 0 ? { balance: { increment: refund } } : {},
+    });
+    await tx.creditReservation.update({
+      where: { id },
+      data: { remainingCredits: 0, status: expired ? "expired" : "refunded", settledAt: now, updatedAt: now },
+    });
+    if (refund > 0) {
+      await tx.creditLedger.create({
+        data: {
+          userId: reservation.userId,
+          delta: refund,
+          type: "llm_reserve_refund",
+          refId: reservation.id,
+          balanceAfter: account.balance,
+          reason: normalizeCreditReason(reason),
+        },
+      });
+    }
+    return true;
+  });
+}
+
+/**
+ * 整组冲正一次最终未交付的 AI 操作。
+ *
+ * - 先插入 operationKey 唯一墓碑，与 reserveCredits 的条件 INSERT 共用 SQLite
+ *   写序，冲正开始后的迟到预占必然失败；
+ * - active 预占只释放冻结，不改 totalSpent；
+ * - settled 预占把已扣实耗退回余额并同额减少 totalSpent，LlmUsage 原始记录保留；
+ * - refunded/expired/reversed 已无可退余额，是 no-op；
+ * - 墓碑和全部账户/流水/预占状态在一个事务中，重试不会双退。
+ */
+export async function reverseCreditOperation(
+  input: ReverseCreditOperationInput,
+  db: CreditsDb = prisma,
+): Promise<CreditOperationReversalResult> {
+  const operationKey = requiredCreditKey(input.operationKey, "operationKey");
+  const userId = requiredCreditKey(input.userId, "userId");
+  const scene = validScene(input.scene);
+  const reason = normalizeCreditReason(input.reason ?? "AI 操作未完整交付，积分已冲正");
+  const now = validCreditDate(input.now);
+
+  return db.$transaction(async (tx) => {
+    // 首写与 reserveCredits 的首写互斥。ON CONFLICT 使丢包重试安全，
+    // 同时保留原始墓碑的 user/scene/reason，不让重试改写审计事实。
+    const inserted = await tx.$executeRaw(Prisma.sql`
+      INSERT INTO "LlmBillingOperationReversal" (
+        "operationKey", "userId", "scene", "reason", "createdAt"
+      ) VALUES (${operationKey}, ${userId}, ${scene}, ${reason}, ${now})
+      ON CONFLICT ("operationKey") DO NOTHING
+    `);
+    const tombstone = await tx.llmBillingOperationReversal.findUniqueOrThrow({ where: { operationKey } });
+    if (tombstone.userId !== userId || tombstone.scene !== scene) {
+      throw new AppError("operationKey 已被不同用户或计费场景占用", 409, false);
+    }
+
+    const reservations = await tx.creditReservation.findMany({
+      where: { operationKey },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    });
+    if (reservations.some((row) => row.userId !== userId || row.scene !== scene)) {
+      throw new AppError("operationKey 的历史预占归属不一致", 409, false);
+    }
+
+    let reversedReservations = 0;
+    let refundedCredits = 0;
+    let balanceAfter: number | null = null;
+    for (const reservation of reservations) {
+      if (["refunded", "expired", "reversed"].includes(reservation.status)) continue;
+      if (reservation.status !== "active" && reservation.status !== "settled") {
+        // settling/refunding 只是事务内瞬时态，不应出现在已提交数据。
+        // 若出现就整笔回滚，不在账务不明时部分冲正。
+        throw new AppError("积分预占状态异常，无法安全冲正", 409, false);
+      }
+
+      const refund = reservation.status === "settled"
+        ? reservation.actualCredits
+        : reservation.remainingCredits;
+      if (refund < 0 || !Number.isSafeInteger(refund)) {
+        throw new AppError("积分预占金额异常，无法安全冲正", 409, false);
+      }
+
+      if (reservation.status === "settled") {
+        // totalSpent 是真实实耗统计，冲正时与余额同一条条件 UPDATE 反向修正；
+        // gte 是损坏数据闸门，绝不允许把累计消耗减成负数。
+        const corrected = await tx.creditAccount.updateMany({
+          where: { userId, totalSpent: { gte: refund } },
+          data: { balance: { increment: refund }, totalSpent: { decrement: refund } },
+        });
+        if (corrected.count !== 1) {
+          throw new AppError("积分账户与用量账不一致，无法安全冲正", 409, false);
+        }
+      } else {
+        await tx.creditAccount.update({
+          where: { userId },
+          data: refund > 0 ? { balance: { increment: refund } } : {},
+        });
+      }
+      const account = await tx.creditAccount.findUniqueOrThrow({ where: { userId } });
+      balanceAfter = account.balance;
+
+      if (refund > 0) {
+        await tx.creditLedger.create({
+          data: {
+            userId,
+            delta: refund,
+            type: "llm_operation_refund",
+            refId: reservation.id,
+            balanceAfter,
+            reason: `AI操作冲正·${scene}·${reason}`.slice(0, 500),
+          },
+        });
+      }
+      const reversed = await tx.creditReservation.updateMany({
+        where: { id: reservation.id, status: reservation.status },
+        data: {
+          remainingCredits: 0,
+          status: "reversed",
+          reversedAt: now,
+          updatedAt: now,
+        },
+      });
+      if (reversed.count !== 1) throw new AppError("积分冲正并发冲突", 409, false);
+      reversedReservations += 1;
+      refundedCredits += refund;
+    }
+
+    if (balanceAfter === null) {
+      balanceAfter = (await tx.creditAccount.findUnique({ where: { userId }, select: { balance: true } }))?.balance ?? null;
+    }
+    return {
+      operationKey,
+      reversedReservations,
+      refundedCredits,
+      duplicate: inserted === 0,
+      balanceAfter,
+    };
+  });
+}
+
+/**
+ * 对“供应商可能已产生成本，但本地无法证明 usage”的 attempt，在一个事务内：
+ * 1) 留下不含课程正文的耐久对账事件；2) 退回用户预占。
+ * 事件写入失败时整个事务回滚，不会出现“已退款但无对账线索”。
+ */
+export async function refundCreditReservationForReconciliation(
+  reservationId: string,
+  input: BillingReconciliationInput,
+  db: CreditsDb = prisma,
+  nowInput?: Date,
+): Promise<boolean> {
+  const id = requiredCreditKey(reservationId, "reservationId");
+  const attemptKey = requiredCreditKey(input.attemptKey, "attemptKey");
+  const allowedReasons = new Set<BillingReconciliationReason>([
+    "provider_timeout", "provider_network", "provider_5xx", "settlement_failed", "empty_response",
+  ]);
+  if (!allowedReasons.has(input.reasonCode)) throw new TypeError("unsupported billing reconciliation reason");
+  if (input.providerStatus !== undefined &&
+    (!Number.isSafeInteger(input.providerStatus) || input.providerStatus < 100 || input.providerStatus > 599)) {
+    throw new TypeError("providerStatus must be a valid HTTP status");
+  }
+  const providerRequestId = typeof input.providerRequestId === "string"
+    ? input.providerRequestId.replace(/[\u0000-\u001f\u007f]+/g, "").trim().slice(0, 200) || null
+    : null;
+  const usage = input.usage ? validLlmUsage(input.usage) : null;
+  const usageJson = usage ? JSON.stringify({
+    promptTokens: usage.promptTokens,
+    completionTokens: usage.completionTokens,
+    totalTokens: usage.totalTokens,
+    model: usage.model,
+  }) : null;
+  const now = validCreditDate(nowInput);
+
+  return db.$transaction(async (tx) => {
+    const claimed = await tx.creditReservation.updateMany({
+      where: { id, status: "active" },
+      data: { status: "refunding", updatedAt: now },
+    });
+    if (claimed.count !== 1) return false;
+    const reservation = await tx.creditReservation.findUniqueOrThrow({ where: { id } });
+    const scene = validScene(reservation.scene);
+    const refund = reservation.remainingCredits;
+    const account = await tx.creditAccount.update({
+      where: { userId: reservation.userId },
+      data: refund > 0 ? { balance: { increment: refund } } : {},
+    });
+    await tx.llmBillingReconciliation.create({
+      data: {
+        reservationId: reservation.id,
+        userId: reservation.userId,
+        scene,
+        attemptKey,
+        reasonCode: input.reasonCode,
+        providerStatus: input.providerStatus,
+        providerRequestId,
+        usageJson,
+      },
+    });
+    await tx.creditReservation.update({
+      where: { id },
+      data: { remainingCredits: 0, status: "refunded", settledAt: now, updatedAt: now },
+    });
+    if (refund > 0) {
+      await tx.creditLedger.create({
+        data: {
+          userId: reservation.userId,
+          delta: refund,
+          type: "llm_reserve_refund",
+          refId: reservation.id,
+          balanceAfter: account.balance,
+          reason: `AI供应商用量待对账·${input.reasonCode}`,
+        },
+      });
+    }
+    return true;
+  });
+}
+
+/**
+ * 释放一小批已过期预占，供定时任务或请求顺手维护调用。
+ * 每行仍走同一 CAS 退款事务，并发 sweep/settle 不会重复退还。
+ */
+export async function releaseExpiredCreditReservations(
+  limit = 100,
+  db: CreditsDb = prisma,
+  nowInput?: Date,
+): Promise<number> {
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 500) {
+    throw new TypeError("limit must be an integer between 1 and 500");
+  }
+  const now = validCreditDate(nowInput);
+  const rows = await db.creditReservation.findMany({
+    where: { status: "active", expiresAt: { lte: now } },
+    select: { id: true },
+    orderBy: { expiresAt: "asc" },
+    take: limit,
+  });
+  let released = 0;
+  for (const row of rows) {
+    if (await refundCreditReservation(row.id, "AI 预占过期自动退款", db, now)) released++;
+  }
+  return released;
+}
+
+/** 为 chat.onUsage 创建预占结算回调；idempotencyKey 必须对应这一笔供应商调用且可稳定重建。 */
+export function createReservationChargingCallback(
+  reservationId: string,
+  idempotencyKey: string,
+): LlmUsageCallback {
+  return async (usage) => {
+    await settleLlmUsage(reservationId, usage, idempotencyKey);
+  };
+}
+
+/**
  * 记录 LLM 用量并扣费（原子）。写 LlmUsage + 扣余额 + 写流水。
  * v2.3 修复：允许扣成负余额（欠账）——AI 已产生真实成本不能回滚已生成内容，
  * 记全额欠账，下次 assertCanSpend 因余额<门槛自然拦截（不再"超出部分免单"）。
@@ -335,23 +948,182 @@ export async function ensureFreeMonthlyGrant(userId: string, monthKey: string): 
 
 /**
  * 便捷 helper：把 llm.ts 的 onUsage 回调直接对接到记账。
- * P2-2：改用 Next 的 after()——onUsage 常在流式生成过程中触发，此时用 fire-and-forget 的 void
- * 记账可能随响应返回被打断而丢账。after() 保证「响应体返回后」仍在同一请求生命周期内落账。
- * 兜底：after() 仅在请求作用域内可用；若在无请求上下文（脚本/嵌套 after 的后台续跑等）被调用会抛，
- * 此时退回原 void 直发，保证任何调用点都不因 after 不可用而崩。
+ * 记账直接返回 Promise 给 chat await：请求路由、脚本以及 Next after() 内的后台生成都走同一
+ * 可等待契约。这里不能再把主记账注册进 after()——after 回调要等响应结束才运行，而响应又在
+ * 等 chat 返回，会形成等待环；退回 void fire-and-forget 则会在进程冻结/回收时丢账。
  */
-export function creditingOnUsage(userId: string, scene: Scene) {
-  return (usage: LlmUsageInfo) => {
-    try {
-      // 必须 async + await(2026-07-21 资金审查 A-4 修):此前回调是同步函数、立即返回 undefined,
-      // Next 认为该 after 任务已完成,真正的 DB 写成了游离 promise —— 响应返回后进程被冻结/回收时
-      // 这笔记账会丢(正是 after 本想解决的问题)。改成 await 后 Next 会等它落库。
-      after(async () => {
-        await recordLlmSpend(userId, usage, scene);
-      });
-    } catch {
-      // 非请求作用域：after() 不可用，退回直发（recordLlmSpend 内部已自带失败落 AuditLog 兜底）。
-      void recordLlmSpend(userId, usage, scene);
-    }
+export function creditingOnUsage(userId: string, scene: Scene): LlmUsageCallback {
+  return async (usage: LlmUsageInfo) => {
+    const charged = await recordLlmSpend(userId, usage, scene);
+    // tokensToCredits 最少为 1；0 只可能表示 recordLlmSpend 已失败并落了 AuditLog。
+    // 抛给 chat 的独立 usage catch 做第二层可观测日志，但绝不触发上游重试。
+    if (charged <= 0) throw new Error(`LLM usage accounting failed (${scene})`);
   };
+}
+
+function requiredCreditKey(value: string, name: string): string {
+  if (typeof value !== "string") throw new TypeError(`${name} must be a string`);
+  const normalized = value.trim();
+  if (!normalized) throw new TypeError(`${name} must not be empty`);
+  if (normalized.length > 512) throw new TypeError(`${name} is too long`);
+  return normalized;
+}
+
+function validScene(value: string): Scene {
+  if (!Object.prototype.hasOwnProperty.call(SCENE_WEIGHT, value)) {
+    throw new TypeError(`unsupported credit scene: ${value}`);
+  }
+  return value as Scene;
+}
+
+function positiveCreditAmount(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 1) throw new TypeError(`${name} must be a positive integer`);
+  return value;
+}
+
+function nonNegativeCreditAmount(value: number, name: string): number {
+  if (!Number.isSafeInteger(value) || value < 0) throw new TypeError(`${name} must be a non-negative integer`);
+  return value;
+}
+
+function validCreditDate(value?: Date): Date {
+  const date = value ? new Date(value.getTime()) : new Date();
+  if (!Number.isFinite(date.getTime())) throw new TypeError("now must be a valid Date");
+  return date;
+}
+
+function validCreditTtl(value = DEFAULT_CREDIT_RESERVATION_TTL_MS): number {
+  if (!Number.isSafeInteger(value) || value < 1 || value > MAX_CREDIT_RESERVATION_TTL_MS) {
+    throw new TypeError(`ttlMs must be an integer between 1 and ${MAX_CREDIT_RESERVATION_TTL_MS}`);
+  }
+  return value;
+}
+
+function validLlmUsage(usage: LlmUsageInfo): LlmUsageInfo {
+  const integers = [usage.promptTokens, usage.completionTokens, usage.totalTokens];
+  if (integers.some((value) => !Number.isSafeInteger(value) || value < 0)) {
+    throw new TypeError("LLM usage tokens must be non-negative integers");
+  }
+  if (usage.totalTokens < usage.promptTokens || usage.totalTokens < usage.completionTokens) {
+    throw new TypeError("LLM totalTokens must cover prompt and completion tokens");
+  }
+  return { ...usage, model: requiredCreditKey(usage.model, "usage.model") };
+}
+
+function normalizeReservation(row: {
+  id: string;
+  reservationKey: string;
+  operationKey: string | null;
+  userId: string;
+  scene: string;
+  estimatedCredits: number;
+  remainingCredits: number;
+  actualCredits: number;
+  maxAdditionalCredits: number;
+  additionalCredits: number;
+  status: string;
+  expiresAt: Date;
+  reversedAt: Date | null;
+}, duplicate: boolean): CreditReservationSnapshot {
+  const status = row.status;
+  if (status !== "active" && status !== "settled" && status !== "refunded" && status !== "expired" && status !== "reversed") {
+    throw new Error(`Invalid CreditReservation status: ${status}`);
+  }
+  return {
+    id: row.id,
+    reservationKey: row.reservationKey,
+    operationKey: row.operationKey,
+    userId: row.userId,
+    scene: validScene(row.scene),
+    estimatedCredits: row.estimatedCredits,
+    remainingCredits: row.remainingCredits,
+    actualCredits: row.actualCredits,
+    maxAdditionalCredits: row.maxAdditionalCredits,
+    additionalCredits: row.additionalCredits,
+    status,
+    expiresAt: row.expiresAt,
+    reversedAt: row.reversedAt,
+    duplicate,
+  };
+}
+
+function assertMatchingReservation(
+  row: { operationKey: string | null; userId: string; scene: string; estimatedCredits: number; maxAdditionalCredits: number },
+  expected: { operationKey: string | null; userId: string; scene: Scene; estimatedCredits: number; maxAdditionalCredits: number },
+): void {
+  if (
+    row.operationKey !== expected.operationKey
+    || row.userId !== expected.userId
+    || row.scene !== expected.scene
+    || row.estimatedCredits !== expected.estimatedCredits
+    || row.maxAdditionalCredits !== expected.maxAdditionalCredits
+  ) {
+    throw new AppError("reservationKey 已被不同参数占用", 409);
+  }
+}
+
+interface DuplicateSettlementRow {
+  usageId: unknown;
+  reservationId: unknown;
+  actualCredits: unknown;
+  estimatedCredits: unknown;
+  additionalCredits: unknown;
+  balanceAfter: unknown;
+}
+
+async function readDuplicateSettlement(
+  db: Pick<PrismaClient, "$queryRaw">,
+  reservationId: string,
+  idempotencyKey: string,
+): Promise<CreditSettlement | null> {
+  const rows = await db.$queryRaw<DuplicateSettlementRow[]>(Prisma.sql`
+    SELECT
+      u."id" AS "usageId",
+      u."reservationId" AS "reservationId",
+      u."creditCost" AS "actualCredits",
+      r."estimatedCredits" AS "estimatedCredits",
+      r."additionalCredits" AS "additionalCredits",
+      COALESCE(
+        MAX(CASE WHEN l."type" IN ('llm_settle_extra', 'llm_reserve_refund') THEN l."balanceAfter" END),
+        MAX(CASE WHEN l."type" = 'llm_reserve' THEN l."balanceAfter" END)
+      ) AS "balanceAfter"
+    FROM "LlmUsage" u
+    JOIN "CreditReservation" r ON r."id" = u."reservationId"
+    JOIN "CreditLedger" l ON l."refId" = r."id"
+    WHERE u."idempotencyKey" = ${idempotencyKey}
+    GROUP BY u."id", u."reservationId", u."creditCost", r."estimatedCredits", r."additionalCredits"
+    LIMIT 1
+  `);
+  const row = rows[0];
+  if (!row) return null;
+  if (String(row.reservationId) !== reservationId) {
+    throw new AppError("idempotencyKey 已被另一笔预占使用", 409);
+  }
+  const actualCredits = Number(row.actualCredits);
+  const estimatedCredits = Number(row.estimatedCredits);
+  const additionalCredits = Number(row.additionalCredits);
+  const chargedFromReservation = actualCredits - additionalCredits;
+  return {
+    reservationId,
+    usageId: String(row.usageId),
+    idempotencyKey,
+    actualCredits,
+    chargedFromReservation,
+    additionalCredits,
+    refundedCredits: estimatedCredits - chargedFromReservation,
+    // 必须返回首次结算时的不可变快照，不能回读当前账户余额；
+    // 否则结算后的任意充值/消费都会让同一 idempotencyKey 返回不同 DTO。
+    balanceAfter: Number(row.balanceAfter),
+    duplicate: true,
+  };
+}
+
+function isPrismaUniqueError(error: unknown): boolean {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function normalizeCreditReason(value: string): string {
+  if (typeof value !== "string") throw new TypeError("reason must be a string");
+  const normalized = value.trim();
+  return (normalized || "AI 调用未完成").slice(0, 500);
 }

@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { sha256 } from "@/lib/session";
 import { ok, handle, assertSameOrigin } from "@/lib/api";

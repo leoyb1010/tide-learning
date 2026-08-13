@@ -1,9 +1,10 @@
-import { NextRequest, after } from "next/server";
+import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { lessonTargetsFromBlocks, validateBlocks } from "@/lib/blocks";
-import { writeLessonBlocks, scoreLesson, renderCourseHtmlBestEffort } from "@/lib/course-gen";
+import { settleExternalCoursePresentation, writeLessonBlocks, scoreLesson } from "@/lib/course-gen";
+import { CoursePresentationMutationLostError, generateLessonHtml } from "@/lib/ai/courseware-gen";
 import { validateLessonGraph } from "@/lib/lesson-graph";
 
 export const dynamic = "force-dynamic";
@@ -62,9 +63,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       where: { id },
       select: {
         id: true,
+        contentType: true,
+        renderEngine: true,
         course: {
           select: {
-            id: true, authorUserId: true, template: true,
+            id: true, authorUserId: true, template: true, status: true, genStatus: true,
+            presentationRevision: true,
             lessons: { select: { id: true } },
             lessonEdges: { select: { fromLessonId: true, toLessonId: true, label: true, conditionJson: true, sortOrder: true } },
           },
@@ -73,6 +77,13 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     });
     if (!lesson || !lesson.course) return fail("章节不存在", 404);
     if (lesson.course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
+    if (lesson.course.status === "archived") return fail("已归档课程不能编辑", 409);
+    if (["generating", "paused", "outline_draft"].includes(lesson.course.genStatus ?? "")) {
+      return fail("课程正在生成或暂停中，请先等待任务收敛", 409);
+    }
+    if (lesson.contentType === "scorm" || lesson.renderEngine === "faithful_import") {
+      return fail("忠实导入课件不能用块编辑器覆盖", 409);
+    }
 
     const validated = validateBlocks(body.blocks);
     if (validated.length === 0) return fail("编辑后内容为空或全部非法，未保存", 400);
@@ -97,37 +108,48 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!graph.ok) return fail(`课件跳转会破坏课程路径图：${graph.issues.join("；")}`, 400);
 
     const quality = scoreLesson(validated, lesson.course.template);
-    await writeLessonBlocks({
+    const presentationRevision = await writeLessonBlocks({
       lessonId: id,
       courseId: lesson.course.id,
       blocksJson: JSON.stringify({ version: 1, blocks: validated }),
-      qualityJson: JSON.stringify({ score: quality.score, passed: quality.passed, flags: quality.flags, manualEdit: true }),
+      qualityJson: JSON.stringify({
+        score: quality.score,
+        passed: false,
+        status: "manual_review_required",
+        rulePassed: quality.passed,
+        flags: quality.flags,
+        manualEdit: true,
+      }),
       reason: "manual",
+      expectedPresentationRevision: lesson.course.presentationRevision,
+      blockTargets: targets,
     });
 
-    await prisma.$transaction(async (tx) => {
-      await tx.lessonEdge.deleteMany({
-        where: { courseId: lesson.course.id, fromLessonId: id, conditionJson: { contains: '"source":"block_target"' } },
+    // blocks 写事务已认领新 presentationRevision；直接用同一 owner 跑免费确定性渲染，
+    // 不再二次 begin 留下两个事务之间的窗口或无意覆盖新换肤 owner。
+    try {
+      const rendered = await generateLessonHtml(id, user.id, {
+        enhance: false,
+        force: true,
+        presentationRevision,
       });
-      if (targets.length > 0) {
-        await tx.lessonEdge.createMany({
-          data: targets.map((target, index) => ({
-            courseId: lesson.course.id, fromLessonId: id, toLessonId: target, label: "课件交互", sortOrder: 500 + index,
-            conditionJson: JSON.stringify({ type: "choice", blockId: `route_${index}`, optionIndex: 0, source: "block_target" }),
-          })),
-        });
-        await tx.course.update({ where: { id: lesson.course.id }, data: { navigationMode: "graph" } });
-      } else {
-        const remainingEdges = await tx.lessonEdge.count({ where: { courseId: lesson.course.id } });
-        if (remainingEdges === 0) await tx.course.update({ where: { id: lesson.course.id }, data: { navigationMode: "linear" } });
+      if (!rendered.ok || rendered.engine === "none") {
+        return fail("内容已保存，但基础排版未完成，请免费重试", 409);
       }
-    });
+    } catch (error) {
+      if (error instanceof CoursePresentationMutationLostError) {
+        return fail("内容已保存，但课件排版已被更新操作取代", 409);
+      }
+      throw error;
+    }
+    const presentation = await settleExternalCoursePresentation(lesson.course.id, presentationRevision);
+    if (!presentation.settled) return fail("内容已保存，但课件表现层已发生并发变更", 409);
 
-    const courseId = lesson.course.id;
-    after(async () => {
-      await renderCourseHtmlBestEffort(courseId);
+    return ok({
+      saved: true,
+      blocks: validated.length,
+      presentationStatus: presentation.status,
+      courseReady: presentation.contentReady && presentation.status !== "incomplete",
     });
-
-    return ok({ saved: true, blocks: validated.length });
   });
 }

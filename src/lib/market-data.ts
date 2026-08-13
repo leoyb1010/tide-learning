@@ -20,9 +20,17 @@ import {
   batchCourseRealRatings,
   type CourseRatingAggregate,
 } from "@/lib/course-review";
+import { filterCurrentMarketCoursesByRevision, marketBaseWhere } from "@/lib/market-eligibility";
 
 /** 集市取货上限（与原 Web page 的 take:60 一致）。 */
 const MARKET_TAKE = 60;
+/**
+ * 候选窗口：先按窗口取轻量行、过滤发布围栏后再截 MARKET_TAKE，
+ * 避免「先 take 再过滤」把被围栏挡掉的课算进 60 个名额造成页面欠填、
+ * 而 60 名之后的合格课永远取不到。窗口内全被挡掉的极端情况仍可能欠填，
+ * 但那意味着集市前 180 门课全是坏档案，属于需要报警的数据事故而非取数问题。
+ */
+const MARKET_CANDIDATE_WINDOW = MARKET_TAKE * 3;
 
 /**
  * 拼装集市摊位视图模型。
@@ -31,26 +39,37 @@ const MARKET_TAKE = 60;
  */
 export async function buildMarketStalls(viewerId: string | null): Promise<MarketStall[]> {
   // 已上架课：作者归属 + 学习人数 + 上新时间。
-  const courses = await prisma.course.findMany({
-    where: { sharedStatus: "shared" },
+  // 轻量行 + 按 revision 缓存的围栏过滤：不再每请求把全部课件 blob 拖出 SQLite。
+  const candidates = await prisma.course.findMany({
+    where: marketBaseWhere(),
     orderBy: { lastUpdatedAt: "desc" },
-    take: MARKET_TAKE,
+    take: MARKET_CANDIDATE_WINDOW,
     select: {
       id: true,
       slug: true,
       title: true,
+      template: true,
+      designJson: true,
+      contentBriefJson: true,
+      modelUsed: true,
       subtitle: true,
       description: true,
       category: true,
       coverColor: true,
       origin: true,
+      status: true,
+      sharedStatus: true,
+      genStatus: true,
       authorUserId: true,
       learnersCount: true,
       priceCredits: true,
       salesCount: true,
       createdAt: true,
+      generationQualityJson: true,
+      presentationRevision: true,
     },
   });
+  const courses = (await filterCurrentMarketCoursesByRevision(candidates)).slice(0, MARKET_TAKE);
 
   const courseIds = courses.map((c) => c.id);
   // 课 id → 作者 userId，用于「拿走数」聚合时排除作者本人。
@@ -204,28 +223,40 @@ export async function buildStallDetail(
   slug: string,
   viewerId: string | null,
 ): Promise<StallDetail | null> {
-  const course = await prisma.course.findFirst({
-    where: { slug, sharedStatus: "shared" },
+  const courseCandidate = await prisma.course.findFirst({
+    where: marketBaseWhere({ slug }),
     select: {
       id: true,
       slug: true,
       title: true,
+      template: true,
+      designJson: true,
+      contentBriefJson: true,
+      modelUsed: true,
       subtitle: true,
       description: true,
       category: true,
       coverColor: true,
       origin: true,
+      status: true,
+      sharedStatus: true,
+      genStatus: true,
       authorUserId: true,
       learnersCount: true,
       priceCredits: true,
       salesCount: true,
       createdAt: true,
+      generationQualityJson: true,
+      presentationRevision: true,
       lessons: {
         orderBy: { sortOrder: "asc" },
-        select: { id: true, title: true, summary: true, durationSec: true, isFree: true, sortOrder: true },
+        select: {
+          id: true, title: true, summary: true, durationSec: true, isFree: true, sortOrder: true,
+        },
       },
     },
   });
+  const course = courseCandidate && (await filterCurrentMarketCoursesByRevision([courseCandidate]))[0];
   if (!course) return null;
 
   // 本课拿走数（去重学习者，排除作者本人）——与列表口径一致。
@@ -260,10 +291,26 @@ export async function buildStallDetail(
 
   let shop: StallSellerShop = { stallCount: 0, totalCollects: 0, totalSales: 0, level: 1 };
   if (course.authorUserId) {
-    const sellerCourses = await prisma.course.findMany({
-      where: { authorUserId: course.authorUserId, sharedStatus: "shared" },
-      select: { id: true, salesCount: true },
+    const sellerCandidates = await prisma.course.findMany({
+      where: marketBaseWhere({ authorUserId: course.authorUserId }),
+      select: {
+        id: true,
+        title: true,
+        category: true,
+        template: true,
+        designJson: true,
+        contentBriefJson: true,
+        modelUsed: true,
+        origin: true,
+        status: true,
+        sharedStatus: true,
+        genStatus: true,
+        generationQualityJson: true,
+        presentationRevision: true,
+        salesCount: true,
+      },
     });
+    const sellerCourses = await filterCurrentMarketCoursesByRevision(sellerCandidates);
     const sellerIds = sellerCourses.map((c) => c.id);
     // 该摊主全部在架课的去重学习者（排除摊主本人），逐课累加为店铺总拿走。
     const rows =
@@ -321,7 +368,15 @@ export async function buildStallDetail(
 
   return {
     stall,
-    lessons: course.lessons,
+    // 发布校验会读正文/质量/表现源字段，商品详情仅显式返回安全大纲。
+    lessons: course.lessons.map((lesson) => ({
+      id: lesson.id,
+      title: lesson.title,
+      summary: lesson.summary,
+      durationSec: lesson.durationSec,
+      isFree: lesson.isFree,
+      sortOrder: lesson.sortOrder,
+    })),
     shop,
     rating,
     description: course.description ?? course.subtitle ?? null,

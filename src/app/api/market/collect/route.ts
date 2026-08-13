@@ -6,6 +6,7 @@ import { assertUserRateLimit } from "@/lib/rate-limit";
 import { track } from "@/lib/analytics";
 import { ensureAccount } from "@/lib/credits";
 import { collectFreeCourse, purchaseCourse, FREE_COLLECT_AUTHOR_BONUS } from "@/lib/credit-trade";
+import { currentMarketPublicationFence, marketBaseWhere } from "@/lib/market-eligibility";
 
 export const dynamic = "force-dynamic";
 
@@ -41,20 +42,38 @@ export async function POST(req: NextRequest) {
 
     // 只允许拿走已上架的课；顺带拿到作者、定价与第 1 节 lesson。
     const course = await prisma.course.findFirst({
-      where: { id: courseId, sharedStatus: "shared" },
+      where: marketBaseWhere({ id: courseId }),
       select: {
         id: true,
         title: true,
+        category: true,
+        template: true,
+        designJson: true,
+        contentBriefJson: true,
+        modelUsed: true,
         authorUserId: true,
         priceCredits: true,
+        origin: true,
+        status: true,
+        sharedStatus: true,
+        genStatus: true,
+        generationQualityJson: true,
+        presentationRevision: true,
         lessons: {
           orderBy: { sortOrder: "asc" },
-          take: 1,
-          select: { id: true },
+          select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true },
         },
       },
     });
-    if (!course) throw new AppError("课程不存在或未在集市展示", 404);
+    const publicationFence = course?.lessons[0]
+      ? await currentMarketPublicationFence(course, {
+          priceCredits: course.priceCredits,
+          firstLessonId: course.lessons[0].id,
+          authorUserId: course.authorUserId,
+          title: course.title,
+        })
+      : null;
+    if (!course || !publicationFence) throw new AppError("课程不存在或当前版本已不可交易", 404);
     if (course.authorUserId === user.id) return fail("这是你自己的课，已在你的书架");
 
     const firstLesson = course.lessons[0];
@@ -82,6 +101,7 @@ export async function POST(req: NextRequest) {
         firstLessonId: firstLesson.id,
         priceCredits: price,
         courseTitle: course.title,
+        publicationFence,
       });
 
       if (result.status === "already_owned") {
@@ -118,6 +138,7 @@ export async function POST(req: NextRequest) {
       firstLessonId: firstLesson.id,
       authorBonus: FREE_COLLECT_AUTHOR_BONUS,
       courseTitle: course.title,
+      publicationFence,
     });
 
     if (result.status === "already_owned") {

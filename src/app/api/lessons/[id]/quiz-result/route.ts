@@ -28,12 +28,12 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     const body = (await req.json().catch(() => null)) as {
       blockId?: string;
       answerIndex?: number;
-      correct?: boolean;
     } | null;
     const blockId = body?.blockId?.trim();
-    if (!blockId || blockId.length > 64) return fail("blockId 非法");
-    if (typeof body?.correct !== "boolean" || !Number.isInteger(body?.answerIndex)) return fail("参数非法");
-    const answerIndex = Math.max(0, Math.min(31, body.answerIndex as number));
+    if (!blockId || !/^[A-Za-z0-9_-]{1,64}$/.test(blockId)) return fail("blockId 非法");
+    if (!Number.isInteger(body?.answerIndex)) return fail("参数非法");
+    const answerIndex = body!.answerIndex as number;
+    if (answerIndex < 0 || answerIndex > 31) return fail("answerIndex 非法");
 
     // 归属 + 权益双门（与 /api/progress 同口径）：无权访问的节不接受任何写入。
     const view = await getLessonForUser(lessonId, user.id);
@@ -49,42 +49,50 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         return [];
       }
     })();
-    if (!parsedBlocks.some((b) => b.id === blockId)) return fail("blockId 不存在于本节");
+    const matchedBlock = parsedBlocks.find((b) => b.id === blockId);
+    if (!matchedBlock) return fail("blockId 不存在于本节");
+    if (matchedBlock.type !== "quiz") return fail("blockId 不是测验块");
+    if (answerIndex >= matchedBlock.options.length) return fail("answerIndex 超出选项范围");
+    // blocksJson 是教学真值。客户端只能声明选了哪项，不能声明自己答对。
+    const correct = answerIndex === matchedBlock.answerIndex;
 
     await prisma.lessonQuizResult.upsert({
       where: { userId_lessonId_blockId: { userId: user.id, lessonId, blockId } },
-      create: { userId: user.id, lessonId, blockId, answerIndex, correct: body.correct },
-      update: { answerIndex, correct: body.correct },
+      create: { userId: user.id, lessonId, blockId, answerIndex, correct },
+      update: { answerIndex, correct },
     });
 
     // 答错 → 错题转复习卡（幂等：同 front 已有卡不重复建）。blocks 复用上方同一次解析。
     let reviewCardCreated = false;
-    if (!body.correct) {
-      const quiz = parsedBlocks.find((b) => b.id === blockId && b.type === "quiz");
-      if (quiz && quiz.type === "quiz") {
-        const front = quiz.question.slice(0, 500);
-        const correctOption = quiz.options[quiz.answerIndex] ?? "";
-        const back = `${correctOption}${quiz.explain ? `\n\n${quiz.explain}` : ""}`.slice(0, 2000);
-        const existing = await prisma.reviewCard.findFirst({
-          where: { userId: user.id, front },
-          select: { id: true },
+    if (!correct) {
+      const front = matchedBlock.question.slice(0, 500);
+      const correctOption = matchedBlock.options[matchedBlock.answerIndex] ?? "";
+      const back = `${correctOption}${matchedBlock.explain ? `\n\n${matchedBlock.explain}` : ""}`.slice(0, 2000);
+      const existing = await prisma.reviewCard.findFirst({
+        where: { userId: user.id, front },
+        select: { id: true },
+      });
+      if (!existing) {
+        await prisma.reviewCard.create({
+          data: { userId: user.id, courseId: view.course.id, front, back, dueAt: new Date() },
         });
-        if (!existing) {
-          await prisma.reviewCard.create({
-            data: { userId: user.id, courseId: view.course.id, front, back, dueAt: new Date() },
-          });
-          reviewCardCreated = true;
-        }
+        reviewCardCreated = true;
       }
     }
 
     await track({
       eventName: "courseware_quiz_result",
       userId: user.id,
-      properties: { lessonId, blockId, correct: body.correct, reviewCardCreated },
+      properties: { lessonId, blockId, answerIndex, correct, reviewCardCreated },
     });
     after(() => recordActivity(user.id, { minutes: 1 }).catch(() => {}));
 
-    return ok({ saved: true, reviewCardCreated });
+    return ok({
+      saved: true,
+      answerIndex,
+      correct,
+      correctAnswerIndex: matchedBlock.answerIndex,
+      reviewCardCreated,
+    });
   });
 }

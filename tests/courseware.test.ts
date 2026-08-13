@@ -379,6 +379,10 @@ describe("翻页运行时（v2）—— 默认翻页、可切滚动、协议齐�
     expect(html).toContain("ct-mode");
     expect(html).toContain("ct-nav");
     expect(html).toContain("ct-height");
+    expect(html).toContain("ct-complete");
+    expect(html).toContain("完成本节");
+    // 末页不在 show()/ct-page 时自动完成，只在显式 nav(1) 超过末页时发信号。
+    expect(html.indexOf("if (d === 1 && cur === secs.length - 1)")).toBeGreaterThan(-1);
     // 默认翻页
     expect(html).toContain("setMode('paged')");
   });
@@ -387,5 +391,44 @@ describe("翻页运行时（v2）—— 默认翻页、可切滚动、协议齐�
     const lint = validateCoursewareHtml(html);
     expect(lint.issues).toEqual([]);
     expect(lint.ok).toBe(true);
+  });
+
+  it("有显式正确键的 hotspot 才输出本地判定数据，且只发 ct-practice", () => {
+    const hotspotBlocks: (Block & { id: string })[] = [{
+      id: "hs_scored",
+      type: "hotspot",
+      imageSrc: "/lesson-stills/lesson-still-ai.jpg",
+      prompt: "哪个是正确位置？",
+      spots: [
+        { x: 30, y: 45, label: "正确点", correct: true },
+        { x: 70, y: 45, label: "干扰点" },
+      ],
+    }];
+    const out = renderCoursewareHtml({ title: "hotspot", blocks: hotspotBlocks, design, variance });
+    const main = out.match(/<main\b[\s\S]*?<\/main>/i)?.[0] ?? "";
+    expect(main).toContain('data-ct-correct="true"');
+    expect(main).toContain('data-ct-correct="false"');
+    expect(main).toContain('aria-pressed="false"');
+    expect(out).toContain("kind:'hotspot'");
+    expect(out).toContain("type:'ct-practice'");
+    expect(out).not.toContain("/quiz-result");
+  });
+
+  it("无正确键的 hotspot 只做探索反馈，标记不带 data-ct-correct", () => {
+    const exploratory: (Block & { id: string })[] = [{
+      id: "hs_explore",
+      type: "hotspot",
+      imageSrc: "/lesson-stills/lesson-still-ai.jpg",
+      prompt: "探索图上两个部件",
+      spots: [
+        { x: 30, y: 45, label: "部件 A", feedback: "A 的作用" },
+        { x: 70, y: 45, label: "部件 B" },
+      ],
+    }];
+    const out = renderCoursewareHtml({ title: "hotspot", blocks: exploratory, design, variance });
+    const main = out.match(/<main\b[\s\S]*?<\/main>/i)?.[0] ?? "";
+    expect((main.match(/data-ct-hotspot/g) || []).length).toBe(2);
+    expect(main).not.toContain("data-ct-correct");
+    expect(main).toContain('data-ct-feedback="A 的作用"');
   });
 });

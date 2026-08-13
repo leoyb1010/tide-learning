@@ -7,7 +7,6 @@
  */
 
 import { chatJson } from "@/lib/llm";
-import { creditingOnUsage } from "@/lib/credits";
 import { sanitizeBrief, type DesignBrief, CHROMA, PAPER_TINT, FONT_PERSONALITY, LAYOUT, MOTION_SIG, RADIUS_STEP, TEXTURE } from "./design-brief";
 
 // 生成 brief 用最便宜的 free 档模型（注册表无 deepseek-chat，gpt-5.6-sol 是 free 且 costWeight=1）。
@@ -43,6 +42,7 @@ interface BriefInput {
   category?: string | null;
   outline?: string[]; // 章节标题若干，帮助判断气质
   userId: string;
+  billingKey?: string;
 }
 
 /**
@@ -67,7 +67,9 @@ export async function generateDesignBrief(input: BriefInput): Promise<DesignBrie
       maxTokens: 400,
       retries: 0,
       timeoutMs: 20_000,
-      onUsage: creditingOnUsage(input.userId, "generate_design_brief"),
+      ...(input.billingKey ? {
+        billing: { userId: input.userId, scene: "generate_design_brief" as const, callKey: `${input.billingKey}:design-brief` },
+      } : {}),
     });
     return sanitizeBrief(raw);
   } catch {

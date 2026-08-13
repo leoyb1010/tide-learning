@@ -69,6 +69,18 @@ export function validateProductionEnv(): void {
   const hops = Number(process.env.TRUSTED_PROXY_HOPS ?? "1");
   if (!Number.isSafeInteger(hops) || hops < 0 || hops > 5) errors.push("TRUSTED_PROXY_HOPS 必须为 0 到 5 的整数");
 
+  const generationWorkerEnabled = process.env.GENERATION_WORKER_ENABLED?.trim();
+  if (generationWorkerEnabled && !["0", "1", "false"].includes(generationWorkerEnabled)) {
+    errors.push("GENERATION_WORKER_ENABLED 只能为 0、1、false 或留空");
+  }
+  const generationWorkerInterval = process.env.GENERATION_WORKER_INTERVAL_MS?.trim();
+  if (generationWorkerInterval) {
+    const intervalMs = Number(generationWorkerInterval);
+    if (!Number.isSafeInteger(intervalMs) || intervalMs < 10_000 || intervalMs > 3_600_000) {
+      errors.push("GENERATION_WORKER_INTERVAL_MS 必须为 10000 到 3600000 的整数毫秒");
+    }
+  }
+
   if (process.env.APPLE_IAP_ENABLED === "1") {
     if (!process.env.APPLE_BUNDLE_ID) errors.push("启用 Apple IAP 时必须配置 APPLE_BUNDLE_ID");
     if (!new Set(["Sandbox", "Production"]).has(process.env.APPLE_IAP_ENVIRONMENT || "")) {
@@ -98,38 +110,26 @@ export function validateProductionEnv(): void {
 }
 
 export async function register() {
-  // 仅 nodejs runtime：edge 无 process 信号处理，也绝不能引入 Prisma。
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-
-  if (process.env.NODE_ENV === "production") {
-    validateProductionEnv();
-    // 本地生产构建预览必须显式 opt-in；真实部署的 HTTPS 地址已在上方 fail-fast。
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
-    if (!siteUrl) {
-      console.warn(
-        "[instrumentation] ⚠️ 未设置 NEXT_PUBLIC_SITE_URL，OG/分享卡/robots/sitemap 将回落默认域名。" +
-          "真实部署请在【构建期与运行期】都设置为公开域名（如 https://tide.learning）。",
-      );
-    } else if (/localhost|127\.0\.0\.1/.test(siteUrl)) {
-      console.warn(
-        `[instrumentation] ⚠️ NEXT_PUBLIC_SITE_URL 当前为本地地址（${siteUrl}）。` +
-          "OG/分享卡链接会烤成本地域名，分享到微信/X 预览图失效。正式部署请改为公开域名后【重新构建】。",
-      );
+  // Next 会为 instrumentation 同时构建 Edge/Node 变体。必须用它能在编译期 DCE 的
+  // 正向 runtime 条件直接包住 import；early return 后的字面量 import 仍会被 Edge 跟踪。
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    if (process.env.NODE_ENV === "production") {
+      validateProductionEnv();
+      // 本地生产构建预览必须显式 opt-in；真实部署的 HTTPS 地址已在上方 fail-fast。
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+      if (!siteUrl) {
+        console.warn(
+          "[instrumentation] ⚠️ 未设置 NEXT_PUBLIC_SITE_URL，OG/分享卡/robots/sitemap 将回落默认域名。" +
+            "真实部署请在【构建期与运行期】都设置为公开域名（如 https://tide.learning）。",
+        );
+      } else if (/localhost|127\.0\.0\.1/.test(siteUrl)) {
+        console.warn(
+          `[instrumentation] ⚠️ NEXT_PUBLIC_SITE_URL 当前为本地地址（${siteUrl}）。` +
+            "OG/分享卡链接会烤成本地域名，分享到微信/X 预览图失效。正式部署请改为公开域名后【重新构建】。",
+        );
+      }
     }
-  }
-
-  // SIGTERM 优雅退出：断开 Prisma 连接（SQLite WAL checkpoint 落盘）。
-  // 动态 import 避免顶层引入 db（instrumentation 也会被 edge 侧解析）；
-  // 全局标记防 dev 热重载 / 多次 register 重复挂监听器。
-  const g = globalThis as unknown as { __tideSigtermRegistered?: boolean };
-  if (!g.__tideSigtermRegistered) {
-    g.__tideSigtermRegistered = true;
-    process.on("SIGTERM", () => {
-      void import("./lib/db")
-        .then(({ prisma }) => prisma.$disconnect())
-        .catch(() => {
-          /* 退出路径上断连失败无补救意义，静默即可 */
-        });
-    });
+    const { registerNodeInstrumentation } = await import("./instrumentation-node");
+    registerNodeInstrumentation();
   }
 }

@@ -16,6 +16,7 @@ import { TrialBooking } from "@/components/TrialBooking";
 import { formatDurationSec } from "@/lib/format";
 import { getCourseRatingAggregate } from "@/lib/course-review";
 import { TRACK_MAP, trackGradientVar } from "@/lib/tracks";
+import { isCurrentStoredCourseware } from "@/lib/courseware-publication";
 
 // 预告静帧兜底：按赛道选一张定格图，作为通用预告视频的 poster（视频加载前 / reduce-motion 时显示）。
 const PREVIEW_POSTER: Record<string, string> = {
@@ -48,11 +49,23 @@ export default async function CourseDetailPage({ params }: { params: Promise<{ i
   const firstFree = lessons.find((l) => l.isFree);
   // 审计修复(2026-07-19)：preview 页要求免费节**有 htmlJson**才渲染,video/article 课挂「免登录试读」按钮
   // 会 404 死链(实测 8/23 门已发布课命中)。入口按同口径预检,查不到就不渲染按钮。
-  const previewable = firstFree
-    ? (await prisma.lesson.count({
-        where: { courseId: course.id, isFree: true, status: "published", htmlJson: { not: null } },
-      })) > 0
-    : false;
+  const previewLesson = firstFree
+    ? await prisma.lesson.findFirst({
+        where: { id: firstFree.id, courseId: course.id, isFree: true, status: "published", htmlJson: { not: null } },
+        select: {
+          title: true,
+          summary: true,
+          sortOrder: true,
+          blocksJson: true,
+          htmlJson: true,
+          renderSourceHash: true,
+          renderEngine: true,
+          designJson: true,
+          course: { select: { id: true, title: true, category: true, template: true, designJson: true, genStatus: true } },
+        },
+      })
+    : null;
+  const previewable = Boolean(previewLesson && isCurrentStoredCourseware(previewLesson, previewLesson.course));
   const firstLesson = lessons[0];
   const needsCompliance = ["life", "silver_english"].includes(course.category) && course.reviewerName;
   const hasAccess = owned || canAccessTrack(course.category, snapshot); // 买断或订阅均可访问

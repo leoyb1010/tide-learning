@@ -1,9 +1,9 @@
+import { randomUUID } from "node:crypto";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { chatJson } from "@/lib/llm";
-import { creditingOnUsage } from "@/lib/credits";
+import { chatJson, isFailClosedLlmError } from "@/lib/llm";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { validateBlocks, type Block } from "@/lib/blocks";
@@ -325,6 +325,7 @@ export async function POST(req: NextRequest) {
       `输出 JSON：{questions:[{type, stem, options?(仅single), answer, explanation, sourceRef}]}`;
 
     let questions: CleanQuestion[] = [];
+    const billingRequestId = randomUUID();
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const result = await chatJson<ExamGenResult>({
@@ -332,14 +333,21 @@ export async function POST(req: NextRequest) {
           user: userMsg,
           temperature: 0.4,
           maxTokens: 8000,
-          onUsage: creditingOnUsage(user.id, "generate_exam"),
+          billing: {
+            userId: user.id,
+            scene: "generate_exam",
+            callKey: `generate-exam:${user.id}:${billingRequestId}:attempt:${attempt}`,
+          },
         });
         const clean = sanitizeQuestions(result?.questions);
         if (clean.length > 0) {
           questions = clean;
           break;
         }
-      } catch {
+      } catch (error) {
+        // 计费/幂等保护错误（402/409/503 等 fail-closed）不能被当成模型偶发故障重试，
+        // 否则会绕过硬预占继续调供应商。
+        if (isFailClosedLlmError(error)) throw error;
         // 网络/解析失败落入下一次重试
       }
     }

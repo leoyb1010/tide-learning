@@ -23,10 +23,11 @@ jobs:
       STREAM_SIGNING_SECRET: "ci-stream-signing-secret-at-least-32-characters"
 
     steps:
-      - uses: actions/checkout@v7
+      # v7 / v6 固定到官方仓库的不可变 commit，避免可移动 tag 改变已审计供应链。
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 20
           cache: npm
@@ -61,7 +62,7 @@ jobs:
         run: npm test
 
       - name: Dependency audit
-        run: npm audit --audit-level=moderate
+        run: npm audit --audit-level=low
 
       - name: Build
         run: npm run build
@@ -80,6 +81,7 @@ jobs:
           RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
           NODE_ENV=production BASE_URL=http://127.0.0.1:3100 node scripts/verify-browser-interactions.mjs
+          E2E_BASE=http://127.0.0.1:3100 npm run check:embed
 
       - name: Backup and restore drill
         run: |

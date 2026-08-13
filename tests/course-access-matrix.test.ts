@@ -22,7 +22,7 @@ vi.mock("@/lib/course-review", () => ({ batchCourseRealRatings: vi.fn() }));
 vi.mock("@/lib/demand-score", () => ({ rankDemands: vi.fn() }));
 vi.mock("@/lib/credit-trade", () => ({ getAuthorEarnings: vi.fn(), LEDGER_TYPE: {} }));
 
-import { getCourseDetail, getLessonForUser } from "@/lib/queries";
+import { canViewCourse, getCourseDetail, getLessonForUser } from "@/lib/queries";
 
 const FREE = { accessibleTracks: [] as string[], isSubscriber: false, accessLevel: "free" };
 const ORAL = { accessibleTracks: ["oral"] as string[], isSubscriber: true, accessLevel: "subscriber" };
@@ -30,6 +30,7 @@ const ALL = { accessibleTracks: "all" as const, isSubscriber: true, accessLevel:
 
 const paidLesson = {
   id: "lesson-paid",
+  status: "published",
   title: "付费章节",
   summary: "安全大纲",
   contentType: "video",
@@ -49,6 +50,7 @@ const paidLesson = {
     id: "course-ai",
     slug: "course-ai",
     title: "AI 课程",
+    status: "published",
     category: "ai",
     totalDurationSec: 120,
     origin: "official",
@@ -56,8 +58,8 @@ const paidLesson = {
     authorUserId: null,
     sharedStatus: "unshared",
     lessons: [
-      { id: "lesson-free", title: "试听", summary: "公开", contentType: "article", durationSec: 60, isFree: true, sortOrder: 1 },
-      { id: "lesson-paid", title: "付费章节", summary: "安全大纲", contentType: "video", durationSec: 120, isFree: false, sortOrder: 2 },
+      { id: "lesson-free", status: "published", title: "试听", summary: "公开", contentType: "article", durationSec: 60, isFree: true, sortOrder: 1 },
+      { id: "lesson-paid", status: "published", title: "付费章节", summary: "安全大纲", contentType: "video", durationSec: 120, isFree: false, sortOrder: 2 },
     ],
   },
 };
@@ -69,7 +71,7 @@ function expectPaidBodyRedacted(result: Awaited<ReturnType<typeof getLessonForUs
     videoUrl: null,
     articleMd: null,
     blocksJson: null,
-    htmlJson: null,
+    hasHtmlCourseware: false,
     videoGenStatus: null,
     videoDurationSec: null,
     subtitles: [],
@@ -141,6 +143,59 @@ describe("付费课件身份矩阵", () => {
     await expect(getLessonForUser("lesson-paid", "owner")).resolves.not.toBeNull();
     mockPrisma.coursePurchase.findUnique.mockResolvedValue({ id: "purchase-private" });
     await expect(getLessonForUser("lesson-paid", "buyer")).resolves.not.toBeNull();
+  });
+
+  it("课程归档下架后仍保留已购者访问，不用 market 在架状态撤销买断", async () => {
+    mockPrisma.lesson.findUnique.mockResolvedValue({
+      ...paidLesson,
+      course: {
+        ...paidLesson.course,
+        status: "archived",
+        visibility: "private",
+        origin: "ai_generated",
+        authorUserId: "owner",
+        sharedStatus: "private",
+      },
+    });
+    mockPrisma.coursePurchase.findUnique.mockResolvedValue({ id: "purchase-before-archive" });
+
+    const result = await getLessonForUser("lesson-paid", "buyer");
+    expect(result?.access).toBe(true);
+    expect(result?.lesson.articleMd).toBe("TOP_SECRET_ARTICLE");
+  });
+
+  it("archived 即使遗留 public/shared 也不对匿名直链开放，仅作者或已购者可读", () => {
+    const archived = {
+      status: "archived",
+      visibility: "public",
+      sharedStatus: "shared",
+      authorUserId: "owner",
+    };
+    expect(canViewCourse(archived, null, false)).toBe(false);
+    expect(canViewCourse(archived, "other", false)).toBe(false);
+    expect(canViewCourse(archived, "owner", false)).toBe(true);
+    expect(canViewCourse(archived, "buyer", true)).toBe(true);
+  });
+
+  it("draft/beta 课程与未发布课节不向匿名或普通买家泄正文，作者仍可管理预览", async () => {
+    mockPrisma.lesson.findUnique.mockResolvedValue({
+      ...paidLesson,
+      isFree: true,
+      status: "draft",
+      course: { ...paidLesson.course, status: "draft", visibility: "public", authorUserId: "owner" },
+    });
+    await expect(getLessonForUser("lesson-paid", null)).resolves.toBeNull();
+    mockPrisma.coursePurchase.findUnique.mockResolvedValue({ id: "purchase-draft" });
+    await expect(getLessonForUser("lesson-paid", "buyer")).resolves.toBeNull();
+    mockPrisma.coursePurchase.findUnique.mockResolvedValue(null);
+    await expect(getLessonForUser("lesson-paid", "owner")).resolves.not.toBeNull();
+
+    expect(canViewCourse({
+      status: "beta",
+      visibility: "public",
+      sharedStatus: "shared",
+      authorUserId: "owner",
+    }, null, false)).toBe(false);
   });
 
   it("课程详情的递归响应只含安全大纲，不含任何课件字段或秘密值", async () => {

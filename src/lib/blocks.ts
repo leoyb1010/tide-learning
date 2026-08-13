@@ -30,7 +30,7 @@ export type Block =
   | { type: "image"; src: string; caption?: string; alt?: string } // 课件图解：站内图 + 可选说明/替代文本
   // v4.3 公式块（吸收 KaTeX）：latex 源，服务端渲染为自包含 HTML；display=独立居中/inline=行内。
   | { type: "formula"; latex: string; display?: boolean; caption?: string }
-  // v4.3 交互块（吸收 H5P 交互设计，自研确定性渲染 + 判分回传 ct-quiz 进错题闭环）：
+  // v4.3 交互块（吸收 H5P 交互设计，自研确定性渲染 + 本地形成性反馈）：
   //  - fillblank 填空：blanks 由学员键入，每空 answers 多写法都算对；
   //  - dragwords 拖词：blanks 从打乱的词库（正解 + 干扰词）点选填入（移动友好，不用 HTML5 拖拽）。
   | { type: "fillblank"; prompt?: string; segments: string[]; blanks: string[][] }
@@ -69,6 +69,11 @@ const BLOCK_TYPES = new Set([
   "fillblank", "dragwords",
   "choice", "branch", "hotspot",
 ]);
+
+/** 只有 quiz 具备 answerIndex 服务端真值，可进入掌握度/错题本。 */
+export const SERVER_SCORED_BLOCK_TYPES = new Set<Block["type"]>(["quiz"]);
+/** 有确定性即时反馈，但不得冒充服务端评分结果。 */
+export const LOCAL_FORMATIVE_BLOCK_TYPES = new Set<Block["type"]>(["fillblank", "dragwords", "hotspot"]);
 
 /** 公式 latex 长度上限（防超长 latex 撑爆渲染/存储）。 */
 const MAX_LATEX = 1200;
@@ -148,7 +153,7 @@ function keepId(raw: unknown, index: number, seen: Set<string>): string {
 /**
  * 校验并规范化原始块数组。
  * - 丢弃非白名单 type 的块 / 结构不合法的块。
- * - quiz 的 answerIndex 越界（<0 或 >=options.length）归 0。
+ * - quiz 的 answerIndex 缺失或越界时整题丢弃，绝不静默伪造正确答案。
  * - 超长 markdown(>4000)/code(>6000) 截断。
  * - 每块生成稳定 id。
  * 永远返回合法数组（哪怕空）。
@@ -199,10 +204,14 @@ export function validateBlocks(raw: unknown): (Block & { id: string })[] {
           .filter((o) => typeof o === "string")
           .map((o) => clampStr(o, 300))
           .slice(0, MAX_OPTIONS);
-        if (!question || options.length < 2) continue; // 无题干或选项不足，丢弃
-        let answerIndex = typeof b.answerIndex === "number" && Number.isInteger(b.answerIndex) ? b.answerIndex : 0;
-        // 越界归 0（安全默认，永不指向不存在的选项）
-        if (answerIndex < 0 || answerIndex >= options.length) answerIndex = 0;
+        if (!question || options.length < 2 || options.some((option) => !option)) continue; // 无题干、空选项或选项不足，丢弃
+        // 选项文本重复时不存在唯一可判定的答案。这里必须 fail closed，不能把语义冲突留给客户端判分。
+        const normalizedOptions = options.map((option) => option.replace(/\s+/g, " ").trim().toLocaleLowerCase());
+        if (new Set(normalizedOptions).size !== normalizedOptions.length) continue;
+        // 正确答案键是教学真值，缺失/越界时宁可丢弃坏题，也不能静默把第 1 项判成正确。
+        if (typeof b.answerIndex !== "number" || !Number.isInteger(b.answerIndex)) continue;
+        const answerIndex = b.answerIndex;
+        if (answerIndex < 0 || answerIndex >= options.length) continue;
         const explain = clampStr(b.explain, MAX_MARKDOWN);
         const rawTargets = Array.isArray(b.branchTargets) ? b.branchTargets : [];
         const branchTargets = options.map((_, index) => safeLessonId(rawTargets[index]));
@@ -552,6 +561,132 @@ export function blocksToPlainText(blocks: (Block & { id: string })[]): string {
     }
   }
   return parts.join("\n\n").trim();
+}
+
+/**
+ * 给教学评审的结构化判分清单。普通纯文本刻意不暴露答案，适合搜索/伴侣；评审必须看到真实答案键，
+ * 否则会出现“解析说 4、系统却把 3 判对”的隐形坏题。
+ */
+function assessmentRecords(blocks: (Block & { id: string })[]): Record<string, unknown>[] {
+  const assessments: Record<string, unknown>[] = [];
+  for (const block of blocks) {
+    switch (block.type) {
+      case "quiz":
+        assessments.push({
+          id: block.id,
+          type: block.type,
+          question: block.question,
+          options: block.options,
+          answerIndex: block.answerIndex,
+          correctAnswer: block.options[block.answerIndex],
+          explain: block.explain || null,
+        });
+        break;
+      case "fillblank":
+        assessments.push({ id: block.id, type: block.type, prompt: block.prompt || null, answers: block.blanks });
+        break;
+      case "dragwords":
+        assessments.push({ id: block.id, type: block.type, prompt: block.prompt, answers: block.blanks, distractors: block.distractors });
+        break;
+      case "flashcard":
+        assessments.push({ id: block.id, type: block.type, prompt: block.front, answer: block.back });
+        break;
+      case "choice":
+        assessments.push({ id: block.id, type: block.type, prompt: block.prompt, choices: block.choices });
+        break;
+      case "branch":
+        assessments.push({ id: block.id, type: block.type, prompt: block.prompt, options: block.options });
+        break;
+      case "hotspot":
+        assessments.push({ id: block.id, type: block.type, prompt: block.prompt || null, spots: block.spots });
+        break;
+    }
+  }
+  return assessments;
+}
+
+export function blocksToAssessmentManifest(blocks: (Block & { id: string })[]): string {
+  return JSON.stringify(assessmentRecords(blocks));
+}
+
+/**
+ * 把完整判分清单切成多份各自合法的 JSON。禁止对 JSON 字符串做字符级 slice：那会同时造成
+ * 尾部题目不可见和语法损坏。单个 assessment 已由 validateBlocks 做字段上限，因此总能独立成批。
+ */
+export function blocksToAssessmentManifestBatches(
+  blocks: (Block & { id: string })[],
+  maxChars = 12_000,
+): string[] {
+  const records = assessmentRecords(blocks);
+  if (records.length === 0) return ["[]"];
+  const batches: string[] = [];
+  let current: Record<string, unknown>[] = [];
+  for (const record of records) {
+    const candidate = JSON.stringify([...current, record]);
+    if (current.length > 0 && candidate.length > maxChars) {
+      batches.push(JSON.stringify(current));
+      current = [record];
+    } else {
+      current.push(record);
+    }
+  }
+  if (current.length > 0) batches.push(JSON.stringify(current));
+  return batches;
+}
+
+/**
+ * 块滥用自检（吸收 bolt-slides 的 entry condition 纪律，做成确定性版本）。
+ *
+ * 与 prompts.BLOCK_ENTRY_RULES 成对：prompt 事前约束，本函数事后抓现行。只报**高精度**的
+ * 客观违例（数量与结构层面），不做「这个块该不该存在」的语义判断——那是双评审 Agent 的活。
+ *
+ * 这些都是高精度、可机械证明的结构问题，因此会与双评审共同参与发布门；更主观的
+ * “这个块是否真的必要”仍交给教学评审，避免把审美偏好伪装成确定性规则。
+ */
+const SPECIALTY_TYPES = new Set([
+  "diagram", "code", "formula", "dialog", "compare", "image", "hotspot", "fillblank", "dragwords", "choice", "branch",
+]);
+/** 全节至多一个的块：多了就是套路化开场/收束或图片堆砌。 */
+const AT_MOST_ONE: Record<string, string> = {
+  scene: "场景开场",
+  objectives: "学习目标",
+  summary: "小结",
+  image: "氛围图",
+};
+
+// 参数必须是真正的 Block（函数会读 items / left / right）——不能沿用 scoreLesson 的 {type:string}[]，
+// 否则传进裸 {type} 对象时会在 b.items.length 上炸。
+export function showcaseIssues(blocks: readonly Block[]): string[] {
+  const issues: string[] = [];
+  const counts = new Map<string, number>();
+  for (const b of blocks) counts.set(b.type, (counts.get(b.type) ?? 0) + 1);
+
+  for (const [type, label] of Object.entries(AT_MOST_ONE)) {
+    const n = counts.get(type) ?? 0;
+    if (n > 1) issues.push(`${label}块（${type}）出现 ${n} 次，全节至多一个：合并成一个，或改用真正承担教学动作的块`);
+  }
+
+  const specialty = [...counts.keys()].filter((type) => SPECIALTY_TYPES.has(type));
+  if (specialty.length >= 5) {
+    issues.push(
+      `一节里用了 ${specialty.length} 种特型块（${specialty.join("、")}），像在展示协议而非讲一节课：` +
+        "只保留能用一句话说清为本节目标做了什么的，其余删掉",
+    );
+  }
+
+  for (const b of blocks) {
+    if (b.type === "diagram" && b.items.length < 3) {
+      issues.push(`diagram「${b.title || "未命名"}」只有 ${b.items.length} 个节点，二元关系用文字讲更清楚，不必画图`);
+    }
+    if (b.type === "compare") {
+      const [a, c] = [b.left.items.length, b.right.items.length];
+      const [lo, hi] = a < c ? [a, c] : [c, a];
+      if (hi >= 3 && lo <= 1) {
+        issues.push(`compare「${b.title || "未命名"}」两边分量悬殊（${a} vs ${c}），属于稻草人对比：两边都要给出真实、可辩护的要点`);
+      }
+    }
+  }
+  return issues.slice(0, 6);
 }
 
 /** 提取课件内声明的跳转目标，供写 API 做“同课程”鉴权，不信任客户端传来的 id。 */

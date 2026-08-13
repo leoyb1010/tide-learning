@@ -36,27 +36,47 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     assertUserRateLimit(user.id, "course_delete", 30, 3_600_000);
     const { id } = await params;
 
-    const course = await prisma.course.findUnique({
-      where: { id },
-      select: { id: true, authorUserId: true, genStatus: true, origin: true, sharedStatus: true },
+    await prisma.$transaction(async (tx) => {
+      // 第一条写取得 SQLite 写序，和视觉/生成 begin 的 Course CAS 互斥；只在事务内
+      // 看“活 owner→删除”最终真值，避免预检后供应商任务刚启动的 TOCTOU。
+      const exists = await tx.course.updateMany({
+        where: { id, authorUserId: user.id },
+        data: { lastUpdatedAt: new Date() },
+      });
+      if (exists.count !== 1) {
+        const found = await tx.course.count({ where: { id } });
+        if (found === 0) throw new AppError("课程不存在", 404);
+        throw new AppError("无权删除该课程", 403);
+      }
+      const course = await tx.course.findUnique({
+        where: { id },
+        select: { id: true, genStatus: true, origin: true, sharedStatus: true },
+      });
+      if (!course) throw new AppError("课程不存在", 404);
+      const liveJob = await tx.generationJob.count({
+        where: {
+          resultRef: id,
+          status: "running",
+          OR: [{ type: "course_presentation" }, { leaseUntil: { gt: new Date() } }],
+        },
+      });
+      if (liveJob > 0) throw new AppError("课程正在生成或重排，请等待任务结束后再删除", 409);
+      const deletable = course.origin === "user_created" || course.genStatus === "outline_draft" || course.genStatus === "failed";
+      if (!deletable) throw new AppError("已生成完成的课程暂不支持直接删除", 409);
+      if (course.sharedStatus === "shared" || course.sharedStatus === "pending") {
+        throw new AppError("已分享到集市的课程不能删除，请先取消分享", 409);
+      }
+      const purchased = await tx.coursePurchase.count({ where: { courseId: id } });
+      if (purchased > 0) throw new AppError("已有用户购买该课程，不能删除", 409);
+      const othersLearning = await tx.learningProgress.count({
+        where: { lesson: { courseId: id }, userId: { not: user.id } },
+      });
+      if (othersLearning > 0) throw new AppError("已有其他用户在学该课程，不能删除", 409);
+      await tx.course.delete({ where: { id } });
+      // GenerationJob.resultRef 是软引用，课程级历史任务不会级联。删除未成品时一并
+      // 清掉已终态/legacy 行；活租约已在上方拒绝，绝不制造孤儿 owner。
+      await tx.generationJob.deleteMany({ where: { resultRef: id } });
     });
-    if (!course) return fail("课程不存在", 404);
-    if (course.authorUserId !== user.id) throw new AppError("无权删除该课程", 403);
-
-    const deletable =
-      course.origin === "user_created" || course.genStatus === "outline_draft" || course.genStatus === "failed";
-    if (!deletable) return fail("已生成完成的课程暂不支持直接删除", 409);
-    if (course.sharedStatus === "shared" || course.sharedStatus === "pending") {
-      return fail("已分享到集市的课程不能删除，请先取消分享", 409);
-    }
-    const purchased = await prisma.coursePurchase.count({ where: { courseId: id } });
-    if (purchased > 0) return fail("已有用户购买该课程，不能删除", 409);
-    const othersLearning = await prisma.learningProgress.count({
-      where: { lesson: { courseId: id }, userId: { not: user.id } },
-    });
-    if (othersLearning > 0) return fail("已有其他用户在学该课程，不能删除", 409);
-
-    await prisma.course.delete({ where: { id } });
     return ok({ deleted: true, id });
   });
 }

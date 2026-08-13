@@ -1,8 +1,9 @@
-/** v6 验收：同一课程 5 种教学动作必须全部走 LLM，并生成 5 套独立逐节设计。 */
+/** v7 验收：同一课程 5 种教学动作必须全部走 LLM，并生成 5 套独立逐节设计。 */
 import "dotenv/config";
 import { prisma } from "../src/lib/db";
 import { validateBlocks } from "../src/lib/blocks";
-import { renderCourseHtmlBestEffort } from "../src/lib/course-gen";
+import { generateLessonHtml } from "../src/lib/ai/courseware-gen";
+import { beginCoursePresentationMutation, settleExternalCoursePresentation } from "../src/lib/course-gen";
 
 const stamp = Date.now();
 const user = await prisma.user.create({
@@ -78,8 +79,9 @@ const specs: Array<{ title: string; summary: string; blocks: unknown[] }> = [
 ];
 
 try {
+  const lessonIds: string[] = [];
   for (const [sortOrder, spec] of specs.entries()) {
-    await prisma.lesson.create({
+    const lesson = await prisma.lesson.create({
       data: {
         courseId: course.id,
         sortOrder,
@@ -91,9 +93,23 @@ try {
         isFree: sortOrder === 0,
         blocksJson: JSON.stringify({ version: 1, blocks: validateBlocks(spec.blocks) }),
       },
+      select: { id: true },
+    });
+    lessonIds.push(lesson.id);
+  }
+  const mutation = await beginCoursePresentationMutation(course.id);
+  if (!mutation.ok) throw new Error(`无法开始表现层验收：${mutation.reason}`);
+  for (const lessonId of lessonIds) {
+    await generateLessonHtml(lessonId, user.id, {
+      enhance: true,
+      force: true,
+      presentationRevision: mutation.revision,
     });
   }
-  await renderCourseHtmlBestEffort(course.id);
+  const presentation = await settleExternalCoursePresentation(course.id, mutation.revision);
+  if (!presentation.settled || !presentation.contentReady || presentation.status !== "ready") {
+    throw new Error(`表现层未完整通过：${presentation.ready}/${presentation.total} (${presentation.status})`);
+  }
   const lessons = await prisma.lesson.findMany({
     where: { courseId: course.id },
     orderBy: { sortOrder: "asc" },

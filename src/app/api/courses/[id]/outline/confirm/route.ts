@@ -5,7 +5,10 @@ import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { assertCanSpend } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
+import { claimCourseGenerationStart, finishGenJobLeaseOnly, initGenJob, runCourseGenBackground } from "@/lib/course-gen";
+import { createCourseContentBrief } from "@/lib/ai/content-brief";
+import { sourcePolicyForFinalCourseOutline } from "@/lib/ai/source-policy";
+import { resolveCourseSourceTruth } from "@/lib/ai/course-source-truth";
 
 export const dynamic = "force-dynamic";
 
@@ -31,12 +34,53 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const course = await prisma.course.findUnique({
       where: { id },
-      select: { id: true, authorUserId: true, genStatus: true, modelUsed: true, category: true },
+      select: {
+        id: true,
+        title: true,
+        authorUserId: true,
+        status: true,
+        genStatus: true,
+        modelUsed: true,
+        category: true,
+        origin: true,
+        blueprintJson: true,
+        contentBriefJson: true,
+        presentationRevision: true,
+        lessons: {
+          orderBy: { sortOrder: "asc" },
+          select: { title: true, summary: true },
+        },
+      },
     });
     if (!course) return fail("课程不存在", 404);
     if (course.authorUserId !== user.id) throw new AppError("无权操作该课程", 403);
+    if (course.status === "archived") return fail("已归档课程不能确认生成", 409);
     if (course.genStatus !== "outline_draft") {
       return fail("该课程不在大纲待确认状态", 409);
+    }
+
+    // 直接 confirm 也必须用已持久化的最终课名/章节/来源重算硬门，
+    // 不能依赖 PATCH 曾经跑过，也不接受请求临时声称有来源。
+    const sourceTruth = await resolveCourseSourceTruth(course);
+    if (sourceTruth.requiresActualSource && !sourceTruth.hasActualSource) {
+      return fail("导入课程的原始资料已丢失或未解析完成，无法开始生成", 422);
+    }
+    const brief = sourceTruth.contentBrief
+      ?? createCourseContentBrief({ request: course.title, requestProvenance: "course_title" });
+    const sourceGate = sourcePolicyForFinalCourseOutline({
+      courseTitle: course.title,
+      originalRequest: brief.request,
+      lessons: course.lessons,
+      category: course.category,
+      sourceAvailable: sourceTruth.hasActualSource,
+      persistedSourceAsOf: sourceTruth.trustedSourceAsOf,
+      actualSourceText: sourceTruth.actualSourceText,
+    });
+    if (sourceGate.missingSource) {
+      return fail(`${sourceGate.reason ?? "该主题需要外部真值"}，请先提供可核查的一手或官方参考资料`, 422);
+    }
+    if (sourceGate.missingAsOfDate) {
+      return fail("该主题包含最新/当前信息，请在课程标题、原始需求或课节中写明截至日期（例如：截至 2026-08-12）", 422);
     }
 
     // 课级模型的余额预检（不对非作者做扣费预检——归属已在上方校验）。
@@ -45,12 +89,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const total = await prisma.lesson.count({ where: { courseId: course.id } });
     if (total === 0) return fail("大纲为空，请先补充章节", 400);
 
-    await prisma.course.update({ where: { id: course.id }, data: { genStatus: "generating" } });
-    await initGenJob(course.id, user.id, total, { category: course.category ?? undefined });
+    const lease = await initGenJob(course.id, user.id, total, { category: course.category ?? undefined });
+    if (!lease) return fail("该课程已有生成任务在运行", 409);
+    const started = await claimCourseGenerationStart({
+      courseId: course.id,
+      userId: user.id,
+      lease,
+      expectedGenStatus: "outline_draft",
+      expectedPresentationRevision: course.presentationRevision,
+    });
+    if (!started) {
+      await finishGenJobLeaseOnly(lease, "outline confirmation state changed");
+      return fail("课程大纲状态已变更，请刷新后重试", 409);
+    }
 
     const courseId = course.id;
     after(async () => {
-      await runCourseGenBackground(courseId, user.id);
+      await runCourseGenBackground(courseId, user.id, lease);
     });
 
     return ok({ confirmed: true, genStatus: "generating", total });

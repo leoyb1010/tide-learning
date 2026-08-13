@@ -2,9 +2,9 @@
  * 课件交互块（v4.3，吸收 H5P 交互设计，自研确定性渲染 + CSP 自包含 + 判分回传）。
  *
  * 与 H5P 的关系：只借「交互范式」，不引其 PHP/重运行时。两种题型都：
- *  - 服务端产纯 HTML（判分答案放 data-* 供 iframe 内 runtime 自检；服务端 mastery 才是记录源）；
+ *  - 服务端产纯 HTML（答案放 data-* 供 iframe 内 runtime 做即时形成性反馈）；
  *  - 移动友好：不用 HTML5 drag（触屏不稳），拖词改「点词→填空、点空→退回」的点选交互；
- *  - 判分后经 ct-quiz 协议回传宿主 → 进 LessonQuizResult/错题本闭环（与 quiz 同管道）。
+ *  - 判分后只发 ct-practice 行为事件；不写 LessonQuizResult/错题本，避免把客户端 correct 伪装成服务端真值。
  *
  * 结构约定：segments（N 段文本）与 blanks（N-1 个空）交替：seg0 [空0] seg1 [空1] … segN。
  */
@@ -113,12 +113,13 @@ export const INTERACTIVE_CSS = `
 
 /**
  * 交互块的 iframe 内运行时 JS（拼进 RUNTIME_SCRIPT）。
- * 判分：填空归一比对 data-ans；拖词比对 slot 词与 data-ans 顺序。判分后 postMessage ct-quiz 进错题闭环。
+ * 判分：填空归一比对 data-ans；拖词比对 slot 词与 data-ans 顺序。
+ * 它们是本地形成性练习，只上报 ct-practice 供行为分析，掌握度/SRS 只认服务端可重算的 quiz。
  */
 export const INTERACTIVE_RUNTIME = `
   function norm(s){ return (s||'').trim().toLowerCase().replace(/\\s+/g,''); }
   function iaReport(root, correct){
-    try{ parent.postMessage({type:'ct-quiz', bid: root.getAttribute('data-bid')||null, answer:0, correct:correct}, '*'); }catch(e){}
+    try{ parent.postMessage({type:'ct-practice', contract:1, kind:root.getAttribute('data-ia')==='fill'?'fillblank':'dragwords', bid:root.getAttribute('data-bid')||null, correct:!!correct}, '*'); }catch(e){}
   }
   // 填空。可重试直到全对；掌握度只记**首次**作答（诚实反映真实记忆,重试是学习不是刷分）。
   document.querySelectorAll('.ia[data-ia="fill"]').forEach(function(root){

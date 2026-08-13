@@ -4,6 +4,7 @@ import { requirePermission } from "@/lib/session";
 import { audit } from "@/lib/audit";
 import { notify } from "@/lib/notify";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
+import { currentCoursePublicationFence } from "@/lib/market-eligibility";
 
 // POST /api/admin/moderation/course — 审核课程集市分享申请 / 强制下架（内容审核台）。
 // body: { courseId, action: "approve" | "reject" | "unshare", reason? }
@@ -34,17 +35,36 @@ export async function POST(req: NextRequest) {
 
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, sharedStatus: true, authorUserId: true, title: true },
+      select: {
+        id: true,
+        status: true,
+        sharedStatus: true,
+        authorUserId: true,
+        title: true,
+        subtitle: true,
+        description: true,
+        category: true,
+        template: true,
+        designJson: true,
+        contentBriefJson: true,
+        modelUsed: true,
+        origin: true,
+        genStatus: true,
+        generationQualityJson: true,
+        presentationRevision: true,
+        lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
+      },
     });
     if (!course) throw new AppError("课程不存在", 404);
 
     // —— unshare：强制下架已上架课（保留 priceCredits；已购者权益由 CoursePurchase 保障，不动）——
     if (body.action === "unshare") {
       if (course.sharedStatus !== "shared") throw new AppError("该课程当前未在集市上架", 409);
-      await prisma.course.update({
-        where: { id: courseId },
+      const unshared = await prisma.course.updateMany({
+        where: { id: courseId, sharedStatus: "shared" },
         data: { sharedStatus: "private" },
       });
+      if (unshared.count !== 1) throw new AppError("该课程已被处理", 409);
       await audit({
         operatorId: admin.id,
         action: "course_moderate",
@@ -69,10 +89,36 @@ export async function POST(req: NextRequest) {
     if (course.sharedStatus !== "pending") throw new AppError("该课程已被处理", 409);
 
     const nextStatus = body.action === "approve" ? "shared" : "rejected";
-    await prisma.course.update({
-      where: { id: courseId },
+    const publicationFence = body.action === "approve"
+      ? await currentCoursePublicationFence(course)
+      : null;
+    if (body.action === "approve" && (course.status !== "published" || !publicationFence)) {
+      throw new AppError("课程已归档或当前内容/表现未通过发布门", 409);
+    }
+    const updated = await prisma.course.updateMany({
+      where: {
+        id: courseId,
+        sharedStatus: "pending",
+        ...(body.action === "approve"
+          ? {
+              status: "published",
+              genStatus: "ready",
+              presentationRevision: publicationFence!.presentationRevision,
+              title: course.title,
+              subtitle: course.subtitle,
+              description: course.description,
+              ...(publicationFence!.origin === "user_created"
+                ? { origin: "user_created" }
+                : {
+                    origin: { in: ["ai_generated", "user_imported"] },
+                    generationQualityJson: publicationFence!.generationQualityJson,
+                  }),
+            }
+          : {}),
+      },
       data: { sharedStatus: nextStatus, lastUpdatedAt: new Date() },
     });
+    if (updated.count !== 1) throw new AppError("该课程已被处理或状态已变更", 409);
 
     await audit({
       operatorId: admin.id,

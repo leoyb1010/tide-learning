@@ -4,6 +4,7 @@ import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { validateLessonGraph } from "@/lib/lesson-graph";
+import { claimCourseContentMutation } from "@/lib/course-gen";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,7 @@ async function authorCourse(id: string, userId: string) {
   const course = await prisma.course.findUnique({
     where: { id },
     select: {
-      id: true, authorUserId: true, navigationMode: true,
+      id: true, authorUserId: true, status: true, genStatus: true, presentationRevision: true, navigationMode: true,
       lessons: { orderBy: { sortOrder: "asc" }, select: { id: true, title: true, sortOrder: true } },
       lessonEdges: { orderBy: [{ fromLessonId: "asc" }, { sortOrder: "asc" }], select: { id: true, fromLessonId: true, toLessonId: true, label: true, conditionJson: true, sortOrder: true } },
     },
@@ -26,6 +27,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const user = await requireUser();
     const { id } = await params;
     const course = await authorCourse(id, user.id);
+    if (course.status === "archived") return fail("已归档课程不能修改导航图", 409);
     return ok({
       navigationMode: course.navigationMode,
       lessons: course.lessons,
@@ -51,6 +53,10 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (!checked.ok) return fail(checked.issues.join("；").slice(0, 800), 400);
     if (navigationMode === "graph" && course.lessons.length > 1 && checked.edges.length === 0) return fail("图导航模式至少需要一条连接", 400);
     await prisma.$transaction(async (tx) => {
+      const presentationRevision = await claimCourseContentMutation(tx, {
+        courseId: course.id,
+        expectedPresentationRevision: course.presentationRevision,
+      });
       await tx.lessonEdge.deleteMany({ where: { courseId: course.id } });
       if (checked.edges.length > 0) {
         await tx.lessonEdge.createMany({
@@ -60,7 +66,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
           })),
         });
       }
-      await tx.course.update({ where: { id: course.id }, data: { navigationMode, lastUpdatedAt: new Date() } });
+      const navigation = await tx.course.updateMany({
+        where: { id: course.id, presentationRevision },
+        data: { navigationMode },
+      });
+      if (navigation.count !== 1) throw new AppError("课程导航已变更，请刷新后重试", 409);
     });
     return ok({ navigationMode, edges: checked.edges });
   });

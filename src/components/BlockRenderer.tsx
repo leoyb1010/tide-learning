@@ -25,13 +25,21 @@ import type { Block } from "@/lib/blocks";
 import { renderMarkdown } from "@/lib/markdown";
 import { useToast } from "./Toast";
 
+/** 首次客户端渲染保持与 SSR 一致，挂载后再应用系统的 reduce-motion 偏好。 */
+function useHydratedReducedMotion(): boolean {
+  const preferred = useReducedMotion();
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
+  return hydrated && Boolean(preferred);
+}
+
 /* ============================================================
    共享：视口触发 in-view 钩子。
    返回 [ref, inView]：元素进视口一次即 inView=true 并断连（长课件不累积监听、不一次性挂载几百个动画）。
    reduce-motion 或 SSR 无 IO 时：直接 inView=true（静态显示，动画由 CSS @media reduce 层降级）。
    ============================================================ */
 function useInView<T extends HTMLElement>(): [React.RefObject<T | null>, boolean] {
-  const reduce = useReducedMotion();
+  const reduce = useHydratedReducedMotion();
   const ref = useRef<T>(null);
   const [inView, setInView] = useState(false);
   useEffect(() => {
@@ -95,18 +103,40 @@ export function BlockRenderer({
       </div>
     );
   }
-  const lastIndex = blocks.length - 1;
   return (
     <div className="flex flex-col gap-6 sm:gap-7">
       {blocks.map((block, i) => (
-        <Reveal key={block.id} index={i} onReachEnd={i === lastIndex ? onReachEnd : undefined}>
+        <Reveal key={block.id} index={i}>
           <div data-block-id={block.id} className="scroll-mt-24">
             <BlockSwitch block={block} courseId={courseId} sceneBg={sceneBg} />
           </div>
         </Reveal>
       ))}
+      <EndSentinel onReachEnd={onReachEnd} />
     </div>
   );
+}
+
+/**
+ * 完课观察与视觉动效完全分离。reduce-motion 只能取消动画，不得代表学员已读到文末。
+ */
+function EndSentinel({ onReachEnd }: { onReachEnd?: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !onReachEnd || typeof IntersectionObserver === "undefined") return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          onReachEnd();
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.5 },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [onReachEnd]);
+  return <div ref={ref} className="h-px w-full" aria-hidden="true" />;
 }
 
 /* ============================================================
@@ -118,25 +148,17 @@ export function BlockRenderer({
 function Reveal({
   children,
   index,
-  onReachEnd,
 }: {
   children: React.ReactNode;
   index: number;
-  /** 仅末块传入：本块首次进视口时触发一次完课信号（复用同一 IntersectionObserver）。 */
-  onReachEnd?: () => void;
 }) {
-  const reduce = useReducedMotion();
+  const reduce = useHydratedReducedMotion();
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
-  // 末块完课回调用 ref 持有最新值，避免把 onReachEnd 塞进 IO effect 依赖导致观察器重挂。
-  const onReachEndRef = useRef(onReachEnd);
-  onReachEndRef.current = onReachEnd;
 
   useEffect(() => {
     if (reduce) {
       setShown(true);
-      // reduce-motion / 无 IO 环境下直接显示，此时末块也视为「已读到」，同步触发完课信号。
-      onReachEndRef.current?.();
       return;
     }
     const el = ref.current;
@@ -147,8 +169,6 @@ function Reveal({
         for (const e of entries) {
           if (e.isIntersecting) {
             setShown(true);
-            // 末块进视口即触发完课信号（onReachEnd 仅末块非空）。IO 进后即断连，天然一次性。
-            onReachEndRef.current?.();
             io.disconnect();
             break;
           }

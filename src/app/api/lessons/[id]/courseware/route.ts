@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { readFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement, canAccessLesson } from "@/lib/entitlement";
 import { canViewCourse, hasPurchasedCourse } from "@/lib/queries";
 import { creatorAssetDiskPath } from "@/lib/creator-assets";
+import { injectBespokeAdapter } from "@/lib/ai/courseware-html";
+import { isCurrentStoredCourseware } from "@/lib/courseware-publication";
 
 export const dynamic = "force-dynamic";
 
@@ -60,10 +63,30 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const lesson = await prisma.lesson.findUnique({
       where: { id },
       select: {
+        title: true,
+        summary: true,
+        sortOrder: true,
+        blocksJson: true,
         htmlJson: true,
+        renderSourceHash: true,
+        renderEngine: true,
+        designJson: true,
         isFree: true,
         status: true,
-        course: { select: { id: true, category: true, visibility: true, authorUserId: true, sharedStatus: true, status: true } },
+        course: {
+          select: {
+            id: true,
+            title: true,
+            category: true,
+            template: true,
+            designJson: true,
+            visibility: true,
+            authorUserId: true,
+            sharedStatus: true,
+            status: true,
+            genStatus: true,
+          },
+        },
       },
     });
     if (!lesson || !lesson.course || lesson.status !== "published" || !lesson.htmlJson) return notFound();
@@ -75,6 +98,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const snapshot = await resolveEntitlement(userId);
     if (!canAccessLesson(lesson.course.category, lesson.isFree, snapshot, owned)) return notFound();
 
+    // 所有读入口共用 contract/checksum/current-hash 门，不能让独立接口安全、RSC 却泄漏旧 HTML。
+    if (!isCurrentStoredCourseware(lesson, lesson.course)) return notFound();
+
     let html = "";
     try {
       html = (JSON.parse(lesson.htmlJson) as { html?: string }).html ?? "";
@@ -82,6 +108,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       return notFound();
     }
     if (!html) return notFound();
+    let scriptSource = "'unsafe-inline'";
+    // 历史 LLM 产物也在读路径重做同一套净化：删除模型/旧 adapter 脚本，
+    // 再注入当前可信 adapter。不能只保护新生成内容，否则已落库脚本仍可伪造平台消息。
+    if (lesson.renderEngine === "llm" || /data-ct-bespoke-adapter/i.test(html)) {
+      // regex 净化是内容去险；响应级 nonce CSP 是执行硬边界。即使恶意畸形 HTML
+      // 越过文本净化，也没有本次随机 nonce，浏览器不会执行；只有后置 adapter 获得 nonce。
+      const adapterNonce = randomBytes(18).toString("base64");
+      html = injectBespokeAdapter(html, adapterNonce);
+      scriptSource = `'nonce-${adapterNonce}'`;
+    }
     html = await inlineOwnedCreatorImages(html, lesson.course.authorUserId);
 
     return new NextResponse(html, {
@@ -91,7 +127,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
         // 本文档自己的 CSP(仅作用于课件):与课件内部 meta CSP 同款,双保险。
         // frame-ancestors 'self':只允许本站嵌入,防外站盗链嵌框。
         "content-security-policy":
-          "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; " +
+          `default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'; ` +
           "img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
         "x-content-type-options": "nosniff",
         // 私有内容不落共享缓存;htmlJson 重渲后立即生效。

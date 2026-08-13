@@ -19,25 +19,23 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
 import { SPRING_GENTLE } from "@/components/motion";
+import {
+  generationNeedsAttention,
+  isDegradedPresentation,
+  isGenerationComplete,
+  isTerminalGenStatus,
+  type ClientGenProgress,
+} from "@/lib/gen-progress-contract";
+
+export {
+  generationNeedsAttention,
+  isDegradedPresentation,
+  isGenerationComplete,
+  isTerminalGenStatus,
+} from "@/lib/gen-progress-contract";
 
 /** gen-progress 返回体（与 /api/courses/:id/gen-progress 对齐） */
-export interface GenProgress {
-  total: number;
-  done: number;
-  failed: number;
-  currentLessonId: string | null;
-  genStatus: string | null; // generating / ready / failed / paused（L3 可控造课）
-  lessons: { id: string; title: string; ready: boolean }[];
-}
-
-/**
- * 轮询终态（无后台进度、停止轮询）：ready（就绪）/ failed（整体失败）/ paused（用户暂停）/
- * outline_draft（大纲待确认，扇出尚未开始，L2 可控造课）。
- * failed/paused/outline_draft 都是「已停下、待用户操作」的态：resume-gen / outline confirm 后重新起轮询。
- */
-export function isTerminalGenStatus(s: string | null | undefined): boolean {
-  return s === "ready" || s === "failed" || s === "paused" || s === "outline_draft";
-}
+export type GenProgress = ClientGenProgress;
 
 /* ============================================================
    ProgressRing —— 环形进度（done/total）
@@ -156,6 +154,7 @@ export function useGenPolling(
   const [progress, setProgress] = useState<GenProgress | null>(null);
   const [loading, setLoading] = useState<boolean>(!!courseId && enabled);
   const [error, setError] = useState(false);
+  const [restartToken, setRestartToken] = useState(0);
   // 用 ref 记录是否已终态，避免 setState 后 effect 重跑造成竞态。
   const stoppedRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -178,10 +177,10 @@ export function useGenPolling(
       const p = j.data as GenProgress;
       setProgress(p);
       setError(false);
-      // 终态：ready / failed / paused，停止轮询。
+      // 终态：ready / failed / paused / outline_draft，停止轮询。
       if (isTerminalGenStatus(p.genStatus)) {
         stoppedRef.current = true;
-        if (p.genStatus === "ready" && !firedReadyRef.current) {
+        if (isGenerationComplete(p) && !firedReadyRef.current) {
           firedReadyRef.current = true;
           onReadyRef.current?.(p);
         }
@@ -243,12 +242,14 @@ export function useGenPolling(
       if (timerRef.current) clearTimeout(timerRef.current);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [courseId, enabled, intervalMs, fetchOnce]);
+  }, [courseId, enabled, intervalMs, fetchOnce, restartToken]);
 
   const refresh = useCallback(() => {
-    if (stoppedRef.current) return;
-    fetchOnce();
-  }, [fetchOnce]);
+    // 用户显式重试单节后，即使之前已停在 failed 终态，也要重拉 DB 真值。
+    // 整课是否成功仍只由 isGenerationComplete 决定，不信任重试 POST 的返回值。
+    // 通过重启轮询 effect 而非只拉一次：若整课终审尚在 judging，后续仍会持续轮询。
+    setRestartToken((token) => token + 1);
+  }, []);
 
   return { progress, loading, error, refresh };
 }

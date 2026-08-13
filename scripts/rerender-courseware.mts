@@ -10,7 +10,8 @@
 import { prisma } from "../src/lib/db";
 import { resolveCourseDesign } from "../src/lib/ai/courseware-design";
 import { resolveCoursewareMode } from "../src/lib/ai/courseware-catalog";
-import { renderAndStoreLessonHtml } from "../src/lib/ai/courseware-gen";
+import { CoursePresentationMutationLostError, renderAndStoreLessonHtml } from "../src/lib/ai/courseware-gen";
+import { beginCoursePresentationMutation, settleExternalCoursePresentation } from "../src/lib/course-gen";
 
 async function main() {
   const limit = Number(process.argv[2]) || 500;
@@ -19,10 +20,13 @@ async function main() {
     select: {
       id: true,
       title: true,
+      summary: true,
       sortOrder: true,
       blocksJson: true,
       htmlJson: true,
       renderSourceHash: true,
+      renderEngine: true,
+      designJson: true,
       course: { select: { id: true, title: true, category: true, template: true, designJson: true } },
     },
     orderBy: { createdAt: "asc" },
@@ -31,16 +35,42 @@ async function main() {
   console.log(`待重渲染:${lessons.length} 节`);
   let ok = 0, skip = 0, fail = 0;
   for (const l of lessons) {
-    const design = resolveCourseDesign({ ...l.course, title: l.course.title });
-    const mode = resolveCoursewareMode({ title: l.course.title, template: l.course.template, artKey: design.art.key });
     try {
-      const r = await renderAndStoreLessonHtml(l.course.id, l, design, mode, { force: true });
-      if (r.ok && r.contract) {
+      const mutation = await beginCoursePresentationMutation(l.course.id, { lessonIds: [l.id] });
+      if (!mutation.ok) {
+        console.log(`skip ${l.course.title} · ${l.title}: ${mutation.reason}`);
+        skip++;
+        continue;
+      }
+      // begin 已归档并清空旧表现层；重新读取后再渲染，避免把缓存的旧 HTML 当成当前 revision。
+      const current = await prisma.lesson.findUnique({
+        where: { id: l.id },
+        select: {
+          id: true, title: true, summary: true, sortOrder: true, blocksJson: true, htmlJson: true,
+          renderSourceHash: true, renderEngine: true, designJson: true,
+        },
+      });
+      if (!current) throw new Error("课节在重渲期间被删除");
+      const design = resolveCourseDesign({ ...l.course, title: l.course.title });
+      const mode = resolveCoursewareMode({ title: l.course.title, template: l.course.template, artKey: design.art.key });
+      const r = await renderAndStoreLessonHtml(l.course.id, current, design, mode, {
+        force: true,
+        enhance: false,
+        presentationRevision: mutation.revision,
+      });
+      const presentation = await settleExternalCoursePresentation(l.course.id, mutation.revision);
+      if (r.ok && r.contract && presentation.settled && presentation.contentReady) {
         ok++;
       } else {
-        skip++; // 被并发 claim 占用等
+        fail++;
+        console.error(`fail ${l.course.title} · ${l.title}: 表现层未完整收敛`);
       }
     } catch (e) {
+      if (e instanceof CoursePresentationMutationLostError) {
+        skip++;
+        console.log(`skip ${l.course.title} · ${l.title}: 已有更新的表现层操作`);
+        continue;
+      }
       fail++;
       console.error(`fail ${l.course.title} · ${l.title}:`, (e as Error).message);
     }

@@ -3,6 +3,51 @@ import { prisma } from "./db";
 import { AppError } from "./errors";
 import { ensureAccount } from "./credits";
 
+/** 调用方在展示预检时取得的精确交易 fence；这里本地定义避免交易内核反向依赖 market/course-gen。 */
+export interface MarketPublicationFence {
+  courseId: string;
+  origin: string;
+  generationQualityJson: string | null;
+  presentationRevision: number;
+  priceCredits: number | null;
+  firstLessonId: string;
+  authorUserId: string | null;
+  title: string;
+}
+
+function publicationFenceWhere(fence: MarketPublicationFence): Prisma.CourseWhereInput {
+  return {
+    id: fence.courseId,
+    status: "published",
+    sharedStatus: "shared",
+    genStatus: "ready",
+    presentationRevision: fence.presentationRevision,
+    priceCredits: fence.priceCredits,
+    authorUserId: fence.authorUserId,
+    title: fence.title,
+    lessons: { some: { id: fence.firstLessonId } },
+    ...(fence.origin === "user_created"
+      ? { origin: "user_created" }
+      : {
+          origin: { in: ["ai_generated", "user_imported"] },
+          generationQualityJson: fence.generationQualityJson,
+        }),
+  };
+}
+
+async function assertTradePublication(
+  tx: Prisma.TransactionClient,
+  fence: MarketPublicationFence,
+): Promise<void> {
+  // increment 0 是无业务副作的写 CAS：命中时锁住这行到交易提交，下架/换肤
+  // 不能再插到“读发布态”和“建所有权/扣款”之间；未命中则在任何资金写前 409。
+  const current = await tx.course.updateMany({
+    where: publicationFenceWhere(fence),
+    data: { salesCount: { increment: 0 } },
+  });
+  if (current.count !== 1) throw new AppError("课程已下架或内容已变更，本次未扣款", 409);
+}
+
 /**
  * 集市交易闭环（S4 §问题⑪）—— 积分作货币的课程买卖记账层（server-only）。
  *
@@ -70,8 +115,10 @@ export async function collectFreeCourse(args: {
   firstLessonId: string;
   authorBonus: number;
   courseTitle: string;
+  publicationFence: MarketPublicationFence;
 }): Promise<CollectResult> {
-  const { collectorId, authorId, courseId, firstLessonId, authorBonus, courseTitle } = args;
+  const { collectorId, authorId, courseId, firstLessonId, authorBonus, courseTitle, publicationFence } = args;
+  if (publicationFence.courseId !== courseId) throw new AppError("课程交易凭据不匹配", 400);
 
   // 作者账户先确保存在（事务外惰性建账，含注册赠送；避免事务内触发多写）。
   const willReward = Boolean(authorId) && authorId !== collectorId && authorBonus > 0;
@@ -79,6 +126,8 @@ export async function collectFreeCourse(args: {
 
   try {
     await prisma.$transaction(async (tx) => {
+      // 展示预检后可能发生 archive/改课/重渲染；建所有权与发放激励前在同一事务重验。
+      await assertTradePublication(tx, publicationFence);
       // —— 所有权 / 幂等真值源：先建 CoursePurchase(priceCredits=0)。撞唯一约束(P2002)=已拿走 → 回滚整笔。
       await tx.coursePurchase.create({
         data: { userId: collectorId, courseId, priceCredits: 0 },
@@ -177,8 +226,10 @@ export async function purchaseCourse(args: {
   firstLessonId: string;
   priceCredits: number;
   courseTitle: string;
+  publicationFence: MarketPublicationFence;
 }): Promise<PurchaseResult> {
-  const { buyerId, authorId, courseId, firstLessonId, priceCredits, courseTitle } = args;
+  const { buyerId, authorId, courseId, firstLessonId, priceCredits, courseTitle, publicationFence } = args;
+  if (publicationFence.courseId !== courseId) throw new AppError("课程交易凭据不匹配", 400);
   if (priceCredits <= 0) throw new AppError("付费课售价必须为正", 400);
   if (buyerId === authorId) throw new AppError("不能购买自己的课", 400);
 
@@ -190,6 +241,8 @@ export async function purchaseCourse(args: {
 
   try {
     return await prisma.$transaction(async (tx) => {
+      // 交易真值在同一事务内重验：下架/归档/档案或表现 revision 变化都先于扣款 fail closed。
+      await assertTradePublication(tx, publicationFence);
       // —— 所有权 / 幂等真值源：先建 CoursePurchase。撞唯一约束(P2002)=已购 → 回滚整笔，
       //    由外层 catch 折叠为 already_owned（不扣款、不重复给作者入账）。免费预览进度不再参与判定。
       await tx.coursePurchase.create({

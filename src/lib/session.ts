@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { createHash, randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
 import { cookies, headers } from "next/headers";
 import { prisma } from "./db";
 import type { User } from "@prisma/client";

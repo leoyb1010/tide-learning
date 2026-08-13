@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ ass
     if (!source?.generatedCourseId) return new NextResponse("资源不存在", { status: 404 });
     const course = await prisma.course.findUnique({
       where: { id: source.generatedCourseId },
-      select: { id: true, authorUserId: true, visibility: true, sharedStatus: true },
+      select: { id: true, authorUserId: true, visibility: true, sharedStatus: true, status: true },
     });
     if (!course) return new NextResponse("课程不存在", { status: 404 });
     const owned = await hasPurchasedCourse(course.id, user.id);

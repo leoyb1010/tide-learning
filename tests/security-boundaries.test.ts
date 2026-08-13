@@ -19,7 +19,7 @@ describe("课程公开 DTO 边界", () => {
     expect(COURSE_PUBLIC_SELECT).not.toHaveProperty("lessons");
     for (const field of PAID_CONTENT_FIELDS) expect(LESSON_OUTLINE_SELECT).not.toHaveProperty(field);
     expect(Object.keys(LESSON_OUTLINE_SELECT).sort()).toEqual(
-      ["contentType", "durationSec", "id", "isFree", "sortOrder", "summary", "title"].sort(),
+      ["contentType", "durationSec", "id", "isFree", "sortOrder", "status", "summary", "title"].sort(),
     );
   });
 });

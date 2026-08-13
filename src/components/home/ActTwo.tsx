@@ -71,7 +71,7 @@ const DESKS: DeskSpec[] = [
     Icon: FileArrowUp,
     eyebrow: "第三张桌 · 资料升维",
     title: "把你的资料变成课",
-    desc: "笔记、长文、讲义丢进来，拆章配测验，升维成能学的课。",
+    desc: "笔记、长文、讲义丢进来，忠实拆章并按目标配练习，变成能学的课。",
     href: "/create?tab=import",
     cta: "导入我的资料",
     tint: "var(--warn)",

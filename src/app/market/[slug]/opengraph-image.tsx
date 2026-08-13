@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/db";
 import { trackLabel } from "@/lib/tracks";
 import { loadCjkSubset } from "@/lib/og-fonts";
+import { currentMarketPublicationFence, marketBaseWhere } from "@/lib/market-eligibility";
 
 /**
  * 集市商品页动态社交预览图（蓝图 D3 / 审查 P1-1）。
@@ -34,17 +35,30 @@ export default async function MarketOgImage({ params }: { params: Promise<{ slug
   const { slug } = await params;
 
   // 只暴露在架商品（sharedStatus=shared），与商品页可见性口径一致；未在架 → 品牌兜底卡。
-  const course = await prisma.course.findFirst({
-    where: { OR: [{ slug }, { id: slug }], sharedStatus: "shared" },
+  const candidate = await prisma.course.findFirst({
+    where: marketBaseWhere({ OR: [{ slug }, { id: slug }] }),
     select: {
+      id: true,
       title: true,
+      template: true,
+      designJson: true,
+      contentBriefJson: true,
+      modelUsed: true,
       subtitle: true,
       category: true,
       priceCredits: true,
       learnersCount: true,
       authorUserId: true, // 软 FK 无 relation，作者昵称下方单查
+      origin: true,
+      status: true,
+      sharedStatus: true,
+      genStatus: true,
+      generationQualityJson: true,
+      presentationRevision: true,
+      lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
     },
   });
+  const course = candidate && await currentMarketPublicationFence(candidate) ? candidate : null;
   const authorUser = course?.authorUserId
     ? await prisma.user.findFirst({ where: { id: course.authorUserId, deletedAt: null }, select: { nickname: true } })
     : null;

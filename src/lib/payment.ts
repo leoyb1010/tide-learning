@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import { Prisma } from "@prisma/client";
-import { randomBytes } from "crypto";
+import { randomBytes } from "node:crypto";
 import { resolveEntitlement } from "./entitlement";
 import { track } from "./analytics";
 import { AppError } from "./api";

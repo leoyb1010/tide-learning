@@ -13,12 +13,31 @@ describe("自由教学导演方案", () => {
       ],
       assessmentStrategy: "在比较后要求解释选择依据",
       transferTask: "独立修订一个新样例并说明取舍",
+      assessmentNeed: "transfer",
       avoid: ["先列学习目标", "固定总结页"],
     });
     expect(plan?.beats).toHaveLength(3);
     const prompt = narrativePlanPrompt(plan);
     expect(prompt).toContain("不规定块数量与固定首尾");
     expect(prompt).toContain("从一份失败作品倒推判断标准");
+  });
+
+  it("按整课检验地图允许参考节不机械塞 quiz 和迁移", () => {
+    const plan = validateNarrativePlan({
+      teachingApproach: "建立术语索引供后续查阅",
+      rationale: "本节承担参考职责，不应重复检验",
+      assessmentNeed: "none",
+      successEvidence: "学习者能在后续任务中查到定义",
+      beats: [
+        { purpose: "定位", technique: "按概念族分组", evidence: "术语目录" },
+        { purpose: "辨析", technique: "并列易混项", evidence: "边界对照" },
+        { purpose: "索引", technique: "建立查阅入口", evidence: "完整索引" },
+      ],
+    });
+    expect(plan?.assessmentNeed).toBe("none");
+    expect(plan?.assessmentStrategy).toBeUndefined();
+    expect(plan?.transferTask).toBeUndefined();
+    expect(narrativePlanPrompt(plan)).toContain("不设独立检验");
   });
 
   it("少于三个有效节拍时拒绝，不伪造默认模板", () => {

@@ -16,7 +16,8 @@ export interface CourseTemplate {
   temperature: number;
 }
 
-export const DEFAULT_TEMPLATE = "classic";
+/** 新造课默认自由导演；classic 只保留为显式兼容方向，不再被客户端静默选中。 */
+export const DEFAULT_TEMPLATE = "";
 
 export const COURSE_TEMPLATES: CourseTemplate[] = [
   { key: "classic", label: "清晰讲解", tagline: "重视概念准确与学习路径", icon: "GraduationCap", recommendedFor: "需要清楚解释与稳健递进的内容", temperature: 0.5 },

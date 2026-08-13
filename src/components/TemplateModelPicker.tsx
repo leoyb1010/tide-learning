@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Lock, Sparkle, Check } from "@phosphor-icons/react";
-import { TemplateCardArt } from "@/components/TemplateCardArt";
+import { BookOpen, Check, GraduationCap, Lock, MagnifyingGlass, Question, Sparkle, Target, Wrench } from "@phosphor-icons/react";
 
 interface TemplateOpt {
   key: string;
@@ -23,6 +22,21 @@ interface LockedModelOpt {
   key: string;
   label: string;
   desc: string;
+}
+
+/** 创作方向只代表教学动作，不再用固定课件缩略图冒充最终视觉。 */
+function DirectionGlyph({ templateKey }: { templateKey: string }) {
+  const props = { size: 30, weight: "duotone" as const };
+  switch (templateKey) {
+    case "case_driven": return <MagnifyingGlass {...props} />;
+    case "story":
+    case "language_immersion": return <BookOpen {...props} />;
+    case "socratic": return <Question {...props} />;
+    case "workshop": return <Wrench {...props} />;
+    case "exam_sprint": return <Target {...props} />;
+    case "kids_bright": return <Sparkle {...props} />;
+    default: return <GraduationCap {...props} />;
+  }
 }
 
 /**
@@ -85,8 +99,11 @@ export function TemplateModelPicker({
       {/* —— 创作方向：自由导演为默认，旧模板只作为显式偏好 —— */}
       <div className="flex flex-col gap-2">
         <span className="mono text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--ink4)]">
-          创作方向
+          教学方式（可选）
         </span>
+        <p className="text-[11px] leading-relaxed text-[var(--ink4)]">
+          只影响讲解与练习方式，不锁定章节结构或视觉皮肤；最终课件会按每节内容单独导演。
+        </p>
         <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
           <button
             type="button"
@@ -131,14 +148,14 @@ export function TemplateModelPicker({
                     <Check size={11} weight="bold" />
                   </span>
                 )}
-                {/* 卡面 = 该模板代表 art 的迷你课件样张(v4.2:真实 design token,所见即所得) */}
+                {/* 只表达教学动作，不承诺最终视觉；最终 HTML 由内容专属视觉导演决定。 */}
                 <span
                   aria-hidden
-                  className={`block aspect-[16/9] w-full overflow-hidden rounded-[10px] border transition-[border-color,opacity] duration-200 ${
+                  className={`grid aspect-[16/9] w-full place-items-center overflow-hidden rounded-[10px] border bg-[var(--surface)] text-[var(--ink3)] transition-[border-color,opacity] duration-200 ${
                     active ? "border-[var(--red)]/40" : "border-[var(--border)] opacity-[0.96] group-hover:opacity-100"
                   }`}
                 >
-                  <TemplateCardArt templateKey={t.key} />
+                  <DirectionGlyph templateKey={t.key} />
                 </span>
                 <span className="flex flex-col gap-0.5 px-1 pb-0.5">
                   <span className={`text-[13px] font-semibold leading-tight ${active ? "text-[var(--red)]" : "text-[var(--ink)]"}`}>

@@ -1,8 +1,18 @@
+import { randomUUID } from "node:crypto";
 import { unlink } from "node:fs/promises";
 import JSZip from "jszip";
 import { prisma } from "../src/lib/db";
 import { creatorAssetDiskPath } from "../src/lib/creator-assets";
 import { createPresentationCourse, createScormCourse } from "../src/lib/import-faithful";
+import { importContentSha256, importPayloadHash, startImportOperation, type ImportOperation } from "../src/lib/import-operation";
+
+/** 与 /api/ai/import-file 路由一致：真实 start 一个幂等导入操作，验收结束后按 jobId 清理。 */
+async function startAcceptanceOperation(userId: string, payload: unknown): Promise<ImportOperation> {
+  const requestId = `acceptance-${randomUUID()}`; // 满足 /^[A-Za-z0-9_-]{16,128}$/
+  const started = await startImportOperation({ userId, requestId, payloadHash: importPayloadHash(payload) });
+  if (started.status !== "acquired") throw new Error(`验收导入操作未取得所有权（status=${started.status}）`);
+  return started.operation;
+}
 
 async function samplePptx(): Promise<Buffer> {
   const zip = new JSZip();
@@ -23,13 +33,34 @@ async function main() {
   if (!user) throw new Error("数据库里没有可用于验收的用户");
   const courseIds: string[] = [];
   const assetIds: string[] = [];
+  const jobIds: string[] = [];
   try {
-    const presentation = await createPresentationCourse({ userId: user.id, title: `PPT 忠实验收 ${Date.now()}`, bytes: await samplePptx(), kind: "pptx" });
+    const pptxTitle = `PPT 忠实验收 ${Date.now()}`;
+    const pptxBytes = await samplePptx();
+    const pptxOperation = await startAcceptanceOperation(user.id, {
+      scope: "file",
+      contentSha256: importContentSha256(pptxBytes),
+      kind: "pptx",
+      title: pptxTitle,
+      fileName: "acceptance.pptx",
+    });
+    jobIds.push(pptxOperation.lease.jobId);
+    const presentation = await createPresentationCourse({ userId: user.id, title: pptxTitle, bytes: pptxBytes, kind: "pptx", operation: pptxOperation });
     courseIds.push(presentation.courseId);
     const pptLesson = await prisma.lesson.findFirst({ where: { courseId: presentation.courseId }, select: { htmlJson: true, blocksJson: true, renderEngine: true } });
     if (!pptLesson?.htmlJson?.includes("忠实导入验收页") || !pptLesson.blocksJson || pptLesson.renderEngine !== "faithful_import") throw new Error("PPT 忠实课件未完整落库");
 
-    const scorm = await createScormCourse({ userId: user.id, title: `SCORM 忠实验收 ${Date.now()}`, bytes: await sampleScorm(), fileName: "acceptance.scorm" });
+    const scormTitle = `SCORM 忠实验收 ${Date.now()}`;
+    const scormBytes = await sampleScorm();
+    const scormOperation = await startAcceptanceOperation(user.id, {
+      scope: "file",
+      contentSha256: importContentSha256(scormBytes),
+      kind: "scorm",
+      title: scormTitle,
+      fileName: "acceptance.scorm",
+    });
+    jobIds.push(scormOperation.lease.jobId);
+    const scorm = await createScormCourse({ userId: user.id, title: scormTitle, bytes: scormBytes, fileName: "acceptance.scorm", operation: scormOperation });
     courseIds.push(scorm.courseId);
     const source = await prisma.importedSource.findFirst({ where: { generatedCourseId: scorm.courseId }, select: { assetId: true } });
     if (source?.assetId) assetIds.push(source.assetId);
@@ -50,6 +81,7 @@ async function main() {
         if (diskPath) await unlink(diskPath).catch(() => {});
       }
     }
+    if (jobIds.length > 0) await prisma.generationJob.deleteMany({ where: { id: { in: jobIds } } });
     await prisma.$disconnect();
   }
 }
