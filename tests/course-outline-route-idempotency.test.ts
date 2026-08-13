@@ -222,4 +222,32 @@ describe("generate-course durable requestId route contract", () => {
     expect(mocks.assertUniqueRequestAdmission).not.toHaveBeenCalled();
     expect(mocks.assertUserRateLimit).not.toHaveBeenCalled();
   });
+
+  it("旧客户端缺 requestId 不再 400：服务端生成合法 ID 进入幂等流程", async () => {
+    const legacyRequest = new NextRequest("http://localhost/api/ai/generate-course", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ prompt: "学习 TypeScript 基础" }),
+    });
+    const replay = {
+      courseId: "course-1",
+      slug: "course-1",
+      title: "TypeScript 基础",
+      lessons: [],
+    };
+    mocks.inspect.mockResolvedValue({ status: "replay", response: replay });
+    const response = await POST(legacyRequest);
+    expect(response.status).toBe(200);
+    expect(mocks.inspect).toHaveBeenCalledWith(
+      expect.objectContaining({ requestId: expect.stringMatching(/^srv-[0-9a-f]{32}$/) }),
+    );
+  });
+
+  it("有值但格式非法仍 400，不兜底", async () => {
+    const response = await POST(request("short"));
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ ok: false, error: "requestId 格式错误" });
+    expect(mocks.inspect).not.toHaveBeenCalled();
+    expect(mocks.start).not.toHaveBeenCalled();
+  });
 });

@@ -278,22 +278,50 @@ describe("durable course generation recovery worker", () => {
 });
 
 describe("generation recovery startup policy", () => {
-  it("defaults on only for production Node SQLite and supports an explicit kill switch", () => {
+  it("defaults on for any Node runtime except test, regardless of DATABASE_URL shape", () => {
     expect(shouldStartGenerationRecoveryWorker({
       NODE_ENV: "production",
       NEXT_RUNTIME: "nodejs",
       DATABASE_URL: "file:/var/lib/tide/prod.db",
     })).toBe(true);
     expect(shouldStartGenerationRecoveryWorker({
-      NODE_ENV: "production",
+      NODE_ENV: "development",
       NEXT_RUNTIME: "nodejs",
-      DATABASE_URL: "file:/var/lib/tide/prod.db",
-      GENERATION_WORKER_ENABLED: "0",
-    })).toBe(false);
+      DATABASE_URL: "file:./dev.db",
+    })).toBe(true);
     expect(shouldStartGenerationRecoveryWorker({
       NODE_ENV: "production",
       NEXT_RUNTIME: "nodejs",
-      DATABASE_URL: "postgresql://db/tide",
+    })).toBe(true);
+    expect(shouldStartGenerationRecoveryWorker({
+      NODE_ENV: "test",
+      NEXT_RUNTIME: "nodejs",
+    })).toBe(false);
+    expect(shouldStartGenerationRecoveryWorker({
+      NODE_ENV: "production",
+      NEXT_RUNTIME: "edge",
+    })).toBe(false);
+  });
+
+  it("supports explicit kill switch and force-on override", () => {
+    expect(shouldStartGenerationRecoveryWorker({
+      NODE_ENV: "production",
+      NEXT_RUNTIME: "nodejs",
+      GENERATION_WORKER_ENABLED: "0",
+    })).toBe(false);
+    expect(shouldStartGenerationRecoveryWorker({
+      NODE_ENV: "development",
+      NEXT_RUNTIME: "nodejs",
+      GENERATION_WORKER_ENABLED: "false",
+    })).toBe(false);
+    expect(shouldStartGenerationRecoveryWorker({
+      NODE_ENV: "test",
+      NEXT_RUNTIME: "nodejs",
+      GENERATION_WORKER_ENABLED: "1",
+    })).toBe(true);
+    expect(shouldStartGenerationRecoveryWorker({
+      NODE_ENV: "test",
+      NEXT_RUNTIME: "edge",
       GENERATION_WORKER_ENABLED: "1",
     })).toBe(false);
   });

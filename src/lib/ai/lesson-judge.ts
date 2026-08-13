@@ -1,5 +1,5 @@
 import { blocksToAssessmentManifestBatches, blocksToPlainText, type Block } from "@/lib/blocks";
-import { chatJson, type LlmUsageInfo } from "@/lib/llm";
+import { chatJson, isFailClosedLlmError, type LlmUsageInfo } from "@/lib/llm";
 import { bespokeTimeoutMs, resolveModel, selectBespokeModel } from "@/lib/ai/models";
 import { topicTaxonomyFragment } from "@/lib/ai/topic-taxonomy";
 import type { AssessmentNeed } from "@/lib/ai/content-brief";
@@ -130,7 +130,8 @@ async function judgeContent(input: {
       } : {}),
     });
     return { raw, judged: true };
-  } catch {
+  } catch (error) {
+    if (isFailClosedLlmError(error)) throw error;
     return { raw: null, judged: false };
   }
 }
@@ -180,7 +181,8 @@ async function judgeTeaching(input: {
       } : {}),
     });
     return { raw, judged: true };
-  } catch {
+  } catch (error) {
+    if (isFailClosedLlmError(error)) throw error;
     return { raw: null, judged: false };
   }
 }

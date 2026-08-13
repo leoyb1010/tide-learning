@@ -24,10 +24,10 @@ import {
   inspectCourseOutlineOperation,
   reconcileCourseOutlineOperationFailure,
   startCourseOutlineOperation,
-  validateCourseOutlineRequestId,
   type CourseOutlineOperation,
   type CourseOutlineOperationResponse,
 } from "@/lib/course-outline-operation";
+import { ensureRequestId } from "@/lib/request-id";
 
 export const dynamic = "force-dynamic";
 
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
       const template = provided ?? null;
       const requestedModel = body?.model?.trim();
       const qualityTier = body?.qualityTier === "premium" ? "premium" : "standard";
-      const requestId = validateCourseOutlineRequestId(body?.requestId);
+      const requestId = ensureRequestId(body?.requestId);
       const payloadHash = courseOutlinePayloadHash({
         prompt,
         category,

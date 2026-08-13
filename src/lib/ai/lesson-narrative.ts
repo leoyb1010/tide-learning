@@ -5,7 +5,7 @@
  * 会在写作时把这些节拍映射成合适的语义块；展示层随后可完全自由重表达。
  */
 
-import { chatJson } from "../llm";
+import { chatJson, isFailClosedLlmError } from "../llm";
 import { bespokeTimeoutMs, selectBespokeModel } from "./models";
 import { topicTaxonomyFragment } from "./topic-taxonomy";
 import { normalizeAssessmentNeed, type AssessmentNeed } from "./content-brief";
@@ -172,7 +172,8 @@ export async function generateLessonNarrativePlan(input: {
       } : {}),
     });
     return validateNarrativePlan(raw);
-  } catch {
+  } catch (error) {
+    if (isFailClosedLlmError(error)) throw error;
     return null;
   }
 }

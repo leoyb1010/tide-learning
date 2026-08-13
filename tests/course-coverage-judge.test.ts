@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({ chatJson: vi.fn() }));
-vi.mock("@/lib/llm", () => ({ chatJson: mocks.chatJson }));
+// 保留真实 isFailClosedLlmError：fail-closed 判定本身就是被测契约的一部分。
+vi.mock("@/lib/llm", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/llm")>()),
+  chatJson: mocks.chatJson,
+}));
 vi.mock("@/lib/ai/models", () => ({
   selectBespokeModel: () => null,
   resolveModel: () => ({ key: "test-model" }),
@@ -11,6 +15,7 @@ vi.mock("@/lib/ai/models", () => ({
 import { buildCourseCoverageBatches, deterministicCourseCoverageIssues, judgeCourseCoverage } from "@/lib/ai/course-coverage-judge";
 import { createCourseContentBrief, type AssessmentNeed } from "@/lib/ai/content-brief";
 import { validateBlocks } from "@/lib/blocks";
+import { AppError } from "@/lib/api";
 
 function lesson(index: number, assessmentNeed: AssessmentNeed = "check") {
   return {
@@ -88,5 +93,25 @@ describe("整课终审输入", () => {
       lessons: [lesson(0)],
     });
     expect(verdict.passed).toBe(true);
+  });
+
+  it("fail-closed 计费错误必须上抛，不得降级成 judged:false 后继续", async () => {
+    mocks.chatJson.mockRejectedValueOnce(new AppError("积分不足", 402));
+    await expect(judgeCourseCoverage({
+      courseTitle: "测试课",
+      brief: createCourseContentBrief({ request: "掌握能力" }),
+      lessons: [lesson(0)],
+    })).rejects.toMatchObject({ status: 402 });
+  });
+
+  it("普通模型故障仍降级为 judged:false 的未通过 verdict", async () => {
+    mocks.chatJson.mockRejectedValueOnce(new Error("解析失败"));
+    const verdict = await judgeCourseCoverage({
+      courseTitle: "测试课",
+      brief: createCourseContentBrief({ request: "掌握能力" }),
+      lessons: [lesson(0)],
+    });
+    expect(verdict.judged).toBe(false);
+    expect(verdict.passed).toBe(false);
   });
 });

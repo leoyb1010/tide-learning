@@ -1,7 +1,7 @@
 import { blocksToPlainText, type Block } from "@/lib/blocks";
 import { contentBriefPrompt, type AssessmentNeed, type CourseContentBrief } from "@/lib/ai/content-brief";
 import { bespokeTimeoutMs, resolveModel, selectBespokeModel } from "@/lib/ai/models";
-import { chatJson, type LlmUsageInfo } from "@/lib/llm";
+import { chatJson, isFailClosedLlmError, type LlmUsageInfo } from "@/lib/llm";
 
 export interface CourseCoverageLesson {
   id: string;
@@ -247,7 +247,8 @@ export async function judgeCourseCoverage(input: {
       verdict.coverage >= 4 && verdict.progression >= 4 && verdict.redundancy >= 4 &&
       (!input.brief.capstone || verdict.capstone >= 4);
     return verdict;
-  } catch {
+  } catch (error) {
+    if (isFailClosedLlmError(error)) throw error;
     return {
       passed: false, judged: false, coverage: 0, progression: 0, redundancy: 0, capstone: 0,
       issues: [], blockingIssues: ["整课终审未成功完成，不能发布"], reviewedLessonIds,

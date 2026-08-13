@@ -1,4 +1,4 @@
-import { chatJson } from "./llm";
+import { chatJson, isFailClosedLlmError } from "./llm";
 import { createHash, randomUUID } from "node:crypto";
 import { prisma } from "./db";
 import { estimateCredits, getBalanceFresh } from "./credits";
@@ -1094,6 +1094,9 @@ export async function generateLessonCore(
         ].slice(0, 14);
       } catch (error) {
         if (error instanceof GenerationJobLeaseLostError) throw error;
+        // 计费/幂等保护错误必须 fail-closed 上抛（外层释放 claim 后由后台/route 收敛 failed），
+        // 不能当成模型偶发故障继续下一稿——那会绕过硬预占继续调供应商。
+        if (isFailClosedLlmError(error)) throw error;
         const message = error instanceof Error ? error.message : "未知作者调用错误";
         authorErrors.push(`第 ${pass + 1} 稿：${message}`);
         console.warn(`[course-gen] 作者第 ${pass + 1} 稿失败`, lesson.id, message);

@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
-import { assertCanSpend } from "@/lib/credits";
+import { assertCanSpend, reverseCreditOperation } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
@@ -167,6 +167,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
       if (!lease) return fail("该课程已有大纲重拟任务在运行", 409);
 
+      // 本 fencing epoch 的稳定账务键。不能用裸 jobId：outline_regen 任务行按课程复用
+      // （businessKey=courseId，done/failed 后 reopen 只换 fencingToken），冲正墓碑按
+      // operationKey 永久拒绝后续预占，裸 jobId 会把下一次合法重试也堵死。
+      const billingOperationKey = `${lease.jobId}:f${lease.fencingToken}`;
       let leaseFinished = false;
       try {
         // 租约落库后再做一次事务快照门。confirm 会先建 course_gen lease；
@@ -228,6 +232,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             userId: user.id,
             scene: "generate_course",
             callKey: `outline-regenerate:${lease.jobId}:f${lease.fencingToken}`,
+            operationKey: billingOperationKey,
           },
         }));
 
@@ -370,6 +375,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return ok({ regenerated: true, lessons: saved });
       } catch (error) {
         if (!leaseFinished) {
+          // 收敛顺序与 course-outline-operation 一致：先持久化冲正墓碑（覆盖 settle 成功后
+          // CAS/内容门失败留下的已扣费），再 fenced finish failed。冲正本身失败时绝不冻结成
+          // failed——只把本 token 的租约立即过期，保持 running 供下次重试接管。
+          try {
+            await reverseCreditOperation({
+              operationKey: billingOperationKey,
+              userId: user.id,
+              scene: "generate_course",
+              reason: "大纲重拟未完整交付",
+            });
+          } catch (reversalError) {
+            console.error("[outline-regenerate] billing reversal deferred:", reversalError);
+            const now = new Date();
+            await prisma.generationJob.updateMany({
+              where: {
+                id: lease.jobId,
+                userId: user.id,
+                type: "outline_regen",
+                status: "running",
+                fencingToken: lease.fencingToken,
+              },
+              data: { leaseUntil: now, heartbeatAt: now, errorMessage: "billing reversal pending" },
+            }).catch(() => undefined);
+            throw error;
+          }
           await finishGenerationJobLease({
             jobId: lease.jobId,
             fencingToken: lease.fencingToken,

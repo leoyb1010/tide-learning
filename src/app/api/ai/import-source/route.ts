@@ -14,9 +14,9 @@ import {
   inspectImportOperation,
   reconcileImportOperationFailure,
   startImportOperation,
-  validateImportRequestId,
   type ImportOperation,
 } from "@/lib/import-operation";
+import { ensureRequestId } from "@/lib/request-id";
 
 export const dynamic = "force-dynamic";
 
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       const qualityTier = body?.qualityTier === "premium" ? "premium" : "standard";
       const checkpoint = body?.checkpoint === true;
       const title = body?.title?.trim().slice(0, 120) || undefined;
-      const requestId = validateImportRequestId(body?.requestId);
+      const requestId = ensureRequestId(body?.requestId);
       const payloadHash = importPayloadHash({
         scope: "paste",
         contentSha256: importContentSha256(rawText),

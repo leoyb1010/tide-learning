@@ -20,9 +20,9 @@ import {
   recordCoursePresentationThemeUsage,
   runCoursePresentationOperationStage,
   startCoursePresentationOperation,
-  validatePresentationRequestId,
   type CoursePresentationOperation,
 } from "@/lib/course-presentation-operation";
+import { ensureRequestId } from "@/lib/request-id";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (body?.lessonId) return fail("课级皮肤必须应用到整门课，不支持单节套皮", 400);
     const courseId = body?.courseId?.trim();
     if (!courseId) return fail("缺少 courseId");
-    const requestId = validatePresentationRequestId(body?.requestId);
+    const requestId = ensureRequestId(body?.requestId);
     const course = await prisma.course.findUnique({
       where: { id: courseId },
       select: {

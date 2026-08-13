@@ -267,16 +267,20 @@ interface GenerationWorkerState {
 type WorkerGlobal = typeof globalThis & { __tideGenerationRecoveryWorker?: GenerationWorkerState };
 
 /**
- * 生产 Node + SQLite 默认启用；可显式 GENERATION_WORKER_ENABLED=0 停用。
- * 非 SQLite 不自启，因为当前迁移与原子 UPSERT 均以 SQLite 为发布真值。
+ * Node runtime 默认启用（dev 与 production 一致）：崩溃恢复与过期预占退还只在这个
+ * worker 里跑，不自启会让 genStatus=generating 与冻结积分永久卡死。
+ * 仅 NODE_ENV=test 默认不启；GENERATION_WORKER_ENABLED=1 可强制打开（含 test），
+ * =0/false 显式停用。schema datasource 固定为 sqlite，方言与原子 UPSERT
+ * 不依赖 DATABASE_URL 形态；lease/fencing 层已保证多实例并发安全。
  */
 export function shouldStartGenerationRecoveryWorker(
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): boolean {
-  if (env.GENERATION_WORKER_ENABLED === "0") return false;
-  if (!env.DATABASE_URL?.startsWith("file:")) return false;
-  if (env.GENERATION_WORKER_ENABLED === "1") return env.NEXT_RUNTIME === "nodejs";
-  return env.NODE_ENV === "production" && env.NEXT_RUNTIME === "nodejs";
+  if (env.NEXT_RUNTIME !== "nodejs") return false;
+  const flag = env.GENERATION_WORKER_ENABLED;
+  if (flag === "0" || flag === "false") return false;
+  if (flag === "1") return true;
+  return env.NODE_ENV !== "test";
 }
 
 /** 进程单例定时器：启动立即扫一次，之后周期扫描；unref 不阻碍优雅退出。 */

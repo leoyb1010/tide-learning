@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import type { PrismaClient } from "@prisma/client";
 import { prisma } from "./db";
 import { AppError } from "./errors";
+import { validateRequestId } from "./request-id";
 import { reverseCreditOperation } from "./credits";
 import {
   acquireGenerationJobLease,
@@ -71,12 +72,7 @@ interface StartCoursePresentationOperationInput {
 type PresentationOperationDb = PrismaClient;
 
 export function validatePresentationRequestId(value: unknown): string {
-  if (typeof value !== "string") throw new AppError("缺少 requestId", 400);
-  const requestId = value.trim();
-  if (!/^[A-Za-z0-9_-]{16,128}$/.test(requestId)) {
-    throw new AppError("requestId 格式错误", 400);
-  }
-  return requestId;
+  return validateRequestId(value);
 }
 
 /** 对已归一化输入做稳定 hash；对象键排序，数组顺序保留。 */

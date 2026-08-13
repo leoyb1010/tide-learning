@@ -48,14 +48,14 @@ describe("AI route durable billing contract", () => {
     expect(examSubmission).toContain("${exam.id}:${billingRequestId}:short-grade:${gradeIndex}:${q.id}");
   });
 
-  it("does not swallow reservation 402 errors in generation or grading fallbacks", () => {
-    for (const path of [
-      "src/app/api/ai/generate-exam/route.ts",
-      "src/app/api/exams/[id]/submit/route.ts",
-    ] as const) {
-      const text = source(path);
-      expect(text).toContain("error instanceof AppError && error.status === 402");
-      expect(text).toContain("throw error");
-    }
+  it("does not swallow fail-closed billing errors in generation or grading fallbacks", () => {
+    // llm.ts 契约：402/409/503 等 fail-closed 计费错误不得降级后继续发起计费调用。
+    const examGeneration = source("src/app/api/ai/generate-exam/route.ts");
+    expect(examGeneration).toContain("if (isFailClosedLlmError(error)) throw error;");
+
+    // 判卷是多题循环：fail-closed 后停止后续计费调用（billingHalt），已判题照常落库。
+    const examSubmission = source("src/app/api/exams/[id]/submit/route.ts");
+    expect(examSubmission).toContain("isFailClosedLlmError(error)");
+    expect(examSubmission).toContain("billingHalt");
   });
 });

@@ -16,9 +16,9 @@ import {
   inspectImportOperation,
   reconcileImportOperationFailure,
   startImportOperation,
-  validateImportRequestId,
   type ImportOperation,
 } from "@/lib/import-operation";
+import { ensureRequestId } from "@/lib/request-id";
 
 // Node 运行时：pdf-parse / mammoth 依赖 Buffer 与 node 内建。
 export const runtime = "nodejs";
@@ -142,7 +142,7 @@ export async function POST(req: NextRequest) {
     const qualityTier = (form.get("qualityTier") as string | null)?.trim() === "premium" ? "premium" : "standard";
     const checkpoint = form.get("checkpoint") === "true";
     if (textKind && !isValidTemplate(template)) return fail("未知的课件模板");
-    const requestId = validateImportRequestId(form.get("requestId"));
+    const requestId = ensureRequestId(form.get("requestId"));
     const payloadHash = importPayloadHash(textKind ? {
       scope: "file",
       contentSha256: importContentSha256(bytes),

@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { chatJson } from "@/lib/llm";
+import { chatJson, isFailClosedLlmError } from "@/lib/llm";
 import { requireLLMAccess } from "@/lib/ai-guard";
 import { track } from "@/lib/analytics";
 import { validateBlocks, type Block } from "@/lib/blocks";
@@ -345,8 +345,9 @@ export async function POST(req: NextRequest) {
           break;
         }
       } catch (error) {
-        // 余额竞争失败不能被当成模型偶发故障重试，否则会绕过硬预占继续生成。
-        if (error instanceof AppError && error.status === 402) throw error;
+        // 计费/幂等保护错误（402/409/503 等 fail-closed）不能被当成模型偶发故障重试，
+        // 否则会绕过硬预占继续调供应商。
+        if (isFailClosedLlmError(error)) throw error;
         // 网络/解析失败落入下一次重试
       }
     }

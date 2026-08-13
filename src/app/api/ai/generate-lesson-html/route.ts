@@ -18,9 +18,9 @@ import {
   recordCoursePresentationRevision,
   runCoursePresentationOperationStage,
   startCoursePresentationOperation,
-  validatePresentationRequestId,
   type CoursePresentationOperation,
 } from "@/lib/course-presentation-operation";
+import { ensureRequestId } from "@/lib/request-id";
 
 export const dynamic = "force-dynamic";
 
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     // requireLessonGenAccess 对有订阅用户只验权益，不等于作者归属。
     // 必须在权益/余额预检与 begin 的任何 DB 写前用已验证会话显式 403。
     if (target.course?.authorUserId !== preUser.id) throw new AppError("无权操作该课程", 403);
-    const requestId = validatePresentationRequestId(body?.requestId);
+    const requestId = ensureRequestId(body?.requestId);
     const existingRequest = await coursePresentationOperationExists(target.courseId, requestId);
     if (!existingRequest) {
       // 新请求先过只读交付前置门和公网限流，再创建 operation。

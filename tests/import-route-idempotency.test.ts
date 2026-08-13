@@ -322,4 +322,38 @@ describe("import routes durable replay", () => {
       expect(mocks.start.mock.invocationCallOrder[0]).toBeLessThan(mocks.assertUserRateLimit.mock.invocationCallOrder[0]);
     });
   });
+
+  describe("旧客户端不带 requestId 的兜底", () => {
+    it("粘贴导入缺 requestId 不再 400：服务端生成合法 ID 走完整流程", async () => {
+      const request = new NextRequest("http://localhost/api/ai/import-source", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rawText: "导入资料".repeat(30) }),
+      });
+      const response = await importSource(request);
+      expect(response.status).toBe(200);
+      expect(mocks.inspect).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: expect.stringMatching(/^srv-[0-9a-f]{32}$/) }),
+      );
+    });
+
+    it("文件导入缺 requestId 不再 400：服务端生成合法 ID 走完整流程", async () => {
+      const form = new FormData();
+      form.append("file", new File(["导入资料".repeat(30)], "notes.txt", { type: "text/plain" }));
+      const request = new NextRequest("http://localhost/api/ai/import-file", { method: "POST", body: form });
+      const response = await importFile(request);
+      expect(response.status).toBe(200);
+      expect(mocks.inspect).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: expect.stringMatching(/^srv-[0-9a-f]{32}$/) }),
+      );
+    });
+
+    it("有值但格式非法仍 400，不兜底", async () => {
+      const response = await importSource(pasteRequest("short"));
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ ok: false, error: "requestId 格式错误" });
+      expect(mocks.inspect).not.toHaveBeenCalled();
+      expect(mocks.start).not.toHaveBeenCalled();
+    });
+  });
 });

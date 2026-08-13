@@ -70,8 +70,8 @@ export function validateProductionEnv(): void {
   if (!Number.isSafeInteger(hops) || hops < 0 || hops > 5) errors.push("TRUSTED_PROXY_HOPS 必须为 0 到 5 的整数");
 
   const generationWorkerEnabled = process.env.GENERATION_WORKER_ENABLED?.trim();
-  if (generationWorkerEnabled && generationWorkerEnabled !== "0" && generationWorkerEnabled !== "1") {
-    errors.push("GENERATION_WORKER_ENABLED 只能为 0、1 或留空");
+  if (generationWorkerEnabled && !["0", "1", "false"].includes(generationWorkerEnabled)) {
+    errors.push("GENERATION_WORKER_ENABLED 只能为 0、1、false 或留空");
   }
   const generationWorkerInterval = process.env.GENERATION_WORKER_INTERVAL_MS?.trim();
   if (generationWorkerInterval) {

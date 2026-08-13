@@ -60,7 +60,7 @@
 
 ## 6. 恢复、运维与验收
 
-- 生产 Node + SQLite 默认启动 recovery worker：进程启动立即扫描，之后定时扫描；可用 `GENERATION_WORKER_ENABLED=0` 显式停用。worker 只能通过 DB lease 接管，不依赖原请求进程存活。
+- Node runtime（dev 与 production，NODE_ENV=test 除外）默认启动 recovery worker：进程启动立即扫描，之后定时扫描；可用 `GENERATION_WORKER_ENABLED=0` 显式停用、`=1` 强制打开。worker 只能通过 DB lease 接管，不依赖原请求进程存活。
 - 前端 `gen-progress` GET 严格只读，不在轮询路径启动付费评审或凭 JSON “自愈”终态。
 - 发布门至少包含：空库与旧基线迁移、lint、TypeScript、全量测试、依赖审计、production build/start、学习协议 E2E（请求+响应+DB+刷新）、备份恢复演练。
 - 视觉质量与工程可用性分开验收：确定性回落可让课程安全可学，但不计入“原创精品命中率”。视觉 95+ 必须用经确认的黄金课件样本、真实生成结果和浏览器截图评审，不能只看 prompt 或单元测试。

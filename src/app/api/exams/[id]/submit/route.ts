@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { ok, fail, handle, assertSameOrigin, AppError } from "@/lib/api";
 import { requireUser } from "@/lib/session";
 import { assertUserRateLimit } from "@/lib/rate-limit";
-import { chatJson } from "@/lib/llm";
+import { chatJson, isFailClosedLlmError } from "@/lib/llm";
 import { assertCanSpend } from "@/lib/credits";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { track } from "@/lib/analytics";
@@ -153,7 +153,17 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } else {
         await assertCanSpend(user.id);
         const billingRequestId = randomUUID();
+        // 计费硬停闸：一旦出现 fail-closed 计费错误（402 余额不足 / 409 幂等冲突 / 503 结算状态未恢复），
+        // 立即停止后续一切计费调用（llm.ts 契约），但不中断整卷——已判的题是已扣费交付的成果，
+        // 必须照常落库；未判的题按 0 分 + 明确说明。整单抛错会让已结算的扣费血本无归，
+        // 且重试会用新 billingRequestId 从头重复扣费。
+        let billingHalt: string | null = null;
         for (const [gradeIndex, { q, userAnswer }] of shortToGrade.entries()) {
+          if (billingHalt) {
+            const it = items.find((x) => x.questionId === q.id);
+            if (it) it.comment = billingHalt;
+            continue;
+          }
           let s = 0;
           let comment = "";
           try {
@@ -184,11 +194,19 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             s = Number.isFinite(raw) ? Math.min(SHORT_MAX, Math.max(0, Math.round(raw))) : 0;
             comment = typeof result?.comment === "string" ? result.comment.trim().slice(0, 300) : "";
           } catch (error) {
-            // 余额不足是硬门，不能降级成免费保底分；其余阅卷故障仍保留原有宽容策略。
-            if (error instanceof AppError && error.status === 402) throw error;
-            // 判分失败：给保底分（宽容），不因判卷故障而零分冤枉学员
-            s = Math.min(SHORT_MAX, 5);
-            comment = "自动判分暂不可用，已给予保底分，可参考下方参考答案自评。";
+            if (isFailClosedLlmError(error)) {
+              // 计费/幂等保护错误不能降级成免费保底分，也不能继续发起新的计费调用。
+              billingHalt =
+                error instanceof AppError && error.status === 402
+                  ? "余额不足，本题及后续简答未判分（0 分），可充值后重新提交，或参考下方参考答案自评。"
+                  : "AI 计费状态待恢复，本题及后续简答未判分（0 分），可稍后重新提交，或参考下方参考答案自评。";
+              s = 0;
+              comment = billingHalt;
+            } else {
+              // 判分失败：给保底分（宽容），不因判卷故障而零分冤枉学员
+              s = Math.min(SHORT_MAX, 5);
+              comment = "自动判分暂不可用，已给予保底分，可参考下方参考答案自评。";
+            }
           }
           const it = items.find((x) => x.questionId === q.id);
           if (it) {

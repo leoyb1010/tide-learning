@@ -107,7 +107,7 @@ try {
     });
   }
   const presentation = await settleExternalCoursePresentation(course.id, mutation.revision);
-  if (!presentation.settled || !presentation.contentReady || presentation.status !== "premium") {
+  if (!presentation.settled || !presentation.contentReady || presentation.status !== "ready") {
     throw new Error(`表现层未完整通过：${presentation.ready}/${presentation.total} (${presentation.status})`);
   }
   const lessons = await prisma.lesson.findMany({

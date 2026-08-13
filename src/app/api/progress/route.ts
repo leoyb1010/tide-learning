@@ -27,14 +27,19 @@ export async function POST(req: NextRequest) {
     if (!body || typeof body !== "object") return fail("请求体非法");
     const lessonId = typeof body.lessonId === "string" ? body.lessonId.trim() : "";
     if (!/^[A-Za-z0-9_-]{1,80}$/.test(lessonId)) return fail("lessonId 非法");
-    const kind = body.kind ?? "video";
-    if (kind !== "video" && kind !== "slide") return fail("进度类型非法");
-    if (body.completed !== undefined && typeof body.completed !== "boolean") return fail("完成状态非法");
+    // 分 kind 的容错边界（兼容已发布客户端 × 保住 slide 协议真值，与嵌入 E2E 断言一致）：
+    // - kind 缺省 → video（已发布 iOS/Mac 端不发 kind 字段）；显式未知字符串是协议错误，400。
+    // - video：秒数来自播放器，溢出/负数取整很常见（86401、-0.5），只拒非数值/NaN/Infinity，
+    //   越界 clamp 到 [0, MAX_PROGRESS]——老客户端 fire-and-forget，硬拒会静默丢续读点。
+    // - slide：页序协议由同版本 Web 宿主发出，无旧端包袱；-4/2.5 等非法页序必须 400 且不落库，
+    //   否则会污染 lastSlideIndex 的单调「最远读到」真值。
+    if (body.kind !== undefined && body.kind !== "video" && body.kind !== "slide") return fail("进度类型非法");
+    const kind = body.kind === "slide" ? "slide" : "video";
     if (typeof body.progressSec !== "number" || !Number.isFinite(body.progressSec)) return fail("进度数值非法");
-    if (body.progressSec < 0 || body.progressSec > MAX_PROGRESS) return fail("进度数值超出范围");
-    // 页序协议严格使用 1-indexed 整数；不再把负数/小数静默 clamp 成“看过首页”。
-    if (kind === "slide" && (!Number.isInteger(body.progressSec) || body.progressSec < 1)) return fail("页序进度非法");
-    const safeProgress = kind === "slide" ? body.progressSec : Math.floor(body.progressSec);
+    if (kind === "slide" && (!Number.isSafeInteger(body.progressSec) || body.progressSec < 0 || body.progressSec > MAX_PROGRESS)) {
+      return fail("进度数值超出范围");
+    }
+    const safeProgress = Math.min(Math.max(0, Math.floor(body.progressSec)), MAX_PROGRESS);
 
     // P2 归属+付费双门：getLessonForUser 已内置 canViewCourse（他人私有课视为不存在→null）
     // 与 canAccessLesson（付费节需订阅→access）。null 即无权可见，403。
@@ -48,8 +53,8 @@ export async function POST(req: NextRequest) {
 
     // 翻页进度写 lastSlideIndex，视频/模拟播放进度写 progressSec；二者隔离，互不污染另一视图的续读点。
     const isSlide = kind === "slide";
-    // 到此 view.access 必为 true（上方已挡）；completed 直接以入参为准。
-    const canComplete = body.completed === true;
+    // 到此 view.access 必为 true（上方已挡）；completed 接受 true/1，其余（含 0/缺省/脏值）视为未完成。
+    const canComplete = body.completed === true || body.completed === 1;
 
     // 页序是“最远读到”而不是当前光标。读旧值+写 max 放在同一事务，
     // 使长滚动完成上报或并发旧请求不能把 lastSlideIndex 从 16 写回 1。

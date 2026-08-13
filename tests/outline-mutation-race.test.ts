@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   requireUser: vi.fn(),
   resolveEntitlement: vi.fn(),
   assertCanSpend: vi.fn(),
+  reverseCreditOperation: vi.fn(),
   after: vi.fn(),
   courseFindUnique: vi.fn(),
   lessonCount: vi.fn(),
@@ -56,7 +57,7 @@ vi.mock("@/lib/session", () => {
 });
 
 vi.mock("@/lib/entitlement", () => ({ resolveEntitlement: mocks.resolveEntitlement }));
-vi.mock("@/lib/credits", () => ({ assertCanSpend: mocks.assertCanSpend }));
+vi.mock("@/lib/credits", () => ({ assertCanSpend: mocks.assertCanSpend, reverseCreditOperation: mocks.reverseCreditOperation }));
 vi.mock("@/lib/rate-limit", () => {
   class RateLimitError extends Error {
     status = 429;
@@ -141,6 +142,7 @@ beforeEach(() => {
   mocks.requireUser.mockResolvedValue({ id: "user_1" });
   mocks.resolveEntitlement.mockResolvedValue({ canUseLLM: true });
   mocks.assertCanSpend.mockResolvedValue(undefined);
+  mocks.reverseCreditOperation.mockResolvedValue(undefined);
   mocks.acquireInflight.mockReturnValue(true);
   mocks.courseFindUnique.mockResolvedValue(course());
   mocks.lessonCount.mockResolvedValue(1);
@@ -251,6 +253,9 @@ describe("outline mutation fencing", () => {
 
     expect(response.status).toBe(409);
     expect(mocks.chatJson).toHaveBeenCalledOnce();
+    // 已结算的扣费必须整笔冲正（operationKey 按 fencing epoch 唯一），不能只标 failed 了事。
+    expect(mocks.reverseCreditOperation).toHaveBeenCalledOnce();
+    expect(mocks.reverseCreditOperation.mock.calls[0][0]).toMatchObject({ scene: "generate_course" });
     expect(mocks.txLessonDeleteMany).not.toHaveBeenCalled();
     expect(mocks.txLessonCreate).not.toHaveBeenCalled();
     expect(mocks.finishGenerationJobLease).toHaveBeenCalledWith(expect.objectContaining({

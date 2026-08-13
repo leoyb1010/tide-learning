@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "./db";
 import { AppError } from "./errors";
+import { validateRequestId } from "./request-id";
 import {
   acquireGenerationJobLease,
   finishGenerationJobLease,
@@ -56,10 +57,7 @@ export class ImportReversalPendingError extends AppError {
 }
 
 export function validateImportRequestId(value: unknown): string {
-  if (typeof value !== "string") throw new AppError("缺少 requestId", 400);
-  const requestId = value.trim();
-  if (!/^[A-Za-z0-9_-]{16,128}$/.test(requestId)) throw new AppError("requestId 格式错误", 400);
-  return requestId;
+  return validateRequestId(value);
 }
 
 export function importContentSha256(value: string | Buffer | Uint8Array): string {
