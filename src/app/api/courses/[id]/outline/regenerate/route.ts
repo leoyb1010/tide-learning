@@ -7,6 +7,7 @@ import { assertCanSpend, reverseCreditOperation } from "@/lib/credits";
 import { assertUserRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
+import { interactiveLlmTimeoutMs, resolveModel } from "@/lib/ai/models";
 import { blueprintOutlineFragment, lessonRangeForLength, untrustedOutlineReferenceFragment } from "@/lib/ai/blueprint";
 import {
   createCourseContentBrief,
@@ -221,12 +222,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       });
       const blueprintWithoutReference = blueprint ? { ...blueprint, referenceText: undefined } : null;
       const sourceReferenceFragment = untrustedOutlineReferenceFragment(sourceTruth.outlineReferenceText, 50_000);
+      const outlineModel = resolveModel(course.modelUsed);
       const result = await runWithGenerationJobLeaseHeartbeat(lease, () => chatJson<OutlineResult>({
           system,
           user: userMsg + blueprintOutlineFragment(blueprintWithoutReference) + (sourceReferenceFragment ? `\n${sourceReferenceFragment}\n` : ""),
           temperature: 0.5,
-          maxTokens: 6000,
+          maxTokens: 3500,
           model: course.modelUsed ?? undefined,
+          reasoningEffort: outlineModel.interactiveReasoningEffort,
+          timeoutMs: interactiveLlmTimeoutMs(outlineModel),
           retries: 0,
           billing: {
             userId: user.id,

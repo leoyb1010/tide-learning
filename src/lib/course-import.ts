@@ -6,6 +6,7 @@ import { track } from "@/lib/analytics";
 import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { importOutlinePrompt } from "@/lib/ai/prompts";
+import { interactiveLlmTimeoutMs, resolveModel } from "@/lib/ai/models";
 import { createCourseContentBrief, normalizeAssessmentNeed, serializeCourseContentBrief } from "@/lib/ai/content-brief";
 import { sourcePolicyForTopic, trustedSourceAsOfDate } from "@/lib/ai/source-policy";
 import { runWithGenerationJobLeaseHeartbeat } from "@/lib/generation-job-lease";
@@ -78,6 +79,7 @@ export async function structureImportedTextIntoCourse(opts: {
 
   // —— 内置 prompt 库：忠于原文切章 + 模板结构。输出契约 {outline:[{title, objective}]}。——
   const { system, user: userMsg } = importOutlinePrompt({ title, rawText, template });
+  const modelEntry = resolveModel(model);
   let outline: OutlineItem[] = [];
   try {
     const result = await runWithGenerationJobLeaseHeartbeat(opts.operation.lease, () => chatJson<OutlineResult>({
@@ -86,7 +88,9 @@ export async function structureImportedTextIntoCourse(opts: {
       temperature: 0.3,
       maxTokens: 6000,
       model,
-      // 切章是导入点击后同步等待的调用：不做超时重试，避免慢模型 120s 漫长转圈；
+      reasoningEffort: modelEntry.interactiveReasoningEffort,
+      timeoutMs: interactiveLlmTimeoutMs(modelEntry),
+      // 切章是导入点击后同步等待的调用：不做超时重试，避免慢模型重复供应商成本；
       // 失败会走下方「退回单章」兜底，导入不空。逐节生成（后台）仍保留默认重试。
       retries: 0,
       billing: {

@@ -24,13 +24,15 @@ export function clearCourseOutlineRequestId(requestId: string): void {
 /**
  * 失败是否仍可能对应一个正在运行或已经提交的耐久操作。
  * 结构化 running 契约与所有不确定的 5xx / 非 JSON 响应都必须保留原 ID；
- * 只有明确解析出的终态 4xx 才允许下一次点击成为新意图。
+ * 服务端明确声明 preserveRequestId=false 时（包括已完成冲正的 5xx）立即清理，
+ * 其余明确终态 4xx 也允许下一次点击成为新意图。
  */
 export function shouldPreserveCourseOutlineRequestId(value: unknown, httpStatus?: number): boolean {
   if (!value || typeof value !== "object") return true;
   const data = (value as { data?: unknown }).data;
   if (data && typeof data === "object") {
     const contract = data as { code?: unknown; preserveRequestId?: unknown };
+    if (contract.preserveRequestId === false) return false;
     if (contract.code === "COURSE_OUTLINE_RUNNING" && contract.preserveRequestId === true) return true;
   }
   if (typeof httpStatus !== "number" || httpStatus >= 500) return true;

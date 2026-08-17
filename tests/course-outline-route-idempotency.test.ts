@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   assertUserRateLimit: vi.fn(),
   start: vi.fn(),
   reconcile: vi.fn(),
+  chatJson: vi.fn(),
+  runWithHeartbeat: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({ prisma: {} }));
@@ -31,7 +33,7 @@ vi.mock("@/lib/rate-limit", () => {
     assertUserRateLimit: mocks.assertUserRateLimit,
   };
 });
-vi.mock("@/lib/llm", () => ({ chatJson: vi.fn() }));
+vi.mock("@/lib/llm", () => ({ chatJson: mocks.chatJson }));
 vi.mock("@/lib/credits", () => ({ assertCanSpend: vi.fn() }));
 vi.mock("@/lib/ai-guard", () => ({ requireCourseGenAccess: mocks.requireAccess }));
 vi.mock("@/lib/analytics", () => ({ track: vi.fn() }));
@@ -39,7 +41,10 @@ vi.mock("@/lib/format", () => ({ slugify: vi.fn(() => "course") }));
 vi.mock("@/lib/course-gen", () => ({ initGenJob: vi.fn(), runCourseGenBackground: vi.fn() }));
 vi.mock("@/lib/ai/prompts", () => ({ courseOutlinePrompt: vi.fn(() => ({ system: "", user: "" })) }));
 vi.mock("@/lib/ai/templates", () => ({ isValidTemplate: vi.fn(() => true) }));
-vi.mock("@/lib/ai/models", () => ({ selectModelFor: vi.fn(() => ({ key: "deepseek-chat" })) }));
+vi.mock("@/lib/ai/models", () => ({
+  selectModelFor: vi.fn(() => ({ key: "deepseek-chat", latencyTier: "slow" })),
+  interactiveLlmTimeoutMs: vi.fn(() => 90_000),
+}));
 vi.mock("@/lib/ai/blueprint", () => ({
   parseBlueprint: vi.fn(() => null),
   serializeBlueprint: vi.fn(),
@@ -59,7 +64,7 @@ vi.mock("@/lib/ai/source-policy", () => ({
   sourcePolicyForTopic: vi.fn(() => ({ requiresSource: false, requiresAsOfDate: false })),
   sourcePolicyForFinalCourseOutline: vi.fn(),
 }));
-vi.mock("@/lib/generation-job-lease", () => ({ runWithGenerationJobLeaseHeartbeat: vi.fn() }));
+vi.mock("@/lib/generation-job-lease", () => ({ runWithGenerationJobLeaseHeartbeat: mocks.runWithHeartbeat }));
 vi.mock("@/lib/course-outline-operation", () => {
   class CourseOutlineReversalPendingError extends Error {
     status = 503;
@@ -101,6 +106,8 @@ beforeEach(() => {
     },
   });
   mocks.acquireInflight.mockReturnValue(false);
+  mocks.runWithHeartbeat.mockImplementation(async (_lease, callback) => callback());
+  mocks.reconcile.mockResolvedValue(undefined);
 });
 
 describe("generate-course durable requestId route contract", () => {
@@ -184,11 +191,29 @@ describe("generate-course durable requestId route contract", () => {
     expect(response.status).toBe(409);
     expect(body.ok).toBe(false);
     if (preserve) expect(body.data).toMatchObject({ code: "COURSE_OUTLINE_RUNNING", preserveRequestId: true });
-    else expect(body.data).toBeUndefined();
+    else expect(body.data).toMatchObject({ code: "COURSE_OUTLINE_FAILED", preserveRequestId: false });
     expect(mocks.requireAccess).not.toHaveBeenCalled();
     expect(mocks.assertUserRateLimit).not.toHaveBeenCalled();
     expect(mocks.acquireInflight).not.toHaveBeenCalled();
     expect(mocks.releaseInflight).not.toHaveBeenCalled();
+  });
+
+
+  it("returns a terminal machine contract after a timed-out outline is reconciled", async () => {
+    const { AppError } = await import("@/lib/errors");
+    mocks.acquireInflight.mockReturnValue(true);
+    mocks.chatJson.mockRejectedValueOnce(new AppError("AI 响应超时，请重试", 504));
+
+    const response = await POST(request("course-outline-timeout-terminal-01"));
+
+    expect(response.status).toBe(504);
+    expect(await response.json()).toMatchObject({
+      ok: false,
+      error: "AI 生成大纲较慢，本次已安全结束且未扣积分，请再试一次",
+      data: { code: "COURSE_OUTLINE_FAILED", preserveRequestId: false },
+    });
+    expect(mocks.reconcile).toHaveBeenCalledOnce();
+    expect(mocks.releaseInflight).toHaveBeenCalledWith("course_gen", "outline-route-user");
   });
 
   it("新 requestId 准入被拒时 429，且零 start / reconcile / 动态门", async () => {

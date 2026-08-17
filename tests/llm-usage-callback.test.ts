@@ -38,6 +38,14 @@ describe("chat usage callback delivery contract", () => {
     expect(settled).toBe(true);
   });
 
+
+  it("sends reasoning_effort only when a caller explicitly opts in", async () => {
+    await expect(chat({ system: "system", user: "user", retries: 0, reasoningEffort: "low" })).resolves.toBe("课程正文");
+    const init = vi.mocked(fetch).mock.calls[0]?.[1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    expect(body.reasoning_effort).toBe("low");
+  });
+
   it("observes callback failure without retrying the successful provider response", async () => {
     const onUsage = vi.fn(async () => { throw new Error("ledger unavailable"); });
     const log = vi.spyOn(console, "error").mockImplementation(() => {});

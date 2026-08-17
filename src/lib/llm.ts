@@ -50,6 +50,7 @@ export interface ChatOptions {
   timeoutMs?: number; // 默认 45s（推理模型延迟更高）
   retries?: number; // 默认 1（仅 5xx/网络/超时重试）
   model?: string; // v3.2：本次调用用哪个模型（见 ai/models.ts）；缺省用默认模型
+  reasoningEffort?: "low" | "medium" | "high"; // OpenAI 兼容推理强度；仅显式传入时发送
   onUsage?: LlmUsageCallback; // v2.3：成功返回后回调实际 Token 用量（供积分记账）
   /** 新生成主链使用：供应商调用前先冻结积分，成功结算、失败退款。 */
   billing?: LlmBillingOptions;
@@ -97,6 +98,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
     // 45s 会偶发 504 让造课「生成失败」。给足头寸，仍由 AbortController 兜底封顶。
     timeoutMs = 60_000,
     retries = 1,
+    reasoningEffort,
     onUsage,
     billing,
   } = opts;
@@ -113,6 +115,7 @@ export async function chat(opts: ChatOptions): Promise<string> {
       ],
       temperature,
       max_tokens: effectiveMaxTokens,
+      ...(reasoningEffort ? { reasoning_effort: reasoningEffort } : {}),
       ...(json ? { response_format: { type: "json_object" } } : {}),
     });
     // 预占必须发生在真实供应商请求之前。每次 HTTP retry 都有独立 reservation；失败 attempt
