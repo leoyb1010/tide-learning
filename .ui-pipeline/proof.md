@@ -24,3 +24,17 @@
 ## Remaining risk
 
 - One `LlmBillingReconciliation` row remains `pending` for the original ambiguous provider timeout. User credits are already fully refunded; operations runbook requires manual provider-bill reconciliation.
+
+## Multi-role adversarial audit — 2026-08-17
+
+- Guest: generation 401; private course 404; public course 200.
+- Free user: model catalog returns free model only and subscriber=false.
+- Full subscriber/creator: own private course 200; cross-owner delete 403.
+- Active single-track simulation: subscriber=true; oral-track lessons unlocked; other-track paid lessons locked; original expired seed subscription restored afterward.
+- Admin: diagnostics 200; normal subscriber diagnostics 403.
+- Malicious requests: bad Bearer 401; bad requestId 400; prototype-like template 400; cross-origin generation 403.
+- Reproduced CSRF defects before fix:
+  - cross-origin Cookie logout returned 200 and invalidated the session;
+  - cross-origin credential login returned 200 and created a session.
+- Fixed shared same-origin boundary on login, signup, logout and anonymous analytics writes. Native Bearer/no-Origin clients remain supported.
+- Dependency audit: 0 vulnerabilities. Focused security suite: 116 passed. Full suite after fix: 84 files, 729 passed, 13 skipped.
