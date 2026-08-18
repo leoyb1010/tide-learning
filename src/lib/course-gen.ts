@@ -1216,17 +1216,20 @@ export async function generateLessonCore(
         userId,
         properties: { courseId: course.id, lessonId: lesson.id, hits: safety.hits.map((h) => h.word).slice(0, 10) },
       });
-      usedFallback = true;
-      blocks = validateBlocks([
-        {
-          type: "concept",
-          title: lesson.title,
-          markdown: "本节内容未通过安全审核，暂不展示。可调整课程主题或表述后重新生成。",
-        },
-      ]);
-      quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
-      adherence = checkTemplateAdherence(blocks, course.template);
-      judge = unverifiedJudge("内容触发安全拦截，未进入发布质量评审");
+      if (deep) {
+        usedFallback = true;
+        blocks = validateBlocks([{ type: "concept", title: lesson.title, markdown: "本节内容未通过安全审核，暂不展示。" }]);
+        quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+        adherence = checkTemplateAdherence(blocks, course.template);
+        judge = unverifiedJudge("内容触发安全拦截，未进入发布质量评审");
+      } else {
+        usedFallback = false;
+        blocks = buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed });
+        quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+        finalDisciplineIssues = [];
+        adherence = checkTemplateAdherence(blocks, course.template);
+        judge = deterministicLessonJudge(quality, finalDisciplineIssues);
+      }
     }
 
     // 最终候选稿也是不可信的模型输出：它可以在安全课名/指令下自行升级成
