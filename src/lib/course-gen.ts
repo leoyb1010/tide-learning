@@ -933,28 +933,32 @@ export async function generateLessonCore(
 
   // v6：模板仅保留为用户表达的创作偏好；自由教学结构由本节导演 Agent 现场决定。
   const tmpl = getTemplate(course.template);
-  const narrativePlan = await runFencedStage(jobLease, () => generateLessonNarrativePlan({
-    courseTitle: course.title,
-    lessonTitle: lesson.title,
-    objective: lesson.summary,
-    category: course.category,
-    topicContext,
-    audience: blueprint?.audience,
-    previousLessonTitles: priorTitles,
-    sourceContext: sourceCtx,
-    templateHint: course.template ? `${tmpl.label}：${tmpl.tagline}` : null,
-    courseBrief: contentBriefText,
-    courseOutline: courseLessons.map((item, position) => ({ title: item.title, objective: item.summary, position })),
-    lessonPosition: lessonIndex,
-    priorCoverage,
-    assessmentNeed,
-    userId,
-    billingKey: jobLease
-      ? leaseBillingKey(jobLease, `lesson:${lessonId}`)
-      : `lesson:${lessonId}:claim:${lessonClaimAt.getTime()}`,
-    model: opts.model ?? course.modelUsed,
-  }));
-  const narrativeFragment = narrativePlanPrompt(narrativePlan);
+  // 标准档不再调用独立导演 Agent：课程地图、前序覆盖、检验分配和模板偏好已经足够指导作者。
+  // premium 才保留一次导演规划，作为显式付费的深度研究能力。
+  const narrativePlan = deep
+    ? await runFencedStage(jobLease, () => generateLessonNarrativePlan({
+        courseTitle: course.title,
+        lessonTitle: lesson.title,
+        objective: lesson.summary,
+        category: course.category,
+        topicContext,
+        audience: blueprint?.audience,
+        previousLessonTitles: priorTitles,
+        sourceContext: sourceCtx,
+        templateHint: course.template ? `${tmpl.label}：${tmpl.tagline}` : null,
+        courseBrief: contentBriefText,
+        courseOutline: courseLessons.map((item, position) => ({ title: item.title, objective: item.summary, position })),
+        lessonPosition: lessonIndex,
+        priorCoverage,
+        assessmentNeed,
+        userId,
+        billingKey: jobLease
+          ? leaseBillingKey(jobLease, `lesson:${lessonId}`)
+          : `lesson:${lessonId}:claim:${lessonClaimAt.getTime()}`,
+        model: opts.model ?? course.modelUsed,
+      }))
+    : null;
+  const narrativeFragment = deep ? narrativePlanPrompt(narrativePlan) : "";
   const authorPromptInput: CourseAuthorPromptInput = {
     courseTitle: sanitizePromptField(course.title),
     lessonTitle: sanitizePromptField(lesson.title),
@@ -1100,7 +1104,7 @@ export async function generateLessonCore(
             model: model.key,
           };
         }
-        if (candidateQuality.passed && candidateJudge.passed && candidateDiscipline.length === 0) break;
+        if (!deep || (candidateQuality.passed && candidateJudge.passed && candidateDiscipline.length === 0)) break;
         const structural = Object.entries(candidateQuality.flags)
           .filter(([key, ok]) => !ok && !(key === "hasAssessment" && assessmentNeed === "none"))
           .map(([key]) => FLAG_HINTS[key] ?? key);
@@ -2931,7 +2935,7 @@ export async function renderCourseHtmlBestEffort(
     if (jobLease) await renewGenerationLeaseOrThrow(jobLease);
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, origin: true },
+      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, qualityTier: true, origin: true },
     });
     if (!course) return empty;
     const design = resolveCourseDesign(course);
@@ -2962,7 +2966,7 @@ export async function renderCourseHtmlBestEffort(
       },
     });
     // 用户拥有的 AI/导入课程默认走原创表现层。官方无作者课仍保持确定性，避免后台种子任务无计费主体。
-    const creativeEnabled = Boolean(course.authorUserId);
+    const creativeEnabled = Boolean(course.authorUserId) && course.qualityTier === "premium";
     const budget = createCoursewareBudget();
     let premiumRenderCount = 0;
     let deterministicRenderCount = 0;
@@ -3051,9 +3055,9 @@ export async function ensureDesignBrief(
     if (jobLease) await renewGenerationLeaseOrThrow(jobLease);
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, subtitle: true, category: true, origin: true, designJson: true },
+      select: { id: true, title: true, subtitle: true, category: true, qualityTier: true, origin: true, designJson: true },
     });
-    if (!course || course.origin !== "ai_generated" || course.designJson) return;
+    if (!course || course.origin !== "ai_generated" || course.designJson || course.qualityTier !== "premium") return;
     const lessons = await prisma.lesson.findMany({
       where: { courseId },
       orderBy: { sortOrder: "asc" },
@@ -3136,11 +3140,10 @@ export async function runCourseGenBackground(
     // 100 分月赠即可产生数千分真实 API 成本。限流(10/天)不是成本护栏。
     // 现在:每节开始前读实时余额,不足以覆盖「一节最坏成本」即停止扇出并落 failed(可续造),
     // 已生成的节全部保留。滞后记账最多让实际透支一节,有界。
-    const genCourse = await prisma.course.findUnique({ where: { id: courseId }, select: { modelUsed: true } });
+    const genCourse = await prisma.course.findUnique({ where: { id: courseId }, select: { modelUsed: true, qualityTier: true } });
     const genModel = genCourse?.modelUsed ?? undefined;
-    const perLessonCost =
-      estimateCredits("generate_lesson", undefined, genModel) +
-      estimateCredits("generate_lesson_html", undefined, genModel);
+    const perLessonCost = estimateCredits("generate_lesson", undefined, genModel) +
+      (genCourse?.qualityTier === "premium" ? estimateCredits("generate_lesson_html", undefined, genModel) : 0);
     let stoppedForCredits = false;
     let stoppedForPause = false;
 
