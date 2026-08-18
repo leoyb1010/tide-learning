@@ -25,7 +25,10 @@ const coverageJudgeMock = vi.hoisted(() => vi.fn());
 const renderLessonHtmlMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/db", () => ({ prisma: prismaMock }));
-vi.mock("@/lib/ai/course-coverage-judge", () => ({ judgeCourseCoverage: coverageJudgeMock }));
+vi.mock("@/lib/ai/course-coverage-judge", () => ({
+  judgeCourseCoverage: coverageJudgeMock,
+  deterministicCourseCoverageIssues: vi.fn(() => []),
+}));
 vi.mock("@/lib/ai/courseware-gen", async (importOriginal) => ({
   ...await importOriginal<typeof import("@/lib/ai/courseware-gen")>(),
   renderAndStoreLessonHtml: renderLessonHtmlMock,
@@ -186,6 +189,7 @@ function courseFor(lessons: CourseLessonFixture[], genStatus = "generating") {
     }),
     generationQualityJson: null,
     modelUsed: null,
+    qualityTier: "premium",
     authorUserId: null,
     genStatus,
     lessons,

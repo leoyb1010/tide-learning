@@ -177,7 +177,15 @@ export async function chat(opts: ChatOptions): Promise<string> {
         // 上游有时会回显 prompt 片段，日志只记状态码/请求 id，不保存原始错误体。
         console.error(`[llm] upstream ${res.status}${providerRequestId ? ` request=${providerRequestId.slice(0, 120)}` : ""}`);
         if (res.status >= 400 && res.status < 500) {
-          if (res.status === 429) throw new AppError("AI 请求过于频繁，请稍后再试", 429);
+          if (res.status === 429) {
+            lastErr = new AppError("AI 请求过于频繁，请稍后再试", 429);
+            if (attempt < retries) {
+              const retryAfterMs = providerRetryAfterMs(res.headers.get("retry-after"), attempt);
+              await sleep(retryAfterMs);
+              continue;
+            }
+            throw lastErr;
+          }
           // 上游 4xx（配置错/payload 超限/鉴权失效）折叠为客户端可见 502，但标记不可重试：
           // 确定性失败，重试只会白打第二次上游调用。retryable=false 供下方 catch 识别。
           throw new AppError("AI 服务暂时不可用", 502, false);
@@ -412,6 +420,16 @@ export async function chatJson<T>(opts: Omit<ChatOptions, "json">): Promise<T> {
   // 不把原文片段落入通用服务日志。
   console.error(`[llm] JSON parse failed (chars=${raw.length})`);
   throw new AppError("AI 返回格式异常，请重试", 502);
+}
+
+function providerRetryAfterMs(value: string | null, attempt: number): number {
+  const seconds = value == null ? NaN : Number(value);
+  if (Number.isFinite(seconds) && seconds >= 0) return Math.min(30_000, Math.max(1_000, Math.ceil(seconds * 1000)));
+  if (value) {
+    const at = Date.parse(value);
+    if (Number.isFinite(at)) return Math.min(30_000, Math.max(1_000, at - Date.now()));
+  }
+  return Math.min(30_000, 2_000 * (attempt + 1));
 }
 
 function sleep(ms: number): Promise<void> {
