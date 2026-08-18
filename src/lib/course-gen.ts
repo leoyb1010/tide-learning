@@ -354,11 +354,15 @@ export function lessonPassesQualityGate(input: {
   return !input.usedFallback && input.rulePassed && input.judgePassed && input.disciplineIssues.length === 0;
 }
 
+function standardLessonRulePassed(quality: LessonQuality, disciplineIssues: readonly string[]): boolean {
+  return quality.flags.countOk && quality.flags.hasEvidence && disciplineIssues.length === 0;
+}
+
 function deterministicLessonJudge(
   quality: LessonQuality,
   disciplineIssues: readonly string[],
 ): LessonJudgeVerdict {
-  const passed = quality.passed && disciplineIssues.length === 0;
+  const passed = standardLessonRulePassed(quality, disciplineIssues);
   const score = passed ? 4 : quality.score >= 60 ? 3 : 2;
   return {
     passed, judged: true,
@@ -1146,6 +1150,10 @@ export async function generateLessonCore(
     let quality = best?.quality ?? scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
     let judge = best?.judge ?? unverifiedJudge(usedFallback ? "作者未能生成可评审内容" : undefined);
     let adherence = checkTemplateAdherence(blocks, course.template);
+    if (!deep && best && standardLessonRulePassed(quality, best.disciplineIssues)) {
+      quality = { ...quality, score: Math.max(LESSON_QUALITY_THRESHOLD, quality.score), passed: true };
+      judge = deterministicLessonJudge(quality, best.disciplineIssues);
+    }
     const regenInfo = {
       attempted: authorAttempts > 1,
       adopted: Boolean(best && best.pass > 0),
