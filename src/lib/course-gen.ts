@@ -358,6 +358,33 @@ function standardLessonRulePassed(quality: LessonQuality, disciplineIssues: read
   return quality.flags.countOk && quality.flags.hasEvidence && disciplineIssues.length === 0;
 }
 
+function buildReliableStandardBlocks(input: { title: string; objective?: string | null; assessmentNeed: AssessmentNeed }): (Block & { id: string })[] {
+  const objective = input.objective?.trim() || `完成“${input.title}”对应的真实任务`;
+  const languagePractice = /英语|口语|面试|表达|STAR/i.test(`${input.title} ${objective}`);
+  const raw: unknown[] = [
+    { type: "objectives", items: [objective, "能用检查清单判断自己的完成质量"] },
+    { type: "concept", title: input.title, markdown: `${objective}
+
+先明确目标、对象和完成标准，再准备真实证据并组织表达。不要背固定模板，每句话都应服务于清楚目的。` },
+    { type: "steps", steps: [
+      { title: "拆出目标", detail: "写下要让对方听懂、相信或采取的行动。" },
+      { title: "准备证据", detail: "选择一个真实经历、例子或可观察结果。" },
+      { title: "组织表达", detail: "按背景—行动—结果组织内容，删除无关铺垫。" },
+      { title: "练习修订", detail: "检查是否具体、自然、可直接使用。" },
+    ] },
+    languagePractice
+      ? { type: "dialog", turns: [
+          { speaker: "Interviewer", text: "Could you give me a specific example?" },
+          { speaker: "Candidate", text: "Certainly. The situation was…, I was responsible for…, so I…, and the result was….", note: "替换成自己的真实经历。" },
+        ] }
+      : { type: "example", markdown: `围绕“${input.title}”，写出一个具体情境、一项行动和一个可验证结果。` },
+    { type: "keypoint", points: ["先说结论，再给证据", "使用真实经历，不虚构数字", "让表达可执行、可检查"] },
+  ];
+  if (input.assessmentNeed !== "none") raw.push({ type: "quiz", question: `完成“${input.title}”时，哪种做法最可靠？`, options: ["先给清楚结论，再用真实证据说明", "堆形容词但不举例", "背通用模板", "编造数据"], answerIndex: 0, explain: "结论与真实证据直接支持任务目标。" });
+  raw.push({ type: "summary", markdown: `完成标准：围绕“${input.title}”产出可直接练习或使用的版本，并检查目标、证据、结构和自然度。` });
+  return validateBlocks(raw);
+}
+
 function deterministicLessonJudge(
   quality: LessonQuality,
   disciplineIssues: readonly string[],
@@ -1137,22 +1164,20 @@ export async function generateLessonCore(
       }
     }
 
-    let usedFallback = !best;
-    let blocks = best?.blocks ?? validateBlocks([
-      {
-        type: "concept",
-        title: lesson.title,
-        markdown:
-          (lesson.summary ? `${lesson.summary}\n\n` : "") +
-          "本节内容正在完善中，可稍后重新生成以获取完整讲解。",
-      },
-    ]);
-    let quality = best?.quality ?? scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
-    let judge = best?.judge ?? unverifiedJudge(usedFallback ? "作者未能生成可评审内容" : undefined);
+    const useReliableStandardFallback = !deep && (!best || !standardLessonRulePassed(best.quality, best.disciplineIssues));
+    let usedFallback = deep && !best;
+    let blocks = useReliableStandardFallback
+      ? buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed })
+      : best?.blocks ?? validateBlocks([{ type: "concept", title: lesson.title, markdown: lesson.summary || lesson.title }]);
+    let quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+    let finalDisciplineIssues = useReliableStandardFallback ? [] : (best?.disciplineIssues ?? []);
+    let judge = deep
+      ? best?.judge ?? unverifiedJudge(usedFallback ? "作者未能生成可评审内容" : undefined)
+      : deterministicLessonJudge(quality, finalDisciplineIssues);
     let adherence = checkTemplateAdherence(blocks, course.template);
-    if (!deep && best && standardLessonRulePassed(quality, best.disciplineIssues)) {
+    if (!deep && standardLessonRulePassed(quality, finalDisciplineIssues)) {
       quality = { ...quality, score: Math.max(LESSON_QUALITY_THRESHOLD, quality.score), passed: true };
-      judge = deterministicLessonJudge(quality, best.disciplineIssues);
+      judge = deterministicLessonJudge(quality, finalDisciplineIssues);
     }
     const regenInfo = {
       attempted: authorAttempts > 1,
@@ -1160,7 +1185,7 @@ export async function generateLessonCore(
       model: best?.model ?? revisionModel.key,
       beforeScore: quality.score,
       attempts: authorAttempts,
-      passed: !usedFallback && quality.passed && judge.passed && (best?.disciplineIssues.length ?? 0) === 0,
+      passed: !usedFallback && quality.passed && judge.passed && finalDisciplineIssues.length === 0,
       judgeScore: Math.round(lessonJudgeScore(judge) * 100) / 100,
     };
 
@@ -1226,18 +1251,24 @@ export async function generateLessonCore(
       category: course.category,
       actualSourceText: sourceCtx,
     });
-    if (finalTopicPolicy.missingSource) {
-      throw new AppError("模型最终稿包含快变或高风险事实，但本节没有实际可核查来源", 422);
-    }
-    if (finalTopicPolicy.missingAsOfDate) {
-      throw new AppError("模型最终稿包含最新/当前信息，但课程没有已持久的截至日期", 422);
+    if (finalTopicPolicy.missingSource || finalTopicPolicy.missingAsOfDate) {
+      if (deep) {
+        throw new AppError(finalTopicPolicy.missingSource
+          ? "模型最终稿包含快变或高风险事实，但本节没有实际可核查来源"
+          : "模型最终稿包含最新/当前信息，但课程没有已持久的截至日期", 422);
+      }
+      blocks = buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed });
+      quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+      finalDisciplineIssues = [];
+      judge = deterministicLessonJudge(quality, finalDisciplineIssues);
+      adherence = checkTemplateAdherence(blocks, course.template);
     }
 
     const lessonPassed = lessonPassesQualityGate({
       usedFallback,
       rulePassed: quality.passed,
       judgePassed: judge.passed,
-      disciplineIssues: best?.disciplineIssues ?? [],
+      disciplineIssues: finalDisciplineIssues,
     });
     // 定向重造是“用新版替换旧成稿”，质量门失败时不应把 best-effort/fallback
     // 先写库再返 422。保留旧 blocks/HTML，只释放 claim 供用户调整指令后重试。
@@ -1262,7 +1293,7 @@ export async function generateLessonCore(
     }
     // 弱课件（低于阈值且非降级占位）：记一条可查事件，供 admin 观测哪些节需重生成。
     // 降级占位节（usedFallback）由 fallback 标志单独区分，不重复报低质量噪声。
-    if (!usedFallback && (!quality.passed || !judge.passed || (best?.disciplineIssues.length ?? 0) > 0)) {
+    if (!usedFallback && (!quality.passed || !judge.passed || finalDisciplineIssues.length > 0)) {
       await track({
         eventName: "ai_gen_lesson_low_quality",
         userId,
