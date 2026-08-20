@@ -45,6 +45,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       removeTagId?: string;
     };
 
+    assertRateLimit(req, "note_update", 120, 60_000);
+    if (body.title !== undefined && body.title !== null && typeof body.title !== "string") return fail("标题类型错误", 400);
+    if (body.contentMd !== undefined && typeof body.contentMd !== "string") return fail("正文类型错误", 400);
+    if (body.addTagId !== undefined && typeof body.addTagId !== "string") return fail("标签类型错误", 400);
+    if (body.removeTagId !== undefined && typeof body.removeTagId !== "string") return fail("标签类型错误", 400);
+    if (body.title != null && body.title.length > 200) return fail("标题过长，请精简到 200 字以内", 400);
+    if (body.timestampSec !== undefined && body.timestampSec !== null && (!Number.isSafeInteger(body.timestampSec) || body.timestampSec < 0 || body.timestampSec > 24 * 60 * 60)) return fail("时间戳非法", 400);
+
     // 运行时类型收窄：脏输入返回 400 而非透传 Prisma 触发 500
     if (body.starred !== undefined && typeof body.starred !== "boolean") {
       return fail("收藏状态非法", 400);
@@ -63,30 +71,30 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const note = await prisma.note.findFirst({ where: { id, userId: user.id, deletedAt: null } });
     if (!note) return fail("笔记不存在", 404);
 
-    // 标签挂载/卸载（标签必须属于本人）
-    if (body.addTagId) {
-      const tag = await prisma.noteTag.findFirst({ where: { id: body.addTagId, userId: user.id } });
-      if (!tag) return fail("标签不存在", 404);
-      await prisma.noteTagOnNote.upsert({
-        where: { noteId_tagId: { noteId: id, tagId: body.addTagId } },
-        create: { noteId: id, tagId: body.addTagId },
-        update: {},
+    // 标签变更和正文更新必须原子提交，避免自动保存过程中出现“标签已变更、正文更新失败”的半状态。
+    const updated = await prisma.$transaction(async (tx) => {
+      if (body.addTagId) {
+        const tag = await tx.noteTag.findFirst({ where: { id: body.addTagId, userId: user.id } });
+        if (!tag) throw new AppError("标签不存在", 404);
+        await tx.noteTagOnNote.upsert({
+          where: { noteId_tagId: { noteId: id, tagId: body.addTagId } },
+          create: { noteId: id, tagId: body.addTagId },
+          update: {},
+        });
+      }
+      if (body.removeTagId) {
+        await tx.noteTagOnNote.deleteMany({ where: { noteId: id, tagId: body.removeTagId } });
+      }
+      return tx.note.update({
+        where: { id },
+        data: {
+          ...(body.title !== undefined ? { title: body.title?.trim() || null } : {}),
+          ...(body.contentMd !== undefined ? { contentMd: body.contentMd, excerpt: buildExcerpt(body.contentMd) } : {}),
+          ...(body.starred !== undefined ? { starred: body.starred } : {}),
+          ...(body.timestampSec !== undefined ? { timestampSec: body.timestampSec } : {}),
+        },
+        include: { tags: { include: { tag: { select: { id: true, name: true, color: true } } } } },
       });
-    }
-    if (body.removeTagId) {
-      await prisma.noteTagOnNote.deleteMany({ where: { noteId: id, tagId: body.removeTagId } });
-    }
-
-    // 仅当传入对应字段时才更新，避免误清空
-    const updated = await prisma.note.update({
-      where: { id },
-      data: {
-        ...(body.title !== undefined ? { title: body.title?.trim() || null } : {}),
-        ...(body.contentMd !== undefined ? { contentMd: body.contentMd } : {}),
-        ...(body.starred !== undefined ? { starred: body.starred } : {}),
-        ...(body.timestampSec !== undefined ? { timestampSec: body.timestampSec } : {}),
-      },
-      include: { tags: { include: { tag: { select: { id: true, name: true, color: true } } } } },
     });
 
     return ok({ ...updated, tags: updated.tags.map((t) => t.tag) });

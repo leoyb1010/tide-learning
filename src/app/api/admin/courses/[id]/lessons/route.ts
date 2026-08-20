@@ -27,8 +27,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       articleMd?: string;
       videoAssetId?: string;
     };
-    if (!body.title?.trim()) return fail("请填写章节标题");
-    const contentType = body.contentType ?? "video";
+    if (typeof body.title !== "string" || !body.title.trim()) return fail("请填写章节标题");
+    if (body.summary !== undefined && typeof body.summary !== "string") return fail("章节摘要类型错误", 400);
+    if (body.articleMd !== undefined && typeof body.articleMd !== "string") return fail("图文正文类型错误", 400);
+    if (body.videoAssetId !== undefined && typeof body.videoAssetId !== "string") return fail("视频资产类型错误", 400);
+    if (body.durationSec !== undefined && (!Number.isSafeInteger(body.durationSec) || body.durationSec < 0 || body.durationSec > 24 * 60 * 60)) return fail("章节时长非法", 400);
+    if (body.isFree !== undefined && typeof body.isFree !== "boolean") return fail("试看标记非法", 400);
+    const contentType = typeof body.contentType === "string" ? body.contentType.trim() : "video";
+    if (!['video', 'article'].includes(contentType)) return fail("不支持的章节类型", 400);
+    if (contentType === "article" && !body.articleMd?.trim()) return fail("图文章节必须填写正文", 400);
     const requiresVideo = contentType === "video";
     const requestedAssetId = body.videoAssetId?.trim();
     if (requiresVideo && process.env.NODE_ENV === "production") {
