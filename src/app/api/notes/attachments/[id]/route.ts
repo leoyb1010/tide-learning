@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { attachmentDiskPath } from "@/lib/private-upload";
@@ -8,7 +8,7 @@ import { assertRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   return handle(async () => {
     const user = await requireUser();
     assertRateLimit(_req, "note_attachment_download", 240, 60_000);
