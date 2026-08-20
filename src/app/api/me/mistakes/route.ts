@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { ok, handle } from "@/lib/api";
+import { ok, fail, handle } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
     const sp = req.nextUrl.searchParams;
     const courseId = sp.get("courseId")?.trim() || null;
     const cursor = sp.get("cursor")?.trim() || null;
+    if (cursor && !/^[A-Za-z0-9_-]{8,100}$/.test(cursor)) return fail("分页游标非法", 400);
 
     // limit：非法/缺省回落默认值，钳制到上限，防止客户端拉全量。
     const limitRaw = Number.parseInt(sp.get("limit") ?? "", 10);
