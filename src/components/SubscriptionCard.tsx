@@ -120,10 +120,10 @@ export function SubscriptionCard({
 
   const loading = submitting || step !== "idle";
 
-  const ctaText = !isLoggedIn
-    ? "登录后订阅"
-    : !paymentAvailable
-      ? "支付接入中"
+  const ctaText = !paymentAvailable
+    ? "支付接入中"
+    : !isLoggedIn
+      ? "登录后订阅"
       : step === "creating"
       ? "生成订单…"
       : step === "redirecting"

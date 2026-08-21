@@ -10,6 +10,7 @@ import { TrackView } from "@/components/TrackView";
 import { trackLabel, FUTURE_TRACKS } from "@/lib/tracks";
 import { ShieldCheck, Sparkle, Quotes, Coins, Notebook } from "@phosphor-icons/react/dist/ssr";
 import { safeInternalPath } from "@/lib/safe-redirect";
+import { freeCourseGenQuota } from "@/lib/ai-guard";
 
 export const metadata = { title: "订阅方案" };
 
@@ -26,7 +27,7 @@ const RIGHTS = [
   { name: "订阅赛道全部课程", free: NO, premium: "是", expired: NO },
   { name: "本周上新", free: "可浏览", premium: "可学习", expired: "可浏览" },
   { name: "每月赠送积分", free: "0", premium: "300 ~ 800", expired: "0" },
-  { name: "AI 造课", free: NO, premium: "赠分即用", expired: NO },
+  { name: "AI 造课", free: "每月体验额度", premium: "赠分即用", expired: NO },
   { name: "AI 笔记整理", free: NO, premium: "赠分即用", expired: NO },
   { name: "模拟考试", free: NO, premium: "是", expired: NO },
   { name: "笔记创建", free: "3 篇", premium: "无限", expired: "仅查看" },
@@ -84,6 +85,7 @@ export default async function PricingPage({
     learners: userCount.length,
     weekly: weekUpdates,
   };
+  const freeCourseQuota = freeCourseGenQuota();
 
   // 为每个 DB Plan 派生 monthlyGrant（前后端单一事实源：credits.ts）。
   const payChannel = process.env.NEXT_PUBLIC_PAY_CHANNEL || "mock";
@@ -101,6 +103,10 @@ export default async function PricingPage({
     highlight: p.highlight,
     monthlyGrant: monthlyGrantForPlan({ billingPeriod: p.billingPeriod, scope: p.scope }),
     }));
+
+  const rights = RIGHTS.map((right) => right.name === "AI 造课"
+    ? { ...right, free: freeCourseQuota > 0 ? `每月 ${freeCourseQuota} 次体验` : NO }
+    : right);
 
   const fullPlans = plans.filter((p) => p.scope === "all");
   const anchor = payChannel === "stripe" ? undefined : plans.find((p) => p.scope === "all" && p.billingPeriod === "month");

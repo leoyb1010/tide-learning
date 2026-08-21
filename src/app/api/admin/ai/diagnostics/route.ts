@@ -1,6 +1,7 @@
 import { ok, handle } from "@/lib/api";
 import { requireAdminRole } from "@/lib/session";
 import { LLM_MODELS, modelCredentials, DEFAULT_MODEL_KEY, resolveModel } from "@/lib/ai/models";
+import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
@@ -107,11 +108,29 @@ export async function GET() {
       }
     }
 
+    const now = new Date();
+    const [pendingBillingReconciliations, expiredActiveReservations, negativeCreditAccounts, runningGenerationJobs, failedCourses] = await Promise.all([
+      prisma.llmBillingReconciliation.count({ where: { status: "pending" } }),
+      prisma.creditReservation.count({ where: { status: "active", expiresAt: { lte: now } } }),
+      prisma.creditAccount.count({ where: { balance: { lt: 0 } } }),
+      prisma.generationJob.count({ where: { status: "running" } }),
+      prisma.course.count({ where: { genStatus: "failed" } }),
+    ]);
+    const operationalHealth = {
+      pendingBillingReconciliations,
+      expiredActiveReservations,
+      negativeCreditAccounts,
+      runningGenerationJobs,
+      failedCourses,
+      healthy: pendingBillingReconciliations === 0 && expiredActiveReservations === 0 && negativeCreditAccounts === 0,
+    };
+
     return ok({
       defaultModelKey: DEFAULT_MODEL_KEY,
       anyUsable: models.some((m) => m.usable),
       models,
       probe,
+      operationalHealth,
     });
   });
 }
