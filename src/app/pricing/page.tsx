@@ -200,7 +200,7 @@ export default async function PricingPage({
               </tr>
             </thead>
             <tbody>
-              {RIGHTS.map((r, i) => (
+              {rights.map((r, i) => (
                 <tr key={r.name} className={i > 0 ? "border-t border-[var(--border)]" : ""}>
                   <td className="px-4 py-3 font-medium text-[var(--ink)]">{r.name}</td>
                   <td className="px-3 py-3 text-center">
