@@ -177,6 +177,15 @@ async function applyCoupon(code: string | undefined, planId: string, baseCents: 
   return { discountCents: discount, couponId: coupon.id, couponMaxRedeem: coupon.maxRedeem };
 }
 
+export function configuredCheckoutChannel(env: NodeJS.ProcessEnv = process.env): string | null {
+  const channel = env.NEXT_PUBLIC_PAY_CHANNEL?.trim() || "mock";
+  if (channel === "stripe") {
+    return env.STRIPE_SECRET_KEY && env.STRIPE_WEBHOOK_SECRET ? "stripe" : null;
+  }
+  if (channel === "mock" && env.NODE_ENV !== "production") return "mock";
+  return null;
+}
+
 /** 发起支付：创建 pending 订单，返回渠道收银台票据。 */
 export async function createCheckoutSession(
   userId: string,
@@ -185,6 +194,9 @@ export async function createCheckoutSession(
   couponCode?: string,
   returnTo?: string,
 ) {
+  const configured = configuredCheckoutChannel();
+  if (!configured) throw new AppError("支付暂未开放，请稍后再试", 503);
+  const effectiveChannel = process.env.NODE_ENV === "production" ? configured : channel;
   const plan = await prisma.plan.findUnique({ where: { id: planId } });
   if (!plan || !plan.isActive) throw new AppError("套餐不可用");
 
@@ -208,10 +220,10 @@ export async function createCheckoutSession(
 
   // P0-2：先校验渠道 provider，再落订单。不支持渠道 / 生产禁用 mock 时直接拒绝，
   // 绝不先创建 pending 订单——否则失败请求会在订单列表/财务对账留下用户从未进入收银台的孤儿单。
-  const provider = getProvider(channel);
+  const provider = getProvider(effectiveChannel);
   if (!provider) throw new AppError("不支持的支付渠道");
 
-  const externalOrderId = channel + "_" + randomBytes(10).toString("hex");
+  const externalOrderId = effectiveChannel + "_" + randomBytes(10).toString("hex");
   // 事务：创建订单 + 在**下单时**原子预留优惠券名额（审计 2026-07-12 P2-1）。
   // 此前折扣在下单时就计入金额，但 redeemedCount 直到支付回调才自增——N 个用户在任何人支付前并发下单
   // 都读到未满、全部拿折扣（并发超发），且无每人上限（同一用户可反复用同券），构成营销预算泄漏。
@@ -221,7 +233,7 @@ export async function createCheckoutSession(
   const order = await prisma.$transaction(async (tx) => {
     const o = await tx.order.create({
       data: {
-        userId, planId, channel,
+        userId, planId, channel: effectiveChannel,
         amountCents: amount,
         currency: plan.currency,
         status: "pending",

@@ -3,6 +3,7 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { PricingPlans } from "@/components/PricingPlans";
 import { coursesFromGrant, isPlanSupportedByChannel } from "@/lib/pricing";
+import { configuredCheckoutChannel } from "@/lib/payment";
 import { type PlanData } from "@/components/SubscriptionCard";
 import { monthlyGrantForPlan } from "@/lib/credits";
 import { TrackView } from "@/components/TrackView";
@@ -86,6 +87,7 @@ export default async function PricingPage({
 
   // 为每个 DB Plan 派生 monthlyGrant（前后端单一事实源：credits.ts）。
   const payChannel = process.env.NEXT_PUBLIC_PAY_CHANNEL || "mock";
+  const paymentAvailable = configuredCheckoutChannel() !== null;
   const plans: PlanData[] = rawPlans
     .filter((p) => isPlanSupportedByChannel(p.billingPeriod, payChannel))
     .map((p) => ({
@@ -155,7 +157,7 @@ export default async function PricingPage({
             一次订阅解锁全部赛道，年卡每月赠 {yearGrant} 积分 · 可造约 {coursesFromGrant(yearGrant)} 门课
           </p>
         </div>
-        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} payChannel={payChannel} />
+        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} payChannel={payChannel} paymentAvailable={paymentAvailable} />
         {anchor && (
           <p className="mono mt-6 text-center text-[13px] text-[var(--ink4)]">
             也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首期优惠，月赠 {anchor.monthlyGrant} 积分）
