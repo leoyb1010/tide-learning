@@ -358,7 +358,7 @@ function standardLessonRulePassed(quality: LessonQuality, disciplineIssues: read
   return quality.flags.countOk && quality.flags.hasEvidence && disciplineIssues.length === 0;
 }
 
-function buildReliableStandardBlocks(input: { title: string; objective?: string | null; assessmentNeed: AssessmentNeed }): (Block & { id: string })[] {
+export function buildReliableStandardBlocks(input: { title: string; objective?: string | null; assessmentNeed: AssessmentNeed }): (Block & { id: string })[] {
   const objective = input.objective?.trim() || `完成“${input.title}”对应的真实任务`;
   const languagePractice = /英语|口语|面试|表达|STAR/i.test(`${input.title} ${objective}`);
   const raw: unknown[] = [
