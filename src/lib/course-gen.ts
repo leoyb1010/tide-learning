@@ -1067,9 +1067,11 @@ export async function generateLessonCore(
           temperature: pass === 0 ? 0.72 : 0.5,
           maxTokens: deep
             ? Math.min(12_000, Math.max(8_000, maxOutputOf(model)))
-            : Math.min(8_000, maxOutputOf(model)),
-          timeoutMs: bespokeTimeoutMs(model),
-          retries: 1,
+            : Math.min(6_000, maxOutputOf(model)),
+          // 标准档的外层最多只有一次协议修复；不要再叠加 chat 内部重试，
+          // 否则一次坏 JSON 会变成 4 次供应商请求。premium 保留一次网络/5xx 重试。
+          timeoutMs: deep ? bespokeTimeoutMs(model) : Math.min(60_000, bespokeTimeoutMs(model)),
+          retries: deep ? 1 : 0,
           model: model.key,
           reasoningEffort: model.interactiveReasoningEffort,
           billing: {
@@ -1166,6 +1168,9 @@ export async function generateLessonCore(
 
     const useReliableStandardFallback = !deep && (!best || !standardLessonRulePassed(best.quality, best.disciplineIssues));
     let usedFallback = deep && !best;
+    // 标准档来源/安全兜底仍然可以发布高质量确定性课件，但后续质量档案必须
+    // 明确它没有走 premium 的双 Agent 真审，避免把安全兜底伪装成深度审核结果。
+    let deterministicVerification = !deep;
     let blocks = useReliableStandardFallback
       ? buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed })
       : best?.blocks ?? validateBlocks([{ type: "concept", title: lesson.title, markdown: lesson.summary || lesson.title }]);
@@ -1255,11 +1260,10 @@ export async function generateLessonCore(
       actualSourceText: sourceCtx,
     });
     if (finalTopicPolicy.missingSource || finalTopicPolicy.missingAsOfDate) {
-      if (deep) {
-        throw new AppError(finalTopicPolicy.missingSource
-          ? "模型最终稿包含快变或高风险事实，但本节没有实际可核查来源"
-          : "模型最终稿包含最新/当前信息，但课程没有已持久的截至日期", 422);
-      }
+      // 课程入口已经拦截了用户明确提出的时事/高风险主题；这里命中的通常是
+      // 模型在安全主题里偶然带出的“政策/价格/版本”等词。丢弃这份不可信稿，
+      // 用本地安全课件继续交付，不能因为模型漂移让整门课落到 failed。
+      deterministicVerification = true;
       blocks = buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed });
       quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
       finalDisciplineIssues = [];
@@ -1372,8 +1376,8 @@ export async function generateLessonCore(
           issues: judge.issues,
           blockingIssues: judge.blockingIssues,
         },
-        verificationMode: deep ? "llm" : "deterministic",
-        deep,
+        verificationMode: deterministicVerification ? "deterministic" : "llm",
+        deep: !deterministicVerification,
       }),
       // regen 模式走 "regen" 归档语义（writeLessonBlocks 会把当前版本存入 LessonRevision 后悔药）。
       reason: isRegen ? "regen" : "generate",

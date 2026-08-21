@@ -9,6 +9,8 @@ describe("standard course generation slim contract", () => {
     expect(source).toContain("const narrativePlan = deep");
     expect(source).toContain("if (!deep || (candidateQuality.passed");
     expect(source).toContain("const candidateJudge = deep && candidateQuality.passed");
+    expect(source).toContain("retries: deep ? 1 : 0");
+    expect(source).toContain("Math.min(6_000, maxOutputOf(model))");
   });
 
   it("uses deterministic course review and deterministic HTML for standard tier", () => {
