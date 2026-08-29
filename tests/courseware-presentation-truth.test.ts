@@ -60,4 +60,9 @@ describe("课件表现层真值标签", () => {
     expect(isCurrentStoredCourseware(lesson, { ...course, genStatus: "ready" })).toBe(true);
     expect(isCurrentStoredCourseware(lesson, { ...course, genStatus: null })).toBe(true);
   });
+
+  it("课件 HTML 禁止 CDN 变换注入，避免第三方 beacon 撞上 iframe CSP", () => {
+    const route = source("src/app/api/lessons/[id]/courseware/route.ts");
+    expect(route).toContain('"cache-control": "private, no-store, no-transform"');
+  });
 });

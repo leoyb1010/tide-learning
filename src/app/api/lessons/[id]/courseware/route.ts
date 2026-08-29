@@ -57,7 +57,7 @@ async function inlineOwnedCreatorImages(html: string, ownerId: string | null): P
  */
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const notFound = () => new NextResponse("Not Found", { status: 404, headers: { "cache-control": "private, no-store" } });
+  const notFound = () => new NextResponse("Not Found", { status: 404, headers: { "cache-control": "private, no-store, no-transform" } });
 
   try {
     const lesson = await prisma.lesson.findUnique({
@@ -131,7 +131,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
           "img-src 'self' data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
         "x-content-type-options": "nosniff",
         // 私有内容不落共享缓存;htmlJson 重渲后立即生效。
-        "cache-control": "private, no-store",
+        // no-transform 同时禁止 CDN 往这个受严格 CSP 约束的 iframe HTML 注入统计脚本；
+        // Cloudflare Browser Insights 的自动 beacon 会被课件 CSP 拦截，造成控制台报错和失败请求。
+        "cache-control": "private, no-store, no-transform",
       },
     });
   } catch {
