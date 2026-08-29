@@ -1,11 +1,12 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { verifyPassword, createSession, DUMMY_PASSWORD_HASH, normalizeAccountIdentifier } from "@/lib/session";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertKeyRateLimit, assertRateLimit } from "@/lib/rate-limit";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
+    assertSameOrigin(req);
     const body = (await req.json().catch(() => null)) as { identifier?: string; password?: string } | null;
     const identifier = body?.identifier;
     const password = body?.password;

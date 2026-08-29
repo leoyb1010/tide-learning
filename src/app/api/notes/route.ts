@@ -22,6 +22,16 @@ const NOTE_PAGE_MAX = 50;
 
 // 正文长度上限：防异常长 payload 撑爆库 / 后续 AI 整理拼接（与 PATCH /api/notes/:id 同口径）
 const NOTE_CONTENT_MAX = 100_000;
+const NOTE_SOURCE_TEXT_MAX = 100_000;
+const NOTE_TITLE_MAX = 200;
+const NOTE_TIMESTAMP_MAX = 24 * 60 * 60;
+
+function isSafeCaptureUrl(value: string): boolean {
+  return value.length <= 12 * 1024 * 1024 && (
+    /^data:image\/(?:png|jpeg|webp|gif);base64,/i.test(value) ||
+    /^\/(?:api\/(?:notes\/attachments|assets|stream)|mock-assets)\//.test(value)
+  );
+}
 
 /**
  * GET /api/notes — 笔记馆列表
@@ -38,11 +48,13 @@ export async function GET(req: NextRequest) {
 
     const sp = req.nextUrl.searchParams;
     const q = sp.get("q")?.trim();
+    if (q && q.length > 200) return fail("搜索内容过长，请精简到 200 字以内", 400);
     const kind = sp.get("kind");
     const tagId = sp.get("tag");
     const courseId = sp.get("courseId");
     const starred = sp.get("starred");
     const cursor = sp.get("cursor")?.trim() || null;
+    if (cursor && !/^[A-Za-z0-9_-]{8,100}$/.test(cursor)) return fail("分页游标非法", 400);
 
     // limit：非法/缺省回落默认值，钳制到上限，防止客户端拉全量
     const limitRaw = Number.parseInt(sp.get("limit") ?? "", 10);
@@ -146,10 +158,16 @@ export async function POST(req: NextRequest) {
     for (const k of ["courseId", "lessonId", "title", "contentMd", "kind", "captureUrl", "sourceText", "source", "notebookId"] as const) {
       if (body[k] != null && typeof body[k] !== "string") return fail(`字段 ${k} 类型错误`);
     }
-    if (body.timestampSec != null && typeof body.timestampSec !== "number") return fail("字段 timestampSec 类型错误");
+    if (body.timestampSec != null && (typeof body.timestampSec !== "number" || !Number.isFinite(body.timestampSec) || !Number.isInteger(body.timestampSec) || body.timestampSec < 0 || body.timestampSec > NOTE_TIMESTAMP_MAX)) return fail("字段 timestampSec 非法");
     if (body.contentMd != null && body.contentMd.length > NOTE_CONTENT_MAX)
       return fail(`笔记内容过长，请精简到 ${NOTE_CONTENT_MAX} 字以内`);
-    if (body.tagIds != null && (!Array.isArray(body.tagIds) || body.tagIds.some((t) => typeof t !== "string")))
+    if (body.sourceText != null && body.sourceText.length > NOTE_SOURCE_TEXT_MAX)
+      return fail(`剪藏原文过长，请精简到 ${NOTE_SOURCE_TEXT_MAX} 字以内`);
+    if (body.title != null && body.title.length > NOTE_TITLE_MAX)
+      return fail(`标题过长，请精简到 ${NOTE_TITLE_MAX} 字以内`);
+    if (body.captureUrl != null && !isSafeCaptureUrl(body.captureUrl))
+      return fail("截帧地址不安全或过长");
+    if (body.tagIds != null && (!Array.isArray(body.tagIds) || body.tagIds.length > 50 || body.tagIds.some((t) => typeof t !== "string")))
       return fail("字段 tagIds 类型错误");
 
     const kind: NoteKind =

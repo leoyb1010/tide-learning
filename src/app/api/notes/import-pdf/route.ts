@@ -157,17 +157,16 @@ export async function POST(req: NextRequest) {
     const contentMd = `> 来源：PDF 文件《${title}》${numPages ? ` · 共 ${numPages} 页` : ""}\n\n${bodyMd}`;
     const excerpt = buildExcerpt(contentMd);
 
-    // 落库：独立笔记，source="pdf_import"、kind="text"
-    const note = await prisma.note.create({
-      data: {
-        userId: user.id,
-        title,
-        contentMd,
-        excerpt,
-        source: "pdf_import",
-        kind: "text",
-      },
-      select: { id: true, title: true },
+    // 最终落库再次在同一事务校验免费配额，闭合“两个并发导入同时通过预检”的竞态。
+    const note = await prisma.$transaction(async (tx) => {
+      if (!snapshot.canCreateNoteUnlimited) {
+        const count = await tx.note.count({ where: { userId: user.id, deletedAt: null } });
+        if (count >= snapshot.noteFreeLimit) throw new AppError(`免费用户最多创建 ${snapshot.noteFreeLimit} 篇笔记，订阅后可无限记录`, 402);
+      }
+      return tx.note.create({
+        data: { userId: user.id, title, contentMd, excerpt, source: "pdf_import", kind: "text" },
+        select: { id: true, title: true },
+      });
     });
 
     await track({

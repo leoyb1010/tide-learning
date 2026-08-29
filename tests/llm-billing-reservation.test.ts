@@ -224,6 +224,18 @@ describe("chat durable billing reservation", () => {
     expect(billing.refundCreditReservation).not.toHaveBeenCalled();
   });
 
+  it("backs off and retries a provider 429 when the caller allows one retry", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ error: "rate limited" }), {
+        status: 429, headers: { "content-type": "application/json", "retry-after": "0" },
+      }))
+      .mockResolvedValueOnce(response()));
+    await expect(chat({ ...options, retries: 1 })).resolves.toBe("课程正文");
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(billing.refundCreditReservation).toHaveBeenCalledOnce();
+    expect(billing.settleLlmUsage).toHaveBeenCalledOnce();
+  });
+
   it("refunds deterministic upstream 4xx without creating a false reconciliation event", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response(429)));
     await expect(chat(options)).rejects.toMatchObject({ status: 429 });

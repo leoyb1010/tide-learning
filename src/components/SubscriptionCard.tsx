@@ -55,6 +55,7 @@ export function SubscriptionCard({
   perks,
   savingsCents = 0,
   perDayCents = 0,
+  paymentAvailable = true,
 }: {
   plan: PlanData;
   isLoggedIn: boolean;
@@ -64,6 +65,7 @@ export function SubscriptionCard({
   perks?: Perk[];
   savingsCents?: number;
   perDayCents?: number;
+  paymentAvailable?: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -118,9 +120,11 @@ export function SubscriptionCard({
 
   const loading = submitting || step !== "idle";
 
-  const ctaText = !isLoggedIn
-    ? "登录后订阅"
-    : step === "creating"
+  const ctaText = !paymentAvailable
+    ? "支付接入中"
+    : !isLoggedIn
+      ? "登录后订阅"
+      : step === "creating"
       ? "生成订单…"
       : step === "redirecting"
         ? "前往收银台…"
@@ -242,7 +246,7 @@ export function SubscriptionCard({
         <Ripple className="w-full rounded-[12px]">
           <button
             onClick={subscribe}
-            disabled={loading}
+            disabled={loading || !paymentAvailable}
             className={`studio-press flex w-full items-center justify-center gap-2 rounded-[12px] py-3 text-[14px] font-bold transition-all disabled:opacity-60 ${
               hot
                 ? "cta-glow bg-[var(--red)] text-white hover:brightness-105"
@@ -254,7 +258,7 @@ export function SubscriptionCard({
           </button>
         </Ripple>
       </div>
-      <p className="mt-3 text-center text-[11px] text-[var(--ink4)]">随时可取消，取消后笔记仍保留</p>
+      <p className="mt-3 text-center text-[11px] text-[var(--ink4)]">{paymentAvailable ? "随时可取消，取消后笔记仍保留" : "当前为产品体验环境，真实支付通道尚未开放"}</p>
     </div>
   );
 }

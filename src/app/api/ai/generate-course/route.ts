@@ -11,7 +11,7 @@ import { slugify } from "@/lib/format";
 import { initGenJob, runCourseGenBackground } from "@/lib/course-gen";
 import { courseOutlinePrompt } from "@/lib/ai/prompts";
 import { isValidTemplate } from "@/lib/ai/templates";
-import { selectModelFor } from "@/lib/ai/models";
+import { interactiveLlmTimeoutMs, selectModelFor } from "@/lib/ai/models";
 import { parseBlueprint, serializeBlueprint, blueprintOutlineFragment, lessonRangeForLength } from "@/lib/ai/blueprint";
 import { createCourseContentBrief, normalizeAssessmentNeed, serializeCourseContentBrief } from "@/lib/ai/content-brief";
 import { acquireInflight, releaseInflight } from "@/lib/ai/inflight";
@@ -146,7 +146,9 @@ export async function POST(req: NextRequest) {
       }
       if (startedOperation.status === "replay") return ok(startedOperation.response);
       if (startedOperation.status === "running") return courseOutlineRunning("同一次造课请求仍在进行，请稍后原样重试");
-      if (startedOperation.status === "failed") return fail("该 requestId 的造课已失败并收敛，请重新发起", 409);
+      if (startedOperation.status === "failed") {
+        return courseOutlineFailed("上一轮造课已安全结束，请重新发起", 409);
+      }
       let outlineOperation: CourseOutlineOperation | null = startedOperation.operation;
       let operationCompleted = false;
       let inflightAcquired = false;
@@ -191,10 +193,14 @@ export async function POST(req: NextRequest) {
         system,
         user: userMsgWithBlueprint,
         temperature: 0.5,
-        maxTokens: 6000,
+        // 实测 gpt-5.6-sol 在 low reasoning 下完整 8 节大纲约 1.45k completion tokens；
+        // 3500 保留复杂主题余量，避免原 6000 预算诱发长达 64-88s 的过度推理。
+        maxTokens: 3500,
         model: modelKey,
-        // 大纲是用户点击后同步等待的调用：不做超时重试，避免慢模型「60s×2=120s」的漫长转圈；
-        // 单次 60s 仍失败即快速回错，前端明确提示而非久等。逐节生成（后台）仍保留默认重试。
+        reasoningEffort: modelEntry.interactiveReasoningEffort,
+        // 用户点击后的同步请求不重试，避免未知供应商状态下重复成本；但按模型延迟档放宽
+        // 单次预算。历史全局 60s 会稳定截断 gpt-5.6-sol（真实复测 64-81s）。
+        timeoutMs: interactiveLlmTimeoutMs(modelEntry),
         retries: 0,
         billing: {
           userId: user.id,
@@ -369,12 +375,32 @@ export async function POST(req: NextRequest) {
             return courseOutlineRunning("造课状态正在收敛，请稍后原样重试", 503);
           }
         }
+        // 此处说明失败操作与账务冲正均已耐久收敛。返回机器可读的终态契约，
+        // 让浏览器立即清掉旧 requestId；否则 504 会被当作“不确定 5xx”保留，
+        // 下一次点击只能先撞一次 409，形成“连续两次生成失败”的假象。
+        if (error instanceof AppError) {
+          const message = error.status === 504
+            ? "AI 生成大纲较慢，本次已安全结束且未扣积分，请再试一次"
+            : error.message;
+          return courseOutlineFailed(message, error.status);
+        }
         throw error;
       }
       finally {
         if (inflightAcquired) releaseInflight("course_gen", authenticatedUser.id);
       }
   });
+}
+
+function courseOutlineFailed(message: string, status = 409): NextResponse {
+  return NextResponse.json({
+    ok: false,
+    error: message,
+    data: {
+      code: "COURSE_OUTLINE_FAILED",
+      preserveRequestId: false,
+    },
+  }, { status });
 }
 
 function courseOutlineRunning(message: string, status = 409): NextResponse {

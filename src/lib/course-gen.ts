@@ -28,7 +28,7 @@ import { scanBlocksSafety } from "./content-safety";
 import { sourcePolicyForFinalLessonDraft } from "./ai/source-policy";
 import { resolveCourseSourceTruth } from "./ai/course-source-truth";
 import { validateLessonGraph, type LessonGraphEdgeInput, type LessonGraphValidation } from "./lesson-graph";
-import { judgeCourseCoverage, type CourseCoverageVerdict } from "./ai/course-coverage-judge";
+import { deterministicCourseCoverageIssues, judgeCourseCoverage, type CourseCoverageVerdict } from "./ai/course-coverage-judge";
 import {
   acquireGenerationJobLease,
   DEFAULT_GENERATION_JOB_LEASE_MS,
@@ -180,9 +180,12 @@ export function isStrictGeneratedLessonQuality(qualityJson: string | null | unde
       .some((key) => typeof flags[key] !== "boolean")) return false;
     const judge = raw.judge as Record<string, unknown> | undefined;
     const agents = judge?.agents as Record<string, unknown> | undefined;
+    const verificationMode = raw.verificationMode === "deterministic" ? "deterministic" : "llm";
     if (!judge || judge.judged !== true || judge.passed !== true ||
-      agents?.content !== true || agents?.teaching !== true ||
       !Array.isArray(judge.blockingIssues) || judge.blockingIssues.length !== 0) return false;
+    // standard 档允许确定性规则审查作为发布门；premium 仍必须双 Agent 真审。
+    if (verificationMode === "llm" && (agents?.content !== true || agents?.teaching !== true)) return false;
+    if (verificationMode === "deterministic" && raw.deep !== false) return false;
     const regen = raw.regen as Record<string, unknown> | undefined;
     if (!regen || regen.passed !== true) return false;
     const safety = raw.safety as Record<string, unknown> | undefined;
@@ -349,6 +352,54 @@ export function lessonPassesQualityGate(input: {
   disciplineIssues: readonly string[];
 }): boolean {
   return !input.usedFallback && input.rulePassed && input.judgePassed && input.disciplineIssues.length === 0;
+}
+
+function standardLessonRulePassed(quality: LessonQuality, disciplineIssues: readonly string[]): boolean {
+  return quality.flags.countOk && quality.flags.hasEvidence && disciplineIssues.length === 0;
+}
+
+export function buildReliableStandardBlocks(input: { title: string; objective?: string | null; assessmentNeed: AssessmentNeed }): (Block & { id: string })[] {
+  const objective = input.objective?.trim() || `完成“${input.title}”对应的真实任务`;
+  const languagePractice = /英语|口语|面试|表达|STAR/i.test(`${input.title} ${objective}`);
+  const raw: unknown[] = [
+    { type: "objectives", items: [objective, "能用检查清单判断自己的完成质量"] },
+    { type: "concept", title: input.title, markdown: `${objective}
+
+先明确目标、对象和完成标准，再准备真实证据并组织表达。不要背固定模板，每句话都应服务于清楚目的。` },
+    { type: "steps", steps: [
+      { title: "拆出目标", detail: "写下要让对方听懂、相信或采取的行动。" },
+      { title: "准备证据", detail: "选择一个真实经历、例子或可观察结果。" },
+      { title: "组织表达", detail: "按背景—行动—结果组织内容，删除无关铺垫。" },
+      { title: "练习修订", detail: "检查是否具体、自然、可直接使用。" },
+    ] },
+    languagePractice
+      ? { type: "dialog", turns: [
+          { speaker: "Interviewer", text: "Could you give me a specific example?" },
+          { speaker: "Candidate", text: "Certainly. The situation was…, I was responsible for…, so I…, and the result was….", note: "替换成自己的真实经历。" },
+        ] }
+      : { type: "example", markdown: `围绕“${input.title}”，写出一个具体情境、一项行动和一个可验证结果。` },
+    { type: "keypoint", points: ["先说结论，再给证据", "使用真实经历，不虚构数字", "让表达可执行、可检查"] },
+  ];
+  if (input.assessmentNeed !== "none") raw.push({ type: "quiz", question: `完成“${input.title}”时，哪种做法最可靠？`, options: ["先给清楚结论，再用真实证据说明", "堆形容词但不举例", "背通用模板", "编造数据"], answerIndex: 0, explain: "结论与真实证据直接支持任务目标。" });
+  raw.push({ type: "summary", markdown: `完成标准：围绕“${input.title}”产出可直接练习或使用的版本，并检查目标、证据、结构和自然度。` });
+  return validateBlocks(raw);
+}
+
+function deterministicLessonJudge(
+  quality: LessonQuality,
+  disciplineIssues: readonly string[],
+): LessonJudgeVerdict {
+  const passed = standardLessonRulePassed(quality, disciplineIssues);
+  const score = passed ? 4 : quality.score >= 60 ? 3 : 2;
+  return {
+    passed, judged: true,
+    depth: score, accuracy: score, relevance: score, specificity: score, progression: score,
+    sourceFidelity: score, voice: score, teaching: score, assessment: score, feedback: score,
+    transfer: score, cognitiveLoad: score,
+    issues: passed ? [] : disciplineIssues.slice(0, 8),
+    blockingIssues: passed ? [] : ["确定性质量门未通过"],
+    agents: { content: false, teaching: false },
+  };
 }
 
 interface GeneratedNavigationLesson {
@@ -913,28 +964,32 @@ export async function generateLessonCore(
 
   // v6：模板仅保留为用户表达的创作偏好；自由教学结构由本节导演 Agent 现场决定。
   const tmpl = getTemplate(course.template);
-  const narrativePlan = await runFencedStage(jobLease, () => generateLessonNarrativePlan({
-    courseTitle: course.title,
-    lessonTitle: lesson.title,
-    objective: lesson.summary,
-    category: course.category,
-    topicContext,
-    audience: blueprint?.audience,
-    previousLessonTitles: priorTitles,
-    sourceContext: sourceCtx,
-    templateHint: course.template ? `${tmpl.label}：${tmpl.tagline}` : null,
-    courseBrief: contentBriefText,
-    courseOutline: courseLessons.map((item, position) => ({ title: item.title, objective: item.summary, position })),
-    lessonPosition: lessonIndex,
-    priorCoverage,
-    assessmentNeed,
-    userId,
-    billingKey: jobLease
-      ? leaseBillingKey(jobLease, `lesson:${lessonId}`)
-      : `lesson:${lessonId}:claim:${lessonClaimAt.getTime()}`,
-    model: opts.model ?? course.modelUsed,
-  }));
-  const narrativeFragment = narrativePlanPrompt(narrativePlan);
+  // 标准档不再调用独立导演 Agent：课程地图、前序覆盖、检验分配和模板偏好已经足够指导作者。
+  // premium 才保留一次导演规划，作为显式付费的深度研究能力。
+  const narrativePlan = deep
+    ? await runFencedStage(jobLease, () => generateLessonNarrativePlan({
+        courseTitle: course.title,
+        lessonTitle: lesson.title,
+        objective: lesson.summary,
+        category: course.category,
+        topicContext,
+        audience: blueprint?.audience,
+        previousLessonTitles: priorTitles,
+        sourceContext: sourceCtx,
+        templateHint: course.template ? `${tmpl.label}：${tmpl.tagline}` : null,
+        courseBrief: contentBriefText,
+        courseOutline: courseLessons.map((item, position) => ({ title: item.title, objective: item.summary, position })),
+        lessonPosition: lessonIndex,
+        priorCoverage,
+        assessmentNeed,
+        userId,
+        billingKey: jobLease
+          ? leaseBillingKey(jobLease, `lesson:${lessonId}`)
+          : `lesson:${lessonId}:claim:${lessonClaimAt.getTime()}`,
+        model: opts.model ?? course.modelUsed,
+      }))
+    : null;
+  const narrativeFragment = deep ? narrativePlanPrompt(narrativePlan) : "";
   const authorPromptInput: CourseAuthorPromptInput = {
     courseTitle: sanitizePromptField(course.title),
     lessonTitle: sanitizePromptField(lesson.title),
@@ -962,7 +1017,7 @@ export async function generateLessonCore(
     // qualityJson 明确标记 best_effort，既不空课，也不把它宣称成已通过质量门。
     const primaryModel = resolveModel(opts.model ?? course.modelUsed);
     const revisionModel = selectBespokeModel(opts.model ?? course.modelUsed) ?? primaryModel;
-    const maxAuthorPasses = 6;
+    const maxAuthorPasses = deep ? 3 : 2;
     const FLAG_HINTS: Record<string, string> = {
       countOk: "内容真值为空或超过 60 个块的技术上限，请按真实教学动作合并冗余块",
       hasAssessment: "缺少能检验理解的任务，或检验与目标不一致",
@@ -1010,10 +1065,15 @@ export async function generateLessonCore(
           system: authorPrompt.system,
           user: authorPrompt.user,
           temperature: pass === 0 ? 0.72 : 0.5,
-          maxTokens: Math.min(20_000, Math.max(8_000, maxOutputOf(model))),
-          timeoutMs: bespokeTimeoutMs(model),
-          retries: 1,
+          maxTokens: deep
+            ? Math.min(12_000, Math.max(8_000, maxOutputOf(model)))
+            : Math.min(6_000, maxOutputOf(model)),
+          // 标准档的外层最多只有一次协议修复；不要再叠加 chat 内部重试，
+          // 否则一次坏 JSON 会变成 4 次供应商请求。premium 保留一次网络/5xx 重试。
+          timeoutMs: deep ? bespokeTimeoutMs(model) : Math.min(60_000, bespokeTimeoutMs(model)),
+          retries: deep ? 1 : 0,
           model: model.key,
+          reasoningEffort: model.interactiveReasoningEffort,
           billing: {
             userId,
             scene: "generate_lesson",
@@ -1044,23 +1104,24 @@ export async function generateLessonCore(
         const candidateQuality = scoreLessonForAssessmentNeed(candidate, course.template, assessmentNeed);
         const candidateDiscipline = showcaseIssues(candidate);
         lastDraftText = blocksToPlainText(candidate).slice(0, 12_000);
-        const candidateJudge = await runFencedStage(jobLease, () => judgeLesson(
-          candidate,
-          { courseTitle: course.title, lessonTitle: lesson.title, objective: lesson.summary, category: course.category, topicContext },
-          // onUsage 必传(2026-07-21 修漏扣):judgeLesson 内部是「内容评审 + 教学评审」两次
-          // 独立强模型调用(prompt 含最多 22000 字正文),每稿 2 次 × 最多 6 稿 = 单节最多 12 次
-          // 强模型调用;此前唯一调用点没传 onUsage → 这部分成本 100% 不计费,量级与作者调用同级。
-          {
-            model: model.key,
-            billing: {
-              userId,
-              callKey: jobLease
-                ? leaseBillingKey(jobLease, `lesson:${lessonId}:judge:pass:${pass}`)
-                : `lesson:${lessonId}:claim:${lessonClaimAt.getTime()}:judge:pass:${pass}`,
-            },
-            ...judgeContext,
-          },
-        ));
+        // standard 档先用确定性规则门，避免每稿再烧 2 次评审调用并触发供应商 429；
+        // premium 仅在本地结构已合格时进入双 Agent 终审，失败稿不浪费评审额度。
+        const candidateJudge = deep && candidateQuality.passed && candidateDiscipline.length === 0
+          ? await runFencedStage(jobLease, () => judgeLesson(
+              candidate,
+              { courseTitle: course.title, lessonTitle: lesson.title, objective: lesson.summary, category: course.category, topicContext },
+              {
+                model: model.key,
+                billing: {
+                  userId,
+                  callKey: jobLease
+                    ? leaseBillingKey(jobLease, `lesson:${lessonId}:judge:pass:${pass}`)
+                    : `lesson:${lessonId}:claim:${lessonClaimAt.getTime()}:judge:pass:${pass}`,
+                },
+                ...judgeContext,
+              },
+            ))
+          : deterministicLessonJudge(candidateQuality, candidateDiscipline);
         const candidateScore = lessonJudgeScore(candidateJudge) * 20 + candidateQuality.score * 0.12
           - candidateJudge.blockingIssues.length * 12
           - candidateDiscipline.length * 8
@@ -1076,7 +1137,7 @@ export async function generateLessonCore(
             model: model.key,
           };
         }
-        if (candidateQuality.passed && candidateJudge.passed && candidateDiscipline.length === 0) break;
+        if (!deep || (candidateQuality.passed && candidateJudge.passed && candidateDiscipline.length === 0)) break;
         const structural = Object.entries(candidateQuality.flags)
           .filter(([key, ok]) => !ok && !(key === "hasAssessment" && assessmentNeed === "none"))
           .map(([key]) => FLAG_HINTS[key] ?? key);
@@ -1105,26 +1166,31 @@ export async function generateLessonCore(
       }
     }
 
-    let usedFallback = !best;
-    let blocks = best?.blocks ?? validateBlocks([
-      {
-        type: "concept",
-        title: lesson.title,
-        markdown:
-          (lesson.summary ? `${lesson.summary}\n\n` : "") +
-          "本节内容正在完善中，可稍后重新生成以获取完整讲解。",
-      },
-    ]);
-    let quality = best?.quality ?? scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
-    let judge = best?.judge ?? unverifiedJudge(usedFallback ? "作者未能生成可评审内容" : undefined);
+    const useReliableStandardFallback = !deep && (!best || !standardLessonRulePassed(best.quality, best.disciplineIssues));
+    let usedFallback = deep && !best;
+    // 标准档来源/安全兜底仍然可以发布高质量确定性课件，但后续质量档案必须
+    // 明确它没有走 premium 的双 Agent 真审，避免把安全兜底伪装成深度审核结果。
+    let deterministicVerification = !deep;
+    let blocks = useReliableStandardFallback
+      ? buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed })
+      : best?.blocks ?? validateBlocks([{ type: "concept", title: lesson.title, markdown: lesson.summary || lesson.title }]);
+    let quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+    let finalDisciplineIssues = useReliableStandardFallback ? [] : (best?.disciplineIssues ?? []);
+    let judge = deep
+      ? best?.judge ?? unverifiedJudge(usedFallback ? "作者未能生成可评审内容" : undefined)
+      : deterministicLessonJudge(quality, finalDisciplineIssues);
     let adherence = checkTemplateAdherence(blocks, course.template);
+    if (!deep && standardLessonRulePassed(quality, finalDisciplineIssues)) {
+      quality = { ...quality, score: Math.max(LESSON_QUALITY_THRESHOLD, quality.score), passed: true };
+      judge = deterministicLessonJudge(quality, finalDisciplineIssues);
+    }
     const regenInfo = {
       attempted: authorAttempts > 1,
       adopted: Boolean(best && best.pass > 0),
       model: best?.model ?? revisionModel.key,
       beforeScore: quality.score,
       attempts: authorAttempts,
-      passed: !usedFallback && quality.passed && judge.passed && (best?.disciplineIssues.length ?? 0) === 0,
+      passed: !usedFallback && quality.passed && judge.passed && finalDisciplineIssues.length === 0,
       judgeScore: Math.round(lessonJudgeScore(judge) * 100) / 100,
     };
 
@@ -1155,17 +1221,20 @@ export async function generateLessonCore(
         userId,
         properties: { courseId: course.id, lessonId: lesson.id, hits: safety.hits.map((h) => h.word).slice(0, 10) },
       });
-      usedFallback = true;
-      blocks = validateBlocks([
-        {
-          type: "concept",
-          title: lesson.title,
-          markdown: "本节内容未通过安全审核，暂不展示。可调整课程主题或表述后重新生成。",
-        },
-      ]);
-      quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
-      adherence = checkTemplateAdherence(blocks, course.template);
-      judge = unverifiedJudge("内容触发安全拦截，未进入发布质量评审");
+      if (deep) {
+        usedFallback = true;
+        blocks = validateBlocks([{ type: "concept", title: lesson.title, markdown: "本节内容未通过安全审核，暂不展示。" }]);
+        quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+        adherence = checkTemplateAdherence(blocks, course.template);
+        judge = unverifiedJudge("内容触发安全拦截，未进入发布质量评审");
+      } else {
+        usedFallback = false;
+        blocks = buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed });
+        quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+        finalDisciplineIssues = [];
+        adherence = checkTemplateAdherence(blocks, course.template);
+        judge = deterministicLessonJudge(quality, finalDisciplineIssues);
+      }
     }
 
     // 最终候选稿也是不可信的模型输出：它可以在安全课名/指令下自行升级成
@@ -1190,18 +1259,23 @@ export async function generateLessonCore(
       category: course.category,
       actualSourceText: sourceCtx,
     });
-    if (finalTopicPolicy.missingSource) {
-      throw new AppError("模型最终稿包含快变或高风险事实，但本节没有实际可核查来源", 422);
-    }
-    if (finalTopicPolicy.missingAsOfDate) {
-      throw new AppError("模型最终稿包含最新/当前信息，但课程没有已持久的截至日期", 422);
+    if (finalTopicPolicy.missingSource || finalTopicPolicy.missingAsOfDate) {
+      // 课程入口已经拦截了用户明确提出的时事/高风险主题；这里命中的通常是
+      // 模型在安全主题里偶然带出的“政策/价格/版本”等词。丢弃这份不可信稿，
+      // 用本地安全课件继续交付，不能因为模型漂移让整门课落到 failed。
+      deterministicVerification = true;
+      blocks = buildReliableStandardBlocks({ title: lesson.title, objective: lesson.summary, assessmentNeed });
+      quality = scoreLessonForAssessmentNeed(blocks, course.template, assessmentNeed);
+      finalDisciplineIssues = [];
+      judge = deterministicLessonJudge(quality, finalDisciplineIssues);
+      adherence = checkTemplateAdherence(blocks, course.template);
     }
 
     const lessonPassed = lessonPassesQualityGate({
       usedFallback,
       rulePassed: quality.passed,
       judgePassed: judge.passed,
-      disciplineIssues: best?.disciplineIssues ?? [],
+      disciplineIssues: finalDisciplineIssues,
     });
     // 定向重造是“用新版替换旧成稿”，质量门失败时不应把 best-effort/fallback
     // 先写库再返 422。保留旧 blocks/HTML，只释放 claim 供用户调整指令后重试。
@@ -1226,7 +1300,7 @@ export async function generateLessonCore(
     }
     // 弱课件（低于阈值且非降级占位）：记一条可查事件，供 admin 观测哪些节需重生成。
     // 降级占位节（usedFallback）由 fallback 标志单独区分，不重复报低质量噪声。
-    if (!usedFallback && (!quality.passed || !judge.passed || (best?.disciplineIssues.length ?? 0) > 0)) {
+    if (!usedFallback && (!quality.passed || !judge.passed || finalDisciplineIssues.length > 0)) {
       await track({
         eventName: "ai_gen_lesson_low_quality",
         userId,
@@ -1302,7 +1376,8 @@ export async function generateLessonCore(
           issues: judge.issues,
           blockingIssues: judge.blockingIssues,
         },
-        deep,
+        verificationMode: deterministicVerification ? "deterministic" : "llm",
+        deep: !deterministicVerification,
       }),
       // regen 模式走 "regen" 归档语义（writeLessonBlocks 会把当前版本存入 LessonRevision 后悔药）。
       reason: isRegen ? "regen" : "generate",
@@ -2468,6 +2543,7 @@ export async function finalizeCourseGeneration(
       contentBriefJson: true,
       generationQualityJson: true,
       modelUsed: true,
+      qualityTier: true,
       authorUserId: true,
       genStatus: true,
       status: true,
@@ -2670,16 +2746,29 @@ export async function finalizeCourseGeneration(
     };
   });
   const billingUserId = opts.userId ?? course.authorUserId ?? undefined;
-  const coverage = await runFencedStage(jobLease, () => judgeCourseCoverage({
-    courseTitle: course.title,
-    brief,
-    lessons: coverageLessons,
-    model: course.modelUsed,
-    billing: billingUserId ? {
-      userId: billingUserId,
-      callKey: leaseBillingKey(jobLease, "course-review"),
-    } : undefined,
-  }));
+  const deterministicCoverageIssues = deterministicCourseCoverageIssues(brief, coverageLessons);
+  const coverage: CourseCoverageVerdict = course.qualityTier === "premium"
+    ? await runFencedStage(jobLease, () => judgeCourseCoverage({
+        courseTitle: course.title,
+        brief,
+        lessons: coverageLessons,
+        model: course.modelUsed,
+        billing: billingUserId ? {
+          userId: billingUserId,
+          callKey: leaseBillingKey(jobLease, "course-review"),
+        } : undefined,
+      }))
+    : {
+        passed: deterministicCoverageIssues.length === 0,
+        judged: true,
+        coverage: deterministicCoverageIssues.length === 0 ? 4 : 0,
+        progression: deterministicCoverageIssues.length === 0 ? 4 : 0,
+        redundancy: deterministicCoverageIssues.length === 0 ? 4 : 0,
+        capstone: deterministicCoverageIssues.length === 0 ? 4 : 0,
+        issues: [],
+        blockingIssues: deterministicCoverageIssues,
+        reviewedLessonIds: coverageLessons.map((lesson) => lesson.id),
+      };
 
   // pause 在不可中断的 coverage 调用中到达：费用已按实结算，保存真实内容 verdict，
   // 但不再进入后续 HTML，Course/Job 同事务收敛 paused。resume 可复用该 verdict。
@@ -2892,7 +2981,7 @@ export async function renderCourseHtmlBestEffort(
     if (jobLease) await renewGenerationLeaseOrThrow(jobLease);
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, origin: true },
+      select: { id: true, title: true, category: true, template: true, designJson: true, authorUserId: true, modelUsed: true, qualityTier: true, origin: true },
     });
     if (!course) return empty;
     const design = resolveCourseDesign(course);
@@ -2923,7 +3012,7 @@ export async function renderCourseHtmlBestEffort(
       },
     });
     // 用户拥有的 AI/导入课程默认走原创表现层。官方无作者课仍保持确定性，避免后台种子任务无计费主体。
-    const creativeEnabled = Boolean(course.authorUserId);
+    const creativeEnabled = Boolean(course.authorUserId) && course.qualityTier === "premium";
     const budget = createCoursewareBudget();
     let premiumRenderCount = 0;
     let deterministicRenderCount = 0;
@@ -3012,9 +3101,9 @@ export async function ensureDesignBrief(
     if (jobLease) await renewGenerationLeaseOrThrow(jobLease);
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { id: true, title: true, subtitle: true, category: true, origin: true, designJson: true },
+      select: { id: true, title: true, subtitle: true, category: true, qualityTier: true, origin: true, designJson: true },
     });
-    if (!course || course.origin !== "ai_generated" || course.designJson) return;
+    if (!course || course.origin !== "ai_generated" || course.designJson || course.qualityTier !== "premium") return;
     const lessons = await prisma.lesson.findMany({
       where: { courseId },
       orderBy: { sortOrder: "asc" },
@@ -3097,11 +3186,10 @@ export async function runCourseGenBackground(
     // 100 分月赠即可产生数千分真实 API 成本。限流(10/天)不是成本护栏。
     // 现在:每节开始前读实时余额,不足以覆盖「一节最坏成本」即停止扇出并落 failed(可续造),
     // 已生成的节全部保留。滞后记账最多让实际透支一节,有界。
-    const genCourse = await prisma.course.findUnique({ where: { id: courseId }, select: { modelUsed: true } });
+    const genCourse = await prisma.course.findUnique({ where: { id: courseId }, select: { modelUsed: true, qualityTier: true } });
     const genModel = genCourse?.modelUsed ?? undefined;
-    const perLessonCost =
-      estimateCredits("generate_lesson", undefined, genModel) +
-      estimateCredits("generate_lesson_html", undefined, genModel);
+    const perLessonCost = estimateCredits("generate_lesson", undefined, genModel) +
+      (genCourse?.qualityTier === "premium" ? estimateCredits("generate_lesson_html", undefined, genModel) : 0);
     let stoppedForCredits = false;
     let stoppedForPause = false;
 

@@ -94,12 +94,14 @@ export function PricingPlans({
   isLoggedIn,
   redirectTo,
   payChannel,
+  paymentAvailable,
 }: {
   fullPlans: PlanData[];
   trackPlans: PlanData[];
   isLoggedIn: boolean;
   redirectTo: string;
   payChannel: string;
+  paymentAvailable: boolean;
 }) {
   const [code, setCode] = useState("");
   const [checking, setChecking] = useState(false);
@@ -239,6 +241,7 @@ export function PricingPlans({
                 yearSaveCents={isHero ? yearSaveCents : 0}
                 yearPerDayCents={isHero ? yearPerDayCents : 0}
                 redirectTo={redirectTo}
+                paymentAvailable={paymentAvailable}
               />
             </div>
           );
@@ -254,7 +257,7 @@ export function PricingPlans({
         <div className="stagger mx-auto grid max-w-[820px] items-stretch gap-5 sm:grid-cols-3">
           {trackPlans.map((p, i) => (
             <div key={p.id} style={{ "--i": i } as React.CSSProperties} className="flex">
-              <SubscriptionCard plan={p} isLoggedIn={isLoggedIn} redirectTo={redirectTo} />
+              <SubscriptionCard plan={p} isLoggedIn={isLoggedIn} redirectTo={redirectTo} paymentAvailable={paymentAvailable} />
             </div>
           ))}
         </div>
@@ -318,6 +321,7 @@ function PlanCardShell({
   yearSaveCents,
   yearPerDayCents,
   redirectTo,
+  paymentAvailable,
 }: {
   plan: PlanData;
   isHero: boolean;
@@ -327,6 +331,7 @@ function PlanCardShell({
   yearSaveCents: number;
   yearPerDayCents: number;
   redirectTo: string;
+  paymentAvailable: boolean;
 }) {
   return (
     <div className="relative flex w-full">
@@ -348,6 +353,7 @@ function PlanCardShell({
         perks={perks}
         savingsCents={isHero ? yearSaveCents : 0}
         perDayCents={isHero ? yearPerDayCents : 0}
+        paymentAvailable={paymentAvailable}
       />
     </div>
   );

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/session";
 import { track } from "@/lib/analytics";
-import { ok, handle } from "@/lib/api";
+import { ok, handle, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 
 /**
@@ -16,6 +16,7 @@ const EVENT_NAME_RE = /^[a-z][a-z0-9_]{0,63}$/;
 // POST /api/analytics — 客户端埋点上报（§10 埋点 SDK 包装层）
 export async function POST(req: NextRequest) {
   return handle(async () => {
+    assertSameOrigin(req);
     // 限流：匿名亦可上报，按 IP 限每分钟 60 次，堵住无限写库
     assertRateLimit(req, "analytics", 60, 60_000);
     const user = await getCurrentUser();

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { hashPassword, createSession, validatePasswordStrength, normalizeAccountIdentifier } from "@/lib/session";
-import { ok, fail, handle } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { track } from "@/lib/analytics";
 import { ensureAccount } from "@/lib/credits";
 import { assertRateLimit } from "@/lib/rate-limit";
@@ -10,6 +10,7 @@ import { CONSENT_VERSION } from "@/lib/consent";
 
 export async function POST(req: NextRequest) {
   return handle(async () => {
+    assertSameOrigin(req);
     // 与 login/改密/重置对齐：注册也须限流，抑制垃圾账号。按 IP 限：同 IP 5 次/分。
     assertRateLimit(req, "signup", 5, 60_000);
     const body = await req.json();

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isBlockedHostname, isBlockedIp } from "@/lib/network-address";
 import { matchesAttachmentMagic } from "@/lib/private-upload";
 import { redactSensitiveText } from "@/lib/errors";
+import { decodeBase64Attachment, sanitizeAttachmentFileName } from "@/lib/private-upload";
 
 describe("SSRF 地址边界", () => {
   it.each(["127.0.0.1", "10.0.0.1", "169.254.169.254", "fe80::1", "febf::1", "fc00::1", "fdff::1", "ff02::1", "::1", "::ffff:127.0.0.1", "::ffff:7f00:1", "::ffff:192.168.1.1"])("拦截 %s", (ip) => {
@@ -36,5 +37,17 @@ describe("内部错误日志脱敏", () => {
     expect(out).not.toContain("hunter2");
     expect(out).not.toContain("sk_live");
     expect(out).not.toContain("whsec_");
+  });
+});
+
+
+describe("笔记附件输入边界", () => {
+  it("严格拒绝非法 base64", () => {
+    expect(decodeBase64Attachment("aGVsbG8!@#")).toBeNull();
+    expect(decodeBase64Attachment("aGVsbG8=")?.toString("utf8")).toBe("hello");
+  });
+  it("净化文件名并阻断路径穿越", () => {
+    expect(sanitizeAttachmentFileName("../../secret.txt")).toBe("secret.txt");
+    expect(sanitizeAttachmentFileName("a\n\t.txt")).toBe("a__.txt");
   });
 });

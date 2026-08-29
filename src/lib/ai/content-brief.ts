@@ -64,7 +64,7 @@ export function createCourseContentBrief(input: {
     .map((item) => cleanText(item, 180))
     .filter((item): item is string => Boolean(item))
     .slice(0, 8);
-  const confirmedOutline = (Array.isArray(input.confirmedOutline) ? input.confirmedOutline : [])
+  let confirmedOutline = (Array.isArray(input.confirmedOutline) ? input.confirmedOutline : [])
     .filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object")
     .flatMap((item): { title: string; objective?: string; assessmentNeed?: AssessmentNeed }[] => {
       const title = cleanText(item.title, 120);
@@ -80,6 +80,17 @@ export function createCourseContentBrief(input: {
       }];
     })
     .slice(0, 100);
+  const capstone = cleanText(plan.capstone, 500);
+  // 有综合成果承诺时，必须给整课检验地图留下至少一个 transfer 节点。
+  // 模型经常只返回 adaptive，旧逻辑会让所有课节都生成成功，却在最后终审
+  // 因“没有 transfer 节点”把整门课判为 failed。没有显式 transfer 时把最后一节
+  // 设为 transfer，保持用户大纲不变，只补齐发布所需的最小检验语义。
+  if (capstone && confirmedOutline.length > 0 && !confirmedOutline.some((item) => item.assessmentNeed === "transfer")) {
+    const last = confirmedOutline.length - 1;
+    confirmedOutline = confirmedOutline.map((item, index) =>
+      index === last ? { ...item, assessmentNeed: "transfer" as const } : item,
+    );
+  }
   return {
     v: 1,
     request: cleanText(input.request, 2000) ?? "完成这门课程的学习目标",
@@ -89,7 +100,7 @@ export function createCourseContentBrief(input: {
     learnerOutcome: cleanText(plan.learnerOutcome, 500),
     scope: cleanText(plan.scope, 800),
     prerequisites: cleanText(plan.prerequisites, 500),
-    capstone: cleanText(plan.capstone, 500),
+    capstone,
     exclusions: exclusions.length ? exclusions : undefined,
     planningRationale: cleanText(plan.planningRationale, 800),
     sourceBased: Boolean(input.sourceBased),

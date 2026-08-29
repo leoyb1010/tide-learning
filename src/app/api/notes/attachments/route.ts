@@ -9,7 +9,7 @@ import { track } from "@/lib/analytics";
 import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { buildExcerpt } from "@/lib/format";
-import { PRIVATE_UPLOAD_DIR, attachmentDownloadPath, matchesAttachmentMagic } from "@/lib/private-upload";
+import { PRIVATE_UPLOAD_DIR, attachmentDownloadPath, decodeBase64Attachment, matchesAttachmentMagic, sanitizeAttachmentFileName } from "@/lib/private-upload";
 
 export const dynamic = "force-dynamic";
 
@@ -65,28 +65,28 @@ export async function POST(req: NextRequest) {
       const file = form.get("file");
       if (!(file instanceof File)) return fail("缺少上传文件");
       noteIdInput = (form.get("noteId") as string | null)?.trim() || undefined;
-      fileName = file.name || "attachment";
+      fileName = sanitizeAttachmentFileName(file.name || "attachment");
       mimeType = file.type || "application/octet-stream";
       const ab = await file.arrayBuffer();
       bytes = Buffer.from(ab);
     } else {
       const body = (await req.json().catch(() => ({}))) as {
-        fileName?: string;
-        mimeType?: string;
-        dataBase64?: string;
-        noteId?: string;
+        fileName?: unknown;
+        mimeType?: unknown;
+        dataBase64?: unknown;
+        noteId?: unknown;
       };
-      if (!body.dataBase64) return fail("缺少上传文件");
-      fileName = body.fileName?.trim() || "attachment";
+      if (typeof body.dataBase64 !== "string" || !body.dataBase64) return fail("缺少上传文件");
+      if (body.fileName !== undefined && typeof body.fileName !== "string") return fail("文件名类型错误", 400);
+      if (body.mimeType !== undefined && typeof body.mimeType !== "string") return fail("文件类型错误", 400);
+      if (body.noteId !== undefined && typeof body.noteId !== "string") return fail("笔记标识类型错误", 400);
+      fileName = sanitizeAttachmentFileName(body.fileName?.trim() || "attachment");
       mimeType = body.mimeType?.trim() || "application/octet-stream";
       noteIdInput = body.noteId?.trim() || undefined;
       // 去掉可能的 data-url 前缀
-      const b64 = body.dataBase64.replace(/^data:[^;]+;base64,/, "");
-      try {
-        bytes = Buffer.from(b64, "base64");
-      } catch {
-        return fail("文件编码不合法");
-      }
+      const decoded = decodeBase64Attachment(body.dataBase64);
+      if (!decoded) return fail("文件编码不合法");
+      bytes = decoded;
     }
 
     if (bytes.length === 0) return fail("文件内容为空");
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
           data: {
             id: attachmentId,
             noteId: noteId!,
-            fileName: fileName.slice(0, 255),
+            fileName,
             mimeType,
             size: bytes.length,
             path: storedName,

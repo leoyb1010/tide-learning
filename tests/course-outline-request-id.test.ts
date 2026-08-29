@@ -50,6 +50,10 @@ describe("browser course outline request id", () => {
       data: { code: "COURSE_OUTLINE_RUNNING", preserveRequestId: true },
     }, 409)).toBe(true);
     expect(shouldPreserveCourseOutlineRequestId(null, 504)).toBe(true);
+    expect(shouldPreserveCourseOutlineRequestId({
+      error: "本次已安全结束",
+      data: { code: "COURSE_OUTLINE_FAILED", preserveRequestId: false },
+    }, 504)).toBe(false);
     expect(shouldPreserveCourseOutlineRequestId(null, 503)).toBe(true);
     expect(shouldPreserveCourseOutlineRequestId({ error: "网关返回了非标准错误" }, 502)).toBe(true);
     expect(shouldPreserveCourseOutlineRequestId({ error: "来源材料不足" }, 422)).toBe(false);

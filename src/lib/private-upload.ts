@@ -2,6 +2,22 @@ import path from "node:path";
 
 export const PRIVATE_UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(process.cwd(), ".data", "uploads");
 
+const ATTACHMENT_NAME_MAX = 255;
+const MAX_BASE64_CHARS = Math.ceil((10 * 1024 * 1024) / 3) * 4 + 16;
+
+export function sanitizeAttachmentFileName(name: string): string {
+  const base = path.basename(name || "attachment").replace(/[\u0000-\u001f\u007f]/g, "_").trim();
+  return (base || "attachment").slice(0, ATTACHMENT_NAME_MAX);
+}
+
+export function decodeBase64Attachment(value: string): Buffer | null {
+  const raw = value.replace(/^data:[^;]+;base64,/, "").replace(/\s+/g, "");
+  if (!raw || raw.length > MAX_BASE64_CHARS || raw.length % 4 === 1 || !/^[A-Za-z0-9+/]*={0,2}$/.test(raw)) return null;
+  const decoded = Buffer.from(raw, "base64");
+  const normalized = decoded.toString("base64").replace(/=+$/, "");
+  return normalized === raw.replace(/=+$/, "") ? decoded : null;
+}
+
 export function attachmentDownloadPath(id: string): string {
   return `/api/notes/attachments/${encodeURIComponent(id)}`;
 }

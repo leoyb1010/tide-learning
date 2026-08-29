@@ -3,12 +3,14 @@ import { getCurrentUser } from "@/lib/session";
 import { resolveEntitlement } from "@/lib/entitlement";
 import { PricingPlans } from "@/components/PricingPlans";
 import { coursesFromGrant, isPlanSupportedByChannel } from "@/lib/pricing";
+import { configuredCheckoutChannel } from "@/lib/payment";
 import { type PlanData } from "@/components/SubscriptionCard";
 import { monthlyGrantForPlan } from "@/lib/credits";
 import { TrackView } from "@/components/TrackView";
 import { trackLabel, FUTURE_TRACKS } from "@/lib/tracks";
 import { ShieldCheck, Sparkle, Quotes, Coins, Notebook } from "@phosphor-icons/react/dist/ssr";
 import { safeInternalPath } from "@/lib/safe-redirect";
+import { freeCourseGenQuota } from "@/lib/ai-guard";
 
 export const metadata = { title: "订阅方案" };
 
@@ -25,7 +27,7 @@ const RIGHTS = [
   { name: "订阅赛道全部课程", free: NO, premium: "是", expired: NO },
   { name: "本周上新", free: "可浏览", premium: "可学习", expired: "可浏览" },
   { name: "每月赠送积分", free: "0", premium: "300 ~ 800", expired: "0" },
-  { name: "AI 造课", free: NO, premium: "赠分即用", expired: NO },
+  { name: "AI 造课", free: "每月体验额度", premium: "赠分即用", expired: NO },
   { name: "AI 笔记整理", free: NO, premium: "赠分即用", expired: NO },
   { name: "模拟考试", free: NO, premium: "是", expired: NO },
   { name: "笔记创建", free: "3 篇", premium: "无限", expired: "仅查看" },
@@ -83,9 +85,11 @@ export default async function PricingPage({
     learners: userCount.length,
     weekly: weekUpdates,
   };
+  const freeCourseQuota = freeCourseGenQuota();
 
   // 为每个 DB Plan 派生 monthlyGrant（前后端单一事实源：credits.ts）。
   const payChannel = process.env.NEXT_PUBLIC_PAY_CHANNEL || "mock";
+  const paymentAvailable = configuredCheckoutChannel() !== null;
   const plans: PlanData[] = rawPlans
     .filter((p) => isPlanSupportedByChannel(p.billingPeriod, payChannel))
     .map((p) => ({
@@ -99,6 +103,10 @@ export default async function PricingPage({
     highlight: p.highlight,
     monthlyGrant: monthlyGrantForPlan({ billingPeriod: p.billingPeriod, scope: p.scope }),
     }));
+
+  const rights = RIGHTS.map((right) => right.name === "AI 造课"
+    ? { ...right, free: freeCourseQuota > 0 ? `每月 ${freeCourseQuota} 次体验` : NO }
+    : right);
 
   const fullPlans = plans.filter((p) => p.scope === "all");
   const anchor = payChannel === "stripe" ? undefined : plans.find((p) => p.scope === "all" && p.billingPeriod === "month");
@@ -155,7 +163,7 @@ export default async function PricingPage({
             一次订阅解锁全部赛道，年卡每月赠 {yearGrant} 积分 · 可造约 {coursesFromGrant(yearGrant)} 门课
           </p>
         </div>
-        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} payChannel={payChannel} />
+        <PricingPlans fullPlans={fullPlans} trackPlans={trackPlans} isLoggedIn={!!user} redirectTo={redirectTo} payChannel={payChannel} paymentAvailable={paymentAvailable} />
         {anchor && (
           <p className="mono mt-6 text-center text-[13px] text-[var(--ink4)]">
             也可选择全站单月 ¥{(anchor.priceCents / 100).toFixed(0)}/月（不含首期优惠，月赠 {anchor.monthlyGrant} 积分）
@@ -192,7 +200,7 @@ export default async function PricingPage({
               </tr>
             </thead>
             <tbody>
-              {RIGHTS.map((r, i) => (
+              {rights.map((r, i) => (
                 <tr key={r.name} className={i > 0 ? "border-t border-[var(--border)]" : ""}>
                   <td className="px-4 py-3 font-medium text-[var(--ink)]">{r.name}</td>
                   <td className="px-3 py-3 text-center">

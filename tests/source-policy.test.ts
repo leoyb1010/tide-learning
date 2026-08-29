@@ -164,7 +164,7 @@ describe("快变与高风险主题来源门", () => {
 
     const courseGenSource = readFileSync("src/lib/course-gen.ts", "utf8");
     const gateStart = courseGenSource.indexOf("const finalTopicPolicy = sourcePolicyForFinalLessonDraft");
-    const gateEnd = courseGenSource.indexOf("if (finalTopicPolicy.missingSource)", gateStart);
+    const gateEnd = courseGenSource.indexOf("if (finalTopicPolicy.missingSource || finalTopicPolicy.missingAsOfDate)", gateStart);
     const gateSource = courseGenSource.slice(gateStart, gateEnd);
     expect(gateStart).toBeGreaterThan(-1);
     expect(gateEnd).toBeGreaterThan(gateStart);

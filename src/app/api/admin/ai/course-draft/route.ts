@@ -5,6 +5,7 @@ import { assertRateLimit } from "@/lib/rate-limit";
 import { chatJson } from "@/lib/llm";
 import { track } from "@/lib/analytics";
 import { trackLabel } from "@/lib/tracks";
+import { interactiveLlmTimeoutMs, resolveModel } from "@/lib/ai/models";
 
 export const dynamic = "force-dynamic";
 
@@ -53,11 +54,14 @@ export async function POST(req: NextRequest) {
       `- chapterTitles：与 outline 对应的纯章标题字符串数组\n` +
       `- summary：面向课程详情页的卖点摘要，40-60 字`;
 
+    const model = resolveModel();
     const result = await chatJson<DraftResult>({
       system,
       user,
       temperature: 0.6,
-      maxTokens: 6000,
+      maxTokens: 3500,
+      reasoningEffort: model.interactiveReasoningEffort,
+      timeoutMs: interactiveLlmTimeoutMs(model),
     });
 
     await track({ eventName: "ai_course_draft", properties: { category: body?.category ?? null, has_hint: Boolean(hint) } });

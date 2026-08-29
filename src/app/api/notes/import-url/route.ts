@@ -260,18 +260,16 @@ export async function POST(req: NextRequest) {
     const contentMd = `> 来源：[${title}](${finalUrl})\n\n${articleMd}`;
     const excerpt = buildExcerpt(contentMd);
 
-    // 落库：独立笔记，source=link_import、sourceUrl 记录原始链接
-    const note = await prisma.note.create({
-      data: {
-        userId: user.id,
-        title,
-        contentMd,
-        excerpt,
-        source: "link_import",
-        sourceUrl: raw,
-        kind: "text",
-      },
-      select: { id: true, title: true },
+    // 最终落库再次在同一事务校验免费配额，闭合并发导入越过免费上限的竞态。
+    const note = await prisma.$transaction(async (tx) => {
+      if (!snapshot.canCreateNoteUnlimited) {
+        const count = await tx.note.count({ where: { userId: user.id, deletedAt: null } });
+        if (count >= snapshot.noteFreeLimit) throw new AppError(`免费用户最多创建 ${snapshot.noteFreeLimit} 篇笔记，订阅后可无限记录`, 402);
+      }
+      return tx.note.create({
+        data: { userId: user.id, title, contentMd, excerpt, source: "link_import", sourceUrl: raw, kind: "text" },
+        select: { id: true, title: true },
+      });
     });
 
     await track({

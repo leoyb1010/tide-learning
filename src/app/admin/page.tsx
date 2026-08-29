@@ -63,6 +63,15 @@ export default async function AdminDashboard() {
   }
   const scopeCounts = [...scopeUsers].map(([scope, users]) => ({ scope, count: users.size }));
 
+  const [pendingReconciliations, expiredReservations, negativeBalances, runningJobs, failedCourses] = await Promise.all([
+    prisma.llmBillingReconciliation.count({ where: { status: "pending" } }),
+    prisma.creditReservation.count({ where: { status: "active", expiresAt: { lte: new Date() } } }),
+    prisma.creditAccount.count({ where: { balance: { lt: 0 } } }),
+    prisma.generationJob.count({ where: { status: "running" } }),
+    prisma.course.count({ where: { genStatus: "failed" } }),
+  ]);
+  const operationalHealthy = pendingReconciliations === 0 && expiredReservations === 0 && negativeBalances === 0;
+
   const activeSubscriberIds = new Set(activeSubs.map((s) => s.userId));
   const subs = activeSubscriberIds.size;
   const registeredIds = new Set(registrationEvents.flatMap((e) => e.userId ? [e.userId] : []));
@@ -108,6 +117,32 @@ export default async function AdminDashboard() {
         </div>
         <p className="mt-2 text-xs text-ink-400">以上为 analytics_events 实际记录数；0 表示尚未观测到该事件，不代表链路已完成。</p>
       </div>
+
+      <section className={`rounded-2xl border p-5 ${operationalHealthy ? "border-success/25 bg-success/5" : "border-warning/30 bg-warning/5"}`}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-medium text-ink-950">运营健康</h2>
+            <p className="mt-1 text-xs text-ink-400">商业化前必须每日清零费用对账、过期预占和负余额</p>
+          </div>
+          <span className={`rounded-full px-3 py-1 text-xs font-medium ${operationalHealthy ? "bg-success/10 text-success" : "bg-warning/10 text-warning"}`}>
+            {operationalHealthy ? "核心账务正常" : "需要运营处理"}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {[
+            ["待对账费用", pendingReconciliations],
+            ["过期预占", expiredReservations],
+            ["负余额账户", negativeBalances],
+            ["运行中任务", runningJobs],
+            ["失败课程", failedCourses],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-xl bg-paper-raised p-3 shadow-sm">
+              <div className="text-xl font-semibold tabular text-ink-950">{value}</div>
+              <div className="text-xs text-ink-400">{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
 
       <div className="rounded-2xl border border-ink-100 bg-paper-raised p-5">
         <div className="flex flex-wrap items-end justify-between gap-3">

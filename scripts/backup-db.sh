@@ -22,6 +22,7 @@
 #   REQUIRE_ENCRYPTION  设为 1 时，未提供密码文件即失败（生产应固定为 1）
 # ============================================================================
 set -euo pipefail
+umask 077
 
 export PATH="/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin:${PATH:-}"
 
@@ -31,6 +32,11 @@ KEEP="${KEEP:-14}"
 ASSETS_DIR="${ASSETS_DIR:-${UPLOADS_DIR:-./.data}}"
 PASSWORD_FILE="${BACKUP_ENCRYPTION_PASSWORD_FILE:-}"
 REQUIRE_ENCRYPTION="${REQUIRE_ENCRYPTION:-0}"
+
+case "$KEEP" in
+  ''|*[!0-9]*) echo "FAIL 前置 · KEEP 必须是 1-365 的整数"; exit 2 ;;
+esac
+[ "$KEEP" -ge 1 ] && [ "$KEEP" -le 365 ] || { echo "FAIL 前置 · KEEP 必须是 1-365 的整数"; exit 2; }
 
 # --- 依赖探活 ---------------------------------------------------------------
 command -v sqlite3 >/dev/null 2>&1 || { echo "FAIL 前置 · 缺少 sqlite3"; exit 2; }
@@ -46,6 +52,7 @@ if [ -n "$PASSWORD_FILE" ]; then
 fi
 
 mkdir -p "$BACKUP_DIR"
+chmod 700 "$BACKUP_DIR" 2>/dev/null || true
 STAMP="$(date +%Y%m%d-%H%M%S)"
 DEST="$BACKUP_DIR/tide-$STAMP.db"
 

@@ -35,6 +35,8 @@ export interface LlmModelEntry {
    * （插图=SVG、视频=课件录屏导出），永不因模型缺位而空产出。
    */
   modality?: "text" | "tts" | "image" | "video";
+  /** 用户点击后的结构化生成可降低推理强度，缩短首屏等待；未配则不发送供应商参数。 */
+  interactiveReasoningEffort?: "low" | "medium" | "high";
 }
 
 /** 蓝图 E2：某模态下当前可用的模型（enabled + env key 就绪）。 */
@@ -83,6 +85,8 @@ export const LLM_MODELS: LlmModelEntry[] = [
     enabled: true,
     latencyTier: "slow", // v4.2 调参:32k 产出预算配 45s(fast)在 bespoke 长产出场景偏紧,升 90s 头寸
     maxOutput: 32000,
+    // 大纲/切章是交互式结构任务，不需要高强度长思考。真实复测由 64-88s 降至约 29s。
+    interactiveReasoningEffort: "low",
   },
   {
     key: "glm-5.2",
@@ -171,6 +175,21 @@ export function bespokeTimeoutMs(m: LlmModelEntry): number {
       return 90_000;
     default:
       return 45_000;
+  }
+}
+
+/**
+ * 用户点击后同步等待的 LLM 调用预算。慢模型必须高于历史 60s（gpt-5.6-sol
+ * 真实大纲调用可超过 80s），同时封顶 90s，给 Cloudflare/HTTP 响应收尾留出余量。
+ * 后台 bespoke 长任务继续使用 bespokeTimeoutMs，可为 reasoning 模型放宽到 120s。
+ */
+export function interactiveLlmTimeoutMs(m: LlmModelEntry): number {
+  switch (m.latencyTier) {
+    case "reasoning":
+    case "slow":
+      return 90_000;
+    default:
+      return 60_000;
   }
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui";
@@ -17,8 +17,15 @@ function LoginInner() {
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
   const [consentAccepted, setConsentAccepted] = useState(false);
+  // 服务端 HTML 到客户端 hydration 之间，React 的 onSubmit 尚未接管表单。
+  // 若此时用户在慢网下点击登录，浏览器会按默认 GET 提交，把账号和密码写进 URL。
+  // SSR 先禁用提交，hydration 后再开启；method/action 作为 Enter 提交的第二道兜底，
+  // 即便脚本完全不可用也只会 POST 到同源 API，绝不把凭据放进查询串/历史记录。
+  const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => setHydrated(true), []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -55,7 +62,7 @@ function LoginInner() {
         <h1 className="text-2xl font-semibold text-ink-950">{mode === "login" ? "登录" : "注册"}</h1>
         <p className="mt-1 text-sm text-ink-500">手机号或邮箱 · 微信登录即将上线</p>
 
-        <form onSubmit={submit} className="mt-6 space-y-4">
+        <form method="post" action="/api/auth/login" onSubmit={submit} className="mt-6 space-y-4">
           <div>
             {/* P2-2：label 用 htmlFor 关联 input id，input 用 aria-describedby 指向错误提示（屏幕阅读器 + 语义自动化）。 */}
             <label htmlFor="login-identifier" className="mb-1.5 block text-sm text-ink-800">用户名 / 手机号 / 邮箱</label>
@@ -104,7 +111,7 @@ function LoginInner() {
               </span>
             </label>
           )}
-          <Button type="submit" full size="lg" loading={loading}>
+          <Button type="submit" full size="lg" loading={loading} disabled={!hydrated || loading}>
             {mode === "login" ? "登录" : "注册并登录"}
           </Button>
         </form>

@@ -45,7 +45,19 @@ describe("课程内容总纲", () => {
     expect(prompt).toContain("用户确认的执行大纲");
     expect(prompt).toContain("JS 闭包");
     expect(prompt).toContain("以用户确认大纲为准");
-    expect(assessmentNeedForLesson(updated, { title: "闭包实战", index: 1 })).toBe("adaptive");
+    expect(assessmentNeedForLesson(updated, { title: "闭包实战", index: 1 })).toBe("transfer");
+  });
+
+  it("有综合成果但模型未分配 transfer 时自动补到最后一节", () => {
+    const brief = createCourseContentBrief({
+      request: "建立一套工作流",
+      plan: { capstone: "完成一次真实练习" },
+      confirmedOutline: [
+        { title: "基础", assessmentNeed: "adaptive" },
+        { title: "交付", assessmentNeed: "adaptive" },
+      ],
+    });
+    expect(brief.confirmedOutline?.map((item) => item.assessmentNeed)).toEqual(["adaptive", "transfer"]);
   });
 
   it("保留旧 job/title 回填的非用户 provenance，防止后续把日期洗白", () => {
