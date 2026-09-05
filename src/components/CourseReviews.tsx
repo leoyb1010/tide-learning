@@ -175,12 +175,12 @@ function ReviewsBody({
       {/* 聚合条：均分 + 星级 + 分布 */}
       <div className="grid gap-5 rounded-[16px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--card),var(--inner-hi)] sm:grid-cols-[auto_1fr]">
         <div className="flex flex-col items-center justify-center gap-1.5 sm:border-r sm:border-[var(--border)] sm:pr-6">
-          <span className="mono text-[40px] font-extrabold leading-none tracking-tight text-[var(--ink)]">
-            {aggregate.score.toFixed(1)}
+          <span className="mono text-[32px] font-extrabold leading-none tracking-tight text-[var(--ink)]">
+            {hasReal ? aggregate.score.toFixed(1) : "暂无"}
           </span>
-          <RatingStars score={aggregate.score} showCount={false} size={14} />
+          <RatingStars score={aggregate.score} showCount={false} size={14} placeholder={!hasReal} />
           <span className="text-[12px] text-[var(--ink3)]">
-            {hasReal ? `${aggregate.count.toLocaleString()} 条评价` : "示例评分"}
+            {hasReal ? `${aggregate.count.toLocaleString()} 条评价` : "还没有真实评价"}
           </span>
         </div>
         <div className="flex flex-col justify-center gap-1.5">

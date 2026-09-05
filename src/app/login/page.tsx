@@ -60,7 +60,7 @@ function LoginInner() {
     <div className="mx-auto max-w-md py-10">
       <div className="rounded-2xl border border-ink-100 bg-paper-raised p-8">
         <h1 className="text-2xl font-semibold text-ink-950">{mode === "login" ? "登录" : "注册"}</h1>
-        <p className="mt-1 text-sm text-ink-500">手机号或邮箱 · 微信登录即将上线</p>
+        <p className="mt-1 text-sm text-ink-500">手机号或邮箱登录 · 微信登录暂未开放</p>
 
         <form method="post" action="/api/auth/login" onSubmit={submit} className="mt-6 space-y-4">
           <div>
