@@ -22,6 +22,7 @@ export async function GET() {
       demandsCount,
       votesCount,
       refunds,
+      paidOrderStats,
     ] = await Promise.all([
       prisma.analyticsEvent.count({ where: { eventName: "homepage_view", createdAt: { gte: today } } }),
       prisma.user.count({ where: { role: "user" } }),
@@ -33,6 +34,11 @@ export async function GET() {
       prisma.demand.count(),
       prisma.demandVote.aggregate({ _sum: { voteCount: true } }),
       prisma.order.count({ where: { status: "refunded" } }),
+      prisma.order.aggregate({
+        where: { status: "paid" },
+        _count: { _all: true },
+        _sum: { amountCents: true, discountCents: true },
+      }),
     ]);
 
     const activeSubscriberIds = new Set(activeSubscriptions.map((s) => s.userId));
@@ -52,6 +58,9 @@ export async function GET() {
         demandsCount,
         votesCount: votesCount._sum.voteCount ?? 0,
         refunds,
+        paidOrders: paidOrderStats._count._all,
+        grossRevenueCents: paidOrderStats._sum.amountCents ?? 0,
+        discountsCents: paidOrderStats._sum.discountCents ?? 0,
       },
     });
   });
