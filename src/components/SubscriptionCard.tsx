@@ -113,7 +113,7 @@ export function SubscriptionCard({
       const msg = (e as Error).message || "";
       // P1-2：生产未开放 mock 渠道时后端回「不支持的支付渠道」——给用户明确「暂未开放」文案，
       // 不把技术错误抛到脸上（真实渠道接入前的过渡态）。
-      const friendly = /不支持的支付渠道/.test(msg) ? "支付暂未开放，敬请期待" : msg || "发起支付失败，请重试";
+      const friendly = /不支持的支付渠道/.test(msg) ? "当前环境未开放支付，请稍后再试" : msg || "发起支付失败，请重试";
       toast(friendly, { tone: "warn" });
     }
   }, 20000);

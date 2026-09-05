@@ -570,7 +570,7 @@ export function CreateStudio({
         }
         if (res.status === 404) {
           resetTheater();
-          toast("资料整理功能即将上线，敬请期待", { tone: "info" });
+          toast("资料整理功能暂未开放", { tone: "info" });
           return;
         }
         throw new Error(json?.error || "整理失败");
