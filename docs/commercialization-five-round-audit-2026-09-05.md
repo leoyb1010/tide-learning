@@ -23,6 +23,8 @@
 - 新增财务后台对账队列 `/api/admin/billing/reconciliation`：仅 `order:refund` 权限可查/处理，`resolved`/`waived` 必须填写原因并写入 `AuditLog`，不会删除记录或自动改余额；匿名 GET/PATCH 实测均返回 401。
 - 新增后台 `/admin/billing` 页面和导航入口，财务可在响应式列表中查看原因、预占 ID、供应商状态并处理记录；匿名页面不会获得后台数据。
 - 新增 `tests/billing-reconciliation-contract.test.ts`，自动验证权限、CSRF、处理状态、原因长度、审计留痕和禁止重复/删除处理。
+- 浏览器审计覆盖 1440/768/375 三种视口：首页、课程库、需求、定价、登录均无 axe 违规、控制台错误、网络失败或横向溢出；登录态造课无失败请求；私有媒体实际返回 9 次 `206 video/mp4` Range 响应；键盘错误态可见。
+- 发现开发库媒体索引脱节后，新增 `npm run repair:media-index`，dry-run 后已在本地开发库恢复 4 条真实媒体引用；该工具生产环境必须显式 `--apply`。
 
 ## 当前上线条件
 

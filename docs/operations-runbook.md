@@ -10,6 +10,15 @@ npm run check:commercial -- --json
 
 它会检查生产支付渠道、Stripe 双密钥、公网 HTTPS、数据库与加密备份配置，并读取数据库确认没有待处理 LLM 账务对账、过期积分预占或失败课程。输出 `ok:false` 时禁止开放真实收费。
 
+若恢复演练后发现 `.data/media/*.bin` 与课程记录脱节，先 dry-run 再执行媒体索引修复：
+
+```bash
+npm run repair:media-index
+npm run repair:media-index -- --apply
+```
+
+生产环境没有 `--apply` 会直接拒绝；执行前应完成数据库备份并核对脚本输出的课程与资产 ID。
+
 财务角色通过 `/api/admin/billing/reconciliation` 查看待对账记录；处理时只能显式标记为 `resolved` 或 `waived`，必须填写原因，接口要求 `order:refund` 权限并写入 `AuditLog`。该流程不会删除记录，也不会自动修改积分余额。
 
 ## 1. 恢复目标
