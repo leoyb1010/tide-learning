@@ -25,6 +25,7 @@
     "video:courseware": "tsx scripts/export-courseware-video.mts",
     "check:embed": "tsx scripts/embed-e2e.mts",
     "audit:quality": "tsx scripts/quality-audit.mts",
+    "check:commercial": "node scripts/commercial-readiness-check.mjs",
     "accept:content": "tsx scripts/content-quality-acceptance.mts",
     "accept:visual": "tsx scripts/visual-originality-acceptance.mts",
     "accept:imports": "tsx scripts/import-faithful-acceptance.mts",
