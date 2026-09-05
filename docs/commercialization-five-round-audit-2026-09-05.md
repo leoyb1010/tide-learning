@@ -20,6 +20,7 @@
 - 发现并修复登录页“微信登录即将上线”的模糊承诺，改为“微信登录暂未开放”。
 - 构造带绝对路径 symlink 的恶意资产归档，恢复脚本以退出码 3 拒绝，目标数据库保持原内容不变。
 - 新增 `npm run check:commercial` 发布门禁；当前开发库实际发现 7 条从 2026-08-17 至 2026-08-18 遗留的 `provider_timeout` 对账记录，因此门禁按预期失败，不能把正式收费误标为 ready。
+- 新增财务后台对账队列 `/api/admin/billing/reconciliation`：仅 `order:refund` 权限可查/处理，`resolved`/`waived` 必须填写原因并写入 `AuditLog`，不会删除记录或自动改余额；匿名 GET/PATCH 实测均返回 401。
 
 ## 当前上线条件
 
