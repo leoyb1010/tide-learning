@@ -10,7 +10,7 @@
 2. **并发与故障恢复**：租约、心跳、限流、备份恢复演练通过；专项回归 4 个测试文件共 41 项通过，可靠性审计相关测试累计 86 项通过。
 3. **商业化闭环**：订单、订阅、权益、积分预占/退款、Stripe 验签与幂等已具备；运营看板补充 `paidOrders`、`grossRevenueCents`、`discountsCents`。
 4. **UI、动效与可用性**：现有响应式、reduced-motion、焦点管理和浮层规范通过审查；通用 Button 增加 `focus-visible`、`aria-busy`，LoadingSkeleton 增加加载语义。
-5. **最终回归与上线门禁**：`vitest` 96 个文件、754 项通过（13 项跳过）；TypeScript、生产构建、ESLint 均通过。
+5. **最终回归与上线门禁**：`vitest` 97 个文件、755 项通过（13 项跳过）；TypeScript、生产构建、ESLint 均通过。
 
 ## 运行态补充验收
 
@@ -38,6 +38,7 @@
 - 确认加密备份调度器已安装，并检查最近一次备份和恢复演练记录。
 - 多实例部署前，将文件型限流迁移到 Redis 或数据库原子计数。
 - 发布前运行 `npm run check:commercial -- --json`，门禁必须输出 `ok=true`；开发环境当前仍按预期 `ok=false`。
+- 新增 `tests/commercial-readiness-gate.test.ts`，锁定生产环境缺少支付、Stripe、加密备份或未清账时必须以非零退出码阻断发布。
 
 ## 关键提交
 
