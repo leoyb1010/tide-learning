@@ -26,6 +26,7 @@
     "check:embed": "tsx scripts/embed-e2e.mts",
     "audit:quality": "tsx scripts/quality-audit.mts",
     "check:commercial": "node scripts/commercial-readiness-check.mjs",
+    "check:backup": "bash scripts/backup-restore-drill.sh",
     "repair:media-index": "node scripts/repair-media-index.mjs",
     "accept:content": "tsx scripts/content-quality-acceptance.mts",
     "accept:visual": "tsx scripts/visual-originality-acceptance.mts",

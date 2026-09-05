@@ -10,6 +10,14 @@ npm run check:commercial -- --json
 
 它会检查生产支付渠道、Stripe 双密钥、公网 HTTPS、数据库与加密备份配置，并读取数据库确认没有待处理 LLM 账务对账、过期积分预占或失败课程。输出 `ok:false` 时禁止开放真实收费。
 
+备份与恢复演练可重复执行，默认只读当前数据库并在临时目录清理：
+
+```bash
+npm run check:backup
+```
+
+该命令会验证加密备份、恢复库 `PRAGMA integrity_check` 以及媒体/上传资产哈希；失败时返回非零退出码。
+
 若恢复演练后发现 `.data/media/*.bin` 与课程记录脱节，先 dry-run 再执行媒体索引修复：
 
 ```bash
