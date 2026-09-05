@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // 本地浏览器验收经常以 127.0.0.1 访问开发服务器；显式允许该来源，
+  // 避免 Next 对 /_next/* 发出跨源开发警告，同时保留生产环境的默认收敛策略。
+  allowedDevOrigins: ["127.0.0.1", "localhost"],
   outputFileTracingRoot: process.cwd(),
   // 三端复用预留：所有业务逻辑集中在 src/lib 与 API 层，
   // Web 视图层与后续 iOS/Android 客户端共享同一套服务端 entitlement。
@@ -25,6 +28,8 @@ const nextConfig: NextConfig = {
     remotePatterns: [],
     // 优先输出 WebP（体积更小），浏览器不支持时 next/image 自动回退原格式。
     formats: ["image/webp"],
+    // 与首页现有图片质量保持一致，提前满足 Next 16 的显式质量要求。
+    qualities: [68, 70],
   },
 
   // 安全响应头 + 静态资源缓存。self-host next start 生效。
