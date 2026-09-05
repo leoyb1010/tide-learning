@@ -28,6 +28,7 @@
 - 运行 `node scripts/runtime-critical.mjs` 通过：媒体 4/4、账户删除与订单链路、需求状态机 5 次状态转移、上线通知 3 个接收者均完成。
 - 真实浏览器验收补充覆盖 Next 开发源白名单与图片质量警告；桌面/平板/手机场景仍保持 axe、控制台、网络失败和横向溢出为 0。
 - 依赖审计发现并修复 `mammoth` 间接引入的 `@xmldom/xmldom` 中危漏洞，现 `npm audit --audit-level=moderate` 为 0 vulnerabilities。
+- 使用最新 `next build` 产物启动 `next start` 后重跑浏览器审计：1440/768/375 三种视口、登录态造课、私有媒体 12 次 `206 video/mp4`、键盘错误态全部通过；生产模式 axe、控制台错误、网络失败和横向溢出均为 0。
 
 ## 当前上线条件
 
