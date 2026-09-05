@@ -29,6 +29,7 @@ export const ADMIN_NAV: AdminNavItem[] = [
   { href: "/admin/leads", label: "建联队列", gate: "lead:manage" },
   { href: "/admin/orders", label: "订单/订阅", gate: "order:read" },
   { href: "/admin/credits", label: "积分管理", gate: "order:refund" },
+  { href: "/admin/billing", label: "费用对账", gate: "order:refund" },
   { href: "/admin/users", label: "用户管理", gate: "user:read" },
   { href: "/admin/redemption-codes", label: "兑换码", gate: "admin" },
   { href: "/admin/permissions", label: "权限管理", gate: "admin" },
