@@ -10,7 +10,7 @@
 2. **并发与故障恢复**：租约、心跳、限流、备份恢复演练通过；专项回归 4 个测试文件共 41 项通过，可靠性审计相关测试累计 86 项通过。
 3. **商业化闭环**：订单、订阅、权益、积分预占/退款、Stripe 验签与幂等已具备；运营看板补充 `paidOrders`、`grossRevenueCents`、`discountsCents`。
 4. **UI、动效与可用性**：现有响应式、reduced-motion、焦点管理和浮层规范通过审查；通用 Button 增加 `focus-visible`、`aria-busy`，LoadingSkeleton 增加加载语义。
-5. **最终回归与上线门禁**：`vitest` 95 个文件、752 项通过（13 项跳过）；TypeScript、生产构建、ESLint 均通过。
+5. **最终回归与上线门禁**：`vitest` 96 个文件、754 项通过（13 项跳过）；TypeScript、生产构建、ESLint 均通过。
 
 ## 运行态补充验收
 
@@ -25,6 +25,9 @@
 - 新增 `tests/billing-reconciliation-contract.test.ts`，自动验证权限、CSRF、处理状态、原因长度、审计留痕和禁止重复/删除处理。
 - 浏览器审计覆盖 1440/768/375 三种视口：首页、课程库、需求、定价、登录均无 axe 违规、控制台错误、网络失败或横向溢出；登录态造课无失败请求；私有媒体实际返回 9 次 `206 video/mp4` Range 响应；键盘错误态可见。
 - 发现开发库媒体索引脱节后，新增 `npm run repair:media-index`，dry-run 后已在本地开发库恢复 4 条真实媒体引用；该工具生产环境必须显式 `--apply`。
+- 运行 `node scripts/runtime-critical.mjs` 通过：媒体 4/4、账户删除与订单链路、需求状态机 5 次状态转移、上线通知 3 个接收者均完成。
+- 真实浏览器验收补充覆盖 Next 开发源白名单与图片质量警告；桌面/平板/手机场景仍保持 axe、控制台、网络失败和横向溢出为 0。
+- 依赖审计发现并修复 `mammoth` 间接引入的 `@xmldom/xmldom` 中危漏洞，现 `npm audit --audit-level=moderate` 为 0 vulnerabilities。
 
 ## 当前上线条件
 
@@ -33,9 +36,12 @@
 - 处理 7 条历史 `LlmBillingReconciliation` pending 记录。
 - 确认加密备份调度器已安装，并检查最近一次备份和恢复演练记录。
 - 多实例部署前，将文件型限流迁移到 Redis 或数据库原子计数。
+- 发布前运行 `npm run check:commercial -- --json`，门禁必须输出 `ok=true`；开发环境当前仍按预期 `ok=false`。
 
 ## 关键提交
 
 - `7b52489`：运营看板收入指标
 - `28e1a8d`：商业化准备度审计记录
 - `66dc1d4`：恢复原子性与无障碍状态修复
+- `1539516`：Next 开发源与图片质量配置加固
+- `4456448`：修复 `@xmldom/xmldom` 间接依赖漏洞
