@@ -39,6 +39,7 @@
 - 多实例部署前，将文件型限流迁移到 Redis 或数据库原子计数。
 - 发布前运行 `npm run check:commercial -- --json`，门禁必须输出 `ok=true`；开发环境当前仍按预期 `ok=false`。
 - 新增 `tests/commercial-readiness-gate.test.ts`，锁定生产环境缺少支付、Stripe、加密备份或未清账时必须以非零退出码阻断发布。
+- 临时隔离目录完成一次加密恢复演练：开发库 DB 与私有资产包均生成 `.enc`，SHA-256 校验通过，恢复库 `PRAGMA integrity_check=ok`，媒体和上传文件哈希一致；演练未写入原开发库。
 
 ## 关键提交
 
