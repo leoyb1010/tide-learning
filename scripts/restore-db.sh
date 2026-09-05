@@ -52,7 +52,6 @@ TMP_DB="$TARGET_DB.restore-tmp-$$"
 trap 'rm -f "$TMP_DB" "${TMP_DECRYPT_DB:-}" "${TMP_DECRYPT_ARCHIVE:-}"; rm -rf "${TMP_UPLOADS:-}"' EXIT
 sqlite3 "$EFFECTIVE_DB" ".backup '$TMP_DB'"
 [ "$(sqlite3 "$TMP_DB" "PRAGMA integrity_check;")" = "ok" ] || { echo "FAIL restored database integrity check"; exit 3; }
-mv "$TMP_DB" "$TARGET_DB"
 
 if [ -n "$UPLOAD_ARCHIVE" ]; then
   [ -f "$UPLOAD_ARCHIVE" ] || { echo "FAIL upload archive not found: $UPLOAD_ARCHIVE"; exit 2; }
@@ -65,7 +64,7 @@ if [ -n "$UPLOAD_ARCHIVE" ]; then
     openssl enc -d -aes-256-cbc -pbkdf2 -iter 200000 -in "$UPLOAD_ARCHIVE" -out "$TMP_DECRYPT_ARCHIVE" -pass "file:$PASSWORD_FILE"
     EFFECTIVE_ARCHIVE="$TMP_DECRYPT_ARCHIVE"
   fi
-  if tar -tzf "$EFFECTIVE_ARCHIVE" | grep -Eq '(^/|(^|/)\.\.(/|$))'; then
+  if tar -tvzf "$EFFECTIVE_ARCHIVE" | awk '$1 ~ /^[bcp]/{bad=1} $1 ~ /(^|[[:space:]])l|(^|[[:space:]])h/{bad=1} $6 ~ /^\// || $6 ~ /(^|\/)\.\.($|\/)/{bad=1} END{exit bad}' ; then :; else
     echo "FAIL unsafe path in upload archive"
     exit 3
   fi
@@ -75,6 +74,15 @@ if [ -n "$UPLOAD_ARCHIVE" ]; then
   mkdir -p "$(dirname "$ASSETS_DIR")"
   EXTRACTED="$(find "$TMP_UPLOADS" -mindepth 1 -maxdepth 1 -type d | head -1)"
   [ -n "$EXTRACTED" ] || { echo "FAIL upload archive has no directory"; exit 3; }
+fi
+
+# Commit only after every input has been decrypted, integrity-checked and (when
+# present) extracted into a temporary directory. A corrupt archive must never
+# leave the database restored while assets remain stale.
+mv "$TMP_DB" "$TARGET_DB"
+if [ -n "${EXTRACTED:-}" ]; then
+  rm -rf "$ASSETS_DIR"
+  mkdir -p "$(dirname "$ASSETS_DIR")"
   mv "$EXTRACTED" "$ASSETS_DIR"
 fi
 

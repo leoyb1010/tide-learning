@@ -35,7 +35,7 @@ export function Button({
   children, variant = "primary", size = "md", href, onClick, type = "button",
   disabled, loading, className = "", full, icon,
 }: ButtonProps) {
-  const cls = `btn group inline-flex items-center justify-center font-medium transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] active:translate-y-px active:scale-[0.985] disabled:opacity-45 disabled:pointer-events-none ${VARIANTS[variant]} ${SIZES[size]} ${full ? "w-full" : ""} ${className}`;
+  const cls = `btn group inline-flex items-center justify-center font-medium transition-all duration-200 [transition-timing-function:var(--ease-out-expo)] active:translate-y-px active:scale-[0.985] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-400 focus-visible:ring-offset-2 disabled:opacity-45 disabled:pointer-events-none ${VARIANTS[variant]} ${SIZES[size]} ${full ? "w-full" : ""} ${className}`;
   const content = (
     <>
       {loading && <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />}
@@ -43,8 +43,8 @@ export function Button({
       {icon && !loading && <ArrowRight weight="bold" className="transition-transform duration-200 group-hover:translate-x-0.5 group-disabled:translate-x-0" size={16} />}
     </>
   );
-  if (href && !disabled) return <Link href={href} className={cls}>{content}</Link>;
-  return <button type={type} onClick={onClick} disabled={disabled || loading} className={cls}>{content}</button>;
+  if (href && !disabled) return <Link href={href} className={cls} aria-busy={loading || undefined}>{content}</Link>;
+  return <button type={type} onClick={onClick} disabled={disabled || loading} aria-busy={loading || undefined} className={cls}>{content}</button>;
 }
 
 /* ============ Badge ============ */
@@ -91,7 +91,7 @@ export function ErrorState({ title = "出错了", hint, onRetry }: { title?: str
 
 export function LoadingSkeleton({ lines = 3, className = "" }: { lines?: number; className?: string }) {
   return (
-    <div className={`space-y-3 ${className}`}>
+    <div className={`space-y-3 ${className}`} aria-busy="true" aria-label="正在加载">
       {Array.from({ length: lines }).map((_, i) => (
         <div key={i} className="skeleton h-4" style={{ width: `${92 - i * 13}%` }} />
       ))}
