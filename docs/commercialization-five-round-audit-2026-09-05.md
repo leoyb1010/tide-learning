@@ -41,6 +41,7 @@
 - 新增 `tests/commercial-readiness-gate.test.ts`，锁定生产环境缺少支付、Stripe、加密备份或未清账时必须以非零退出码阻断发布。
 - 临时隔离目录完成一次加密恢复演练：开发库 DB 与私有资产包均生成 `.enc`，SHA-256 校验通过，恢复库 `PRAGMA integrity_check=ok`，媒体和上传文件哈希一致；演练未写入原开发库。
 - 将恢复演练固化为 `npm run check:backup`，本轮命令实测通过并自动清理临时目录。
+- 新增 `npm run check:release` 汇总发布前全部检查；本轮完整执行通过依赖审计、Lint、类型、97 个测试文件、生产构建和恢复演练，最后按预期被真实商业化条件阻断。
 
 ## 关键提交
 
