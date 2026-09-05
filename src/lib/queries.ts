@@ -1,4 +1,6 @@
 import { prisma } from "./db";
+import fs from "node:fs";
+import path from "node:path";
 import { createStreamSignature } from "./private-media";
 import { resolveEntitlement, canAccessLesson, type EntitlementSnapshot } from "./entitlement";
 import { rankDemands } from "./demand-score";
@@ -22,6 +24,19 @@ export const LEVEL_LABELS: Record<string, string> = { L1: "L1 入门", L2: "L2 �
 
 // 兼容既有 server 侧 `import { relativeTime, formatDuration } from "@/lib/queries"`。
 export { relativeTime, formatDuration };
+
+/**
+ * Legacy seed data can contain a public video path whose file was never
+ * installed. Do not send a guaranteed 404 to the player; it will use its
+ * poster/simulated playback fallback until a real asset is attached.
+ */
+function availablePublicVideoUrl(url: string | null): string | null {
+  if (!url || !url.startsWith("/")) return url;
+  const clean = url.split("?", 1)[0];
+  const relative = clean.replace(/^\/+/, "");
+  if (relative.includes("..")) return null;
+  return fs.existsSync(path.join(process.cwd(), "public", relative)) ? url : null;
+}
 
 /**
  * 归属/可见性门（与订阅门 canAccessLesson 叠加，各管一件事）：
@@ -285,7 +300,7 @@ export async function getLessonForUser(lessonId: string, userId: string | null) 
       // 受控 asset 永远优先经过鉴权流接口；公开直链只允许免费章节使用。
       // 付费章节即使历史数据遗留 videoUrl 也不返回，防止猜测 public 路径绕过权益门。
       videoUrl: access
-        ? (lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : lesson.isFree ? lesson.videoUrl : null)
+        ? (lesson.videoAssetId ? signedVideoUrl(lesson.videoAssetId) : lesson.isFree ? availablePublicVideoUrl(lesson.videoUrl) : null)
         : null,
       articleMd: access ? lesson.articleMd : null,
       // ai_block 类型的结构化课件（付费门控同 articleMd）
