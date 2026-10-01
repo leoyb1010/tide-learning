@@ -34,7 +34,7 @@ await previewTrigger.click();
 await preview.waitFor({ state: "visible" });
 if (process.env.QA_OUT) {
   await mkdir(process.env.QA_OUT, { recursive: true });
-  await page.screenshot({ path: join(process.env.QA_OUT, "mobile-course-preview.png"), fullPage: false });
+  await page.screenshot({ path: join(process.env.QA_OUT, "mobile-course-preview.png"), fullPage: false, animations: "disabled" });
 }
 await page.keyboard.press("Escape");
 await page.getByRole("dialog").waitFor({ state: "hidden" });
