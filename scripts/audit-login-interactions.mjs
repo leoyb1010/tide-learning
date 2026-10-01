@@ -35,8 +35,8 @@ try {
     await page.screenshot({ path: path.join(out, `${viewport.name}-login-pending.png`) });
     assert.equal(requests, 1, "repeat input issued another login request");
     release();
-    await page.getByRole("alert").waitFor({ state: "visible" });
-    assert.match(await page.getByRole("alert").innerText(), /服务暂时不可用/);
+    await page.locator("#login-error").waitFor({ state: "visible" });
+    assert.match(await page.locator("#login-error").innerText(), /服务暂时不可用/);
     await page.screenshot({ path: path.join(out, `${viewport.name}-login-server-error.png`) });
     assert.equal(await page.getByRole("button", { name: "去注册", exact: true }).isEnabled(), true);
     const retryResponse = page.waitForResponse(response => response.url().endsWith("/api/auth/login"));
