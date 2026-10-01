@@ -70,6 +70,13 @@ for (const viewport of [
         load: Math.round(nav.loadEventEnd),
         bytes: performance.getEntriesByType("resource").reduce((sum, r) => sum + (r.transferSize || 0), 0),
         overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        wrappedPriceLabels: [...document.querySelectorAll("[data-price-intro], [data-price-period]")].filter(el => {
+          const style = getComputedStyle(el);
+          const line = Number.parseFloat(style.lineHeight) || Number.parseFloat(style.fontSize) * 1.5;
+          const edges = [style.paddingTop, style.paddingBottom, style.borderTopWidth, style.borderBottomWidth]
+            .reduce((sum, value) => sum + (Number.parseFloat(value) || 0), 0);
+          return el.getBoundingClientRect().height - edges > line * 1.2;
+        }).map(el => el.textContent),
         axe: axeResult.violations.map((v) => ({
           id: v.id,
           impact: v.impact,
@@ -179,6 +186,7 @@ const failures = report.filter((row) =>
   (Array.isArray(row.consoleErrors) && row.consoleErrors.length > 0) ||
   (Array.isArray(row.failed) && row.failed.length > 0) ||
   (typeof row.overflowX === "number" && row.overflowX > 0) ||
+  (Array.isArray(row.wrappedPriceLabels) && row.wrappedPriceLabels.length > 0) ||
   (row.keyboard && !row.keyboard.focused) ||
   (row.route === "/login-invalid" && !row.visibleError) ||
   (row.route === "/learn/private-media" && (

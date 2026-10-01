@@ -172,21 +172,21 @@ export function SubscriptionCard({
 
       {/* 价格区：首期大字 + 之后原价小字标注 */}
       <div className="mt-4">
-        <div className="flex items-baseline gap-1">
+        <div className="flex flex-wrap items-baseline gap-1">
           {hasFirstDeal && (
-            <span className="mono rounded-[6px] bg-[var(--red-soft)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--red-ink)]">
+            <span data-price-intro className="mono shrink-0 whitespace-nowrap rounded-[6px] bg-[var(--red-soft)] px-1.5 py-0.5 text-[11px] font-bold text-[var(--red-ink)]">
               首期
             </span>
           )}
           <span className="text-[14px] text-[var(--ink3)]">¥</span>
           <span
-            className={`mono text-[40px] font-extrabold leading-none tracking-tight ${
+            className={`mono whitespace-nowrap text-[40px] md:text-[28px] lg:text-[40px] font-extrabold leading-none tracking-tight ${
               hot ? "text-[var(--red)]" : "text-[var(--ink)]"
             }`}
           >
             {yuan(shownPrice)}
           </span>
-          <span className="text-[13px] text-[var(--ink4)]">/{perUnit}</span>
+          <span data-price-period className="shrink-0 whitespace-nowrap text-[13px] text-[var(--ink4)]">/{perUnit}</span>
         </div>
 
         {/* 锚定标签：年卡「省 ¥xxx（vs 连续包月累计）」+「≈¥x.xx/天」 */}

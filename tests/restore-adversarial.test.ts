@@ -13,7 +13,12 @@ function fixture() {
   return { root, source, target, assets };
 }
 function restore(f: ReturnType<typeof fixture>, archive: string, env = {}) {
-  return spawnSync("bash", ["scripts/restore-db.sh", f.source, f.target, archive, "--force"], { env: { ...process.env, ASSETS_DIR: f.assets, ...env }, encoding: "utf8" });
+  const result = spawnSync("bash", ["scripts/restore-db.sh", f.source, f.target, archive, "--force"], { env: { ...process.env, ASSETS_DIR: f.assets, ...env }, encoding: "utf8", timeout: 15_000 });
+  // Disk/process startup can exceed Vitest's default 5s on hosted runners.
+  // A hung child still fails, rather than being mistaken for an expected rejection.
+  if (result.error) throw result.error;
+  if (result.signal || result.status === null) throw new Error(`Restore subprocess terminated without an exit code: ${result.signal ?? "unknown"}`);
+  return result;
 }
 function unchanged(f: ReturnType<typeof fixture>) {
   expect(readFileSync(join(f.assets, "keep.txt"), "utf8")).toBe("original");
@@ -25,12 +30,12 @@ describe("offline restore preserves original data until validation", () => {
     const f = fixture(); mkdirSync(join(f.root, "empty")); const archive = join(f.root, "empty.tar.gz");
     execFileSync("tar", ["-czf", archive, "-C", join(f.root, "empty"), "."]);
     expect(restore(f, archive).status).not.toBe(0); unchanged(f);
-  });
+  }, 20_000);
   it("rejects multiple asset roots without selecting an arbitrary one", () => {
     const f = fixture(); mkdirSync(join(f.root, "one")); mkdirSync(join(f.root, "two")); const archive = join(f.root, "multiple.tar.gz");
     execFileSync("tar", ["-czf", archive, "-C", f.root, "one", "two"]);
     expect(restore(f, archive).status).not.toBe(0); unchanged(f);
-  });
+  }, 20_000);
   it("restores a valid single-root snapshot and leaves a database safety backup", () => {
     const f = fixture(); mkdirSync(join(f.root, "snapshot")); writeFileSync(join(f.root, "snapshot", "new.txt"), "restored"); const archive = join(f.root, "assets.tar.gz");
     execFileSync("tar", ["-czf", archive, "-C", f.root, "snapshot"]);
@@ -38,11 +43,11 @@ describe("offline restore preserves original data until validation", () => {
     expect(readFileSync(join(f.assets, "new.txt"), "utf8")).toBe("restored");
     expect(execFileSync("sqlite3", [f.target, "select value from proof;"], { encoding: "utf8" }).trim()).toBe("1");
     expect(readdirSync(f.root).some(name => name.startsWith("target.db.pre-restore-"))).toBe(true);
-  });
+  }, 20_000);
   it("cleans temporary plaintext on failed decryption", () => {
     const f = fixture(); const secret = join(f.root, "key"); writeFileSync(secret, "synthetic-incorrect-key-only-for-test");
     const encrypted = join(f.root, "bad.db.enc"); writeFileSync(encrypted, "corrupt"); const temp = join(f.root, "temps"); mkdirSync(temp);
     const result = restore({ ...f, source: encrypted }, "", { BACKUP_ENCRYPTION_PASSWORD_FILE: secret, TMPDIR: temp });
     expect(result.status).not.toBe(0); unchanged(f); expect(readdirSync(temp)).toEqual([]);
-  });
+  }, 20_000);
 });

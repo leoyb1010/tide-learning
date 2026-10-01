@@ -226,7 +226,7 @@ export function PricingPlans({
       )}
 
       {/* 全站三档卡：入门锚点 → 过渡 → 推荐年卡。角标只在年卡，pt-4 让位不裁切。 */}
-      <div className="stagger mx-auto grid max-w-[1000px] items-stretch gap-5 pt-4 sm:grid-cols-3">
+      <div className="stagger mx-auto grid max-w-[1000px] items-stretch gap-5 pt-4 md:grid-cols-3">
         {orderedFull.map((p, i) => {
           const isHero = heroPlan?.id === p.id;
           const perks = planPerks(p);
@@ -254,7 +254,7 @@ export function PricingPlans({
           <h2 className="text-[18px] font-bold text-[var(--ink)]">单赛道会员</h2>
           <p className="mt-1 text-[13px] text-[var(--ink3)]">低门槛切入，只学你需要的方向（每月赠 200 积分）</p>
         </div>
-        <div className="stagger mx-auto grid max-w-[820px] items-stretch gap-5 sm:grid-cols-3">
+        <div className="stagger mx-auto grid max-w-[820px] items-stretch gap-5 md:grid-cols-3">
           {trackPlans.map((p, i) => (
             <div key={p.id} style={{ "--i": i } as React.CSSProperties} className="flex">
               <SubscriptionCard plan={p} isLoggedIn={isLoggedIn} redirectTo={redirectTo} paymentAvailable={paymentAvailable} />
