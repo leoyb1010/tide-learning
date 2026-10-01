@@ -1,8 +1,10 @@
 import { chromium } from "playwright";
+import { restrictToLocalApp } from "./audit-browser-network.mjs";
 
 const base = process.env.BASE_URL || "http://127.0.0.1:3100";
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+const page = await browser.newPage({ viewport: { width: 390, height: 844 }, serviceWorkers: "block" });
+await restrictToLocalApp(page.context(), base);
 const errors = [];
 page.on("console", (msg) => { if (msg.type() === "error") errors.push(msg.text()); });
 
@@ -25,6 +27,18 @@ check(await faq.getAttribute("aria-expanded") === "false", "FAQ click did not hy
 await page.goto(`${base}/courses`, { waitUntil: "networkidle" });
 await page.locator('button[aria-haspopup="dialog"]').first().click();
 check(await page.getByRole("dialog").isVisible(), "course preview interaction failed");
+await page.keyboard.press("Escape");
+await page.getByRole("dialog").waitFor({ state: "hidden" });
+check(await page.getByRole("dialog").count() === 0, "Escape left the preview dialog open");
+await page.locator('button[aria-haspopup="dialog"]').first().click();
+await page.getByRole("button", { name: "关闭预览", exact: true }).click();
+await page.getByRole("dialog").waitFor({ state: "hidden" });
+check(await page.getByRole("dialog").count() === 0, "Close left the preview dialog open");
+check(new URL(page.url()).pathname === "/courses", "dismissal changed the course-list location");
+await page.goto(`${base}/pricing`, { waitUntil: "networkidle" });
+await page.goBack({ waitUntil: "networkidle" });
+check(new URL(page.url()).pathname === "/courses", "Back failed to restore the course-list page");
+check(await page.getByRole("dialog").count() === 0, "Back resurrected a dismissed preview");
 check(errors.length === 0, `browser console errors: ${errors.join(" | ")}`);
 
 await page.goto(`${base}/does-not-exist`);

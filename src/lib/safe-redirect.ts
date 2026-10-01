@@ -1,4 +1,12 @@
-/** 只允许站内绝对路径，避免 next 参数形成开放重定向。 */
+/** Accept only unambiguous same-origin absolute paths. Browsers normalize
+ * backslashes and strip control characters before resolving a URL. */
 export function safeInternalPath(value: string | null | undefined, fallback: string): string {
-  return value?.startsWith("/") && !value.startsWith("//") ? value : fallback;
+  if (!value || !value.startsWith("/") || value.startsWith("//") || /[\\\x00-\x20\x7f]/.test(value)) return fallback;
+  try {
+    const base = "https://tide.invalid";
+    const parsed = new URL(value, base);
+    return parsed.origin === base ? value : fallback;
+  } catch {
+    return fallback;
+  }
 }

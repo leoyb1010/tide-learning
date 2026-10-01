@@ -20,7 +20,9 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     const admin = await requireAdminRole();
     const { id } = await ctx.params;
 
-    const body = (await req.json()) as { action?: unknown; password?: unknown; role?: unknown };
+    const rawBody: unknown = await req.json();
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) return fail("请求体格式错误");
+    const body = rawBody as { action?: unknown; password?: unknown; role?: unknown };
     const action = typeof body.action === "string" ? body.action : "";
 
     const target = await prisma.user.findUnique({
@@ -35,6 +37,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       await prisma.$transaction([
         prisma.user.update({ where: { id }, data: { deletedAt: new Date() } }),
         prisma.session.deleteMany({ where: { userId: id } }),
+        prisma.passwordReset.updateMany({ where: { userId: id, usedAt: null }, data: { usedAt: new Date() } }),
       ]);
       await audit({ operatorId: admin.id, action: "user:disable", targetType: "user", targetId: id }).catch(() => {});
       return ok({ id, deletedAt: new Date().toISOString() });
@@ -54,6 +57,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       await prisma.$transaction([
         prisma.user.update({ where: { id }, data: { passwordHash: hashPassword(password) } }),
         prisma.session.deleteMany({ where: { userId: id } }),
+        prisma.passwordReset.updateMany({ where: { userId: id, usedAt: null }, data: { usedAt: new Date() } }),
       ]);
       await audit({ operatorId: admin.id, action: "user:reset_password", targetType: "user", targetId: id }).catch(() => {});
       return ok({ id, reset: true });

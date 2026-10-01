@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { restrictToLocalApp } from "../scripts/audit-browser-network.mjs";
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
@@ -20,7 +21,8 @@ for (const viewport of [
   { name: "mobile", width: 375, height: 812 },
 ]) {
   // axe-core 由测试工具内联注入；绕过 CSP 只用于审计脚本，产品页面另有真实 CSP/交互探针。
-  const context = await browser.newContext({ viewport, bypassCSP: true });
+  const context = await browser.newContext({ viewport, bypassCSP: true, serviceWorkers: "block" });
+  await restrictToLocalApp(context, baseURL);
   for (const route of pages) {
     const page = await context.newPage();
     const consoleErrors = [];
@@ -89,7 +91,8 @@ for (const viewport of [
 }
 
 // 登录后检查造课模板资源，不让匿名重定向掩盖 404。
-const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, bypassCSP: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, bypassCSP: true, serviceWorkers: "block" });
+await restrictToLocalApp(context, baseURL);
 const page = await context.newPage();
 const failed = [];
 page.on("response", (res) => { if (res.status() >= 400) failed.push({ status: res.status(), url: res.url() }); });
@@ -131,6 +134,7 @@ if (mediaProbe) {
     await video.evaluate((el) => { el.muted = true; el.load(); });
     await page.waitForTimeout(800);
   }
+  await page.screenshot({ path: path.join(outDir, "desktop-auth-private-media.png"), fullPage: false });
   report.push({
     viewport: "desktop-auth",
     route: "/learn/private-media",
@@ -143,7 +147,8 @@ if (mediaProbe) {
 }
 
 // 错误态与键盘提交：不填写凭据直接提交，错误信息必须可见且页面不能产生 5xx/控制台错误。
-const errorContext = await browser.newContext({ viewport: { width: 375, height: 812 }, bypassCSP: true });
+const errorContext = await browser.newContext({ viewport: { width: 375, height: 812 }, bypassCSP: true, serviceWorkers: "block" });
+await restrictToLocalApp(errorContext, baseURL);
 const errorPage = await errorContext.newPage();
 const errorConsole = [];
 const errorFailed = [];
@@ -164,6 +169,7 @@ report.push({
   consoleErrors: errorConsole,
   failed: errorFailed,
 });
+await errorPage.screenshot({ path: path.join(outDir, "mobile-login-empty-error.png"), fullPage: false });
 await errorContext.close();
 
 await browser.close();

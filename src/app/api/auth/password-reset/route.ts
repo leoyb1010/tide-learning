@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { randomBytes } from "node:crypto";
 import { prisma } from "@/lib/db";
 import { sha256 } from "@/lib/session";
-import { ok, handle, assertSameOrigin } from "@/lib/api";
+import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +21,13 @@ export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
     assertRateLimit(req, "pwd-reset-request", 5, 60_000);
-    const { email } = (await req.json()) as { email?: string };
+    const body: unknown = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体格式错误");
+    const rawEmail = (body as { email?: unknown }).email;
+    const email = typeof rawEmail === "string" ? rawEmail.trim().toLowerCase() : "";
+    // No email delivery adapter exists yet. Do not mint undeliverable tokens or
+    // falsely tell production users that a recovery email has been sent.
+    if (process.env.NODE_ENV === "production") return fail("密码找回暂未开放，请通过帮助中心联系支持", 503);
 
     const generic = ok({ message: "若该邮箱已注册，我们已发送重置链接，请查收邮件。" });
     if (!email) return generic;
@@ -38,10 +44,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // 真实环境应发邮件；开发环境直接回传明文 token 方便调试
-    if (process.env.NODE_ENV !== "production") {
-      return ok({ message: "若该邮箱已注册，我们已发送重置链接，请查收邮件。", devToken: token });
-    }
-    return generic;
+    // Only development/test reaches this branch; production is gated above.
+    return ok({ message: "开发测试重置令牌已生成。", devToken: token });
   });
 }

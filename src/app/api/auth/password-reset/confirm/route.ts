@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { sha256, hashPassword, validatePasswordStrength } from "@/lib/session";
-import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
+import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -15,24 +15,35 @@ export async function POST(req: NextRequest) {
   return handle(async () => {
     assertSameOrigin(req);
     assertRateLimit(req, "pwd-reset-confirm", 10, 60_000);
-    const { token, password } = (await req.json()) as { token?: string; password?: string };
-    if (!token || !password) return fail("参数不完整");
+    const body: unknown = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("参数不完整");
+    const { token, password } = body as { token?: unknown; password?: unknown };
+    if (typeof token !== "string" || !/^[a-f0-9]{64}$/.test(token) || typeof password !== "string") return fail("参数不完整");
 
     const weak = validatePasswordStrength(password);
     if (weak) return fail(weak);
 
     const record = await prisma.passwordReset.findUnique({ where: { tokenHash: sha256(token) } });
-    if (!record || record.usedAt || record.expiresAt < new Date()) {
+    if (!record || record.usedAt || record.expiresAt <= new Date()) {
       return fail("重置链接无效或已过期，请重新申请");
     }
 
-    // 事务：更新密码 + 标记 token 已用（防并发复用）+ 吊销该用户所有旧会话
-    // P1-8：重置成功即失效历史登录态，避免攻击者用已窃取的旧会话在改密后继续访问。
-    await prisma.$transaction([
-      prisma.user.update({ where: { id: record.userId }, data: { passwordHash: hashPassword(password) } }),
-      prisma.passwordReset.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
-      prisma.session.deleteMany({ where: { userId: record.userId } }),
-    ]);
+    const passwordHash = hashPassword(password);
+    await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      // Claim atomically; the earlier lookup alone cannot enforce single use.
+      const claimed = await tx.passwordReset.updateMany({
+        where: { id: record.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+      if (claimed.count !== 1) throw new AppError("重置链接无效或已过期，请重新申请", 400);
+      const updated = await tx.user.updateMany({
+        where: { id: record.userId, deletedAt: null }, data: { passwordHash },
+      });
+      if (updated.count !== 1) throw new AppError("重置链接无效或已过期，请重新申请", 400);
+      await tx.passwordReset.updateMany({ where: { userId: record.userId, usedAt: null }, data: { usedAt: now } });
+      await tx.session.deleteMany({ where: { userId: record.userId } });
+    });
 
     return ok({ message: "密码已重置，请用新密码登录。" });
   });

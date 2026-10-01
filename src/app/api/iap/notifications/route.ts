@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = (await req.json().catch(() => null)) as { signedPayload?: string } | null;
-    const signedPayload = body?.signedPayload?.trim();
+    const signedPayload = typeof body?.signedPayload === "string" ? body.signedPayload.trim() : "";
     if (!signedPayload) return fail("缺少 signedPayload");
 
     const decoded = decodeAppleJws(signedPayload);
@@ -90,24 +90,26 @@ export async function POST(req: NextRequest) {
 
     const dedupKey = notificationUUID || `${notificationType}:${txId || originalTxId}`;
 
-    // 幂等占位：唯一冲突即视为重投，直接确认。
-    try {
-      await prisma.paymentWebhookLog.create({
-        data: {
-          channel: APPLE_IAP_CHANNEL,
-          eventType: notificationType,
-          externalId: dedupKey,
-          payloadJson: JSON.stringify({ notificationType, txId, originalTxId }),
-          status: "received",
-        },
-      });
-    } catch {
-      return ok({ received: true, duplicate: true });
-    }
-
     const affectedUserIds = new Set<string>();
-
+    // The receipt, financial mutations, and processed marker share one commit.
+    // Transient failures roll the marker back, so provider retries remain useful.
     const result = await prisma.$transaction(async (tx) => {
+      const key = { channel_externalId: { channel: APPLE_IAP_CHANNEL, externalId: dedupKey } };
+      const existing = await tx.paymentWebhookLog.findUnique({ where: key });
+      if (existing?.status === "processed") return { duplicate: true, revokedSub: false, clawedCredits: 0 };
+      await tx.paymentWebhookLog.upsert({
+        where: key,
+        create: { channel: APPLE_IAP_CHANNEL, eventType: notificationType, externalId: dedupKey, payloadJson: JSON.stringify({ notificationType, txId, originalTxId }), status: "received" },
+        update: { status: "received" },
+      });
+      const refundedTransactionId = txId || originalTxId;
+      // Preserve revocations that arrive before a client presents its purchase.
+      // A stale, previously signed purchase must not grant value after refund.
+      await tx.paymentWebhookLog.upsert({
+        where: { channel_externalId: { channel: "apple_iap_revocation", externalId: refundedTransactionId } },
+        create: { channel: "apple_iap_revocation", externalId: refundedTransactionId, eventType: notificationType, payloadJson: "{}", status: "processed", processedAt: new Date() },
+        update: {},
+      });
       let revokedSub = false;
       let clawedCredits = 0;
 
@@ -115,20 +117,13 @@ export async function POST(req: NextRequest) {
       // 一次 REFUND 只针对「具体退款的那笔交易(txId)」，故只精确回退该笔订单激活的订阅的**一个计费周期**，
       // 与 payment.processWebhook 退款对齐（rollbackOnePeriod），不再遍历 candidateOrderIds 把 original
       // 也一并 currentPeriodEnd=now 清零——那会误伤同订阅上 Web/其它续期已付的未退款周期。
-      // 优先具体退款交易 txId 的订单，缺失才回退到 originalTxId。
+      // 有具体交易 ID 时只处理该笔；不能因它尚未入账就回收原始交易的另一期权益。
       const refundEoid = txId ? `iap_${txId}` : `iap_${originalTxId}`;
-      const fallbackEoid = originalTxId && `iap_${originalTxId}` !== refundEoid ? `iap_${originalTxId}` : null;
-      let order = await tx.order.findUnique({
+      const order = await tx.order.findUnique({
         where: { externalOrderId: refundEoid },
         select: { id: true, userId: true, status: true, subscriptionId: true, plan: { select: { billingPeriod: true } } },
       });
-      if (!order && fallbackEoid) {
-        order = await tx.order.findUnique({
-          where: { externalOrderId: fallbackEoid },
-          select: { id: true, userId: true, status: true, subscriptionId: true, plan: { select: { billingPeriod: true } } },
-        });
-      }
-      if (order) {
+      if (order && order.status !== "refunded") {
         affectedUserIds.add(order.userId);
         if (order.status !== "refunded") {
           await tx.order.update({ where: { id: order.id }, data: { status: "refunded" } });
@@ -154,7 +149,7 @@ export async function POST(req: NextRequest) {
       }
 
       // 消耗型积分：按 refId 的 recharge 流水回收（负流水 + 扣余额，允许负债；(type=refund,refId) 幂等）。
-      for (const rid of [txId, originalTxId].filter(Boolean)) {
+      for (const rid of [refundedTransactionId]) {
         const recharge = await tx.creditLedger.findFirst({
           where: { type: "recharge", refId: rid },
           select: { delta: true, userId: true },
@@ -183,21 +178,15 @@ export async function POST(req: NextRequest) {
         clawedCredits += recharge.delta;
       }
 
-      return { revokedSub, clawedCredits };
+      await tx.paymentWebhookLog.update({ where: key, data: { status: "processed", processedAt: new Date() } });
+      return { duplicate: false, revokedSub, clawedCredits };
     });
 
     // 事务外：刷新受影响用户权益快照（非关键路径，失败不回滚已撤销状态）。
     for (const uid of affectedUserIds) {
       await resolveEntitlement(uid).catch(() => {});
     }
-    // 标记处理完成（best-effort）。
-    await prisma.paymentWebhookLog
-      .updateMany({
-        where: { channel: APPLE_IAP_CHANNEL, externalId: dedupKey },
-        data: { status: "processed", processedAt: new Date() },
-      })
-      .catch(() => {});
 
-    return ok({ received: true, notificationType, revokedSub: result.revokedSub, clawedCredits: result.clawedCredits });
+    return ok({ received: true, notificationType, duplicate: result.duplicate, revokedSub: result.revokedSub, clawedCredits: result.clawedCredits });
   });
 }

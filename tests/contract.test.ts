@@ -73,6 +73,9 @@ beforeAll(async () => {
   } catch {
     SERVER_UP = false;
   }
+  if (!SERVER_UP && process.env.CONTRACT_BASE) {
+    throw new Error(`Required contract server or test login unavailable: ${BASE}`);
+  }
   if (!SERVER_UP) {
     console.warn(`[contract] 生产服务器不可达（${BASE}），契约测试整组跳过。`);
   }

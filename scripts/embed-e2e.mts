@@ -1,3 +1,4 @@
+import { restrictToLocalApp } from "./audit-browser-network.mjs";
 /**
  * 嵌入层 E2E(v4.2·防 P0 回归网)—— 在**真实 App 页面**里验证课件三链路,而非独立渲染课件。
  *
@@ -143,7 +144,8 @@ async function main() {
   try {
     browser = await chromium.launch();
     // —— 1&2:匿名 preview 页 ——
-    const page = await browser.newPage();
+    const page = await browser.newPage({ serviceWorkers: "block" });
+    await restrictToLocalApp(page.context(), BASE);
     await page.goto(`${BASE}/courses/${fixture.slug}/preview`, { waitUntil: "domcontentloaded" });
     const modeToggle = page.getByRole("tab", { name: "翻页" });
     await modeToggle.waitFor({ state: "visible", timeout: 15_000 }).catch(() => failures.push("preview:未收到 ct-ready(「翻页」切换未出现)——课件脚本疑似被拦"));
@@ -168,7 +170,8 @@ async function main() {
     } else {
       // 清 demo 在本节的历史进度:否则 ct-goto 续读会恢复到末页(下一页禁用),翻页断言失真。
       await prisma.learningProgress.deleteMany({ where: { userId: demo.id, lessonId } });
-      const ctx = await browser.newContext();
+      const ctx = await browser.newContext({ serviceWorkers: "block" });
+      await restrictToLocalApp(ctx, BASE);
       await ctx.addCookies([{ name: "tide_session", value: token, url: BASE }]);
       const lp = await ctx.newPage();
       await lp.goto(`${BASE}/courses/${fixture.slug}/learn/${lessonId}`, { waitUntil: "domcontentloaded" });
@@ -338,7 +341,7 @@ async function main() {
       const localPracticeResponses = new Map<string, { status: number; tracked: boolean }>();
       // Beacon 的响应对页面 JS 不可见，Chromium 也不保证向 Playwright 发 response 事件。
       // 在测试路由中用 route.fetch() 真实访问 App API，记录响应后原样回填给浏览器。
-      await deterministic.route("**/api/analytics", async (route) => {
+      await deterministic.route(new URL("/api/analytics", BASE).href, async (route) => {
         const request = route.request();
         let practiceBlockId: string | null = null;
         try {
@@ -698,7 +701,8 @@ async function main() {
 
       // —— 8:reduce-motion —— 长滚动块课首载静态显示，但零滚动绝不完课。
       await prisma.learningProgress.deleteMany({ where: { userId: demo.id, lessonId: reducedLessonId } });
-      const reduceContext = await browser.newContext({ reducedMotion: "reduce" });
+      const reduceContext = await browser.newContext({ reducedMotion: "reduce", serviceWorkers: "block" });
+      await restrictToLocalApp(reduceContext, BASE);
       await reduceContext.addCookies([{ name: "tide_session", value: token, url: BASE }]);
       const reducePage = await reduceContext.newPage();
       await reducePage.goto(`${BASE}/courses/${fixture.slug}/learn/${reducedLessonId}`, { waitUntil: "domcontentloaded" });

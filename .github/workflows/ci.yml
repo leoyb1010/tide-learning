@@ -4,12 +4,20 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, "codex/audit-tide-learning-20261001*"]
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tide-ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     env:
       DATABASE_URL: "file:${{ github.workspace }}/ci.db"
       # 构建/运行时占位密钥（生产必须覆盖）。
@@ -20,6 +28,7 @@ jobs:
       NEXT_PUBLIC_PAY_CHANNEL: "mock"
       ALLOW_LOCAL_PRODUCTION: "1"
       STORAGE_MODE: "local"
+      GENERATION_WORKER_ENABLED: "0"
       STREAM_SIGNING_SECRET: "ci-stream-signing-secret-at-least-32-characters"
 
     steps:
@@ -29,7 +38,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
 
       - name: Install dependencies
@@ -77,11 +86,23 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:3100/api/courses >/dev/null
-          CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts
+          CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts tests/search.test.ts
           RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
+          BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-login-interactions.mjs
           NODE_ENV=production BASE_URL=http://127.0.0.1:3100 node scripts/verify-browser-interactions.mjs
           E2E_BASE=http://127.0.0.1:3100 npm run check:embed
+
+      - name: Preserve isolated browser audit evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tide-audit-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/browser-qa/
+            ${{ runner.temp }}/tide-server.log
+          if-no-files-found: warn
+          retention-days: 7
 
       - name: Backup and restore drill
         run: |
@@ -99,3 +120,51 @@ jobs:
           restored_media_count="$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)"
           test "$source_media_count" -ge 4
           test "$restored_media_count" = "$source_media_count"
+
+  native:
+    name: Unsigned native builds and offline policy tests
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_ANALYTICS: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Prepare Xcode project
+        working-directory: ios
+        run: |
+          xcodebuild -version
+          command -v xcodegen >/dev/null || brew install xcodegen
+          xcodegen generate
+      - name: Build iOS simulator without signing
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -project YoudaoStudio.xcodeproj -scheme YoudaoStudio \
+            -configuration Debug -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/tide-ios" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build | tee "$RUNNER_TEMP/tide-ios-build.log"
+      - name: Build macOS app without signing
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -project YoudaoStudio.xcodeproj -scheme YoudaoStudioMac \
+            -configuration Debug -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/tide-macos" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            build | tee "$RUNNER_TEMP/tide-macos-build.log"
+      - name: Run offline native session-policy tests
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild -project YoudaoStudio.xcodeproj -scheme TidePolicyTests \
+            -configuration Debug -destination 'platform=macOS' \
+            -derivedDataPath "$RUNNER_TEMP/tide-policy" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO \
+            test | tee "$RUNNER_TEMP/tide-policy-tests.log"
+      - name: Preserve native build and test logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tide-native-${{ github.sha }}
+          path: ${{ runner.temp }}/tide-*.log
+          if-no-files-found: warn
+          retention-days: 7

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
     assertRateLimit(req, `account-delete:${user.id}`, 5, 60_000);
 
     const body = (await req.json().catch(() => null)) as { password?: string; confirmation?: string } | null;
-    const password = (body?.password ?? "").trim();
+    const password = typeof body?.password === "string" ? body.password : "";
     if (body?.confirmation !== "DELETE_ACCOUNT") return fail("请输入“注销账号”以确认");
 
     if (user.authProvider === "password" && user.passwordHash) {

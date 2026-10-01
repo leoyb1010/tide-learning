@@ -41,10 +41,11 @@ struct LoginView: View {
                             .font(.studio(12)).foregroundStyle(Studio.ink3)
                     }
                     StudioButton(title: isSignup ? "注册" : "登录", loading: loading) { Task { await submit() } }
-                        .disabled(isSignup && !consentAccepted)
+                        .disabled(loading || (isSignup && !consentAccepted))
                     Button(isSignup ? "已有账号？去登录" : "没有账号？去注册") {
                         withAnimation { isSignup.toggle(); error = nil }
                     }
+                    .disabled(loading)
                     .font(.studio(13)).foregroundStyle(Studio.ink3)
                 }
                 .studioCard(padding: 20)
@@ -66,6 +67,8 @@ struct LoginView: View {
     }
 
     private func submit() async {
+        guard !loading else { return }
+        let attemptGeneration = auth.sessionGeneration
         guard !identifier.isEmpty, !password.isEmpty else { error = "请填写账号和密码"; return }
         loading = true; error = nil
         defer { loading = false }
@@ -78,7 +81,7 @@ struct LoginView: View {
             } else {
                 u = try await API.shared.post("/api/auth/login", body: LoginBody(identifier: identifier, password: password), as: AuthUser.self)
             }
-            auth.handleLoginSuccess(u)
+            guard auth.handleLoginSuccess(u, expectedGeneration: attemptGeneration) else { return }
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? "登录失败，请重试"
         }

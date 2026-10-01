@@ -4,7 +4,7 @@
   "private": true,
   "description": "潮汐学习 — 全龄订阅制学习平台 v3.4 工程原型",
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=22.13 <23"
   },
   "scripts": {
     "dev": "next dev",
@@ -45,13 +45,14 @@
     "jszip": "^3.10.1",
     "katex": "^0.18.1",
     "mammoth": "^1.12.0",
-    "next": "15.5.21",
+    "next": "15.5.27",
     "pdf-parse": "^1.1.1",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "shiki": "^4.3.1",
-    "ts-fsrs": "^5.4.1"
+    "ts-fsrs": "^5.4.1",
+    "undici": "7.29.1"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
@@ -60,18 +61,18 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "eslint": "^9.31.0",
-    "eslint-config-next": "15.5.20",
+    "eslint-config-next": "15.5.27",
     "playwright": "^1.59.1",
     "prisma": "^6.1.0",
     "tailwindcss": "^4.0.0",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^4.1.10"
+    "vitest": "4.1.11"
   },
   "overrides": {
     "postcss": ">=8.5.10",
-    "brace-expansion": "^5.0.8",
-    "sharp": "^0.35.3",
+    "brace-expansion": "^5.0.12",
+    "sharp": "^0.35.4",
     "deepmerge-ts": "^8.0.0",
     "@xmldom/xmldom": "^0.9.12"
   }

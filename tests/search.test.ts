@@ -24,9 +24,12 @@ beforeAll(async () => {
     // 没有本地服务时，某些系统/代理环境的 fetch 不会立即 ECONNREFUSED，
     // 而是一直等到 Vitest 10s hook 超时。探活必须自己有界，才能稳定地进入显式 skip。
     const res = await fetch(`${BASE}/api/search?q=z`, { signal: AbortSignal.timeout(1_500) });
-    SERVER_UP = res.ok || res.status === 429; // 429 也算「服务在跑」
+    SERVER_UP = res.ok;
   } catch {
     SERVER_UP = false;
+  }
+  if (!SERVER_UP && (process.env.SEARCH_BASE || process.env.CONTRACT_BASE)) {
+    throw new Error(`Required search contract server unavailable: ${BASE}`);
   }
 });
 
@@ -36,8 +39,8 @@ describe("GET /api/search 五域联搜", () => {
   it("响应信封 {ok,data:{results,counts}} + type 合法", async ({ skip }) => {
     if (!SERVER_UP) return skip(); // 服务器未起：显式 skip（不是静默零断言）
     const res = await fetch(`${BASE}/api/search?q=${encodeURIComponent("英语")}`);
-    // 429（限流窗口内）不算失败——契约形状本身无从校验，跳过即可
-    if (res.status === 429) return;
+    // A required CI contract must execute its assertions, not silently pass a throttle response.
+    expect(res.status).not.toBe(429);
     expect(res.ok).toBe(true);
     const json = await res.json();
     expect(json.ok).toBe(true);
@@ -61,7 +64,7 @@ describe("GET /api/search 五域联搜", () => {
     if (!SERVER_UP) return skip();
     // 不带 Authorization → 游客。用一个大概率命中笔记的常见词。
     const res = await fetch(`${BASE}/api/search?q=${encodeURIComponent("笔记")}`);
-    if (res.status === 429) return;
+    expect(res.status).not.toBe(429);
     expect(res.ok).toBe(true);
     const json = await res.json();
     expect(json.data.counts.note).toBe(0);
@@ -71,7 +74,7 @@ describe("GET /api/search 五域联搜", () => {
   it("空 q 返回空结果（不查库）", async ({ skip }) => {
     if (!SERVER_UP) return skip();
     const res = await fetch(`${BASE}/api/search?q=`);
-    if (res.status === 429) return;
+    expect(res.status).not.toBe(429);
     expect(res.ok).toBe(true);
     const json = await res.json();
     expect(json.ok).toBe(true);

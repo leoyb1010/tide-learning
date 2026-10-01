@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as
       | { productId?: string; transactionId?: string; receiptData?: string; jwsRepresentation?: string }
       | null;
-    const productId = (body?.productId ?? "").trim();
-    const transactionId = (body?.transactionId ?? "").trim();
+    const productId = typeof body?.productId === "string" ? body.productId.trim() : "";
+    const transactionId = typeof body?.transactionId === "string" ? body.transactionId.trim() : "";
     if (!productId || !transactionId) return fail("缺少 productId 或 transactionId");
 
     // 真实 Apple 校验（已实现，见 apple-iap.ts）：失败即抛 AppError("内购校验失败",400)，
@@ -116,6 +116,9 @@ export async function POST(req: NextRequest) {
     // 幂等键：优先用**签名验证过的** payload.transactionId（防同一 JWS 以 transactionId /
     // originalTransactionId 两次提交各领一次）；mock 路径（本机/测试无 payload）回落客户端提交值。
     const idempotencyTxId = (typeof verified.transactionId === "string" && verified.transactionId) || transactionId;
+    const revocationKey = { channel_externalId: { channel: "apple_iap_revocation", externalId: idempotencyTxId } };
+    if (await prisma.paymentWebhookLog.findUnique({ where: revocationKey, select: { id: true } })) throw new AppError("该内购交易已退款或撤销", 409);
+
 
     // —— 积分类充值 ——
     // 用 Object.hasOwn 而非 `in`（审计 2026-07-12 P2-3）：`in` 会命中 Object.prototype 继承键，
@@ -131,6 +134,7 @@ export async function POST(req: NextRequest) {
       //   全局唯一会破坏计费/月赠契约；故用事务内全局二次确认，等价幂等且不改 schema。）
       await ensureAccount(user.id);
       const result = await prisma.$transaction(async (tx) => {
+        if (await tx.paymentWebhookLog.findUnique({ where: revocationKey, select: { id: true } })) throw new AppError("该内购交易已退款或撤销", 409);
         const dup = await tx.creditLedger.findFirst({
           where: { type: "recharge", refId: idempotencyTxId },
           select: { id: true },
@@ -185,6 +189,7 @@ export async function POST(req: NextRequest) {
       let result: string;
       try {
         result = await prisma.$transaction(async (tx) => {
+        if (await tx.paymentWebhookLog.findUnique({ where: revocationKey, select: { id: true } })) throw new AppError("该内购交易已退款或撤销", 409);
         // 记账订单（幂等键 externalOrderId 全局唯一，并发下重复插入会被 unique 拦截）
         const order = await tx.order.create({
           data: {

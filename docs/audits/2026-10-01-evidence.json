@@ -1,0 +1,129 @@
+{
+  "repository": "leoyb1010/tide-learning",
+  "date_utc": "2026-10-01",
+  "baseline_commit": "7bc284abed7b3fb2cb23aec5b7b2b0178d8ae95c",
+  "baseline_tree": "3269dbd66267fc772838ecfbba023a889ffafa91",
+  "round1_frozen_local_snapshot": "edf8be68270ae6154a8fb6a887146a05cb8a357b",
+  "methods": [
+    "manual source trust-boundary review",
+    "synthetic isolated SQLite adversarial tests",
+    "HTTP contracts",
+    "compatible dependency upgrades",
+    "backup and restore failure drills"
+  ],
+  "round1_new_adversarial": {
+    "files": 8,
+    "passed": 31,
+    "failed": 0
+  },
+  "round2_aggregate_before_network_cases": {
+    "files": 107,
+    "passed": 793,
+    "skipped": 13,
+    "failed": 0
+  },
+  "round2_network_cases": {
+    "passed": 2,
+    "failed": 0
+  },
+  "http_smoke": {
+    "passed": 22,
+    "failed": 0
+  },
+  "http_contracts": {
+    "passed": 10,
+    "failed": 0
+  },
+  "dependency_advisories": {
+    "before": 7,
+    "after": 0
+  },
+  "hosted_ci": {
+    "status": "pending exact-commit run",
+    "browser_screenshots": "pending inspection",
+    "ios_unsigned_build": "pending",
+    "macos_unsigned_build": "pending",
+    "native_xctest": "pending; 8 cases"
+  },
+  "local_limits": [
+    "localhost CUA ERR_BLOCKED_BY_CLIENT",
+    "source/authored synthetic media used in local tests; original remote binaries preserved",
+    "one build and one typecheck killed under shared load; bounded reruns passed"
+  ],
+  "evidence_log_digests": {
+    "round1-repro.log": {
+      "sha256": "e5b79c363a4e5ee05dc989156a1a5e4955988a66f91be3939e9fcbc8479369a7",
+      "bytes": 7295
+    },
+    "round1-rbac-repro.log": {
+      "sha256": "6878239e2a0edcad2907284888af9656db892f256f5f53df95d71e5b930031a6",
+      "bytes": 1959
+    },
+    "round1-restore-tests-repro.log": {
+      "sha256": "9332b4ddc8aa4090df54ff86eb36ff0c2d488447116a88888df9b70ef19460ce",
+      "bytes": 3508
+    },
+    "round1-reset-repro.log": {
+      "sha256": "47bc2f37c6fdfb2a1594ad6e6adc6e7439f47f481396fa7e57cf69d6020f6fbb",
+      "bytes": 4651
+    },
+    "round1-iap-repro.log": {
+      "sha256": "a40d8548a37447a41bcc73b734c5a62ba8079f9d122f725b3d0f10919e32c2a1",
+      "bytes": 4564
+    },
+    "round1-new-adversarial-all.log": {
+      "sha256": "6018f627de8a3897dec506d025a7d304be523bf99caef8fcbeb1ba64892ca515",
+      "bytes": 2835
+    },
+    "round1-build-bounded.log": {
+      "sha256": "ae1feb754d4ee4a8b8bd79633c2c5125d95065b87e40244e6dfa97025cf89fb1",
+      "bytes": 20840
+    },
+    "round1-contract-smoke.log": {
+      "sha256": "41b82e6b00e8283fb321905c132ed16f3be7e993cbbb62759c34d73a0317eef2",
+      "bytes": 1383
+    },
+    "round1-final-runtime.log": {
+      "sha256": "dfc6c21d760833326566a5605cea748d76669d83d167458375cbbf3be98a5068",
+      "bytes": 469
+    },
+    "round1-legacy-migration.log": {
+      "sha256": "eb35e47f2a845fb4908bb2f1324e67c3c01fb5e952765ac33cb6c59b0a898cd3",
+      "bytes": 827
+    },
+    "round1-complete-npm-audit.json": {
+      "sha256": "a066bc8f11d8c739a4ee93186393fd3fd40b7e4f6ce20ec7310bf5885dba5566",
+      "bytes": 366
+    },
+    "round2-repro.log": {
+      "sha256": "9a98754ffd8d152db548046fb4301944efc841653f82878ca89ba4f205578e7b",
+      "bytes": 3970
+    },
+    "round2-focused.log": {
+      "sha256": "fbbb2cad77954de92e37bf3de201307238100fa3b3bfe08d88509c402f44e1f6",
+      "bytes": 1765
+    },
+    "round2-unit.log": {
+      "sha256": "134c44be89ab24de06e6a3c8ad402d7165ed00b3bfb174069d0c172fc357b4bf",
+      "bytes": 20067
+    },
+    "round2-tsc-bounded.log": {
+      "sha256": "b8f1da23c25f1d57d5608040046f3916f6bcbdcdbe8ce869f7248e79badcb07a",
+      "bytes": 273
+    },
+    "round2-lint-final.log": {
+      "sha256": "7e602a5cdfd8df2290884560fd4dcc89ad920a081f7f8288cb643595255741e8",
+      "bytes": 506
+    },
+    "round2-network.log": {
+      "sha256": "fb5ac5fc4252c6b9e878f0c887afbcfd9e95183701767c9445ae7fd93a076f9d",
+      "bytes": 1321
+    }
+  },
+  "final_local_aggregate": {
+    "files": 108,
+    "passed": 795,
+    "skipped": 13,
+    "failed": 0
+  }
+}

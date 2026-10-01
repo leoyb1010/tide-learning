@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
+import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -60,6 +60,7 @@ function normalizeShowProfile(raw: unknown): Record<ShowKey, boolean> | null {
   } else if (raw && typeof raw === "object") {
     obj = raw as Record<string, unknown>;
   }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) return null;
   return {
     stats: obj.stats !== false, // 缺省展示
     badges: obj.badges !== false,
@@ -73,7 +74,9 @@ export async function PATCH(req: NextRequest) {
     const user = await requireUser();
     assertRateLimit(req, "profile_update", 20, 60_000);
 
-    const body = (await req.json().catch(() => ({}))) as PatchBody;
+    const rawBody: unknown = await req.json();
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) return fail("请求体格式错误");
+    const body = rawBody as PatchBody;
 
     // 组装两张表的增量（只带入合法字段），并记录昵称是否变更以判定冷却。
     const userData: { nickname?: string; avatarUrl?: string | null } = {};
@@ -197,6 +200,12 @@ export async function PATCH(req: NextRequest) {
 
     // 事务：User + UserProfile 一起写；profile 不存在则 upsert 创建。
     await prisma.$transaction(async (tx) => {
+      if (userData.nickname) {
+        const profile = await tx.userProfile.findUnique({ where: { userId: user.id }, select: { nicknameChangedAt: true } });
+        if (profile?.nicknameChangedAt && Date.now() < profile.nicknameChangedAt.getTime() + NICKNAME_COOLDOWN_DAYS * 864e5) {
+          throw new AppError("改名冷却中，请稍后再试", 429);
+        }
+      }
       if (Object.keys(userData).length > 0) {
         await tx.user.update({ where: { id: user.id }, data: userData });
       }

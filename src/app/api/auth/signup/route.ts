@@ -13,7 +13,8 @@ export async function POST(req: NextRequest) {
     assertSameOrigin(req);
     // 与 login/改密/重置对齐：注册也须限流，抑制垃圾账号。按 IP 限：同 IP 5 次/分。
     assertRateLimit(req, "signup", 5, 60_000);
-    const body = await req.json();
+    const body: unknown = await req.json();
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体格式错误");
     const { identifier, password, nickname, termsAccepted, privacyAccepted, consentVersion } = body as {
       identifier?: string;
       password?: string;
@@ -46,6 +47,7 @@ export async function POST(req: NextRequest) {
     await track({ eventName: "signup_start", properties: { method: isEmail ? "email" : "phone" } });
 
     // 昵称净化：去控制字符/换行 + trim + 截断，防止拼进通知标题投放骚扰。
+    if (nickname !== undefined && typeof nickname !== "string") return fail("昵称格式不正确");
     const cleanNickname = (nickname ?? "").replace(/[\x00-\x1f\x7f]/g, "").trim().slice(0, 20);
     const finalNickname =
       cleanNickname || (isEmail ? account.value.split("@")[0] : `用户${account.value.slice(-4)}`);

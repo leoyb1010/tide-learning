@@ -53,8 +53,12 @@ fi
 
 mkdir -p "$BACKUP_DIR"
 chmod 700 "$BACKUP_DIR" 2>/dev/null || true
-STAMP="$(date +%Y%m%d-%H%M%S)"
-DEST="$BACKUP_DIR/tide-$STAMP.db"
+# Publish only complete snapshots. Encryption or archive failures must never
+# leave plaintext in a directory advertised as encrypted-only.
+WORK_DIR="$(mktemp -d "$BACKUP_DIR/.tide-backup-XXXXXX")"
+trap 'rm -rf -- "$WORK_DIR"' EXIT
+STAMP="$(date +%Y%m%d-%H%M%S)-$$"
+DEST="$WORK_DIR/tide-$STAMP.db"
 
 # --- 在线热备：.backup 产出事务一致的快照（WAL 安全） ------------------------
 sqlite3 "$DB_PATH" ".backup '$DEST'"
@@ -66,7 +70,7 @@ echo "✅ DB 备份完成：${DEST}（$(du -h "$DEST" | cut -f1)）"
 
 # --- uploads 目录打包（若存在）----------------------------------------------
 if [ -d "$ASSETS_DIR" ]; then
-  TARBALL="$BACKUP_DIR/tide-$STAMP-uploads.tar.gz"
+  TARBALL="$WORK_DIR/tide-$STAMP-uploads.tar.gz"
   tar -czf "$TARBALL" -C "$(dirname "$ASSETS_DIR")" "$(basename "$ASSETS_DIR")"
   echo "✅ 私有资产打包完成：${TARBALL}（$(du -h "$TARBALL" | cut -f1)）"
 fi
@@ -87,13 +91,14 @@ if [ -n "$PASSWORD_FILE" ]; then
 fi
 
 # --- 校验清单：恢复前可验证备份未被截断或篡改 -------------------------------
-MANIFEST="$BACKUP_DIR/tide-$STAMP.sha256"
+MANIFEST="$WORK_DIR/tide-$STAMP.sha256"
 if command -v sha256sum >/dev/null 2>&1; then
-  (cd "$BACKUP_DIR" && sha256sum "${BACKUP_FILES[@]##*/}") > "$MANIFEST"
+  (cd "$WORK_DIR" && sha256sum "${BACKUP_FILES[@]##*/}") > "$MANIFEST"
 else
-  (cd "$BACKUP_DIR" && shasum -a 256 "${BACKUP_FILES[@]##*/}") > "$MANIFEST"
+  (cd "$WORK_DIR" && shasum -a 256 "${BACKUP_FILES[@]##*/}") > "$MANIFEST"
 fi
-echo "✅ 校验清单完成：${MANIFEST}"
+mv -- "${BACKUP_FILES[@]}" "$MANIFEST" "$BACKUP_DIR/"
+echo "✅ 完整备份与校验清单已发布到：${BACKUP_DIR}"
 
 # --- 轮转清理：按文件名时间戳倒序，保留最近 KEEP 份 --------------------------
 find "$BACKUP_DIR" -maxdepth 1 -type f \( -name 'tide-*.db' -o -name 'tide-*.db.enc' \) | sort -r | tail -n +$((KEEP + 1)) | while read -r OLD; do

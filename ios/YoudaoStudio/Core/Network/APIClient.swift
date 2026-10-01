@@ -36,6 +36,16 @@ final class API {
         session = URLSession(configuration: cfg)
     }
 
+    /// Best-effort server revocation of an explicitly captured logout credential.
+    /// This request cannot clear or accidentally send a newer account's token.
+    func revokeSession(_ token: String) async {
+        var req = URLRequest(url: makeURL("/api/auth/logout"))
+        req.httpMethod = "POST"
+        req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        req.setValue(AppConfig.appOrigin, forHTTPHeaderField: "X-App-Origin")
+        _ = try? await session.data(for: req)
+    }
+
     func get<T: Decodable>(_ path: String, as: T.Type) async throws -> T {
         try await send(path, method: "GET", body: Optional<EmptyBody>.none, as: T.self)
     }
@@ -70,45 +80,49 @@ final class API {
     }
 
     /// 组装带鉴权头（Bearer + X-App-Origin）的请求。upload/getData 与 send 共用，保证鉴权一致。
-    private func authorizedRequest(_ path: String, method: String) async -> URLRequest {
+    private func authorizedRequest(_ path: String, method: String) async -> (request: URLRequest, generation: UInt64) {
+        let snapshot = await AuthManager.shared.requestSnapshot()
         var req = URLRequest(url: makeURL(path))
         req.httpMethod = method
         req.setValue(AppConfig.appOrigin, forHTTPHeaderField: "X-App-Origin")
-        if let token = await AuthManager.shared.token {
+        if let token = snapshot.token {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        return req
+        return (req, snapshot.generation)
     }
 
     private func send<B: Encodable, T: Decodable>(_ path: String, method: String, body: B?, as: T.Type) async throws -> T {
-        var req = await authorizedRequest(path, method: method)
+        let context = await authorizedRequest(path, method: method)
+        var req = context.request
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let body, !(body is EmptyBody) {
             req.httpBody = try JSONEncoder().encode(body)
         }
-        return try await run(req, as: T.self)
+        return try await run(req, generation: context.generation, as: T.self)
     }
 
     /// 执行请求并解码统一信封。send/upload 共用。
-    private func run<T: Decodable>(_ req: URLRequest, as: T.Type) async throws -> T {
+    private func run<T: Decodable>(_ req: URLRequest, generation: UInt64, as: T.Type) async throws -> T {
         let data: Data, resp: URLResponse
         do { (data, resp) = try await session.data(for: req) }
         catch { throw APIError.network("网络连接失败，请稍后重试") }
 
+        try await requireCurrentSession(for: req, generation: generation)
         let http = resp as! HTTPURLResponse
         let env: APIEnvelope<T>
         do { env = try JSONDecoder.api.decode(APIEnvelope<T>.self, from: data) }
         catch {
             if http.statusCode >= 400 {
-                await handleAuthExpiredIfNeeded(status: http.statusCode)
+                await handleAuthExpiredIfNeeded(status: http.statusCode, request: req, generation: generation)
                 throw APIError.from(status: http.statusCode, message: nil)
             }
             throw APIError.network("数据解析失败")
         }
         guard http.statusCode < 400, env.ok, let value = env.data else {
-            await handleAuthExpiredIfNeeded(status: http.statusCode)
+            await handleAuthExpiredIfNeeded(status: http.statusCode, request: req, generation: generation)
             throw APIError.from(status: http.statusCode, message: env.error)
         }
+        try await requireCurrentSession(for: req, generation: generation)
         return value
     }
 
@@ -129,32 +143,42 @@ final class API {
         body.append(fileData)
         body.appendString("\r\n--\(boundary)--\r\n")
 
-        var req = await authorizedRequest(path, method: "POST")
+        let context = await authorizedRequest(path, method: "POST")
+        var req = context.request
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         req.httpBody = body
-        return try await run(req, as: T.self)
+        return try await run(req, generation: context.generation, as: T.self)
     }
 
     /// 带鉴权拉二进制（分享图 PNG 用）：返回原始 Data，非信封。4xx/5xx 折叠为 APIError。
     func getData(_ path: String) async throws -> Data {
-        let req = await authorizedRequest(path, method: "GET")
+        let context = await authorizedRequest(path, method: "GET")
+        let req = context.request
         let data: Data, resp: URLResponse
         do { (data, resp) = try await session.data(for: req) }
         catch { throw APIError.network("网络连接失败，请稍后重试") }
+        try await requireCurrentSession(for: req, generation: context.generation)
         let http = resp as! HTTPURLResponse
         guard http.statusCode < 400 else {
-            await handleAuthExpiredIfNeeded(status: http.statusCode)
+            await handleAuthExpiredIfNeeded(status: http.statusCode, request: req, generation: context.generation)
             throw APIError.from(status: http.statusCode, message: nil)
         }
+        try await requireCurrentSession(for: req, generation: context.generation)
         return data
+    }
+
+    private func requireCurrentSession(for request: URLRequest, generation: UInt64) async throws {
+        guard await AuthManager.shared.acceptsResponse(generation: generation, requestAuthorization: request.value(forHTTPHeaderField: "Authorization")) else {
+            throw APIError.message("登录状态已变化，请重新操作")
+        }
     }
 
     /// 全局 401 处理：任意请求命中 401（token 失效）即触发本地登出，
     /// AuthManager 内部幂等（已登出则跳过），RootView 观察登录态自动回登录页。
     /// iOS / macOS 双端共享此逻辑。
-    private func handleAuthExpiredIfNeeded(status: Int) async {
+    private func handleAuthExpiredIfNeeded(status: Int, request: URLRequest, generation: UInt64) async {
         guard status == 401 else { return }
-        await AuthManager.shared.handleAuthExpired()
+        await AuthManager.shared.handleAuthExpired(requestAuthorization: request.value(forHTTPHeaderField: "Authorization"), generation: generation)
     }
 }
 

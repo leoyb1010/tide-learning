@@ -6,7 +6,7 @@ import {
   hashPassword,
   validatePasswordStrength,
 } from "@/lib/session";
-import { ok, fail, handle, assertSameOrigin } from "@/lib/api";
+import { ok, fail, handle, AppError, assertSameOrigin } from "@/lib/api";
 import { assertRateLimit } from "@/lib/rate-limit";
 import { track } from "@/lib/analytics";
 
@@ -28,9 +28,9 @@ export async function POST(req: NextRequest) {
     const body = (await req.json().catch(() => null)) as
       | { currentPassword?: string; newPassword?: string; confirmPassword?: string }
       | null;
-    const currentPassword = (body?.currentPassword ?? "").trim();
-    const newPassword = (body?.newPassword ?? "").trim();
-    const confirmPassword = (body?.confirmPassword ?? "").trim();
+    const currentPassword = typeof body?.currentPassword === "string" ? body.currentPassword : "";
+    const newPassword = typeof body?.newPassword === "string" ? body.newPassword : "";
+    const confirmPassword = typeof body?.confirmPassword === "string" ? body.confirmPassword : "";
     if (!currentPassword || !newPassword) return fail("请填写当前密码和新密码");
     if (newPassword !== confirmPassword) return fail("两次输入的新密码不一致");
     if (newPassword === currentPassword) return fail("新密码不能与当前密码相同");
@@ -47,14 +47,18 @@ export async function POST(req: NextRequest) {
     const weak = validatePasswordStrength(newPassword);
     if (weak) return fail(weak);
 
-    // 越权铁律：where userId
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: hashPassword(newPassword) },
+    const passwordHash = hashPassword(newPassword);
+    await prisma.$transaction(async (tx) => {
+      // A concurrent password change must not be overwritten using a stale
+      // authenticated snapshot, and revocation must commit with the new hash.
+      const updated = await tx.user.updateMany({
+        where: { id: user.id, passwordHash: user.passwordHash, deletedAt: null },
+        data: { passwordHash },
+      });
+      if (updated.count !== 1) throw new AppError("账号状态已变更，请重新登录后重试", 409);
+      await tx.session.deleteMany({ where: { userId: user.id } });
+      await tx.passwordReset.updateMany({ where: { userId: user.id, usedAt: null }, data: { usedAt: new Date() } });
     });
-
-    // 改密后吊销全部会话，避免旧凭据被继续使用
-    await prisma.session.deleteMany({ where: { userId: user.id } });
 
     await track({ eventName: "account_change_password", userId: user.id });
 

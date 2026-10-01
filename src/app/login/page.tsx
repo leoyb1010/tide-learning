@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui";
@@ -24,16 +24,23 @@ function LoginInner() {
   const [hydrated, setHydrated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const pending = useRef<AbortController | null>(null);
+  useEffect(() => () => pending.current?.abort(), []);
 
   useEffect(() => setHydrated(true), []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (pending.current) return;
+    const controller = new AbortController();
+    pending.current = controller;
+    const timeout = setTimeout(() => controller.abort(), 20_000);
     setLoading(true);
     setErr(null);
     try {
       const res = await fetch(`/api/auth/${mode === "login" ? "login" : "signup"}`, {
         method: "POST",
+        signal: controller.signal,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           identifier,
@@ -50,8 +57,10 @@ function LoginInner() {
       router.push(next);
       router.refresh();
     } catch (e) {
-      setErr((e as Error).message);
+      setErr(e instanceof Error && e.name === "AbortError" ? "请求超时，请稍后重试" : e instanceof Error ? e.message : "服务异常，请稍后再试");
     } finally {
+      clearTimeout(timeout);
+      pending.current = null;
       setLoading(false);
     }
   }
@@ -69,6 +78,7 @@ function LoginInner() {
             <input
               id="login-identifier"
               name="identifier"
+              maxLength={254}
               autoComplete="username"
               value={identifier}
               onChange={(e) => setIdentifier(e.target.value)}
@@ -90,6 +100,7 @@ function LoginInner() {
             <input
               id="login-password"
               name="password"
+              maxLength={mode === "signup" ? 256 : 1024}
               type="password"
               autoComplete={mode === "signup" ? "new-password" : "current-password"}
               value={password}
@@ -118,7 +129,7 @@ function LoginInner() {
 
         <p className="mt-5 text-center text-sm text-ink-500">
           {mode === "login" ? "还没有账号？" : "已有账号？"}
-          <button onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); }} className="ml-1 font-medium text-accent-700 hover:underline">
+          <button type="button" disabled={loading} onClick={() => { setMode(mode === "login" ? "signup" : "login"); setErr(null); }} className="ml-1 font-medium text-accent-700 hover:underline disabled:cursor-wait disabled:opacity-50">
             {mode === "login" ? "去注册" : "去登录"}
           </button>
         </p>

@@ -66,6 +66,7 @@ const WEAK_PASSWORDS = new Set([
 
 /** 返回错误文案；null 表示通过。要求 ≥8 位、含字母与数字、非黑名单。 */
 export function validatePasswordStrength(pw: string): string | null {
+  if (pw.length > 256) return "密码最多 256 位";
   if (pw.length < 8) return "密码至少 8 位";
   if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) return "密码需同时包含字母和数字";
   if (WEAK_PASSWORDS.has(pw.toLowerCase())) return "密码过于常见，请更换";
@@ -101,7 +102,7 @@ export async function createSession(userId: string): Promise<string> {
   // 会话令牌：256 位 CSPRNG 明文 token 只交给客户端（cookie / Bearer）；DB 只存其 sha256 作查找键。
   // P2-10 修复：此前把明文 token 直接作 Session.id 落库——只读级 DB 泄露（注入取数 / 备份外泄）即可
   // 拿到所有在线会话 token 直接重放，与已哈希的重置 token 处理不一致。现改为存 sha256，原文不落库。
-  // 旧明文会话由 getCurrentUser / destroySession 双读兼容，至自然过期（≤30 天）后全量收敛。
+  // 旧明文会话的 30 天迁移窗口已结束；读取只接受令牌哈希，禁止把存储摘要当作令牌重放。
   const token = randomBytes(32).toString("hex");
   await prisma.session.create({
     data: { id: sha256(token), userId, expiresAt },
@@ -118,13 +119,10 @@ export async function createSession(userId: string): Promise<string> {
 }
 
 export async function destroySession(): Promise<void> {
+  const sid = await currentSessionId();
+  if (sid) await prisma.session.deleteMany({ where: { id: sha256(sid) } });
   const cookieStore = await cookies();
-  const sid = cookieStore.get(SESSION_COOKIE)?.value;
-  if (sid) {
-    // 删新格式(sha256)与旧格式(明文)两种主键，兼容 P2-10 前创建的会话。
-    await prisma.session.deleteMany({ where: { id: { in: [sha256(sid), sid] } } });
-    cookieStore.delete(SESSION_COOKIE);
-  }
+  cookieStore.delete(SESSION_COOKIE);
 }
 
 /**
@@ -139,29 +137,27 @@ export async function destroySession(): Promise<void> {
 async function currentSessionId(): Promise<string | null> {
   const h = await headers();
   const auth = h.get("authorization");
-  if (auth?.startsWith("Bearer ")) {
-    const t = auth.slice(7).trim();
-    if (t) return t;
+  // An explicit Authorization header must never silently authenticate a different
+  // cookie identity. Only the 256-bit tokens issued by createSession are accepted.
+  if (auth !== null) {
+    const match = /^Bearer ([a-f0-9]{64})$/i.exec(auth);
+    return match?.[1] ?? null;
   }
   const cookieStore = await cookies();
-  return cookieStore.get(SESSION_COOKIE)?.value ?? null;
+  const sid = cookieStore.get(SESSION_COOKIE)?.value;
+  return sid && /^[a-f0-9]{64}$/.test(sid) ? sid : null;
 }
 
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const sid = await currentSessionId();
   if (!sid) return null;
-  // 先按 sha256(sid) 查（P2-10 新格式）；查不到再按明文 id 查（修复前创建的旧会话，兼容至过期）。
-  let session = await prisma.session.findUnique({
+  // The pre-July legacy plaintext grace period (at most 30 days) has expired.
+  // Raw-ID fallback would also accept a leaked stored digest as a credential.
+  const session = await prisma.session.findUnique({
     where: { id: sha256(sid) },
     include: { user: true },
   });
-  if (!session) {
-    session = await prisma.session.findUnique({
-      where: { id: sid },
-      include: { user: true },
-    });
-  }
-  if (!session || session.expiresAt < new Date()) return null;
+  if (!session || session.expiresAt <= new Date()) return null;
   if (session.user.deletedAt) return null;
   return session.user;
 });
@@ -210,6 +206,10 @@ export const ALL_PERMISSIONS: Permission[] = [
 /** 全部内置角色（矩阵 UI 的行）。 */
 export const ALL_ROLES = Object.keys(ROLE_PERMISSIONS);
 
+// Persistent marker distinguishes an intentionally empty override from defaults.
+// It is never an assignable permission and is removed only by explicit reset.
+export const PERMISSION_OVERRIDE_MARKER = "__override__";
+
 const ADMIN_ROLES = ALL_ROLES;
 
 /**
@@ -231,7 +231,7 @@ const OVERRIDE_TTL_MS = 10_000; // 10s 短缓存：调整权限后最迟 10s 全
  * 刷新 DB 覆盖缓存（TTL 内直接命中，不查库）。
  * 权限校验路径在调用同步 hasPermission 前应先 await 本函数，
  * 以确保读到的是最新覆盖（requirePermission 已内置调用）。
- * 查库失败时保留旧缓存并放行（fail-safe：不因权限表抖动导致全站 403）。
+ * 查库失败必须拒绝权限敏感请求，不能在冷启动或缓存过期时恢复默认授权。
  */
 export async function primePermissionCache(force = false): Promise<void> {
   const now = Date.now();
@@ -251,8 +251,8 @@ export async function primePermissionCache(force = false): Promise<void> {
       overrideCache = next;
       overrideCacheAt = Date.now();
     } catch (e) {
-      // 保留旧缓存；仅记录，避免权限表读取失败拖垮请求
       console.error("[rbac:override-cache]", e instanceof Error ? e.message : e);
+      throw new AuthError("权限服务暂不可用，请稍后重试", 503);
     } finally {
       overrideInflight = null;
     }

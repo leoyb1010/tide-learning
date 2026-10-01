@@ -108,3 +108,31 @@ targets:
         # 生产走 https 正式域名不受影响；NSAllowsLocalNetworking 只放行本地网络。
         NSAppTransportSecurity:
           NSAllowsLocalNetworking: true
+
+  TidePolicyTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+      - path: YoudaoStudio/Core/Auth/SessionInvalidationPolicy.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.youdao.studio.policy-tests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGNING_ALLOWED: NO
+schemes:
+  YoudaoStudio:
+    build:
+      targets:
+        YoudaoStudio: all
+  YoudaoStudioMac:
+    build:
+      targets:
+        YoudaoStudioMac: all
+  TidePolicyTests:
+    build:
+      targets:
+        TidePolicyTests: all
+    test:
+      targets:
+        - TidePolicyTests

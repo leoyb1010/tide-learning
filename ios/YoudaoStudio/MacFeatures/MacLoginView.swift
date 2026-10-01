@@ -79,11 +79,12 @@ struct MacLoginView: View {
                     StudioButton(title: isSignup ? "注册" : "登录", loading: loading) {
                         Task { await submit() }
                     }
-                    .disabled(isSignup && !consentAccepted)
+                    .disabled(loading || (isSignup && !consentAccepted))
 
                     Button(isSignup ? "已有账号？去登录" : "没有账号？去注册") {
                         withAnimation { isSignup.toggle(); error = nil }
                     }
+                    .disabled(loading)
                     .buttonStyle(.plain)
                     .font(.studio(13))
                     .foregroundStyle(Studio.ink3)
@@ -98,6 +99,8 @@ struct MacLoginView: View {
     }
 
     private func submit() async {
+        guard !loading else { return }
+        let attemptGeneration = auth.sessionGeneration
         guard !identifier.isEmpty, !password.isEmpty else {
             error = "请填写账号和密码"
             return
@@ -126,7 +129,7 @@ struct MacLoginView: View {
                 )
             }
             // 复用共享登录成功处理：写 token/Keychain，触发 RootView 切主界面。
-            auth.handleLoginSuccess(u)
+            guard auth.handleLoginSuccess(u, expectedGeneration: attemptGeneration) else { return }
         } catch {
             self.error = (error as? APIError)?.errorDescription ?? "登录失败，请重试"
         }

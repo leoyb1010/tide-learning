@@ -8,6 +8,7 @@ import {
   ALL_ROLES,
   ALL_PERMISSIONS,
   ROLE_PERMISSIONS,
+  PERMISSION_OVERRIDE_MARKER,
   ADMIN_LOCKED_PERMISSIONS,
   type Permission,
 } from "@/lib/session";
@@ -59,7 +60,9 @@ export async function POST(req: NextRequest) {
     const operator = await requireAdminRole();
     assertSameOrigin(req); // 写操作 CSRF 防护
 
-    const body = (await req.json()) as { role?: string; permission?: string; granted?: boolean };
+    const rawBody: unknown = await req.json();
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) return fail("请求体格式错误");
+    const body = rawBody as { role?: string; permission?: string; granted?: boolean };
     const role = body.role;
     const permission = body.permission;
     const granted = body.granted;
@@ -76,23 +79,29 @@ export async function POST(req: NextRequest) {
     await primePermissionCache(true);
     const before = new Set(effectivePermissions(role).permissions);
 
-    // 首次覆盖：把该角色当前有效权限固化进 DB（代码默认 → DB 记录），后续变更基于此
-    const hasDbRows = await prisma.rolePermission.count({ where: { role } });
-    if (hasDbRows === 0) {
-      await prisma.rolePermission.createMany({
-        data: ROLE_PERMISSIONS[role]?.map((perm) => ({ role, permission: perm })) ?? [],
-      });
-    }
-
-    if (granted) {
-      await prisma.rolePermission.upsert({
-        where: { role_permission: { role, permission } },
-        create: { role, permission },
+    // Seed defaults and mutate the override atomically. Keep a marker even when
+    // the final grant is revoked; otherwise an empty role silently regains defaults.
+    await prisma.$transaction(async (tx) => {
+      const hasDbRows = await tx.rolePermission.count({ where: { role } });
+      if (hasDbRows === 0) {
+        await tx.rolePermission.createMany({
+          data: ROLE_PERMISSIONS[role]?.map((perm) => ({ role, permission: perm })) ?? [],
+        });
+      }
+      await tx.rolePermission.upsert({
+        where: { role_permission: { role, permission: PERMISSION_OVERRIDE_MARKER } },
+        create: { role, permission: PERMISSION_OVERRIDE_MARKER },
         update: {},
       });
-    } else {
-      await prisma.rolePermission.deleteMany({ where: { role, permission } });
-    }
+      if (granted) {
+        await tx.rolePermission.upsert({
+          where: { role_permission: { role, permission } },
+          create: { role, permission }, update: {},
+        });
+      } else {
+        await tx.rolePermission.deleteMany({ where: { role, permission } });
+      }
+    });
 
     invalidatePermissionCache();
     await primePermissionCache(true);
