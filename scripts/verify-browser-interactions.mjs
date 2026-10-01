@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium } from "playwright";
 import { restrictToLocalApp } from "./audit-browser-network.mjs";
@@ -32,9 +32,27 @@ const previewTrigger = page.getByRole("main").locator('button[aria-haspopup="dia
 const preview = page.getByRole("dialog", { name: / · 课程预览$/ });
 await previewTrigger.click();
 await preview.waitFor({ state: "visible" });
+// Observe the real settled state; screenshot animation overrides can capture a compositor mid-frame.
+await page.waitForFunction(() => {
+  const panel = document.querySelector('[role="dialog"][aria-label$="课程预览"] .preview-sheet-in');
+  if (!panel) return false;
+  const css = getComputedStyle(panel);
+  const box = panel.getBoundingClientRect();
+  const transform = new DOMMatrixReadOnly(css.transform);
+  return Number(css.opacity) >= 0.999 && Math.abs(transform.m42) < 0.1 &&
+    box.top >= 0 && box.bottom <= innerHeight + 1 && box.left >= 0 && box.right <= innerWidth + 1 &&
+    panel.getAnimations().every(animation => ["finished", "idle"].includes(animation.playState));
+}, undefined, { timeout: 5000 });
+await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 if (process.env.QA_OUT) {
+  const settled = await preview.locator(".preview-sheet-in").evaluate(panel => {
+    const css = getComputedStyle(panel);
+    const box = panel.getBoundingClientRect();
+    return { opacity: css.opacity, transform: css.transform, top: box.top, bottom: box.bottom, left: box.left, right: box.right, viewportWidth: innerWidth, viewportHeight: innerHeight };
+  });
   await mkdir(process.env.QA_OUT, { recursive: true });
-  await page.screenshot({ path: join(process.env.QA_OUT, "mobile-course-preview.png"), fullPage: false, animations: "disabled" });
+  await writeFile(join(process.env.QA_OUT, "course-preview-settled.json"), JSON.stringify(settled, null, 2));
+  await page.screenshot({ path: join(process.env.QA_OUT, "mobile-course-preview.png"), fullPage: false });
 }
 await page.keyboard.press("Escape");
 await page.getByRole("dialog").waitFor({ state: "hidden" });
