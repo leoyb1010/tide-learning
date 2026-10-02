@@ -121,13 +121,14 @@ try {
   assert.equal(revokedStatus, 403, "Revoked reviewer retained authority beyond cache TTL");
   do {
     await reviewer.page.reload({ waitUntil: "networkidle" });
-    if (new URL(reviewer.page.url()).pathname === "/") break;
+    // The public-home fallback redirects authenticated users to their own desk.
+    if (new URL(reviewer.page.url()).pathname === "/desk") break;
     await new Promise(resolve => setTimeout(resolve, 250));
   } while (Date.now() < deadline);
-  assert.equal(new URL(reviewer.page.url()).pathname, "/", "Revoked role did not land safely within cache TTL");
+  assert.equal(new URL(reviewer.page.url()).pathname, "/desk", "Revoked role did not land safely within cache TTL");
   await reviewer.page.goto(`${base}/courses`, { waitUntil: "networkidle" });
   await reviewer.page.goBack({ waitUntil: "networkidle" });
-  assert.equal(new URL(reviewer.page.url()).pathname, "/", "Back resurrected revoked page");
+  assert.equal(new URL(reviewer.page.url()).pathname, "/desk", "Back resurrected revoked page");
   await snap(reviewer.page, "role-r2-revoked-reviewer-mobile");
   results.push({ round: 2, journey: "support impersonation denied; reviewer revoked in open session; reload and Back safe", status: "passed" });
 
