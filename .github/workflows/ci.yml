@@ -87,7 +87,9 @@ jobs:
           done
           curl -fsS http://127.0.0.1:3100/api/courses >/dev/null
           CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts tests/search.test.ts
+          BASE=http://127.0.0.1:3100 bash scripts/contract-smoke.sh
           RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
+          ROLE_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-role-journeys.mjs
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-login-interactions.mjs
           NODE_ENV=production BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/verify-browser-interactions.mjs

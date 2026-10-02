@@ -25,10 +25,14 @@ export async function POST(req: NextRequest) {
     // 防刷：每小时最多 30 次申请
     assertUserRateLimit(user.id, "market_request", 30, 3_600_000);
 
-    const body = (await req.json().catch(() => null)) as { courseId?: string; message?: string } | null;
-    const courseId = body?.courseId?.trim();
+    const rawBody: unknown = await req.json().catch(() => null);
+    if (!rawBody || typeof rawBody !== "object" || Array.isArray(rawBody)) return fail("请求体格式错误");
+    const body = rawBody as { courseId?: unknown; message?: unknown };
+    if (typeof body.courseId !== "string" || body.courseId.length > 200) return fail("课程参数格式错误");
+    if (body.message !== undefined && typeof body.message !== "string") return fail("申请说明格式错误");
+    const courseId = body.courseId.trim();
     if (!courseId) return fail("缺少课程参数");
-    const message = body?.message?.trim().slice(0, 200) || undefined;
+    const message = typeof body.message === "string" ? body.message.trim().slice(0, 200) || undefined : undefined;
 
     // 只允许申请已上架的课；顺带拿到作者 ownerId。
     const course = await prisma.course.findFirst({
@@ -60,12 +64,13 @@ export async function POST(req: NextRequest) {
     // 防重复申请（先查一次给出友好文案；真正的原子约束是 @@unique）。
     const existing = await prisma.courseAccessRequest.findUnique({
       where: { courseId_requesterId: { courseId: course.id, requesterId: user.id } },
-      select: { status: true },
+      select: { id: true, status: true },
     });
-    if (existing) {
-      const label = existing.status === "approved" ? "已获得学习权" : existing.status === "rejected" ? "上次申请未通过" : "申请审核中";
-      return ok({ status: existing.status, message: `你${label}，无需重复申请` });
-    }
+    const existingResponse = (stored: { id: string; status: string }) => {
+      const label = stored.status === "approved" ? "已获得学习权" : stored.status === "rejected" ? "上次申请未通过" : "申请审核中";
+      return ok({ status: stored.status, requestId: stored.id, message: `你${label}，无需重复申请` });
+    };
+    if (existing) return existingResponse(existing);
 
     let request;
     try {
@@ -73,9 +78,16 @@ export async function POST(req: NextRequest) {
         data: { courseId: course.id, requesterId: user.id, ownerId, status: "pending", message: message ?? null },
         select: { id: true },
       });
-    } catch {
-      // 并发下唯一约束兜底（两次点击竞争）
-      return ok({ status: "pending", message: "申请已提交，等待作者批准" });
+    } catch (error) {
+      // Only a unique conflict can be a repeated click. Storage outages must stay
+      // failures, and the winner may already have an author's final decision.
+      if (!error || typeof error !== "object" || !("code" in error) || error.code !== "P2002") throw error;
+      const winner = await prisma.courseAccessRequest.findUnique({
+        where: { courseId_requesterId: { courseId: course.id, requesterId: user.id } },
+        select: { id: true, status: true },
+      });
+      if (!winner) throw error;
+      return existingResponse(winner);
     }
 
     // 通知课程作者（失败静默，不阻断主流程）

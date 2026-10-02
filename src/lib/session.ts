@@ -225,6 +225,8 @@ type OverrideMap = Map<string, Set<string>>;
 let overrideCache: OverrideMap = new Map();
 let overrideCacheAt = 0;
 let overrideInflight: Promise<void> | null = null;
+let overrideGeneration = 0;
+let overrideCacheGeneration = -1;
 const OVERRIDE_TTL_MS = 10_000; // 10s 短缓存：调整权限后最迟 10s 全量生效
 
 /**
@@ -234,34 +236,45 @@ const OVERRIDE_TTL_MS = 10_000; // 10s 短缓存：调整权限后最迟 10s 全
  * 查库失败必须拒绝权限敏感请求，不能在冷启动或缓存过期时恢复默认授权。
  */
 export async function primePermissionCache(force = false): Promise<void> {
-  const now = Date.now();
-  if (!force && now - overrideCacheAt < OVERRIDE_TTL_MS) return;
-  if (overrideInflight) return overrideInflight;
-  overrideInflight = (async () => {
-    try {
-      const rows = await prisma.rolePermission.findMany({
-        select: { role: true, permission: true },
-      });
-      const next: OverrideMap = new Map();
-      for (const r of rows) {
-        let set = next.get(r.role);
-        if (!set) { set = new Set(); next.set(r.role, set); }
-        set.add(r.permission);
-      }
-      overrideCache = next;
-      overrideCacheAt = Date.now();
-    } catch (e) {
-      console.error("[rbac:override-cache]", e instanceof Error ? e.message : e);
-      throw new AuthError("权限服务暂不可用，请稍后重试", 503);
-    } finally {
-      overrideInflight = null;
+  for (;;) {
+    const generation = overrideGeneration;
+    if (!force && Date.now() - overrideCacheAt < OVERRIDE_TTL_MS) return;
+    if (!overrideInflight) {
+      overrideInflight = (async () => {
+        try {
+          const rows = await prisma.rolePermission.findMany({
+            select: { role: true, permission: true },
+          });
+          const next: OverrideMap = new Map();
+          for (const r of rows) {
+            let set = next.get(r.role);
+            if (!set) { set = new Set(); next.set(r.role, set); }
+            set.add(r.permission);
+          }
+          // A read started before revocation cannot republish the old grants.
+          if (generation === overrideGeneration) {
+            overrideCache = next;
+            overrideCacheGeneration = generation;
+            overrideCacheAt = Date.now();
+          }
+        } catch (e) {
+          console.error("[rbac:override-cache]", e instanceof Error ? e.message : e);
+          throw new AuthError("权限服务暂不可用，请稍后重试", 503);
+        } finally {
+          overrideInflight = null;
+        }
+      })();
     }
-  })();
-  return overrideInflight;
+    await overrideInflight;
+    if (overrideCacheGeneration === overrideGeneration) return;
+    // All waiters join a fresh read after invalidation, including forced admin reads.
+    force = true;
+  }
 }
 
 /** 手动失效缓存（写权限后调用，使下一次 prime 立即回源）。 */
 export function invalidatePermissionCache(): void {
+  overrideGeneration += 1;
   overrideCacheAt = 0;
 }
 
