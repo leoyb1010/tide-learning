@@ -1,0 +1,2411 @@
+{
+  "scope": "2026-10-03 two-round product audit; inventory is not evidence of all-buttons runtime execution",
+  "baseline": "3aa82c9f3897a1bccd7a5523b0285843890ef10a",
+  "pages": [
+    {
+      "source": "src/app/admin/billing/page.tsx",
+      "route": "/admin/billing",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/content-calendar/page.tsx",
+      "route": "/admin/content-calendar",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/courses/page.tsx",
+      "route": "/admin/courses",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/credits/page.tsx",
+      "route": "/admin/credits",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/demands/page.tsx",
+      "route": "/admin/demands",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/errors/page.tsx",
+      "route": "/admin/errors",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/gen-quality/page.tsx",
+      "route": "/admin/gen-quality",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/leads/page.tsx",
+      "route": "/admin/leads",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/moderation/page.tsx",
+      "route": "/admin/moderation",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/orders/page.tsx",
+      "route": "/admin/orders",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/page.tsx",
+      "route": "/admin",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/permissions/page.tsx",
+      "route": "/admin/permissions",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/redemption-codes/page.tsx",
+      "route": "/admin/redemption-codes",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/admin/users/page.tsx",
+      "route": "/admin/users",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/checkout/mock/page.tsx",
+      "route": "/checkout/mock",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/courses/[id]/learn/[lessonId]/page.tsx",
+      "route": "/courses/[id]/learn/[lessonId]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/courses/[id]/page.tsx",
+      "route": "/courses/[id]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/courses/[id]/preview/page.tsx",
+      "route": "/courses/[id]/preview",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/courses/page.tsx",
+      "route": "/courses",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/create/page.tsx",
+      "route": "/create",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/demands/[demandId]/page.tsx",
+      "route": "/demands/[demandId]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/demands/new/page.tsx",
+      "route": "/demands/new",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/demands/page.tsx",
+      "route": "/demands",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/desk/page.tsx",
+      "route": "/desk",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/login/page.tsx",
+      "route": "/login",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/market/[slug]/page.tsx",
+      "route": "/market/[slug]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/market/page.tsx",
+      "route": "/market",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/courses/page.tsx",
+      "route": "/me/courses",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/creator/page.tsx",
+      "route": "/me/creator",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/earnings/page.tsx",
+      "route": "/me/earnings",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/history/page.tsx",
+      "route": "/me/history",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/page.tsx",
+      "route": "/me",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/account/page.tsx",
+      "route": "/me/settings/account",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/help/page.tsx",
+      "route": "/me/settings/help",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/page.tsx",
+      "route": "/me/settings",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/preferences/page.tsx",
+      "route": "/me/settings/preferences",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/privacy/page.tsx",
+      "route": "/me/settings/privacy",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/profile/page.tsx",
+      "route": "/me/settings/profile",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/settings/subscription/page.tsx",
+      "route": "/me/settings/subscription",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/me/subscription/page.tsx",
+      "route": "/me/subscription",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/notes/[id]/page.tsx",
+      "route": "/notes/[id]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/notes/notebook/[id]/page.tsx",
+      "route": "/notes/notebook/[id]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/notes/page.tsx",
+      "route": "/notes",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/page.tsx",
+      "route": "/",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/pricing/page.tsx",
+      "route": "/pricing",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/privacy/page.tsx",
+      "route": "/privacy",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/review/page.tsx",
+      "route": "/review",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/terms/page.tsx",
+      "route": "/terms",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/u/[id]/page.tsx",
+      "route": "/u/[id]",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    },
+    {
+      "source": "src/app/updates/page.tsx",
+      "route": "/updates",
+      "status": "static-inventoried; hosted desktop/mobile crawl pending",
+      "runtimeEvidence": "tide-audit-<FINAL_SHA>/browser-qa/product-20261003/product-journeys.json"
+    }
+  ],
+  "api": [
+    {
+      "source": "src/app/api/account/change-password/route.ts",
+      "route": "/api/account/change-password",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/account/delete/route.ts",
+      "route": "/api/account/delete",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/account-delete-settlement-fence.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/account/export/route.ts",
+      "route": "/api/account/export",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/ai/course-draft/route.ts",
+      "route": "/api/admin/ai/course-draft",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/ai/demand-draft-reply/route.ts",
+      "route": "/api/admin/ai/demand-draft-reply",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/ai/diagnostics/route.ts",
+      "route": "/api/admin/ai/diagnostics",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/billing/reconciliation/route.ts",
+      "route": "/api/admin/billing/reconciliation",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/content-calendar/route.ts",
+      "route": "/api/admin/content-calendar",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/coupons/route.ts",
+      "route": "/api/admin/coupons",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/course-update-logs/route.ts",
+      "route": "/api/admin/course-update-logs",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/courses/[id]/lessons/route.ts",
+      "route": "/api/admin/courses/[id]/lessons",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/courses/[id]/route.ts",
+      "route": "/api/admin/courses/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/market-archive-race.test.ts",
+        "tests/admin-faithful-import-guard.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/admin/courses/route.ts",
+      "route": "/api/admin/courses",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/credits/adjust/route.ts",
+      "route": "/api/admin/credits/adjust",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/credits/grant/route.ts",
+      "route": "/api/admin/credits/grant",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/credits/route.ts",
+      "route": "/api/admin/credits",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/dashboard/route.ts",
+      "route": "/api/admin/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/demands/[id]/merge/route.ts",
+      "route": "/api/admin/demands/[id]/merge",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/demands/[id]/status/route.ts",
+      "route": "/api/admin/demands/[id]/status",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/demands/pending/route.ts",
+      "route": "/api/admin/demands/pending",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/leads/[id]/route.ts",
+      "route": "/api/admin/leads/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/leads/route.ts",
+      "route": "/api/admin/leads",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/lessons/[id]/route.ts",
+      "route": "/api/admin/lessons/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/admin-faithful-import-guard.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/admin/moderation/course/route.ts",
+      "route": "/api/admin/moderation/course",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/market-archive-race.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/admin/moderation/post/route.ts",
+      "route": "/api/admin/moderation/post",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/orders/route.ts",
+      "route": "/api/admin/orders",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/permissions/route.ts",
+      "route": "/api/admin/permissions",
+      "methods": [
+        "GET",
+        "POST",
+        "DELETE"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/permission-override-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/admin/redemption-codes/[id]/route.ts",
+      "route": "/api/admin/redemption-codes/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/redemption-codes/route.ts",
+      "route": "/api/admin/redemption-codes",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/subscriptions/grant/route.ts",
+      "route": "/api/admin/subscriptions/grant",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/upload/route.ts",
+      "route": "/api/admin/upload",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/admin/users/[id]/route.ts",
+      "route": "/api/admin/users/[id]",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/admin-reset-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/admin/users/route.ts",
+      "route": "/api/admin/users",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/companion/route.ts",
+      "route": "/api/ai/companion",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/generate-course/route.ts",
+      "route": "/api/ai/generate-course",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/course-outline-route-idempotency.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/ai/generate-exam/route.ts",
+      "route": "/api/ai/generate-exam",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/generate-lesson/route.ts",
+      "route": "/api/ai/generate-lesson",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/generation-publish-gate.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/ai/generate-lesson-html/route.ts",
+      "route": "/api/ai/generate-lesson-html",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/generation-publish-gate.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/ai/generate-video/route.ts",
+      "route": "/api/ai/generate-video",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/import-file/route.ts",
+      "route": "/api/ai/import-file",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/import-route-idempotency.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/ai/import-source/route.ts",
+      "route": "/api/ai/import-source",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/import-route-idempotency.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/ai/models/route.ts",
+      "route": "/api/ai/models",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/note-summary/route.ts",
+      "route": "/api/ai/note-summary",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/note-transform/route.ts",
+      "route": "/api/ai/note-transform",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/ai/regenerate-lesson/route.ts",
+      "route": "/api/ai/regenerate-lesson",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/generation-publish-gate.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/ai/review-card/route.ts",
+      "route": "/api/ai/review-card",
+      "methods": [
+        "POST",
+        "GET",
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/analytics/route.ts",
+      "route": "/api/analytics",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/assets/[id]/route.ts",
+      "route": "/api/assets/[id]",
+      "methods": [
+        "GET",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/assets/route.ts",
+      "route": "/api/assets",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/auth/login/route.ts",
+      "route": "/api/auth/login",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/auth/logout/route.ts",
+      "route": "/api/auth/logout",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/auth-logout-csrf.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/auth/me/route.ts",
+      "route": "/api/auth/me",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/auth/password-reset/confirm/route.ts",
+      "route": "/api/auth/password-reset/confirm",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/password-reset-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/auth/password-reset/route.ts",
+      "route": "/api/auth/password-reset",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/auth-input-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/auth/signup/route.ts",
+      "route": "/api/auth/signup",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/auth-input-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/checkout/mock-pay/route.ts",
+      "route": "/api/checkout/mock-pay",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/checkout/session/route.ts",
+      "route": "/api/checkout/session",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/coupons/validate/route.ts",
+      "route": "/api/coupons/validate",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/gen-progress/route.ts",
+      "route": "/api/courses/[id]/gen-progress",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/graph/route.ts",
+      "route": "/api/courses/[id]/graph",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/lessons/route.ts",
+      "route": "/api/courses/[id]/lessons",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/outline/confirm/route.ts",
+      "route": "/api/courses/[id]/outline/confirm",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/outline-mutation-race.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/courses/[id]/outline/regenerate/route.ts",
+      "route": "/api/courses/[id]/outline/regenerate",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/outline-mutation-race.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/courses/[id]/outline/route.ts",
+      "route": "/api/courses/[id]/outline",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/outline-source-gate.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/courses/[id]/pause-gen/route.ts",
+      "route": "/api/courses/[id]/pause-gen",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/resume-gen/route.ts",
+      "route": "/api/courses/[id]/resume-gen",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/reviews/route.ts",
+      "route": "/api/courses/[id]/reviews",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/route.ts",
+      "route": "/api/courses/[id]",
+      "methods": [
+        "GET",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/[id]/theme/route.ts",
+      "route": "/api/courses/[id]/theme",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/generating/route.ts",
+      "route": "/api/courses/generating",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/courses/route.ts",
+      "route": "/api/courses",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/creator/templates/[id]/instantiate/route.ts",
+      "route": "/api/creator/templates/[id]/instantiate",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/creator/templates/[id]/route.ts",
+      "route": "/api/creator/templates/[id]",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/creator/templates/route.ts",
+      "route": "/api/creator/templates",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/creator/themes/[id]/apply/route.ts",
+      "route": "/api/creator/themes/[id]/apply",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/custom-theme-application-gate.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/creator/themes/[id]/route.ts",
+      "route": "/api/creator/themes/[id]",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/creator/themes/route.ts",
+      "route": "/api/creator/themes",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/credits/me/route.ts",
+      "route": "/api/credits/me",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/credits/recharge/route.ts",
+      "route": "/api/credits/recharge",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/[id]/comments/[commentId]/route.ts",
+      "route": "/api/demands/[id]/comments/[commentId]",
+      "methods": [
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/[id]/comments/route.ts",
+      "route": "/api/demands/[id]/comments",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/[id]/follow/route.ts",
+      "route": "/api/demands/[id]/follow",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/[id]/route.ts",
+      "route": "/api/demands/[id]",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/[id]/stages/route.ts",
+      "route": "/api/demands/[id]/stages",
+      "methods": [
+        "GET",
+        "POST",
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/[id]/vote/route.ts",
+      "route": "/api/demands/[id]/vote",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/me/voted/route.ts",
+      "route": "/api/demands/me/voted",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/demands/route.ts",
+      "route": "/api/demands",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/desk/route.ts",
+      "route": "/api/desk",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/devices/route.ts",
+      "route": "/api/devices",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/entitlement/me/route.ts",
+      "route": "/api/entitlement/me",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/exams/[id]/route.ts",
+      "route": "/api/exams/[id]",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/exams/[id]/submit/route.ts",
+      "route": "/api/exams/[id]/submit",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/focus/route.ts",
+      "route": "/api/focus",
+      "methods": [
+        "POST",
+        "PATCH"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/focus-sqlite-lifecycle.test.ts",
+        "tests/focus-lifecycle.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/health/route.ts",
+      "route": "/api/health",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/home/route.ts",
+      "route": "/api/home",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/iap/notifications/route.ts",
+      "route": "/api/iap/notifications",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/iap-notifications-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/iap/verify/route.ts",
+      "route": "/api/iap/verify",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/iap-notifications-adversarial.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/leads/route.ts",
+      "route": "/api/leads",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/[id]/blocks/route.ts",
+      "route": "/api/lessons/[id]/blocks",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/[id]/courseware/route.ts",
+      "route": "/api/lessons/[id]/courseware",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/[id]/quiz-result/route.ts",
+      "route": "/api/lessons/[id]/quiz-result",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/[id]/revisions/route.ts",
+      "route": "/api/lessons/[id]/revisions",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/[id]/rollback/route.ts",
+      "route": "/api/lessons/[id]/rollback",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/[id]/route.ts",
+      "route": "/api/lessons/[id]",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/lessons/route.ts",
+      "route": "/api/lessons",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/market/collect/route.ts",
+      "route": "/api/market/collect",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/market/decide/route.ts",
+      "route": "/api/market/decide",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/market/request/route.ts",
+      "route": "/api/market/request",
+      "methods": [
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/role-market-recovery.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/market/route.ts",
+      "route": "/api/market",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/market/share/route.ts",
+      "route": "/api/market/share",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/generation-publish-gate.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/me/creator/route.ts",
+      "route": "/api/me/creator",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/me/gamification/route.ts",
+      "route": "/api/me/gamification",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/me/mistakes/route.ts",
+      "route": "/api/me/mistakes",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/me/overview/route.ts",
+      "route": "/api/me/overview",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/note-tags/[id]/route.ts",
+      "route": "/api/note-tags/[id]",
+      "methods": [
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/note-tags/route.ts",
+      "route": "/api/note-tags",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notebooks/[id]/route.ts",
+      "route": "/api/notebooks/[id]",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/notebook-input-recovery.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/notebooks/route.ts",
+      "route": "/api/notebooks",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "automated handler regression",
+      "directHandlerTests": [
+        "tests/notebook-input-recovery.test.ts"
+      ]
+    },
+    {
+      "source": "src/app/api/notes/[id]/route.ts",
+      "route": "/api/notes/[id]",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/attachments/[id]/route.ts",
+      "route": "/api/notes/attachments/[id]",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/attachments/route.ts",
+      "route": "/api/notes/attachments",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/compose-options/route.ts",
+      "route": "/api/notes/compose-options",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/export/route.ts",
+      "route": "/api/notes/export",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/import-pdf/route.ts",
+      "route": "/api/notes/import-pdf",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/import-url/route.ts",
+      "route": "/api/notes/import-url",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notes/route.ts",
+      "route": "/api/notes",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/notifications/route.ts",
+      "route": "/api/notifications",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/posts/[id]/comment/route.ts",
+      "route": "/api/posts/[id]/comment",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/posts/[id]/like/route.ts",
+      "route": "/api/posts/[id]/like",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/posts/[id]/repost/route.ts",
+      "route": "/api/posts/[id]/repost",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/posts/route.ts",
+      "route": "/api/posts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/pricing/route.ts",
+      "route": "/api/pricing",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/profile/route.ts",
+      "route": "/api/profile",
+      "methods": [
+        "PATCH"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/progress/route.ts",
+      "route": "/api/progress",
+      "methods": [
+        "POST",
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/redeem/route.ts",
+      "route": "/api/redeem",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/referral/bind/route.ts",
+      "route": "/api/referral/bind",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/referral/route.ts",
+      "route": "/api/referral",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/scorm/[assetId]/[...path]/route.ts",
+      "route": "/api/scorm/[assetId]/[...path]",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/scorm/[assetId]/token/route.ts",
+      "route": "/api/scorm/[assetId]/token",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/search/route.ts",
+      "route": "/api/search",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/shelf/route.ts",
+      "route": "/api/shelf",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/stream/[assetId]/route.ts",
+      "route": "/api/stream/[assetId]",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/subscription/cancel/route.ts",
+      "route": "/api/subscription/cancel",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/subscription/change/route.ts",
+      "route": "/api/subscription/change",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/subscription/me/route.ts",
+      "route": "/api/subscription/me",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/subscription/restore/route.ts",
+      "route": "/api/subscription/restore",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/u/[id]/route.ts",
+      "route": "/api/u/[id]",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/updates/route.ts",
+      "route": "/api/updates",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/version/route.ts",
+      "route": "/api/version",
+      "methods": [
+        "GET"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    },
+    {
+      "source": "src/app/api/webhooks/payment/[channel]/route.ts",
+      "route": "/api/webhooks/payment/[channel]",
+      "methods": [
+        "POST"
+      ],
+      "status": "static inventory; see group ledger for runtime contracts",
+      "directHandlerTests": []
+    }
+  ],
+  "controls": [
+    {
+      "source": "src/app/admin/permissions/PermissionMatrix.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/app/demands/new/page.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 5,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/app/login/page.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 5,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/app/me/history/HistoryGroups.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/app/notes/NotesClient.tsx",
+      "buttonDeclarations": 21,
+      "formControlDeclarations": 9,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/app/review/page.tsx",
+      "buttonDeclarations": 7,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/AccessRequestActions.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/AccountActions.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/BlockEditor.tsx",
+      "buttonDeclarations": 17,
+      "formControlDeclarations": 30,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/BlockRenderer.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/BlockSlideshow.tsx",
+      "buttonDeclarations": 13,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CommandK.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CommunityTabs.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CompanionPanel.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CourseCard.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CourseFilterBar.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CourseGenControls.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CourseManageButton.tsx",
+      "buttonDeclarations": 8,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CoursePreviewCard.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CourseReviews.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CoursewareManager.tsx",
+      "buttonDeclarations": 10,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CreateStudio.tsx",
+      "buttonDeclarations": 21,
+      "formControlDeclarations": 9,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CreatorLibraryDialog.tsx",
+      "buttonDeclarations": 11,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/CreditCard.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/DemandCard.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/DemandComments.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/DeskShelf.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/Dialog.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/ElderModeToggle.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/ExamRunner.tsx",
+      "buttonDeclarations": 12,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/ExportMenu.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/HtmlCourseware.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/LessonGraphDialog.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 6,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/Lightbox.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/MobileTabs.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/MockPayActions.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NoteDetail.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NoteEditor.tsx",
+      "buttonDeclarations": 9,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NoteEditorInline.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NoteTimeline.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NoteTransformPanel.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NotebookAiTidy.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NotebookComposeButton.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NotebookGrid.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/NotifBell.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/OutlineCheckpoint.tsx",
+      "buttonDeclarations": 8,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/Player.tsx",
+      "buttonDeclarations": 23,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/PostCard.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/PostComposer.tsx",
+      "buttonDeclarations": 7,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/PricingPlans.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/RedeemBox.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/SettingsSections.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 6,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/SharePanel.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/ShareToMarketButton.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/StudyDesk.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/StudySquare.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/SubscriptionCard.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/SubscriptionManager.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/TemplateModelPicker.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/TideCalendar.tsx",
+      "buttonDeclarations": 3,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/Toast.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/TopNav.tsx",
+      "buttonDeclarations": 8,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/TrialBooking.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/VoteButton.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/WeeklyReportBanner.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/AdminContentCalendar.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 6,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/AdminCourseManager.tsx",
+      "buttonDeclarations": 7,
+      "formControlDeclarations": 22,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/AdminCreditManager.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 4,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/AdminDemandManager.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 6,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/AdminLeadManager.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 2,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/AdminUserManager.tsx",
+      "buttonDeclarations": 9,
+      "formControlDeclarations": 12,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/BillingReconciliationQueue.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/ModerationConsole.tsx",
+      "buttonDeclarations": 5,
+      "formControlDeclarations": 1,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/admin/RedemptionCodeManager.tsx",
+      "buttonDeclarations": 6,
+      "formControlDeclarations": 10,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/home/HeroPromptInput.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 3,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/market/MarketBuyPanel.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/market/MarketCategoryTabs.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/market/MarketSortTabs.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/market/MarketStallCard.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/market/SellerEarningsCard.tsx",
+      "buttonDeclarations": 1,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/profile/ProfileForm.tsx",
+      "buttonDeclarations": 4,
+      "formControlDeclarations": 4,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    },
+    {
+      "source": "src/components/ui.tsx",
+      "buttonDeclarations": 2,
+      "formControlDeclarations": 0,
+      "status": "static declaration inventory; conditional/repeated runtime instances differ"
+    }
+  ],
+  "native": [
+    {
+      "source": "ios/YoudaoStudio/App/YoudaoStudioAppMac.swift",
+      "controlDeclarations": 4,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Core/Share/ShareCardSheet.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Auth/LoginView.swift",
+      "controlDeclarations": 4,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Community/CommunityView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Community/PostCard.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Community/PostComposer.swift",
+      "controlDeclarations": 3,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Companion/CompanionView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Courses/CourseReviews.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Courses/CoursesView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Create/CreateView.swift",
+      "controlDeclarations": 4,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Credits/RechargeView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Desk/ShelfView.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Learn/LearnView.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Market/MarketView.swift",
+      "controlDeclarations": 4,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Notes/ComposeOptions.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Notes/NoteDetailView.swift",
+      "controlDeclarations": 5,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Notes/NotebookView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Notes/NotesView.swift",
+      "controlDeclarations": 7,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Settings/AppSettingsView.swift",
+      "controlDeclarations": 4,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/Features/Settings/ChangePasswordView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacComposeWindow.swift",
+      "controlDeclarations": 7,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacCoursesView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacExamView.swift",
+      "controlDeclarations": 1,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacImportWindow.swift",
+      "controlDeclarations": 3,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacLoginView.swift",
+      "controlDeclarations": 4,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacMarketView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacMenuBar.swift",
+      "controlDeclarations": 5,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacNotesView.swift",
+      "controlDeclarations": 3,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacPlayerWindow.swift",
+      "controlDeclarations": 3,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    },
+    {
+      "source": "ios/YoudaoStudio/MacFeatures/MacProfileView.swift",
+      "controlDeclarations": 2,
+      "status": "static inventory; unsigned native CI build and offline policy tests; no native UI interaction claim"
+    }
+  ],
+  "counts": {
+    "pages": 50,
+    "api": 150,
+    "controls": 82,
+    "native": 30
+  }
+}

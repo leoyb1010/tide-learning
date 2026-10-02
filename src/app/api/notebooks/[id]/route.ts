@@ -57,6 +57,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       icon?: string | null;
     };
 
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体非法");
+    if (body.title !== undefined && typeof body.title !== "string") return fail("标题格式错误");
+    for (const value of [body.description, body.icon]) {
+      if (value !== undefined && value !== null && typeof value !== "string") return fail("笔记本信息格式错误");
+    }
+
     if (body.title !== undefined) {
       const t = body.title?.trim();
       if (!t) return fail("笔记本标题不能为空");

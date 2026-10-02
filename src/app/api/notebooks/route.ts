@@ -59,6 +59,12 @@ export async function POST(req: NextRequest) {
       icon?: string;
     };
 
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体非法");
+    if (body.title !== undefined && typeof body.title !== "string") return fail("标题格式错误");
+    for (const value of [body.description, body.icon]) {
+      if (value !== undefined && value !== null && typeof value !== "string") return fail("笔记本信息格式错误");
+    }
+
     const title = body.title?.trim();
     if (!title) return fail("笔记本标题不能为空");
     if (title.length > TITLE_MAX) return fail(`标题最多 ${TITLE_MAX} 个字`);

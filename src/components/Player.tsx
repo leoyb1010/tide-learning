@@ -27,6 +27,7 @@ import { HtmlCourseware } from "./HtmlCourseware";
 import { ScormCourseware } from "./ScormCourseware";
 import { trapFocus } from "./focus-trap";
 import { isPlayableVideoUrl } from "@/lib/media-url";
+import { createFocusSessionRun, type FocusSessionRun } from "@/lib/focus-session-run";
 
 interface OutlineItem { id: string; title: string; isFree: boolean; durationSec: number; current: boolean }
 interface SubtitleCue { startSec: number; endSec: number; text: string }
@@ -100,6 +101,7 @@ export function Player({
   const [remainingSec, setRemainingSec] = useState(25 * 60); // 剩余秒数
   const [onBreak, setOnBreak] = useState(false); // 到点休息提示
   const [sessionId, setSessionId] = useState<string | null>(null); // FocusSession id
+  const focusRunRef = useRef<FocusSessionRun | null>(null);
   const focusStartRef = useRef<number>(0); // 入席时刻（ms），用于算真实时长
   const [reviewData, setReviewData] = useState<{ minutes: number; noteCount: number; summary: string | null } | null>(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -293,57 +295,64 @@ export function Player({
     setFocusStage("prep");
   }, [focusStage]);
 
-  // 正式入席：调 /api/focus 建会话，进入全屏沉浸 + 启动番茄钟
-  const enterFocus = useCallback(async () => {
+  // A visit owns both requests. Leaving before POST completes must still close that visit;
+  // its late response cannot install or clear the following visit's state.
+  useEffect(() => () => {
+    const run = focusRunRef.current;
+    focusRunRef.current = null;
+    void run?.end(false);
+  }, []);
+
+  const enterFocus = useCallback(() => {
+    if (focusRunRef.current && !focusRunRef.current.ending) return;
     setRemainingSec(pomodoroMin * 60);
     setOnBreak(false);
+    setSessionId(null);
+    setSummaryLoading(false);
     focusStartRef.current = Date.now();
     setFocus(true);
     setFocusStage("active");
     track("focus_mode_toggle", { on: true, pomodoro_min: pomodoroMin });
-    if (isLoggedIn) {
-      try {
-        const res = await fetch("/api/focus", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ goal: focusGoal.trim() || undefined, lessonId: lesson.id, courseId }),
-        });
-        const json = (await res.json()) as { ok: true; data: { sessionId: string } } | { ok: false };
-        if (json.ok) setSessionId(json.data.sessionId);
-      } catch {
-        /* 会话记录失败不阻断专注体验 */
-      }
-    }
+    const run = createFocusSessionRun(async () => {
+      if (!isLoggedIn) return null;
+      const res = await fetch("/api/focus", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ goal: focusGoal.trim() || undefined, lessonId: lesson.id, courseId }),
+      });
+      const json = await res.json();
+      return json.ok && typeof json.data?.sessionId === "string" ? json.data.sessionId : null;
+    }, async (id, aiSummary) => {
+      const res = await fetch("/api/focus", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId: id, aiSummary }),
+      });
+      const json = await res.json();
+      return json.ok ? json.data : null;
+    });
+    focusRunRef.current = run;
+    void run.started.then(id => {
+      if (focusRunRef.current === run && !run.ending) setSessionId(id);
+    });
   }, [pomodoroMin, focusGoal, isLoggedIn, lesson.id, courseId]);
 
-  // 离席：调 /api/focus PATCH 结束会话（可选 AI 小结），进入小结卡
   const exitFocus = useCallback(async (withAiSummary: boolean) => {
+    const run = focusRunRef.current;
+    if (!run || run.ending) return;
     const elapsedMin = Math.max(0, Math.round((Date.now() - focusStartRef.current) / 60000));
+    const ended = run.end(withAiSummary); // synchronously fences repeated Escape/clicks
     setFocus(false);
     setFocusStage("review");
     setReviewData({ minutes: elapsedMin, noteCount: 0, summary: null });
-    if (withAiSummary) setSummaryLoading(true);
-    if (isLoggedIn && sessionId) {
-      try {
-        const res = await fetch("/api/focus", {
-          method: "PATCH",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ sessionId, minutes: elapsedMin, aiSummary: withAiSummary }),
-        });
-        const json = (await res.json()) as
-          | { ok: true; data: { minutes: number; noteCount: number; summary: string | null } }
-          | { ok: false };
-        if (json.ok) {
-          setReviewData({ minutes: json.data.minutes, noteCount: json.data.noteCount, summary: json.data.summary });
-        }
-      } catch {
-        /* 结束失败：仍展示本地统计 */
-      }
-    }
-    setSummaryLoading(false);
     setSessionId(null);
+    setSummaryLoading(withAiSummary);
     track("focus_mode_toggle", { on: false, minutes: elapsedMin });
-  }, [isLoggedIn, sessionId]);
+    const summary = await ended;
+    if (focusRunRef.current !== run) return;
+    if (summary) setReviewData(summary);
+    setSummaryLoading(false);
+  }, []);
 
   // 番茄钟倒计时：active 且未休息时每秒递减；到点切休息态并提示
   useEffect(() => {
@@ -369,6 +378,7 @@ export function Player({
   onKeyRef.current = (e: KeyboardEvent) => {
     // Esc 关闭任一全屏浮层（prep/review/active），即使焦点在输入框内也生效
     if (e.key === "Escape" && (focusStage === "prep" || focusStage === "review")) { e.preventDefault(); setFocusStage("idle"); return; }
+    if (e.key === "Escape" && focusStage === "active") { e.preventDefault(); void exitFocus(false); return; }
     // prep/review 模态开启时把 Tab 焦点困在面板内（须在 INPUT/TEXTAREA 早退之前处理，
     // 否则焦点落在目标输入框时 Tab 会逃出面板）。
     if (e.key === "Tab" && (focusStage === "prep" || focusStage === "review")) { trapFocus(e, focusPanelRef.current); return; }
@@ -378,7 +388,6 @@ export function Player({
     else if (e.key.toLowerCase() === "s") { e.preventDefault(); captureFrame(); }
     else if (e.key.toLowerCase() === "n") { e.preventDefault(); quickNote(); }
     else if (e.key.toLowerCase() === "f") { e.preventDefault(); if (focusStage === "active") exitFocus(false); else openFocusPrep(); }
-    else if (e.key === "Escape" && focusStage === "active") { e.preventDefault(); exitFocus(false); }
   };
   useEffect(() => {
     const handler = (e: KeyboardEvent) => onKeyRef.current(e);

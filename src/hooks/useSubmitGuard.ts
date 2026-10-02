@@ -32,6 +32,8 @@ export function useSubmitGuard<Args extends unknown[], R>(
   const [submitting, setSubmitting] = useState(false);
   // 进行中判定用 ref：同一渲染周期内的重复点击也能可靠拦截
   const inFlight = useRef(false);
+  // Each request owns its unlock. A timed-out/reset request may settle after its successor.
+  const generation = useRef(0);
   const mounted = useRef(true);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // 始终指向最新 fn，guard 依赖保持稳定（引用不随 fn 变化而改变）
@@ -42,6 +44,8 @@ export function useSubmitGuard<Args extends unknown[], R>(
     mounted.current = true;
     return () => {
       mounted.current = false;
+      generation.current += 1;
+      inFlight.current = false;
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);
@@ -54,6 +58,7 @@ export function useSubmitGuard<Args extends unknown[], R>(
   }, []);
 
   const unlock = useCallback(() => {
+    generation.current += 1;
     inFlight.current = false;
     clearTimer();
     if (mounted.current) setSubmitting(false);
@@ -62,12 +67,14 @@ export function useSubmitGuard<Args extends unknown[], R>(
   const guard = useCallback(
     async (...args: Args): Promise<R | undefined> => {
       if (inFlight.current) return undefined; // 进行中：忽略重复调用
+      const requestGeneration = ++generation.current;
       inFlight.current = true;
       if (mounted.current) setSubmitting(true);
 
       // 超时兜底：到点强制解锁（不打断真实 fn 的后续 finally）
       if (timeoutMs > 0) {
         timer.current = setTimeout(() => {
+          if (generation.current !== requestGeneration) return;
           inFlight.current = false;
           timer.current = null;
           if (mounted.current) setSubmitting(false);
@@ -77,7 +84,7 @@ export function useSubmitGuard<Args extends unknown[], R>(
       try {
         return await fnRef.current(...args);
       } finally {
-        unlock();
+        if (generation.current === requestGeneration) unlock();
       }
     },
     [timeoutMs, unlock],

@@ -73,6 +73,7 @@ export default async function LearnPage({
 
   return (
     <Player
+      key={lesson.id}
       courseId={course.id}
       courseSlug={course.slug}
       courseTitle={course.title}
