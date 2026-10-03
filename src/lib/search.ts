@@ -1,3 +1,4 @@
+import { MARKET_LESSON_PRESENTATION_SELECT } from "@/lib/market-lesson-select";
 import { prisma } from "./db";
 import type { Prisma } from "@prisma/client";
 import { buildExcerpt } from "./format";
@@ -154,7 +155,7 @@ async function searchCourses(term: string, viewerId: string | null, take: number
       genStatus: true,
       generationQualityJson: true,
       presentationRevision: true,
-      lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
+      lessons: { orderBy: { sortOrder: "asc" }, select: MARKET_LESSON_PRESENTATION_SELECT },
     },
     orderBy: [{ isFeatured: "desc" }, { learnersCount: "desc" }],
     take,
@@ -273,7 +274,7 @@ async function searchMarket(term: string, take: number): Promise<SearchResult[]>
       genStatus: true,
       generationQualityJson: true,
       presentationRevision: true,
-      lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
+      lessons: { orderBy: { sortOrder: "asc" }, select: MARKET_LESSON_PRESENTATION_SELECT },
     },
     orderBy: [{ salesCount: "desc" }, { lastUpdatedAt: "desc" }],
     take,

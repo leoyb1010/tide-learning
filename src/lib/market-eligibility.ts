@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
+import { MARKET_LESSON_PRESENTATION_SELECT } from "./market-lesson-select";
 import {
   assessCoursePresentation,
   courseGenerationInputFingerprint,
@@ -50,6 +51,7 @@ export async function currentCoursePublicationFence(course: {
     id: string;
     title: string;
     summary: string | null;
+    sortOrder?: number | null;
     blocksJson: string | null;
     qualityJson: string | null;
     htmlJson: string | null;
@@ -121,6 +123,7 @@ export async function currentMarketPublicationFence(course: {
     id: string;
     title: string;
     summary: string | null;
+    sortOrder?: number | null;
     blocksJson: string | null;
     qualityJson: string | null;
     htmlJson: string | null;
@@ -151,6 +154,7 @@ export async function filterCurrentMarketCourses<T extends {
     id: string;
     title: string;
     summary: string | null;
+    sortOrder?: number | null;
     blocksJson: string | null;
     qualityJson: string | null;
     htmlJson: string | null;
@@ -217,17 +221,15 @@ export async function filterCurrentMarketCoursesByRevision<T extends MarketFence
     return !cached || cached.key !== fenceCacheKey(c);
   });
   const blobsByCourse = new Map<string, Array<{
-    id: string; title: string; summary: string | null; blocksJson: string | null;
+    id: string; title: string; summary: string | null; sortOrder?: number | null; blocksJson: string | null;
     qualityJson: string | null; htmlJson: string | null; renderSourceHash: string | null;
     renderEngine: string | null; designJson: string | null;
   }>>();
   if (misses.length > 0) {
     const lessons = await db.lesson.findMany({
       where: { courseId: { in: misses.map((c) => c.id) } },
-      select: {
-        courseId: true, id: true, title: true, summary: true, blocksJson: true,
-        qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true,
-      },
+      orderBy: [{ courseId: "asc" }, { sortOrder: "asc" }],
+      select: { courseId: true, ...MARKET_LESSON_PRESENTATION_SELECT },
     });
     for (const { courseId, ...lesson } of lessons) {
       const list = blobsByCourse.get(courseId);

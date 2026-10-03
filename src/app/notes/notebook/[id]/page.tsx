@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/session";
 import { TidalReveal } from "@/components/motion";
 import { EmptyTide } from "@/components/TideIllustration";
 import NotebookAiTidy from "@/components/NotebookAiTidy";
-import NotebookComposeButton from "@/components/NotebookComposeButton";
+import NotebookComposeButton, { NotebookComposeProvider } from "@/components/NotebookComposeButton";
 import { SmartBackLink } from "@/components/SmartBackLink";
 import { ExportMenu } from "@/components/ExportMenu";
 
@@ -54,6 +54,7 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
   const courseCount = new Set(notes.filter((n) => n.courseId).map((n) => n.courseId)).size;
 
   return (
+    <NotebookComposeProvider key={notebook.id} notebookId={notebook.id}>
     <div className="space-y-7">
       <TidalReveal>
         <SmartBackLink
@@ -144,5 +145,6 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
         </div>
       )}
     </div>
+    </NotebookComposeProvider>
   );
 }

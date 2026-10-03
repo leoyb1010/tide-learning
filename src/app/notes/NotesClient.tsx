@@ -20,6 +20,8 @@ import { NoteGallery } from "@/components/NoteGallery";
 import NotebookGrid from "@/components/NotebookGrid";
 import { ExportMenu } from "@/components/ExportMenu";
 import { track } from "@/lib/analytics-client";
+import { useHydratedClock } from "@/hooks/useHydratedClock";
+import { noteRelativeTime } from "@/lib/note-relative-time";
 import { useCaptureAuditTrace } from "@/hooks/useCaptureAuditTrace";
 import { useActiveCallback } from "@/hooks/useActiveCallback";
 import { renderMarkdown } from "@/lib/markdown";
@@ -67,6 +69,7 @@ export interface NotesInitialData {
   total: number;
   tags: TagFacet[];
   loggedIn: boolean;
+  renderedAt?: number;
   /** 首屏落地视图（如从笔记本详情页返回时经 ?view=notebook 直达笔记本视图）。缺省「全部」。 */
   initialView?: View;
 }
@@ -93,6 +96,7 @@ const VIRTUALIZE_THRESHOLD = 60;
  * 视图切换（全部/时间轴/画廊/课程/笔记本）纯客户端，复用已有数据不重新请求。
  */
 export default function NotesClient({ initialData }: { initialData: NotesInitialData }) {
+  const renderNow = useHydratedClock(initialData.renderedAt);
   const { toast } = useToast();
   const [notes, setNotes] = useState<NoteRow[]>(initialData.notes);
   const [nextCursor, setNextCursor] = useState<string | null>(initialData.nextCursor);
@@ -427,7 +431,7 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
         ) : (
           // 默认「全部」：普通可点击列表，整卡跳 /notes/{id}
           <>
-            <AllNotesList notes={notes} />
+            <AllNotesList notes={notes} now={renderNow} />
             {/* 加载更多：哨兵触发 + 手动按钮兜底（无障碍/IO 不可用时可点） */}
             {nextCursor && (
               <div ref={sentinelRef} className="mt-4 flex justify-center">
@@ -770,21 +774,6 @@ function ResultActions({
   );
 }
 
-/** 相对时间：刚刚 / N分钟前 / N小时前 / N天前 / MM-DD */
-function relativeTime(iso: string): string {
-  const then = new Date(iso).getTime();
-  if (Number.isNaN(then)) return "";
-  const diff = Date.now() - then;
-  const min = Math.floor(diff / 60_000);
-  if (min < 1) return "刚刚";
-  if (min < 60) return `${min} 分钟前`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr} 小时前`;
-  const day = Math.floor(hr / 24);
-  if (day < 7) return `${day} 天前`;
-  return new Date(iso).toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai", month: "2-digit", day: "2-digit" });
-}
-
 /** 来源标识：课程名（课程内记）/ AI整理 / 独立笔记 */
 function sourceLabel(n: NoteRow): { text: string; slug: string | null } {
   if (n.source === "ai_transform") return { text: "AI 整理", slug: null };
@@ -804,7 +793,7 @@ const KIND_TAG: Record<string, { label: string; icon: typeof Camera }> = {
  * v3.0 虚拟化：> 60 条时给每卡加 content-visibility:auto + contain-intrinsic-size，
  *   让视口外的卡片跳过布局/绘制，显著减少长列表 DOM 回流（零依赖）。
  */
-function AllNotesList({ notes }: { notes: NoteRow[] }) {
+function AllNotesList({ notes, now }: { notes: NoteRow[]; now: number }) {
   const sorted = useMemo(() => {
     return [...notes].sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
@@ -865,7 +854,7 @@ function AllNotesList({ notes }: { notes: NoteRow[] }) {
                 <span className={`truncate ${isAi ? "font-medium text-[var(--info)]" : ""}`}>{src.text}</span>
               )}
               <span aria-hidden>·</span>
-              <span className="mono shrink-0">{relativeTime(n.updatedAt || n.createdAt)}</span>
+              <span className="mono shrink-0">{noteRelativeTime(n.updatedAt || n.createdAt, now)}</span>
               {n.starred && <Star size={12} weight="fill" className="ml-auto shrink-0 text-[var(--red)]" />}
             </div>
 

@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
     const user = await requireUser();
     assertRateLimit(req, "note_create", 60, 60_000);
 
-    const body = (await req.json()) as {
+    const body = (await req.json().catch(() => null)) as {
       courseId?: string;
       lessonId?: string;
       timestampSec?: number | null;
@@ -152,6 +152,8 @@ export async function POST(req: NextRequest) {
       notebookId?: string; // v2.2：归入笔记本（可空）
       tagIds?: string[]; // v3.1：创建时批量关联标签（每个标签须属本人，越权铁律）
     };
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体非法", 400);
 
     // as-cast 不做运行时收窄：字符串字段传入非字符串（如数字）时 ?.trim() 会抛 TypeError 变 500。
     // 这里统一收窄为 400 客户端错误。

@@ -733,7 +733,9 @@ async function main() {
     await prisma.reviewCard.deleteMany({ where: { userId: demo.id, courseId: fixture.id } }).catch(() => {});
     // delete() 会读回 Course 全行，当本地验收库落后当前 Prisma schema 时反而会让清理失败。
     // deleteMany() 仅做范围受控的删除，不依赖读回新列，确保失败路径也能回收随机 slug 夹具。
-    await prisma.course.deleteMany({ where: { slug } }).catch(() => {});
+    if (process.env.E2E_KEEP_FIXTURE_FOR_AUDIT !== "1") {
+      await prisma.course.deleteMany({ where: { slug } }).catch(() => {});
+    }
     await prisma.$disconnect();
   }
 

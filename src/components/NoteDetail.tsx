@@ -106,11 +106,11 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
       ) : (
         <article className="studio-rise space-y-5">
           {/* 标题行 + 编辑按钮 */}
-          <div className="flex items-start justify-between gap-4">
-            <h1 className="text-[26px] font-bold leading-tight text-[var(--ink)]">
+          <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+            <h1 className="min-w-0 break-words text-[26px] font-bold leading-tight text-[var(--ink)] sm:flex-1">
               {title?.trim() || "未命名笔记"}
             </h1>
-            <div className="mt-1 flex shrink-0 items-center gap-2">
+            <div className="mt-1 flex flex-wrap items-center gap-2 sm:shrink-0">
               {/* 分享笔记：生成笔记摘录卡（note-quote 服务端 where id+userId，仅取本人笔记） */}
               <SharePanel
                 kind="note-quote"
@@ -118,7 +118,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
                 params={{ noteId: note.id }}
                 triggerLabel="分享笔记"
                 trigger={
-                  <span className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]">
+                  <span className="studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]">
                     <ShareNetwork size={14} weight="bold" /> 分享
                   </span>
                 }
@@ -127,7 +127,7 @@ export function NoteDetail({ note }: { note: NoteDetailData }) {
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="studio-press inline-flex shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+                className="studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
               >
                 <PencilSimple size={14} weight="bold" /> 编辑
               </button>

@@ -37,8 +37,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     assertSameOrigin(req);
     const user = await requireUser();
     const { id } = await params;
-    // 空/畸形 body 折叠为 {}，走下方必填校验返回 fail，而非抛 SyntaxError 触发 500
-    const body = (await req.json().catch(() => ({}))) as {
+    // 空/畸形 body 折叠为 null，走下方必填校验返回 fail，而非抛 SyntaxError 触发 500
+    const body = (await req.json().catch(() => null)) as {
       title?: string | null;
       contentMd?: string;
       starred?: boolean;
@@ -46,6 +46,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       addTagId?: string;
       removeTagId?: string;
     };
+
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体非法", 400);
 
     assertRateLimit(req, "note_update", 120, 60_000);
     if (body.title !== undefined && body.title !== null && typeof body.title !== "string") return fail("标题类型错误", 400);

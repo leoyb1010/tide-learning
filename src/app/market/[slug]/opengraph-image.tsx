@@ -1,3 +1,4 @@
+import { MARKET_LESSON_PRESENTATION_SELECT } from "@/lib/market-lesson-select";
 import { ImageResponse } from "next/og";
 import { prisma } from "@/lib/db";
 import { trackLabel } from "@/lib/tracks";
@@ -55,7 +56,7 @@ export default async function MarketOgImage({ params }: { params: Promise<{ slug
       genStatus: true,
       generationQualityJson: true,
       presentationRevision: true,
-      lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
+      lessons: { orderBy: { sortOrder: "asc" }, select: MARKET_LESSON_PRESENTATION_SELECT },
     },
   });
   const course = candidate && await currentMarketPublicationFence(candidate) ? candidate : null;

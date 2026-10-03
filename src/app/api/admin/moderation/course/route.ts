@@ -1,3 +1,4 @@
+import { MARKET_LESSON_PRESENTATION_SELECT } from "@/lib/market-lesson-select";
 import { NextRequest } from "next/server";
 import { prisma } from "@/lib/db";
 import { requirePermission } from "@/lib/session";
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
         genStatus: true,
         generationQualityJson: true,
         presentationRevision: true,
-        lessons: { select: { id: true, title: true, summary: true, blocksJson: true, qualityJson: true, htmlJson: true, renderSourceHash: true, renderEngine: true, designJson: true } },
+        lessons: { orderBy: { sortOrder: "asc" }, select: MARKET_LESSON_PRESENTATION_SELECT },
       },
     });
     if (!course) throw new AppError("课程不存在", 404);

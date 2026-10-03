@@ -198,7 +198,7 @@ export function StudyDesk({
   const secondaryResumes = deskItems.slice(1);
 
   return (
-    <div className="stagger mx-auto flex max-w-[960px] flex-col gap-12 md:gap-14">
+    <div className="stagger mx-auto flex w-full min-w-0 max-w-[960px] flex-col gap-12 md:gap-14">
       {/* ============================================================
           1. HERO —— 「今天想学点什么」绝对主角（问候 + 超大输入 + 灵感）
           ============================================================ */}
@@ -444,12 +444,12 @@ export function StudyDesk({
             />
           </button>
         </div>
-        <div className="stagger grid gap-3.5 sm:grid-cols-3">
+        <div className="stagger grid min-w-0 grid-cols-1 gap-3.5 sm:grid-cols-3">
           {/* 我的课：红做「学习主战场」信号 */}
           <Link
             href="/me/courses"
             style={{ "--i": 0 } as CSSProperties}
-            className="studio-lift group flex flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+            className="studio-lift group flex min-w-0 flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
             <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[var(--radius-card-sm)] border border-[var(--red-soft-border)] bg-[var(--red-soft)] text-[var(--red)] transition-transform group-hover:scale-105">
               <BookOpen size={17} weight="fill" />
@@ -468,7 +468,7 @@ export function StudyDesk({
           <Link
             href="/notes"
             style={{ "--i": 1 } as CSSProperties}
-            className="studio-lift group flex flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+            className="studio-lift group flex min-w-0 flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
             <div className="flex h-[36px] w-[36px] items-center justify-center rounded-[var(--radius-card-sm)] border border-[color-mix(in_srgb,var(--info)_22%,transparent)] bg-[var(--info-soft)] text-[var(--info)] transition-transform group-hover:scale-105">
               <NotePencil size={17} weight="fill" />
@@ -487,7 +487,7 @@ export function StudyDesk({
             </p>
             <p className="mt-auto flex items-center gap-1 pt-3 text-[12px] text-[var(--ink3)]">
               {recentNotes.length > 0 ? (
-                <span className="truncate">{recentNotes[0].title}</span>
+                <span className="min-w-0 flex-1 truncate">{recentNotes[0].title}</span>
               ) : (
                 "还没有笔记，边看边记"
               )}
@@ -499,7 +499,7 @@ export function StudyDesk({
           <Link
             href="/review"
             style={{ "--i": 2 } as CSSProperties}
-            className="studio-lift group flex flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
+            className="studio-lift group flex min-w-0 flex-col rounded-[var(--radius-card-sm)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--card),var(--inner-hi)]"
           >
             <div
               className={
@@ -534,7 +534,7 @@ export function StudyDesk({
           ============================================================ */}
       <section className="grid gap-3.5 lg:grid-cols-[1fr_auto]" style={{ "--i": 3 } as CSSProperties}>
         {/* AI 建议卡 */}
-        <div className="relative overflow-hidden rounded-[var(--radius-card)] p-4 text-white shadow-[var(--lift)]">
+        <div data-testid="desk-ai-advice" className="relative isolate overflow-hidden rounded-[var(--radius-card)] p-4 text-white shadow-[var(--lift)]">
           <div className="absolute inset-0 -z-10" style={{ background: "var(--ai-grad)" }} />
           <div
             className="pointer-events-none absolute inset-0 -z-10"

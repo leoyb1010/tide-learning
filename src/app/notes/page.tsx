@@ -28,6 +28,7 @@ export default async function NotesPage({
   searchParams: Promise<{ view?: string }>;
 }) {
   const user = await getCurrentUser();
+  const renderedAt = Date.now();
 
   // ?view= 直达指定视图（如从笔记本详情页返回落到「笔记本」视图）；非法值忽略。
   const { view } = await searchParams;
@@ -37,7 +38,7 @@ export default async function NotesPage({
 
   // 未登录：交互岛用空数据渲染登录引导，不查库。
   if (!user) {
-    const empty: NotesInitialData = { notes: [], nextCursor: null, total: 0, tags: [], loggedIn: false };
+    const empty: NotesInitialData = { notes: [], nextCursor: null, total: 0, tags: [], loggedIn: false, renderedAt };
     return <NotesClient initialData={empty} />;
   }
 
@@ -66,7 +67,7 @@ export default async function NotesPage({
 
   const hasMore = rows.length > FIRST_PAGE;
   const pageRows = hasMore ? rows.slice(0, FIRST_PAGE) : rows;
-  const nextCursor = hasMore ? rows[FIRST_PAGE].id : null;
+  const nextCursor = hasMore ? pageRows[pageRows.length - 1].id : null;
 
   // 序列化为可传给 client 组件的普通对象（Date → ISO 字符串，拍平标签结构）。
   const notes = pageRows.map((n) => ({
@@ -93,7 +94,7 @@ export default async function NotesPage({
 
   const tags = tagRows.map((t) => ({ id: t.id, name: t.name, color: t.color, count: t._count.notes }));
 
-  const initialData: NotesInitialData = { notes, nextCursor, total, tags, loggedIn: true, initialView };
+  const initialData: NotesInitialData = { notes, nextCursor, total, tags, loggedIn: true, initialView, renderedAt };
 
   return <NotesClient initialData={initialData} />;
 }

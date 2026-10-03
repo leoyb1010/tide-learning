@@ -1,0 +1,94 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/market-presentation-projection.test.ts (3 tests | 3 failed) 51ms
+   × actual collect route preserves sortOrder for current/stale=false presentation 43ms
+   × actual collect route preserves sortOrder for current/stale=true presentation 3ms
+   × market list/detail revision-cache cold reader projects all fingerprint fields 4ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/market-presentation-projection.test.ts > actual collect route preserves sortOrder for current/stale=false presentation
+AssertionError: expected 404 to be 200 // Object.is equality
+
+- Expected
++ Received
+
+- 200
++ 404
+
+ ❯ tests/market-presentation-projection.test.ts:32:26
+     30|  mocks.course.mockImplementation(async({select})=>({...course,lessons:…
+     31|  const response=await POST(new NextRequest('http://localhost:3100/api/…
+     32|  expect(response.status).toBe(stale?404:200);
+       |                          ^
+     33|  expect(mocks.course.mock.calls[0][0].select.lessons.select.sortOrder)…
+     34|  expect(mocks.collect).toHaveBeenCalledTimes(stale?0:1);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/market-presentation-projection.test.ts > actual collect route preserves sortOrder for current/stale=true presentation
+AssertionError: expected undefined to be true // Object.is equality
+
+- Expected:
+true
+
++ Received:
+undefined
+
+ ❯ tests/market-presentation-projection.test.ts:33:72
+     31|  const response=await POST(new NextRequest('http://localhost:3100/api/…
+     32|  expect(response.status).toBe(stale?404:200);
+     33|  expect(mocks.course.mock.calls[0][0].select.lessons.select.sortOrder)…
+       |                                                                        ^
+     34|  expect(mocks.collect).toHaveBeenCalledTimes(stale?0:1);
+     35| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/market-presentation-projection.test.ts > market list/detail revision-cache cold reader projects all fingerprint fields
+AssertionError: expected [] to deeply equal [ { id: 'synthetic-clone', …(14) } ]
+
+- Expected
++ Received
+
+- [
+-   {
+-     "authorUserId": "author",
+-     "category": "ai_skill",
+-     "contentBriefJson": null,
+-     "designJson": "{\"artKey\":\"cinematic_neon\",\"variance\":9,\"motion\":6,\"density\":4}",
+-     "genStatus": "ready",
+-     "generationQualityJson": null,
+-     "id": "synthetic-clone",
+-     "modelUsed": null,
+-     "origin": "user_created",
+-     "presentationRevision": 0,
+-     "priceCredits": 0,
+-     "sharedStatus": "shared",
+-     "status": "published",
+-     "template": null,
+-     "title": "Synthetic current course",
+-   },
+- ]
++ []
+
+ ❯ tests/market-presentation-projection.test.ts:39:63
+     37|  const {course,lesson}=fixture();
+     38|  mocks.lessons.mockImplementation(async({select})=>[project(lesson,sel…
+     39|  expect(await filterCurrentMarketCoursesByRevision([course])).toEqual(…
+       |                                                               ^
+     40|  expect(mocks.lessons.mock.calls[0][0].select.sortOrder).toBe(true);
+     41|  expect(await filterCurrentMarketCoursesByRevision([course])).toEqual(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed (3)
+   Start at  01:37:43
+   Duration  969ms (transform 545ms, setup 0ms, import 757ms, tests 51ms, environment 0ms)

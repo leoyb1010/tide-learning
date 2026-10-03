@@ -32,7 +32,9 @@ export async function POST(req: NextRequest) {
     const user = await requireUser();
     assertRateLimit(req, "note_tag_create", 30, 60_000);
 
-    const body = (await req.json()) as { name?: string; color?: string };
+    const body = (await req.json().catch(() => null)) as { name?: string; color?: string } | null;
+    if (!body || typeof body !== "object" || Array.isArray(body)) return fail("请求体非法", 400);
+    if (body.name !== undefined && typeof body.name !== "string") return fail("标签名称格式错误", 400);
     const name = body.name?.trim();
     if (!name) return fail("标签名不能为空");
     if (name.length > 20) return fail("标签名过长");

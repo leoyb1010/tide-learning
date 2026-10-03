@@ -1,0 +1,124 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+stderr | tests/notes-input-recovery.test.ts > create: malformed shape null returns 400 with no mutation
+[api:internal] TypeError: Cannot read properties of null (reading 'courseId')
+    at <repo>/src/app/api/notes/route.ts:159:11
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at handle (<repo>/src/lib/api.ts:96:12)
+    at <repo>/tests/notes-input-recovery.test.ts:20:11
+    at file://<repo>/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/notes-input-recovery.test.ts > edit: malformed shape null returns 400 with no mutation
+[api:internal] TypeError: Cannot read properties of null (reading 'title')
+    at <repo>/src/app/api/notes/[id]/route.ts:51:14
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at handle (<repo>/src/lib/api.ts:96:12)
+    at <repo>/tests/notes-input-recovery.test.ts:20:11
+    at file://<repo>/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/notes-input-recovery.test.ts > tag: malformed shape null returns 400 with no mutation
+[api:internal] TypeError: Cannot read properties of null (reading 'name')
+    at <repo>/src/app/api/note-tags/route.ts:36:23
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at handle (<repo>/src/lib/api.ts:96:12)
+    at <repo>/tests/notes-input-recovery.test.ts:20:11
+    at file://<repo>/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+stderr | tests/notes-input-recovery.test.ts > tag name has a recoverable type boundary
+[api:internal] TypeError: body.name?.trim is not a function
+    at <repo>/src/app/api/note-tags/route.ts:36:29
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at handle (<repo>/src/lib/api.ts:96:12)
+    at <repo>/tests/notes-input-recovery.test.ts:29:65
+    at file://<repo>/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20
+
+ ❯ tests/notes-input-recovery.test.ts (16 tests | 8 failed) 46ms
+   × create: malformed shape null returns 400 with no mutation 22ms
+   × edit: malformed shape null returns 400 with no mutation 3ms
+   × edit: malformed shape undefined returns 400 with no mutation 2ms
+   × edit: malformed shape 42 returns 400 with no mutation 1ms
+   × edit: malformed shape "unexpected" returns 400 with no mutation 2ms
+   × edit: invalid JSON can be corrected and retried 1ms
+   × tag: malformed shape null returns 400 with no mutation 2ms
+   × tag name has a recoverable type boundary 1ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 8 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/notes-input-recovery.test.ts > create: malformed shape null returns 400 with no mutation
+ FAIL  tests/notes-input-recovery.test.ts > edit: malformed shape null returns 400 with no mutation
+ FAIL  tests/notes-input-recovery.test.ts > tag: malformed shape null returns 400 with no mutation
+AssertionError: expected 500 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 500
+
+ ❯ tests/notes-input-recovery.test.ts:20:38
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/8]⎯
+
+ FAIL  tests/notes-input-recovery.test.ts > edit: malformed shape undefined returns 400 with no mutation
+ FAIL  tests/notes-input-recovery.test.ts > edit: malformed shape 42 returns 400 with no mutation
+ FAIL  tests/notes-input-recovery.test.ts > edit: malformed shape "unexpected" returns 400 with no mutation
+AssertionError: expected 200 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 200
+
+ ❯ tests/notes-input-recovery.test.ts:20:38
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/8]⎯
+
+ FAIL  tests/notes-input-recovery.test.ts > edit: invalid JSON can be corrected and retried
+AssertionError: expected 200 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 200
+
+ ❯ tests/notes-input-recovery.test.ts:23:47
+     21|  });
+     22|  it(`${name}: invalid JSON can be corrected and retried`,async()=>{
+     23|   expect((await call('{broken',true)).status).toBe(400);
+       |                                               ^
+     24|   const valid=name==='tag'?{name:'Valid',color:'accent'}:{title:'Resto…
+     25|   expect((await call(valid)).status).toBe(200);
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/8]⎯
+
+ FAIL  tests/notes-input-recovery.test.ts > tag name has a recoverable type boundary
+AssertionError: expected 500 to be 400 // Object.is equality
+
+- Expected
++ Received
+
+- 400
++ 500
+
+ ❯ tests/notes-input-recovery.test.ts:29:104
+     27|  });
+     28| }
+     29| it('tag name has a recoverable type boundary',async()=>{expect((await …
+       |                                                                                                        ^
+     30|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/8]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  8 failed | 8 passed (16)
+   Start at  00:58:34
+   Duration  430ms (transform 111ms, setup 0ms, import 193ms, tests 46ms, environment 0ms)

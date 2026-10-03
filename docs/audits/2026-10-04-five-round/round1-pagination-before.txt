@@ -1,0 +1,98 @@
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/notes-ssr-pagination.test.ts (4 tests | 3 failed) 31ms
+   × SSR followed by Load more never omits or duplicates any of 31 notes 17ms
+   × SSR followed by Load more never omits or duplicates any of 32 notes 4ms
+   × SSR followed by Load more never omits or duplicates any of 61 notes 3ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/notes-ssr-pagination.test.ts > SSR followed by Load more never omits or duplicates any of 31 notes
+AssertionError: expected [ 'note-0031', 'note-0030', …(28) ] to deeply equal [ 'note-0031', 'note-0030', …(29) ]
+
+- Expected
++ Received
+
+@@ -27,7 +27,6 @@
+    "note-0006",
+    "note-0005",
+    "note-0004",
+    "note-0003",
+    "note-0002",
+-   "note-0001",
+  ]
+
+ ❯ tests/notes-ssr-pagination.test.ts:28:15
+     26|   const data=(await response.json()).data;seen.push(...data.notes.map(…
+     27|  }
+     28|  expect(seen).toEqual(all.map(x=>x.id));expect(new Set(seen).size).toB…
+       |               ^
+     29| });
+     30|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/notes-ssr-pagination.test.ts > SSR followed by Load more never omits or duplicates any of 32 notes
+AssertionError: expected [ 'note-0032', 'note-0031', …(29) ] to deeply equal [ 'note-0032', 'note-0031', …(30) ]
+
+- Expected
++ Received
+
+@@ -27,8 +27,7 @@
+    "note-0007",
+    "note-0006",
+    "note-0005",
+    "note-0004",
+    "note-0003",
+-   "note-0002",
+    "note-0001",
+  ]
+
+ ❯ tests/notes-ssr-pagination.test.ts:28:15
+     26|   const data=(await response.json()).data;seen.push(...data.notes.map(…
+     27|  }
+     28|  expect(seen).toEqual(all.map(x=>x.id));expect(new Set(seen).size).toB…
+       |               ^
+     29| });
+     30|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+ FAIL  tests/notes-ssr-pagination.test.ts > SSR followed by Load more never omits or duplicates any of 61 notes
+AssertionError: expected [ 'note-0061', 'note-0060', …(58) ] to deeply equal [ 'note-0061', 'note-0060', …(59) ]
+
+- Expected
++ Received
+
+@@ -27,11 +27,10 @@
+    "note-0036",
+    "note-0035",
+    "note-0034",
+    "note-0033",
+    "note-0032",
+-   "note-0031",
+    "note-0030",
+    "note-0029",
+    "note-0028",
+    "note-0027",
+    "note-0026",
+
+ ❯ tests/notes-ssr-pagination.test.ts:28:15
+     26|   const data=(await response.json()).data;seen.push(...data.notes.map(…
+     27|  }
+     28|  expect(seen).toEqual(all.map(x=>x.id));expect(new Set(seen).size).toB…
+       |               ^
+     29| });
+     30|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed (4)
+   Start at  00:48:26
+   Duration  383ms (transform 104ms, setup 0ms, import 181ms, tests 31ms, environment 0ms)

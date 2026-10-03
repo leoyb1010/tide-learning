@@ -1,0 +1,42 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/notebook-compose-refresh.test.ts (1 test | 1 failed) 164ms
+   × empty-state trigger can disappear after A persists without unmounting replacement draft B 162ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/notebook-compose-refresh.test.ts > empty-state trigger can disappear after A persists without unmounting replacement draft B
+AssertionError: expected null to be <textarea …(3)></textarea> // Object.is equality
+
+- Expected:
+<textarea
+  class="w-full resize-y rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2.5 text-[14px] leading-[1.7] text-[var(--ink)] outline-none transition-colors placeholder:text-[var(--ink4)] focus:border-[var(--ink3)]"
+  placeholder="随手写点什么…支持 Markdown"
+  rows="6"
+>
+  B draft
+</textarea>
+
++ Received:
+null
+
+ ❯ tests/notebook-compose-refresh.test.ts:46:45
+     44|  expect(mocks.refresh).toHaveBeenCalledTimes(1);
+     45|  await renderPage();expect(buttons()).toHaveLength(1);expect(document.…
+     46|  expect(document.querySelector('textarea')).toBe(textarea);expect(docu…
+       |                                             ^
+     47|  await act(async()=>[...document.querySelectorAll('button')].find(x=>x…
+     48|  expect(writes).toBe(2);expect(mocks.refresh).toHaveBeenCalledTimes(2)…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed (1)
+   Start at  01:26:20
+   Duration  6.17s (transform 276ms, setup 0ms, import 4.66s, tests 164ms, environment 1.16s)
