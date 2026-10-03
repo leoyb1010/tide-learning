@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
+import { useCaptureAuditTrace } from "@/hooks/useCaptureAuditTrace";
 import { ComposeDialog } from "@/app/notes/NotesClient";
 
 /**
@@ -25,6 +26,7 @@ export default function NotebookComposeButton({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  useCaptureAuditTrace("NotebookComposeButton", { open, notebookId, variant });
 
   const cls =
     variant === "solid"

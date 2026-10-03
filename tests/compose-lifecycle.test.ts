@@ -12,7 +12,7 @@ let dom:JSDOM,root:Root;
 let setOpen:(value:boolean)=>void;
 const completed=vi.fn();
 const persisted=vi.fn();
-function Harness(){const [open,update]=useState(true);setOpen=update;return createElement(ComposeDialog,{open,onClose:()=>update(false),onCreated:()=>{completed();update(false);},prefillNotebookId:'fixture-notebook',onPersisted:persisted});}
+function Harness({prefill=true}:{prefill?:boolean}){const [open,update]=useState(true);setOpen=update;return createElement(ComposeDialog,{open,onClose:()=>update(false),onCreated:()=>{completed();update(false);},prefillNotebookId:prefill?'fixture-notebook':undefined,onPersisted:persisted});}
 beforeEach(()=>{
  dom=new JSDOM('<!doctype html><div id="root"></div>',{url:'http://localhost:3100',pretendToBeVisual:true});
  for(const name of ['window','document','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','KeyboardEvent'] as const)vi.stubGlobal(name,dom.window[name]);
@@ -68,4 +68,34 @@ it('late failed A does not contaminate B; B can still save exactly once',async()
  await act(async()=>[...document.querySelectorAll('button')].find(x=>x.textContent?.trim()==='保存')!.click());
  expect(writes).toBe(2);expect(persisted).toHaveBeenCalledTimes(1);expect(completed).toHaveBeenCalledTimes(1);
  expect(document.querySelector('textarea')).toBeNull();
+});
+
+async function clickNamed(text:string){await act(async()=>[...document.querySelectorAll('button')].find(x=>x.textContent?.trim().startsWith(text))!.click());}
+async function fillUrl(text:string){const el=document.querySelector<HTMLInputElement>('input[type="url"]')!;await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value')!.set!.call(el,text);el.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});}
+it.each([true,false])('late link import success=%s preserves the replacement write panel',async success=>{
+ let deliver!:(value:Response)=>void;const pending=new Promise<Response>(r=>{deliver=r;});
+ vi.stubGlobal('fetch',vi.fn((url:string)=>url==='/api/notes/import-url'?pending:Promise.resolve(new Response(JSON.stringify({ok:true,data:{notebooks:[],tags:[],courses:[]}})))));
+ await act(async()=>root.render(createElement(Harness,{prefill:false})));
+ await clickNamed('链接导入');await fillUrl('https://example.com/synthetic');await clickNamed('导入');
+ expect(document.querySelector<HTMLInputElement>('input[type="url"]')?.disabled).toBe(true);
+ await clickNamed('换个方式');await clickNamed('随手写');await fill('B after link');
+ await act(async()=>deliver(new Response(JSON.stringify(success?{ok:true,data:{id:'import-A'}}:{ok:false,error:'old failure'}))));
+ expect(document.querySelector('textarea')?.value).toBe('B after link');expect(completed).not.toHaveBeenCalled();
+ expect(persisted).toHaveBeenCalledTimes(success?1:0);expect(toastMock).not.toHaveBeenCalled();
+});
+it('closing upload aborts the client; an already queued success refreshes data without closing B',async()=>{
+ const transfers:FakeXHR[]=[];
+ class FakeXHR {upload={onprogress:null};status=200;responseText='';onload:(()=>void)|null=null;onerror:(()=>void)|null=null;onabort:(()=>void)|null=null;aborted=false;constructor(){transfers.push(this);}open(){}send(){}abort(){this.aborted=true;this.onabort?.();}}
+ vi.stubGlobal('XMLHttpRequest',FakeXHR);vi.stubGlobal('FormData',dom.window.FormData);
+ vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({ok:true,data:{notebooks:[],tags:[],courses:[]}}))));
+ await act(async()=>root.render(createElement(Harness,{prefill:false})));await clickNamed('附件');
+ const input=document.querySelector<HTMLInputElement>('input[type="file"]')!;
+ Object.defineProperty(input,'files',{value:[new dom.window.File(['synthetic text'],'fixture.txt',{type:'text/plain'})]});
+ await act(async()=>input.dispatchEvent(new dom.window.Event('change',{bubbles:true})));
+ expect(transfers).toHaveLength(1);
+ act(()=>setOpen(false));expect(transfers[0].aborted).toBe(true);expect(persisted).not.toHaveBeenCalled();
+ act(()=>setOpen(true));await clickNamed('随手写');await fill('B after upload');
+ transfers[0].responseText=JSON.stringify({ok:true,data:{noteId:'upload-A',attachment:{fileName:'fixture.txt',mimeType:'text/plain',path:'/api/notes/attachments/fixture',size:14}}});
+ await act(async()=>transfers[0].onload?.());
+ expect(persisted).toHaveBeenCalledTimes(1);expect(completed).not.toHaveBeenCalled();expect(toastMock).not.toHaveBeenCalled();expect(document.querySelector('textarea')?.value).toBe('B after upload');
 });

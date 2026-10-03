@@ -29,6 +29,7 @@ jobs:
       ALLOW_LOCAL_PRODUCTION: "1"
       STORAGE_MODE: "local"
       GENERATION_WORKER_ENABLED: "0"
+      NEXT_PUBLIC_CAPTURE_AUDIT: "1"
       STREAM_SIGNING_SECRET: "ci-stream-signing-secret-at-least-32-characters"
 
     steps:
@@ -55,6 +56,7 @@ jobs:
         run: npm run db:deploy
 
       - name: Verify migration status and seed
+        id: seed
         run: |
           npx prisma migrate status
           npm run db:seed
@@ -84,16 +86,19 @@ jobs:
             sleep 1
           done
           curl -fsS http://127.0.0.1:3100/api/courses >/dev/null
-          CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts tests/search.test.ts
-          BASE=http://127.0.0.1:3100 bash scripts/contract-smoke.sh
-          RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
-          ROLE_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-role-journeys.mjs
-          BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
-          BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-login-interactions.mjs
-          NODE_ENV=production BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/verify-browser-interactions.mjs
-          PRODUCT_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-product-journeys.mjs
-          PRODUCT_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-five-round.mjs
-          E2E_BASE=http://127.0.0.1:3100 npm run check:embed
+          runtime_status=0
+          run_check() { "$@" || runtime_status=1; }
+          run_check env CONTRACT_BASE=http://127.0.0.1:3100 npm test -- tests/contract.test.ts tests/search.test.ts
+          run_check env BASE=http://127.0.0.1:3100 bash scripts/contract-smoke.sh
+          run_check env RUNTIME_BASE=http://127.0.0.1:3100 node scripts/runtime-critical.mjs
+          run_check env ROLE_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-role-journeys.mjs
+          run_check env BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node tests/browser-audit.mjs
+          run_check env BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-login-interactions.mjs
+          run_check env NODE_ENV=production BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/verify-browser-interactions.mjs
+          run_check env PRODUCT_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-product-journeys.mjs
+          run_check env E2E_BASE=http://127.0.0.1:3100 npm run check:embed
+          run_check env PRODUCT_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-five-round.mjs
+          exit "$runtime_status"
 
       - name: Preserve isolated browser audit evidence
         if: always()
@@ -101,12 +106,16 @@ jobs:
         with:
           name: tide-audit-${{ github.sha }}
           path: |
-            ${{ runner.temp }}/browser-qa/
+            ${{ runner.temp }}/browser-qa/*.png
+            ${{ runner.temp }}/browser-qa/*.json
+            ${{ runner.temp }}/browser-qa/product-20261003/
+            ${{ runner.temp }}/browser-qa/round-*/matrix.json
             ${{ runner.temp }}/tide-server.log
           if-no-files-found: warn
           retention-days: 7
 
       - name: Backup and restore drill
+        if: ${{ always() && steps.seed.outcome == 'success' }}
         run: |
           printf '%s' 'ci-only-backup-password-32-bytes-minimum' > "$RUNNER_TEMP/backup-password"
           REQUIRE_ENCRYPTION=1 BACKUP_ENCRYPTION_PASSWORD_FILE="$RUNNER_TEMP/backup-password" \
@@ -126,6 +135,114 @@ jobs:
       - name: Dependency audit
         if: ${{ always() && steps.dependencies.outcome == 'success' }}
         run: npm audit --audit-level=low
+
+      - name: Preserve phone-light-no-preference pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-phone-light-no-preference-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/phone-light-no-preference/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve phone-light-reduce pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-phone-light-reduce-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/phone-light-reduce/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve phone-dark-no-preference pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-phone-dark-no-preference-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/phone-dark-no-preference/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve phone-dark-reduce pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-phone-dark-reduce-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/phone-dark-reduce/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve tablet-light-no-preference pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-tablet-light-no-preference-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/tablet-light-no-preference/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve tablet-light-reduce pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-tablet-light-reduce-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/tablet-light-reduce/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve tablet-dark-no-preference pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-tablet-dark-no-preference-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/tablet-dark-no-preference/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve tablet-dark-reduce pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-tablet-dark-reduce-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/tablet-dark-reduce/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve desktop-light-no-preference pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-desktop-light-no-preference-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/desktop-light-no-preference/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve desktop-light-reduce pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-desktop-light-reduce-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/desktop-light-reduce/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve desktop-dark-no-preference pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-desktop-dark-no-preference-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/desktop-dark-no-preference/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Preserve desktop-dark-reduce pixels
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: tide-desktop-dark-reduce-${{ github.sha }}
+          path: ${{ runner.temp }}/browser-qa/round-*/desktop-dark-reduce/
+          if-no-files-found: warn
+          retention-days: 7
 
   native:
     name: Unsigned native builds and offline policy tests

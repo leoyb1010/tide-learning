@@ -25,7 +25,13 @@ async function pages(dir) {
  }
  return rows.sort();
 }
-async function snap(page, name) {await page.screenshot({path:path.join(out,`${name}.png`),fullPage:true});}
+async function snap(page, name, fullPage = true) {
+ const variant=name.match(/^(phone|tablet|desktop)-(light|dark)-(no-preference|reduce)/)?.[0]??'other';
+ await mkdir(path.join(out,variant),{recursive:true});
+ const relative=path.join(variant,`${name}.png`);
+ await page.screenshot({path:path.join(out,relative),fullPage});
+ return relative;
+}
 async function check(name, task) {
  try {await task();report.journeys.push({name,status:'passed'});} catch(e) {report.failures.push({name,error:e.message});report.journeys.push({name,status:'failed'});}
 }
@@ -43,6 +49,7 @@ try {
  const course=await prisma.course.findFirstOrThrow({where:{slug:'ai-office-005'}});
  const lesson=await prisma.lesson.findFirstOrThrow({where:{courseId:course.id}});
  const demand=await prisma.demand.findFirst();
+ const marketCourse=await prisma.course.findFirstOrThrow({where:{sharedStatus:'shared',status:'published',visibility:{in:['public','unlisted']}}});
  notebook=await prisma.notebook.create({data:{userId:learner.id,title:stamp}});
  note=await prisma.note.create({data:{userId:learner.id,notebookId:notebook.id,title:stamp,contentMd:'Synthetic baseline note',kind:'text'}});
  const sourcePages=await pages('src/app');
@@ -55,10 +62,12 @@ try {
     let route=source==='.'?'/':'/'+source;
     let expected;
     if(route==='/checkout/mock') {expected='/pricing';}
+    if(route==='/me/settings') {expected='/me/settings/profile';}
     if(route.startsWith('/notes/notebook/')) route=route.replace('[id]',notebook.id);
     else if(route.startsWith('/notes/')) route=route.replace('[id]',note.id);
     else if(route.startsWith('/u/')) route=route.replace('[id]',learner.id);
-    else route=route.replace('[id]',course.slug).replace('[slug]',course.slug).replace('[lessonId]',lesson.id).replace('[demandId]',demand?.id??'missing-fixture');
+    else route=route.replace('[id]',course.slug).replace('[slug]',marketCourse.slug).replace('[lessonId]',lesson.id).replace('[demandId]',demand?.id??'missing-fixture');
+    if(source==='courses/[id]/preview') {report.routes.push({source,route,variant,status:'fixture-blocked',reason:'seed video course has no current published HTML; separate embed fixture owns positive preview assertions'});continue;}
     const ctx=route.startsWith('/admin')?admin:route==='/login'?guest:user;
     const page=await ctx.newPage();const errors=[];
     page.on('pageerror',e=>errors.push(e.message));
@@ -75,13 +84,13 @@ try {
      assert(!/This page could not be found|Application error|页面不存在|找不到该笔记/.test(content),'wrong or missing-resource screen');
      assert(content.length>30,'empty page');
      row.layout=await page.evaluate(()=>({theme:document.documentElement.dataset.theme??"system",systemDark:matchMedia("(prefers-color-scheme: dark)").matches,reducedMotion:matchMedia("(prefers-reduced-motion: reduce)").matches,surface:getComputedStyle(document.documentElement).getPropertyValue("--surface"),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,height:document.documentElement.scrollHeight,heading:[...document.querySelectorAll('h1')].map(e=>e.textContent),unnamedButtons:[...document.querySelectorAll('button')].filter(e=>!e.textContent.trim()&&!e.getAttribute('aria-label')&&!e.getAttribute('title')).length}));
-     await snap(page,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}`);
+     row.screenshot=await snap(page,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}`);
      await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
      await page.keyboard.press('Tab');
      row.keyboard=await page.evaluate(()=>({tag:document.activeElement.tagName,label:document.activeElement.getAttribute('aria-label')||document.activeElement.textContent?.trim().slice(0,80)}));
      assert.equal(row.layout.systemDark,colorScheme==='dark');
      assert.equal(row.layout.reducedMotion,reducedMotion==='reduce');
-     await page.screenshot({path:path.join(out,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}-bottom.png`),fullPage:false});
+     row.bottomScreenshot=await snap(page,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}-bottom`,false);
      assert(row.layout.overflow<=2,`horizontal overflow ${row.layout.overflow}px`);
      assert.equal(errors.length,0,`unexpected browser errors: ${errors.join('; ')}`);
      row.status='render-pass-interactions-separate';
@@ -89,6 +98,14 @@ try {
     row.errors=errors;report.routes.push(row);await page.close();
    }
    const page=await user.newPage();
+   await page.addInitScript(()=>{
+    window.__captureTrace=[];const ids=new WeakMap();let next=0;
+    const id=node=>{if(!ids.has(node))ids.set(node,++next);return ids.get(node);};
+    window.__captureSnapshot=label=>({label,at:performance.now(),fields:[...document.querySelectorAll('input,textarea')].map(n=>({id:id(n),tag:n.tagName,type:n.type,placeholder:n.placeholder,length:n.value.length,connected:n.isConnected})),events:window.__captureTrace.slice()});
+    addEventListener('tide:capture-audit',event=>window.__captureTrace.push({at:performance.now(),...event.detail}));
+    addEventListener('input',event=>{if(event.target instanceof HTMLInputElement||event.target instanceof HTMLTextAreaElement)window.__captureTrace.push({at:performance.now(),phase:'input',domId:id(event.target),length:event.target.value.length});},true);
+   });
+   page.on('pageerror',e=>report.failures.push({name:variant+':interactive-browser-error',error:e.message}));
    await check(variant+':note edit cancel save reload persistence',async()=>{
     await page.goto(`${base}/notes/${note.id}`,{waitUntil:'networkidle'});
     await page.getByRole('button',{name:'编辑',exact:true}).click();
@@ -141,9 +158,13 @@ try {
      await page.getByRole('button',{name:'在此笔记本记一条',exact:true}).click();
      await page.getByPlaceholder('标题（可留空）').fill(titleB);
      await page.getByPlaceholder('随手写点什么…支持 Markdown').fill('Synthetic B');
+     report.journeys.push({name:variant+':before A response',diagnostic:await page.evaluate(()=>window.__captureSnapshot('before-A-response'))});
      const completion=page.waitForResponse(r=>r.url().endsWith('/api/notes')&&r.request().method()==='POST');
      release();await completion;
+     report.journeys.push({name:variant+':after A response',diagnostic:await page.evaluate(()=>window.__captureSnapshot('after-A-response'))});
      await page.getByRole('link').filter({hasText:titleA}).waitFor();
+     report.journeys.push({name:variant+':after A list refresh',diagnostic:await page.evaluate(()=>window.__captureSnapshot('after-A-list-refresh'))});
+     await snap(page,variant+'-A-list-refresh-before-B-assert');
      assert(await page.getByRole('dialog').isVisible());
      assert.equal(await page.getByPlaceholder('随手写点什么…支持 Markdown').inputValue(),'Synthetic B');
      await snap(page,variant+'-late-A-preserved-B');

@@ -20,6 +20,7 @@ import { NoteGallery } from "@/components/NoteGallery";
 import NotebookGrid from "@/components/NotebookGrid";
 import { ExportMenu } from "@/components/ExportMenu";
 import { track } from "@/lib/analytics-client";
+import { useCaptureAuditTrace } from "@/hooks/useCaptureAuditTrace";
 import { useActiveCallback } from "@/hooks/useActiveCallback";
 import { renderMarkdown } from "@/lib/markdown";
 
@@ -984,6 +985,7 @@ export function ComposeDialog({
   const refreshPersisted = useActiveCallback(() => onPersisted?.());
   const [entry, setEntry] = useState<CaptureEntry>("menu");
   const { opts, addLocalTag } = useComposeOptions(open);
+  useCaptureAuditTrace("ComposeDialog", { open, entry, prefillNotebookId });
 
   // 打开时回到入口选择面板；带 prefillNotebookId（来自笔记本详情页）时直接进「随手写」。
   useEffect(() => {
@@ -1077,6 +1079,7 @@ function WritePanel({
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
   const [creatingTag, setCreatingTag] = useState(false);
+  useCaptureAuditTrace("WritePanel", { titleLength: title.length, contentLength: contentMd.length, saving, notebookId, prefillNotebookId });
 
   // 预填笔记本变化（不同笔记本详情页复用同一弹窗）时同步默认归属
   useEffect(() => {
