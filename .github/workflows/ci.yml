@@ -4,7 +4,7 @@ name: CI
 
 on:
   push:
-    branches: [master, "codex/audit-tide-learning-20261001*"]
+    branches: [master, "codex/audit-tide-learning-20261001*", "audit/five-round-product-20261004"]
   pull_request:
 
 permissions:
@@ -94,6 +94,7 @@ jobs:
           BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-login-interactions.mjs
           NODE_ENV=production BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/verify-browser-interactions.mjs
           PRODUCT_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-product-journeys.mjs
+          PRODUCT_AUDIT_ALLOW_SYNTHETIC=1 BASE_URL=http://127.0.0.1:3100 QA_OUT="$RUNNER_TEMP/browser-qa" node scripts/audit-five-round.mjs
           E2E_BASE=http://127.0.0.1:3100 npm run check:embed
 
       - name: Preserve isolated browser audit evidence
