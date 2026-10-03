@@ -138,7 +138,7 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
         </div>
       )}
 
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={result?.title}>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={result?.title} returnFocusRef={menu.triggerRef}>
         {result?.kind === "list" ? (
           <>
             <ul className="space-y-2.5">

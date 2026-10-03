@@ -116,10 +116,10 @@ export function PermissionMatrix({ initialRows, permissions, defaults, adminLock
       )}
 
       <div className="overflow-x-auto rounded-[16px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--card)]">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+        <table className="w-full min-w-[1040px] border-collapse text-[13px]">
           <thead>
             <tr className="border-b border-[var(--border)]">
-              <th className="sticky left-0 z-10 bg-[var(--surface2)] px-4 py-3 text-left font-semibold text-[var(--ink)]">
+              <th className="sticky left-0 z-10 min-w-[176px] bg-[var(--surface2)] px-4 py-3 text-left font-semibold text-[var(--ink)]">
                 角色 \ 权限
               </th>
               {permissions.map((perm) => (
@@ -131,7 +131,7 @@ export function PermissionMatrix({ initialRows, permissions, defaults, adminLock
                   <span className="mono mt-0.5 block text-[10px] text-[var(--ink4)]">{perm}</span>
                 </th>
               ))}
-              <th className="px-4 py-3 text-right font-medium text-[var(--ink2)]">操作</th>
+              <th className="min-w-[100px] px-4 py-3 text-right font-medium text-[var(--ink2)]">操作</th>
             </tr>
           </thead>
           <tbody>
@@ -141,16 +141,16 @@ export function PermissionMatrix({ initialRows, permissions, defaults, adminLock
               const resetting = busy === `reset:${row.role}`;
               return (
                 <tr key={row.role} className="border-b border-[var(--border)] last:border-b-0">
-                  <td className="sticky left-0 z-10 bg-[var(--surface)] px-4 py-3">
+                  <td className="sticky left-0 z-10 min-w-[176px] bg-[var(--surface)] px-4 py-3">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-[var(--ink)]">
                         {ROLE_LABELS[row.role] ?? row.role}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-1.5">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span className="mono text-[10px] text-[var(--ink4)]">{row.role}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
+                        className={`whitespace-nowrap rounded-full px-1.5 py-0.5 text-[9px] font-medium ${
                           row.source === "db"
                             ? "bg-[var(--red-soft)] text-[var(--red-ink)]"
                             : "bg-[var(--surface-inset)] text-[var(--ink3)]"
@@ -166,9 +166,10 @@ export function PermissionMatrix({ initialRows, permissions, defaults, adminLock
                     const pending = busy === key;
                     return (
                       <td key={cell.perm} className="px-3 py-3 text-center">
-                        <label className="inline-flex items-center justify-center">
+                        <label className="inline-flex min-h-[44px] min-w-[44px] items-center justify-center">
                           <input
                             type="checkbox"
+                            aria-label={`${ROLE_LABELS[row.role] ?? row.role}：${PERM_LABELS[cell.perm] ?? cell.perm}`}
                             checked={cell.granted}
                             disabled={locked || pending || resetting}
                             onChange={(e) => toggle(row.role, cell.perm, e.target.checked)}
@@ -179,12 +180,12 @@ export function PermissionMatrix({ initialRows, permissions, defaults, adminLock
                       </td>
                     );
                   })}
-                  <td className="px-4 py-3 text-right">
+                  <td className="min-w-[100px] px-4 py-3 text-right">
                     <button
                       type="button"
                       onClick={() => resetRole(row.role)}
                       disabled={row.source !== "db" || resetting}
-                      className="studio-press rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink2)] transition-colors hover:border-[var(--border2)] disabled:cursor-not-allowed disabled:opacity-40"
+                      className="studio-press min-h-[44px] whitespace-nowrap rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] px-3 py-1.5 text-[12px] font-medium text-[var(--ink2)] transition-colors hover:border-[var(--border2)] disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       {resetting ? "重置中…" : "重置默认"}
                     </button>

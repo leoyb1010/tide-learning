@@ -1,0 +1,116 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/note-menu-keyboard.test.ts (14 tests | 1 failed | 13 skipped) 82ms
+   × menu focus commits synchronously before any scheduled animation frame 80ms
+ ❯ tests/dialog-focus-ownership.test.ts (4 tests | 1 failed | 3 skipped) 80ms
+   × an async result dialog can return to its explicit trigger even when focus was lost during loading 79ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/dialog-focus-ownership.test.ts > an async result dialog can return to its explicit trigger even when focus was lost during loading
+AssertionError: expected <body style>…(2)</body> to be <button id="trigger"></button> // Object.is equality
+
+- Expected
++ Received
+
++ <body
++   style=""
++ >
+    <button
+      id="trigger"
+    >
+      Open
+    </button>
++   <div
++     id="root"
++   />
++ </body>
+
+ ❯ tests/dialog-focus-ownership.test.ts:35:116
+     33|  const props={open:true,onClose:()=>{},title:'Async result',returnFocu…
+     34|  await act(async()=>root.render(createElement(Dialog,props,child)));fl…
+     35|  await act(async()=>root.render(createElement(Dialog,{...props,open:fa…
+       |                                                                                                                    ^
+     36| });
+     37|
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/note-menu-keyboard.test.ts > menu focus commits synchronously before any scheduled animation frame
+AssertionError: expected <button type="button" …(4)>…(2)</button> to be <button type="button" …(3)>…(2)</button> // Object.is equality
+
+- Expected
++ Received
+
+  <button
+-   class="flex min-h-[44px] w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-inset)]"
+-   role="menuitem"
+-   tabindex="-1"
++   aria-controls="_r_0_"
++   aria-expanded="true"
++   aria-haspopup="menu"
++   class="studio-press inline-flex whitespace-nowrap min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]"
+    type="button"
+- >
+-   <span
+-     class="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] border border-[var(--border)] bg-[var(--surface2)] text-[var(--ink3)]"
+  >
+    <svg
+      fill="currentColor"
+-       height="16"
++     height="15"
+      viewBox="0 0 256 256"
+-       width="16"
++     width="15"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <path
+-         d="M213.66,82.34l-56-56A8,8,0,0,0,152,24H56A16,16,0,0,0,40,40v72a8,8,0,0,0,16,0V40h88V88a8,8,0,0,0,8,8h48V224a8,8,0,0,0,16,0V88A8,8,0,0,0,213.66,82.34ZM160,51.31,188.69,80H160ZM144,144H128a8,8,0,0,0-8,8v56a8,8,0,0,0,8,8h16a36,36,0,0,0,0-72Zm0,56h-8V160h8a20,20,0,0,1,0,40Zm-40-48v56a8,8,0,0,1-16,0V177.38L74.55,196.59a8,8,0,0,1-13.1,0L48,177.38V208a8,8,0,0,1-16,0V152a8,8,0,0,1,14.55-4.59L68,178.05l21.45-30.64A8,8,0,0,1,104,152Z"
++       d="M228,144v64a12,12,0,0,1-12,12H40a12,12,0,0,1-12-12V144a12,12,0,0,1,24,0v52H204V144a12,12,0,0,1,24,0Zm-108.49,8.49a12,12,0,0,0,17,0l40-40a12,12,0,0,0-17-17L140,115V32a12,12,0,0,0-24,0v83L96.49,95.51a12,12,0,0,0-17,17Z"
+      />
+    </svg>
+-   </span>
+-   <span
+-     class="min-w-0"
+-   >
+-     <span
+-       class="block truncate text-[13px] font-semibold text-[var(--ink)]"
++
++   导出
++   <svg
++     class="transition-transform rotate-180"
++     fill="currentColor"
++     height="12"
++     viewBox="0 0 256 256"
++     width="12"
++     xmlns="http://www.w3.org/2000/svg"
+    >
+-       Markdown
+-     </span>
+-     <span
+-       class="block truncate text-[11px] text-[var(--ink4)]"
+-     >
+-       .md · 保留标题与格式
+-     </span>
+-   </span>
++     <path
++       d="M216.49,104.49l-80,80a12,12,0,0,1-17,0l-80-80a12,12,0,0,1,17-17L128,159l71.51-71.52a12,12,0,0,1,17,17Z"
++     />
++   </svg>
+  </button>
+
+ ❯ tests/note-menu-keyboard.test.ts:86:33
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed (2)
+      Tests  2 failed | 16 skipped (18)
+   Start at  03:19:28
+   Duration  6.65s (transform 275ms, setup 0ms, import 4.44s, tests 162ms, environment 1.68s)

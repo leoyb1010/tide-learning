@@ -27,3 +27,10 @@ it('without user focus, first form field still receives initial focus and Escape
  const close=vi.fn();await act(async()=>root.render(createElement(Dialog,{open:true,onClose:()=>close(),title:'Fixture'} as React.ComponentProps<typeof Dialog>,createElement('input',{'aria-label':'Title'}))));flush();expect(document.activeElement?.getAttribute('aria-label')).toBe('Title');
  act(()=>document.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true})));expect(close).toHaveBeenCalledTimes(1);
 });
+it('an async result dialog can return to its explicit trigger even when focus was lost during loading',async()=>{
+ const target=document.getElementById('trigger')!;target.blur();expect(document.activeElement).toBe(document.body);
+ const returnFocusRef={current:target};const child=createElement('input',{'aria-label':'Result'});
+ const props={open:true,onClose:()=>{},title:'Async result',returnFocusRef} as React.ComponentProps<typeof Dialog>;
+ await act(async()=>root.render(createElement(Dialog,props,child)));flush();
+ await act(async()=>root.render(createElement(Dialog,{...props,open:false},child)));expect(document.activeElement).toBe(target);
+});

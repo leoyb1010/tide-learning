@@ -28,6 +28,7 @@ async function pages(dir) {
  return rows.sort();
 }
 async function snap(page, name, fullPage = true, lossless = true) {
+ await settleVisible(page);
  const variant=name.match(/^(phone|tablet|desktop)-(light|dark)-(no-preference|reduce)/)?.[0]??'other';
  await mkdir(path.join(out,variant),{recursive:true});
  const relative=path.join(variant,`${name}.${lossless?'png':'jpg'}`);
@@ -144,7 +145,7 @@ try {
  const reviewToken=randomBytes(32).toString('hex');
  await prisma.session.create({data:{id:createHash('sha256').update(reviewToken).digest('hex'),userId:reviewer.id,expiresAt:new Date(Date.now()+3600_000)}});
  reviewerActor={id:reviewer.id,token:reviewToken};
- const pageNotes=Array.from({length:61},(_,i)=>({id:`audit-${round}-${Date.now()}-${String(i).padStart(3,'0')}`,userId:buyer.id,title:`Synthetic note ${i+1}`,contentMd:`Synthetic pagination ${i+1}`,kind:'text',source:'manual',updatedAt:new Date('2026-01-01T00:00:00Z')}));
+ const pageNotes=Array.from({length:61},(_,i)=>({id:`audit-${round}-${Date.now()}-${String(i).padStart(3,'0')}`,userId:buyer.id,title:`Synthetic note ${i+1}`,contentMd:`Synthetic pagination ${i+1}`,kind:'text',source:'manual',starred:i===0,updatedAt:new Date('2026-01-01T00:00:00Z')}));
  await prisma.note.createMany({data:pageNotes});
  notebook=await prisma.notebook.create({data:{userId:learner.id,title:stamp}});
  note=await prisma.note.create({data:{userId:learner.id,notebookId:notebook.id,title:stamp,contentMd:'Synthetic baseline note',kind:'text'}});
@@ -181,21 +182,22 @@ try {
      assert(!/This page could not be found|Application error|页面不存在|找不到该笔记/.test(content),'wrong or missing-resource screen');
      assert(content.length>30,'empty page');
      row.ready=await assertReady(page,source,{course,lesson,previewFixture,demand,learner,note,notebook});
+     if(source==='admin/permissions'){assert.equal(await page.getByRole('checkbox').count(),48);assert.equal(await page.getByRole('checkbox',{name:'',exact:true}).count(),0,'permission checkbox lacks role/permission name');}
      if(source==='courses/[id]/preview') {
       await page.getByRole('tab',{name:'翻页',exact:true}).waitFor({state:'visible'});
       assert((await page.frameLocator('iframe[title="AI 课件"]').locator('h1,.lead,.q,.body').first().innerText()).trim());
      }
      await revealDocument(page);
-     if(source==='.'||source==='desk'||source==='courses') {
-      row.contrast=await page.locator('[data-testid="course-trial"], [data-ui="badge"][data-tone="success"]').evaluateAll(nodes=>nodes.map(node=>{
+     if(source==='.'||source==='desk'||source==='courses'||source==='me/courses') {
+      row.contrast=await page.locator('[data-testid="course-trial"], [data-testid="owned-course-status"], [data-ui="badge"][data-tone="success"]').evaluateAll(nodes=>nodes.map(node=>{
        const style=getComputedStyle(node);
        const rgb=value=>{const values=value.match(/[\d.]+/g)?.map(Number);if(!values||values.length<3)throw new Error(`Unrecognized computed color ${value}`);return values;};
        const foreground=rgb(style.color),background=rgb(style.backgroundColor);
        const luminance=color=>color.slice(0,3).map(value=>{const n=value/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
        const a=luminance(foreground),b=luminance(background);
-       return {kind:node.matches('[data-testid="course-trial"]')?'trial':'success',label:node.textContent.trim(),foreground:style.color,background:style.backgroundColor,opaque:background.length===3||background[3]===1,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+       return {kind:node.matches('[data-testid="course-trial"]')?'trial':node.matches('[data-testid="owned-course-status"]')?'owned':'success',label:node.textContent.trim(),foreground:style.color,background:style.backgroundColor,opaque:background.length===3||background[3]===1,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
       }));
-      assert(row.contrast.some(sample=>sample.kind==='trial')&&row.contrast.some(sample=>sample.kind==='success'),'contrast fixture lacks trial or success labels');
+      assert(source==='me/courses'?row.contrast.some(sample=>sample.kind==='owned'):row.contrast.some(sample=>sample.kind==='trial')&&row.contrast.some(sample=>sample.kind==='success'),'contrast fixture lacks required label types');
       for(const sample of row.contrast){assert(sample.opaque,'contrast measurement requires an opaque matched surface');assert(sample.ratio>=4.5,`course label contrast ${sample.ratio}: ${sample.label}`);}
      }
 
@@ -333,11 +335,36 @@ try {
      await dialog.getByRole('button',{name:'存为笔记',exact:true}).click();
      await dialog.getByRole('button',{name:'已保存',exact:true}).waitFor();
      assert.equal(await prisma.note.count({where:{userId:learner.id,source:'ai_transform',contentMd:{contains:resultText}}}),1);
+     await page.getByRole('status').filter({hasText:'正在加载笔记'}).waitFor({state:'hidden'});
      await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
      assert(await trigger.evaluate(element=>element===document.activeElement),'AI result dismissal did not restore its trigger focus');
      await page.reload({waitUntil:'networkidle'});
      assert((await page.locator('body').innerText()).includes('AI整理·当前笔记'));
     }finally{await page.unroute('**/api/ai/note-summary');}
+   });
+   for(const oldSuccess of [true,false]) await check(variant+`:global AI old success=${oldSuccess} cannot follow a newer filter`,async()=>{
+    const filtered=await buyer.newPage();let releaseA,releaseB;const heldA=new Promise(resolve=>{releaseA=resolve;}),heldB=new Promise(resolve=>{releaseB=resolve;});let calls=0;const payloads=[];
+    const errors=[];filtered.on('pageerror',e=>errors.push(e.stack||e.message));
+    await filtered.route('**/api/ai/note-summary',async route=>{
+     payloads.push(route.request().postDataJSON());calls++;
+     if(calls===1){await heldA;return route.fulfill({status:oldSuccess?200:503,contentType:'application/json',body:JSON.stringify(oldSuccess?{ok:true,data:{summary:['Old filtered A']}}:{ok:false,error:'Old filtered A failed'})});}
+     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({ok:true,data:{summary:['Current filtered B']}})});
+    });
+    await filtered.route('**/api/notes?*',async route=>{
+     if(!new URL(route.request().url()).searchParams.has('starred'))return route.continue();
+     const response=await route.fetch();await heldB;await route.fulfill({response});
+    });
+    try{
+     await filtered.goto(base+'/notes',{waitUntil:'networkidle'});const trigger=filtered.getByRole('button',{name:'AI 整理',exact:true}).first();
+     await trigger.click();await filtered.getByRole('menuitem',{name:'AI 总结',exact:true}).click();await filtered.getByRole('button',{name:'仅收藏',exact:true}).click();
+     await filtered.getByRole('status').filter({hasText:'正在加载笔记'}).waitFor();assert(await trigger.isDisabled());
+     const oldResponse=filtered.waitForResponse(r=>r.url().endsWith('/api/ai/note-summary'));releaseA();await oldResponse;await settleVisible(filtered);
+     assert.equal(await filtered.getByRole('dialog').count(),0);assert(!(await filtered.locator('body').innerText()).includes('Old filtered A'));assert(await trigger.isDisabled());
+     releaseB();await filtered.getByRole('status').filter({hasText:'正在加载笔记'}).waitFor({state:'hidden'});
+     await trigger.click();await filtered.getByRole('menuitem',{name:'AI 总结',exact:true}).click();
+     const dialog=filtered.getByRole('dialog');await dialog.waitFor({state:'visible'});assert((await dialog.innerText()).includes('Current filtered B'));assert.deepEqual(payloads[1].noteIds,[pageNotes[0].id]);assert(!payloads[0].noteIds.includes(pageNotes[0].id),'old and new filter fixtures were not distinct');
+     await snap(filtered,variant+`-filtered-ai-${oldSuccess?'success':'error'}-ownership`,false);assert.equal(errors.length,0,errors.join('; '));
+    }finally{releaseA();releaseB();await filtered.unrouteAll({behavior:'wait'});await filtered.close();}
    });
    await check(variant+':author manual course create retry edit cancel and persisted courseware',async()=>{
     const creator=await buyer.newPage();const errors=[];creator.on('pageerror',e=>errors.push(e.message));let createdCourse;
@@ -362,6 +389,10 @@ try {
      await creator.goto(`${base}/create?manual=${createdCourse.id}`,{waitUntil:'networkidle'});await creator.getByRole('button',{name:'编辑',exact:true}).first().click();assert.equal(await dialog.getByPlaceholder('正文',{exact:true}).inputValue(),body);
      await dialog.getByPlaceholder('正文',{exact:true}).fill('Cancelled synthetic change');await dialog.getByRole('button',{name:'取消',exact:true}).click();
      assert((await prisma.lesson.findUniqueOrThrow({where:{id:first.id}})).blocksJson.includes(body));
+     const authorLayout=await creator.locator('[data-testid="courseware-description"], [data-testid="managed-lesson-title"]').evaluateAll(nodes=>nodes.map(node=>({kind:node.getAttribute('data-testid'),width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height})));
+     assert.equal(authorLayout.length,2);for(const item of authorLayout)assert(item.width>=120,`author text compressed to ${item.width}px`);
+     report.journeys.push({name:variant+':author layout dimensions',diagnostic:authorLayout});
+     await creator.evaluate(()=>scrollTo(0,0));await settleVisible(creator);
      await snap(creator,variant+'-author-manual-course');assert.equal(errors.length,0,errors.join('; '));
     }finally{await creator.close();if(createdCourse)await prisma.course.deleteMany({where:{id:createdCourse.id,authorUserId:buyerActor.id}});}
    });

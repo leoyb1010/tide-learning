@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { X } from "@phosphor-icons/react";
 
@@ -16,16 +16,20 @@ import { X } from "@phosphor-icons/react";
  * （书桌 hero 的 .studio-lightup / .stagger 会把内联浮层困住变半透明）。见 globals.css Z-INDEX 铁律 2。
  */
 export function Dialog({
-  open, onClose, title, ariaLabel, children, className,
+  open, onClose, title, ariaLabel, children, className, returnFocusRef,
 }: {
   open: boolean; onClose: () => void; title?: string;
   /** 无障碍名（不渲染可见标题）；缺省时回退用 title 作可访问名。给无可见标题的浮层（如命令面板）用。 */
   ariaLabel?: string;
   children: ReactNode; className?: string;
+  /** Async actions may temporarily disable/blur their trigger before the dialog opens. */
+  returnFocusRef?: RefObject<HTMLElement | null>;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   // 打开前的焦点锚点：关闭时还原，避免焦点落回 body（WCAG 2.4.3 焦点顺序）。
   const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const explicitReturnRef = useRef(returnFocusRef);
+  explicitReturnRef.current = returnFocusRef;
   const [host, setHost] = useState<HTMLElement | null>(null);
 
   // onClose 存入 ref：下方键盘/焦点 effect 只依赖 [open]，不因父组件每次重渲染传入
@@ -42,7 +46,7 @@ export function Dialog({
   useEffect(() => {
     if (!open) return;
     // open 翻转为真：记录来源焦点、锁滚动、装监听、初始聚焦——整段仅在开合翻转时跑一次。
-    restoreFocusRef.current = document.activeElement as HTMLElement | null;
+    restoreFocusRef.current = (explicitReturnRef.current?.current ?? document.activeElement) as HTMLElement | null;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     const onKey = (e: KeyboardEvent) => {

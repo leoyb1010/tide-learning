@@ -1,0 +1,72 @@
+{
+  "commit": "3594da4a6d165ded2ba3694af1f633fc60e87228",
+  "run": 37145550101,
+  "scope": "Selected original screenshots from all 12 variants; not every captured image",
+  "images": [
+    {
+      "artifactPath": "round-1/phone-light-no-preference/phone-light-no-preference-market-slug.jpg",
+      "sha256": "0d3c8cedc6005b04004aac4c7ad1688ec15f0095bbc8ba64957d0f53a90f815a",
+      "observation": "Market detail route content inspected"
+    },
+    {
+      "artifactPath": "round-1/phone-light-reduce/phone-light-reduce-notes-notebook-id.jpg",
+      "sha256": "ebed80658d3cfd5ce251bf3c8ef84b81a685267284c91233db8efd05be8c49e4",
+      "observation": "Notebook primary/secondary actions fit mobile rows"
+    },
+    {
+      "artifactPath": "round-1/phone-dark-no-preference/phone-dark-no-preference-author-manual-course.png",
+      "sha256": "893eb3b83d2e3a1a63dede85566d9dffc01a729ec96bbe088d06f4ed56e46607",
+      "observation": "Caption and lesson title compressed; responsive fix pending retest"
+    },
+    {
+      "artifactPath": "round-1/phone-dark-reduce/phone-dark-reduce-courses-id-preview.jpg",
+      "sha256": "8087e16cc66f9da5e7c0e47b18cf852054d72593c88f578fea2f1b8bcbd7243f",
+      "observation": "Readable sandboxed course preview"
+    },
+    {
+      "artifactPath": "round-1/tablet-light-no-preference/tablet-light-no-preference-courses.jpg",
+      "sha256": "9e74843a96f9f832bc1a574a6a879aac908f47fa136322a1797556392eb88e2f",
+      "observation": "Course grid and lower content inspected; long full-page image viewed scaled"
+    },
+    {
+      "artifactPath": "round-1/tablet-light-reduce/tablet-light-reduce-reviewer-approval.png",
+      "sha256": "f9d549ba54f48b8bb7dccec1416469ba3fc0b200051d4ea8fc0299f19176f7dc",
+      "observation": "Actual approval completed and queue empty state inspected"
+    },
+    {
+      "artifactPath": "round-1/tablet-dark-no-preference/tablet-dark-no-preference-desk-bottom.jpg",
+      "sha256": "b027a998ef710eedff27ecfbbc0efdcbdec3d6fb943f84d0b1ac5f55594a50d7",
+      "observation": "Lower recommendations and badges readable"
+    },
+    {
+      "artifactPath": "round-1/tablet-dark-reduce/tablet-dark-reduce-me-settings-profile-bottom.jpg",
+      "sha256": "e7c7f354150a46b4d35e01a7c614170ae2ec69a573b2807328462bf5b31c017f",
+      "observation": "Lower profile card inspected; QR readability remains a candidate, not a validated defect"
+    },
+    {
+      "artifactPath": "round-1/desktop-light-no-preference/desktop-light-no-preference-admin-permissions.jpg",
+      "sha256": "1e67f88ccd3abb773ba5cf9311f42f4d1f28d0b404aba3e655ffb65e3a485aa6",
+      "observation": "Metadata/reset labels squeezed; responsive and checkbox-name fix pending retest"
+    },
+    {
+      "artifactPath": "round-1/desktop-light-reduce/desktop-light-reduce-courses-id-learn-lessonId.jpg",
+      "sha256": "8db5e31d34e5ab07e530c95d5c2c9130ef4c2a661333b3d7d0a5e68e4526567b",
+      "observation": "Lesson frame and notes inspected"
+    },
+    {
+      "artifactPath": "round-1/desktop-dark-no-preference/desktop-dark-no-preference-me-courses.jpg",
+      "sha256": "b4d93d92cdf82e97e991502d1a5a53119ca03d65bfcbd838f33aa831b9f4d353",
+      "observation": "Ready label white-on-white; semantic surface fix pending retest"
+    },
+    {
+      "artifactPath": "round-1/desktop-dark-reduce/desktop-dark-reduce-desk-bottom.jpg",
+      "sha256": "2220db4e3ff60010084b62c62210f8529939819a7a25e0ea88492e54af93e4d2",
+      "observation": "Trial/success label colors and lower cards readable"
+    },
+    {
+      "artifactPath": "round-1/desktop-dark-no-preference/desktop-dark-no-preference-keyboard-ai-result.png",
+      "sha256": "2f137a15b52e8102b4b4e1df62576aa1e3432a3d26dc83373008eb7907b4883c",
+      "observation": "REJECTED: unfinished entry fade, not a valid contrast or layout pass"
+    }
+  ]
+}

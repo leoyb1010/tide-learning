@@ -6,8 +6,11 @@
       "round": 1,
       "status": "in_progress",
       "accepted": false,
-      "latestExecutedAttempt": "1b238574b9062c0762d66b2a500c027487972395",
-      "evidence": "round1-browser-attempt-1b.json"
+      "latestExecutedAttempt": "3594da4a6d165ded2ba3694af1f633fc60e87228",
+      "evidence": "round1-browser-attempt-3594.json",
+      "latestPublishedCandidate": "3594da4a6d165ded2ba3694af1f633fc60e87228",
+      "candidateCiRun": 37145550101,
+      "candidateCiStatus": "failure"
     },
     {
       "round": 2,

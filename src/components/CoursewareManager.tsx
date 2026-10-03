@@ -144,8 +144,8 @@ export function CoursewareManager({
     <div className="mt-4 rounded-[14px] border border-[var(--border)] bg-[var(--surface2)] p-4 shadow-[var(--card)]">
       <div className="flex flex-wrap items-center gap-2">
         <Palette size={16} weight="fill" className="text-[var(--red)]" />
-        <span className="text-[13px] font-semibold text-[var(--ink)]">内容管理 · 可控编辑</span>
-        <span className="mono flex-1 text-[11px] text-[var(--ink4)]">内容、结构与视觉都可继续编辑</span>
+        <span className="shrink-0 text-[13px] font-semibold text-[var(--ink)]">内容管理 · 可控编辑</span>
+        <span data-testid="courseware-description" className="mono basis-full text-[11px] leading-relaxed text-[var(--ink4)] sm:min-w-[180px] sm:flex-1 sm:basis-auto">内容、结构与视觉都可继续编辑</span>
         <button
           type="button"
           onClick={() => setGraphOpen(true)}
@@ -215,28 +215,30 @@ export function CoursewareManager({
         {managedLessons.map((l, i) => (
           <li
             key={l.id}
-            className="flex items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
+            className="flex flex-wrap items-center gap-2 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-2"
           >
-            <span className="mono text-[11px] text-[var(--ink4)]">{String(i + 1).padStart(2, "0")}</span>
-            <span className="flex-1 truncate text-[13px] text-[var(--ink2)]">{l.title}</span>
+            <div className="flex w-full min-w-0 items-center gap-2 sm:w-auto sm:flex-1">
+              <span className="mono shrink-0 text-[11px] text-[var(--ink4)]">{String(i + 1).padStart(2, "0")}</span>
+              <span data-testid="managed-lesson-title" className="min-w-0 flex-1 truncate text-[13px] text-[var(--ink2)]">{l.title}</span>
+            </div>
             <button
               type="button"
               onClick={() => setEditFor(l)}
-              className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+              className="studio-press inline-flex min-h-[44px] items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
             >
               <ListBullets size={12} weight="bold" /> 编辑
             </button>
             <button
               type="button"
               onClick={() => setRewriteFor(l)}
-              className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)]"
+              className="studio-press inline-flex min-h-[44px] items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)]"
             >
               <PencilSimple size={12} weight="fill" /> 改写
             </button>
             <button
               type="button"
               onClick={() => setHistoryFor(l)}
-              className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
+              className="studio-press inline-flex min-h-[44px] items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-1 text-[11px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)]"
             >
               <ClockCounterClockwise size={12} weight="bold" /> 历史
             </button>
@@ -472,7 +474,7 @@ function HistoryDialog({ lesson, onClose }: { lesson: ManagerLesson; onClose: ()
                 disabled={!rev.hasBlocks || !!rollingBack}
                 title={rev.hasBlocks ? "回滚到此版本" : "该版本仅排版快照，不可回滚"}
                 onClick={() => rollback(rev.id)}
-                className="studio-press inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)] disabled:opacity-40"
+                className="studio-press inline-flex min-h-[44px] items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1.5 text-[12px] font-semibold text-[var(--ink2)] transition-colors hover:border-[var(--red-soft-border)] hover:text-[var(--red-ink)] disabled:opacity-40"
               >
                 {rollingBack === rev.id ? <Spinner size={11} /> : <ClockCounterClockwise size={12} weight="bold" />}
                 回滚

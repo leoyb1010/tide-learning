@@ -80,3 +80,11 @@ it.each([['unmount',true],['unmount',false],['scope change',true],['scope change
  await act(async()=>replies[1](new Response(JSON.stringify({ok:true,data:{markdown:'# Current B'}}))));
  expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Current B');expect(JSON.parse(String(request.mock.calls[1][1]?.body)).noteIds).toEqual(['B']);
 });
+it('menu focus commits synchronously before any scheduled animation frame',async()=>{
+ vi.stubGlobal('requestAnimationFrame',vi.fn(()=>1));vi.stubGlobal('cancelAnimationFrame',vi.fn());
+ await act(async()=>root.render(createElement(ExportMenu,{scope:{kind:'all'}})));const trigger=document.querySelector('#root button') as HTMLButtonElement;trigger.focus();await act(async()=>trigger.click());
+ expect(document.activeElement).toBe(document.querySelector('[role="menuitem"]'));
+ await act(async()=>document.activeElement?.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true})));
+ await act(async()=>trigger.dispatchEvent(new dom.window.KeyboardEvent('keydown',{key:'ArrowUp',bubbles:true,cancelable:true})));
+ expect(document.activeElement).toBe([...document.querySelectorAll('[role="menuitem"]')].at(-1));
+});

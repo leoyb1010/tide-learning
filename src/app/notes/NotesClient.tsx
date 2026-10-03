@@ -106,6 +106,7 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
   const [error, setError] = useState(false);
   const [needLogin] = useState(!initialData.loggedIn);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [loadingNotes, setLoadingNotes] = useState(false);
   const [view, setView] = useState<View>(initialData.initialView ?? "all"); // v2.2：默认落「全部」；?view= 可直达指定视图
 
   // 「记一条」独立笔记编辑弹窗
@@ -140,6 +141,7 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
   // 筛选变化 → 重取第一页（覆盖列表）。视图切换不触发（view 不在依赖里）。
   const reload = useCallback(async () => {
     const seq = ++loadSeq.current;
+    setLoadingNotes(true);
     setError(false);
     try {
       const params = buildParams();
@@ -152,6 +154,8 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
     } catch {
       if (seq !== loadSeq.current) return;
       setError(true);
+    } finally {
+      if (seq === loadSeq.current) setLoadingNotes(false);
     }
   }, [buildParams]);
 
@@ -290,6 +294,8 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
                 <AiTidyMenu
                   scope={{ noteIds: notes.slice(0, 80).map((n) => n.id) }}
                   title="当前笔记"
+                  contextKey={buildParams().toString()}
+                  disabled={loadingNotes || error}
                   onSaved={refreshAll}
                 />
                 {/* 导出中心：md / html / txt / json / 打印版，一处显性选择 */}
@@ -404,8 +410,10 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
         </div>
       )}
 
+      {loadingNotes && <p role="status" className="text-[13px] text-[var(--ink3)]">正在加载笔记…</p>}
+
       {/* 主体：按 view 作 key，切换视图时重放 .studio-slide 转场 */}
-      <div key={view} className="studio-slide">
+      <div key={view} className="studio-slide" aria-busy={loadingNotes}>
         {view === "notebook" ? (
           // v2.2：笔记本视图，笔记本网格（新建/进入/整理）。
           <NotebookGrid />
@@ -501,10 +509,14 @@ function AiTidyMenu({
   title,
   compact,
   onSaved,
+  contextKey = "",
+  disabled = false,
 }: {
   scope: { courseId: string } | { noteIds: string[] };
   title: string;
   compact?: boolean;
+  contextKey?: string;
+  disabled?: boolean;
   onSaved?: () => void; // 存为笔记成功后回调（刷新列表）
 }) {
   const { toast } = useToast();
@@ -518,6 +530,9 @@ function AiTidyMenu({
   const menu = useActionMenu(open, setOpen);
   const submitRef = useRef(false);
   const operationRef = useRef(0);
+  const scopeKey = JSON.stringify({ scope, contextKey });
+  const currentScope = useRef(scopeKey);
+  currentScope.current = scopeKey;
   // 超时兜底句柄：卸载/复位时清理，避免泄漏或误清后续请求的 busy
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearBusyTimeout = useCallback(() => {
@@ -527,22 +542,28 @@ function AiTidyMenu({
     }
   }, []);
 
-  // 卸载时清超时句柄
-  useEffect(() => () => { operationRef.current++; clearBusyTimeout(); }, [clearBusyTimeout]);
+  const invalidate = useCallback(() => { operationRef.current++; clearBusyTimeout(); }, [clearBusyTimeout]);
+  // Filter intent invalidates pending results immediately, before its new GET
+  // resolves. Completed/saved dialogs stay intact during their own list refresh.
+  useEffect(() => {
+    submitRef.current = false; setBusy(null);
+    return invalidate;
+  }, [scopeKey, invalidate]);
 
   const payload = "courseId" in scope ? { courseId: scope.courseId } : { noteIds: scope.noteIds };
 
   async function run(action: TidyAction) {
-    if (submitRef.current) return;
+    if (submitRef.current || disabled) return;
     submitRef.current = true;
     const operation = ++operationRef.current;
+    const isCurrent = () => operation === operationRef.current && scopeKey === currentScope.current;
     menu.closeAfterAction();
     setBusy(action);
     setSaved(false);
     // 15s 超时兜底：无论请求 resolve 与否，到点强制复位 busy 并提示，避免菜单永久卡死
     clearBusyTimeout();
     timeoutRef.current = setTimeout(() => {
-      if (operation !== operationRef.current) return;
+      if (!isCurrent()) return;
       timeoutRef.current = null;
       operationRef.current++; // A retry owns its own result and busy state.
       submitRef.current = false;
@@ -556,7 +577,7 @@ function AiTidyMenu({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ ...payload, mode: "summary" }),
         }).then((r) => r.json());
-        if (operation !== operationRef.current) return;
+        if (!isCurrent()) return;
         if (!json.ok) return toast(json.error ?? "AI 总结失败", { tone: "warn" });
         const points = (json.data?.summary ?? []) as string[];
         if (points.length === 0) return toast("没有可总结的要点", { tone: "info" });
@@ -569,7 +590,7 @@ function AiTidyMenu({
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         }).then((r) => r.json());
-        if (operation !== operationRef.current) return;
+        if (!isCurrent()) return;
         if (!json.ok) return toast(json.error ?? "复习卡生成失败", { tone: "warn" });
         const count = (json.data?.count ?? 0) as number;
         setResult({ title: `${title} · 复习卡`, kind: "cards", count, action });
@@ -582,7 +603,7 @@ function AiTidyMenu({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ ...payload, action }),
         }).then((r) => r.json());
-        if (operation !== operationRef.current) return;
+        if (!isCurrent()) return;
         if (!json.ok) return toast(json.error ?? "AI 整理失败", { tone: "warn" });
         if (action === "actions") {
           const items = (json.data?.items ?? []) as string[];
@@ -598,10 +619,10 @@ function AiTidyMenu({
       }
       track("ai_note_tidy", { action, scope: "courseId" in scope ? "course" : "notes" });
     } catch {
-      if (operation !== operationRef.current) return;
+      if (!isCurrent()) return;
       toast("AI 整理失败，请稍后重试", { tone: "warn" });
     } finally {
-      if (operation === operationRef.current) {
+      if (isCurrent()) {
         submitRef.current = false;
         clearBusyTimeout();
         setBusy(null);
@@ -661,7 +682,7 @@ function AiTidyMenu({
         aria-expanded={open}
         aria-controls={open ? menu.id : undefined}
         onClick={() => setOpen((v) => !v)}
-        disabled={busy !== null}
+        disabled={disabled || busy !== null}
         className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45 ${
           compact ? "px-3 py-1.5 text-[12px]" : "px-3.5 py-2 text-[13px]"
         }`}
@@ -687,7 +708,7 @@ function AiTidyMenu({
                 role="menuitem"
                 tabIndex={-1}
                 onClick={() => void run(it.key)}
-                disabled={busy !== null}
+                disabled={disabled || busy !== null}
                 className="flex min-h-[44px] w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-60"
               >
                 {itemBusy ? (
@@ -703,7 +724,7 @@ function AiTidyMenu({
       )}
 
       {/* 结果弹窗 */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={result?.title}>
+      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title={result?.title} returnFocusRef={menu.triggerRef}>
         {result?.kind === "cards" ? (
           <div className="flex flex-col items-center gap-3 py-4 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[var(--red-soft)] text-[var(--red)]">

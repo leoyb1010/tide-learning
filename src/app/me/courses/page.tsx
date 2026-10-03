@@ -239,7 +239,7 @@ export default async function MyCoursesPage() {
                         待确认大纲
                       </div>
                     ) : (
-                      <div className="absolute right-3 top-3 rounded-full bg-white/90 px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
+                      <div data-testid="owned-course-status" className="absolute right-3 top-3 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[0.66rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
                         就绪 · {c.total} 节
                       </div>
                     )}

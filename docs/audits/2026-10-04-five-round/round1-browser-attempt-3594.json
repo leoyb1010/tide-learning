@@ -1,0 +1,125 @@
+{
+  "commit": "3594da4a6d165ded2ba3694af1f633fc60e87228",
+  "ciRun": 37145550101,
+  "status": "failed",
+  "routeResults": {
+    "render-pass-interactions-separate": 600
+  },
+  "journeys": {
+    "passed": 96,
+    "diagnostic": 72,
+    "failed": 24
+  },
+  "failures": [
+    {
+      "name": "phone-light-no-preference:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.last()))\n"
+    },
+    {
+      "name": "phone-light-no-preference:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "phone-light-reduce:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.last()))\n"
+    },
+    {
+      "name": "phone-light-reduce:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "phone-dark-no-preference:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.first()))\n"
+    },
+    {
+      "name": "phone-dark-no-preference:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "phone-dark-reduce:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.first()))\n"
+    },
+    {
+      "name": "phone-dark-reduce:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "tablet-light-no-preference:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.first()))\n"
+    },
+    {
+      "name": "tablet-light-no-preference:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "tablet-light-reduce:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.first()))\n"
+    },
+    {
+      "name": "tablet-light-reduce:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "tablet-dark-no-preference:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.last()))\n"
+    },
+    {
+      "name": "tablet-dark-no-preference:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "tablet-dark-reduce:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.last()))\n"
+    },
+    {
+      "name": "tablet-dark-reduce:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "desktop-light-no-preference:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.first()))\n"
+    },
+    {
+      "name": "desktop-light-no-preference:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "desktop-light-reduce:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.last()))\n"
+    },
+    {
+      "name": "desktop-light-reduce:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "desktop-dark-no-preference:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.last()))\n"
+    },
+    {
+      "name": "desktop-dark-no-preference:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    },
+    {
+      "name": "desktop-dark-reduce:note export and AI menus keyboard navigation and real export",
+      "error": "The expression evaluated to a falsy value:\n\n  assert(await focused(items.first()))\n"
+    },
+    {
+      "name": "desktop-dark-reduce:keyboard AI error retry synthetic result saved as actual note",
+      "error": "AI result dismissal did not restore its trigger focus"
+    }
+  ],
+  "contrast": {
+    "samples": 408,
+    "minimum": 5.265384030350504
+  },
+  "harnessCalibration": {
+    "source": "playwright-core/lib/server/browserContext.js serviceWorkers=block init script",
+    "errors": [
+      {
+        "name": "SecurityError",
+        "message": "Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.",
+        "stack": "SecurityError: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n    at <anonymous>:3:15\n    at <anonymous>:5:7"
+      }
+    ]
+  }
+}
