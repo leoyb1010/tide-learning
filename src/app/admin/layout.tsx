@@ -25,7 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const navItems = adminNavForUser(user.role);
 
   return (
-    <div className="grid gap-6 md:grid-cols-[200px_1fr]">
+    <div className="grid min-w-0 grid-cols-1 gap-6 md:grid-cols-[200px_minmax(0,1fr)]">
       <AdminNav role={user.role} items={navItems} />
       <div className="min-w-0">{children}</div>
     </div>

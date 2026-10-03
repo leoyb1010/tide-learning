@@ -13,7 +13,7 @@ type NavItem = { href: string; label: string };
 export function AdminNav({ role, items }: { role: string; items: NavItem[] }) {
   const pathname = usePathname();
   return (
-    <aside className="md:sticky md:top-24 md:h-fit">
+    <aside className="min-w-0 md:sticky md:top-24 md:h-fit">
       <div className="mb-4 flex items-center gap-2 px-2">
         <GearSix size={18} weight="fill" className="text-[var(--red)]" />
         <div>

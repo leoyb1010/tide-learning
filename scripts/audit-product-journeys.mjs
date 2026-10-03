@@ -61,6 +61,7 @@ try {
         controls: [...document.querySelectorAll('button,a[href],input,select,textarea')].map(e => ({ tag: e.tagName, label: e.getAttribute('aria-label') || e.textContent?.trim().slice(0, 100) || e.getAttribute('placeholder'), disabled: e.disabled ?? false, href: e.getAttribute('href') })),
         overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
       }));
+      if (route.startsWith('/admin')) assert(snapshot.overflowX <= 2, `${route}: admin viewport overflow ${snapshot.overflowX}px`);
       const screenshot = `${viewport.name}-${source === '.' ? 'home' : source.replaceAll('/', '-').replaceAll('[', '').replaceAll(']', '')}.png`;
       await page.screenshot({ path: path.join(out, screenshot), fullPage: false });
       report.routes.push({ source, route, viewport: viewport.name, status: 'rendered-not-all-controls-exercised', httpStatus: response.status(), finalUrl: page.url(), screenshot, errors, ...snapshot });
