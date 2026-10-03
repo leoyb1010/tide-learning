@@ -45,7 +45,7 @@ export default function NotebookComposeButton({ notebookId, variant = "solid" }:
   const context = useContext(NotebookComposeContext);
   if (!context) return <NotebookComposeProvider notebookId={notebookId}><NotebookComposeButton notebookId={notebookId} variant={variant} /></NotebookComposeProvider>;
   const cls = variant === "solid"
-    ? "cta-glow studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
+    ? "cta-glow studio-press col-span-2 inline-flex min-h-[44px] w-full items-center justify-center whitespace-nowrap sm:w-auto sm:justify-start gap-1.5 rounded-[12px] bg-[var(--red)] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[var(--red-hover)]"
     : "studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-4 py-2.5 text-[13px] font-semibold text-[var(--red)] transition-colors";
   return <button ref={variant === "solid" ? context.primaryTrigger : undefined} type="button" onClick={context.show} className={cls}>
     <Plus size={15} weight="bold" /> 在此笔记本记一条

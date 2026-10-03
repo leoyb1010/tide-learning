@@ -93,7 +93,7 @@ export default async function NotebookDetailPage({ params }: { params: Promise<{
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5">
+          <div className="grid w-full grid-cols-[auto_1fr] items-center gap-2.5 sm:flex sm:w-auto">
             {/* 在此笔记本记一条：预填本笔记本 id，新建即归入（空态/非空态都可见） */}
             <NotebookComposeButton notebookId={notebook.id} />
             {/* 导出中心：md / html / txt / json / 打印版，导出的是「本笔记本」范围 */}

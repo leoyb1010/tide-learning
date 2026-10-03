@@ -1,0 +1,160 @@
+{
+  "commit": "1b238574b9062c0762d66b2a500c027487972395",
+  "ciRun": 37142110553,
+  "status": "failed",
+  "routes": 600,
+  "journeys": {
+    "passed": 71,
+    "diagnostic": 72,
+    "failed": 1
+  },
+  "variants": [
+    "desktop-dark-no-preference",
+    "desktop-dark-reduce",
+    "desktop-light-no-preference",
+    "desktop-light-reduce",
+    "phone-dark-no-preference",
+    "phone-dark-reduce",
+    "phone-light-no-preference",
+    "phone-light-reduce",
+    "tablet-dark-no-preference",
+    "tablet-dark-reduce",
+    "tablet-light-no-preference",
+    "tablet-light-reduce"
+  ],
+  "failures": [
+    {
+      "name": "phone-light-no-preference:/",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-no-preference:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-no-preference:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-no-preference:/desk",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-reduce:/",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-reduce:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-reduce:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-light-reduce:/desk",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-no-preference:/",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-no-preference:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-no-preference:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-no-preference:/desk",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-reduce:/",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-reduce:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-reduce:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "phone-dark-reduce:/desk",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-light-no-preference:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-light-no-preference:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-light-reduce:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-light-reduce:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-dark-no-preference:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-dark-no-preference:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-dark-reduce:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "tablet-dark-reduce:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-light-no-preference:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-light-no-preference:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-light-no-preference:nonempty notebook persisted A late response cannot dismiss draft B",
+      "error": "Expected values to be strictly equal:\n\n'' !== 'Synthetic B'\n"
+    },
+    {
+      "name": "desktop-light-reduce:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-light-reduce:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-dark-no-preference:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-dark-no-preference:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-dark-reduce:/courses/e2e-courseware-7766-1791050320633/preview",
+      "error": "unexpected browser errors: Failed to read the 'serviceWorker' property from 'Navigator': Service worker is disabled because the context is sandboxed and lacks the 'allow-same-origin' flag.\n\n1 !== 0\n"
+    },
+    {
+      "name": "desktop-dark-reduce:/demands/cmusox9v4004k1ofkaw169rso",
+      "error": "visible button has no accessible name\n\n1 !== 0\n"
+    }
+  ],
+  "geometryOverflows": []
+}

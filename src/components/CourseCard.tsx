@@ -79,7 +79,7 @@ export function CourseCardFace({ course }: { course: CourseCardData }) {
         )}
         {course.freeLessonsCount > 0 && (
           // 免费试学：文字退成中性深色，只保留 PlayCircle 一点红点睛——封面上同时最多一处彩色热点
-          <div className="absolute bottom-3.5 left-3.5 flex items-center gap-1.5 rounded-full bg-white/92 px-2.5 py-1 text-[0.7rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
+          <div data-testid="course-trial" className="absolute bottom-3.5 left-3.5 flex items-center gap-1.5 rounded-full bg-[var(--surface)] px-2.5 py-1 text-[0.7rem] font-semibold text-[var(--ink)] backdrop-blur-sm">
             <PlayCircle size={13} weight="fill" className="text-[var(--red-active)]" />
             {course.freeLessonsCount} 节免费试学
           </div>

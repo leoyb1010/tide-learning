@@ -1,0 +1,127 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/note-menu-keyboard.test.ts (9 tests | 1 failed | 8 skipped) 167ms
+   × timed-out AI result cannot overwrite a newer retry or clear its busy ownership 161ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/note-menu-keyboard.test.ts > timed-out AI result cannot overwrite a newer retry or clear its busy ownership
+AssertionError: expected <div …(5)>…(2)</div> to be null
+
+- Expected:
+null
+
++ Received:
+<div
+  aria-label="当前笔记 · 复习要点"
+  aria-modal="true"
+  class="fixed inset-0 flex items-center justify-center p-4"
+  role="dialog"
+  style="z-index: var(--z-modal);"
+>
+  <div
+    class="dialog-scrim-in absolute inset-0 bg-ink-950/45"
+  />
+  <div
+    class="dialog-panel-in relative w-full max-w-lg rounded-3xl border border-ink-100 bg-paper-raised p-6 shadow-[0_32px_80px_-32px_rgba(125,8,18,0.35)] "
+  >
+    <h2
+      class="mb-4 text-lg font-semibold text-ink-950"
+    >
+      当前笔记 · 复习要点
+    </h2>
+    <button
+      aria-label="关闭"
+      class="absolute right-4 top-4 text-ink-400 transition-colors hover:text-ink-700"
+      title="关闭"
+    >
+      <svg
+        fill="currentColor"
+        height="18"
+        viewBox="0 0 256 256"
+        width="18"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"
+        />
+      </svg>
+    </button>
+    <ul
+      class="space-y-2.5"
+    >
+      <li
+        class="flex gap-2.5 text-[14px] leading-[1.7] text-[var(--ink2)]"
+      >
+        <span
+          class="mono mt-0.5 shrink-0 font-semibold text-[var(--red)]"
+        >
+          1
+          .
+        </span>
+        <span>
+          Old A
+        </span>
+      </li>
+    </ul>
+    <div
+      class="mt-4 flex items-center justify-end gap-2 border-t border-[var(--border)] pt-3"
+    >
+      <button
+        class="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--red-soft-border)] bg-[var(--red-soft)] px-3 py-1.5 text-[13px] font-semibold text-[var(--red)] transition-colors disabled:opacity-55"
+        type="button"
+      >
+        <svg
+          fill="currentColor"
+          height="13"
+          viewBox="0 0 256 256"
+          width="13"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M222.14,69.17,186.83,33.86A19.86,19.86,0,0,0,172.69,28H48A20,20,0,0,0,28,48V208a20,20,0,0,0,20,20H208a20,20,0,0,0,20-20V83.31A19.86,19.86,0,0,0,222.14,69.17ZM164,204H92V160h72Zm40,0H188V156a20,20,0,0,0-20-20H88a20,20,0,0,0-20,20v48H52V52H171l33,33ZM164,84a12,12,0,0,1-12,12H96a12,12,0,0,1,0-24h56A12,12,0,0,1,164,84Z"
+          />
+        </svg>
+        存为笔记
+      </button>
+      <button
+        class="studio-press inline-flex items-center gap-1.5 rounded-[10px] border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[13px] font-semibold text-[var(--ink2)] transition-colors hover:text-[var(--ink)]"
+        type="button"
+      >
+        <svg
+          fill="currentColor"
+          height="13"
+          viewBox="0 0 256 256"
+          width="13"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"
+          />
+        </svg>
+        复制
+      </button>
+    </div>
+  </div>
+</div>
+
+ ❯ tests/note-menu-keyboard.test.ts:59:52
+     57|  await choose('改写大纲');expect(replies).toHaveLength(2);
+     58|  await act(async()=>replies[0](new Response(JSON.stringify({ok:true,da…
+     59|  expect(document.querySelector('[role="dialog"]')).toBeNull();expect(d…
+       |                                                    ^
+     60|  await act(async()=>replies[1](new Response(JSON.stringify({ok:true,da…
+     61|  expect(document.querySelector('[role="dialog"]')?.textContent).toCont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 8 skipped (9)
+   Start at  02:03:23
+   Duration  4.18s (transform 262ms, setup 0ms, import 2.92s, tests 167ms, environment 894ms)

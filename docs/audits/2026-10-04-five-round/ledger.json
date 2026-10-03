@@ -1,0 +1,39 @@
+{
+  "baseline": "0b2afb7da45db7fe46d17711c7646c4c2dd71c48",
+  "branch": "audit/five-round-product-20261004",
+  "rounds": [
+    {
+      "round": 1,
+      "status": "in_progress",
+      "accepted": false,
+      "latestExecutedAttempt": "1b238574b9062c0762d66b2a500c027487972395",
+      "evidence": "round1-browser-attempt-1b.json"
+    },
+    {
+      "round": 2,
+      "status": "pending",
+      "accepted": false
+    },
+    {
+      "round": 3,
+      "status": "pending",
+      "accepted": false
+    },
+    {
+      "round": 4,
+      "status": "pending",
+      "accepted": false
+    },
+    {
+      "round": 5,
+      "status": "pending",
+      "accepted": false
+    }
+  ],
+  "limits": [
+    "Synthetic isolated data only",
+    "Live provider/OAuth/payment quality not validated",
+    "Native builds/policies, not native screen interaction",
+    "Strict dependency audit remains failed; current product browser candidate still has unresolved findings"
+  ]
+}

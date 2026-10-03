@@ -1,0 +1,59 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/dialog-focus-ownership.test.ts (3 tests | 2 failed) 118ms
+   × opening frame never steals focus from a user-selected textarea 84ms
+   × close cancels the old frame before a rapid reopen 16ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/dialog-focus-ownership.test.ts > opening frame never steals focus from a user-selected textarea
+AssertionError: expected <input aria-label="Title"></input> to be <textarea aria-label="Body"></textarea> // Object.is equality
+
+- Expected
++ Received
+
+- <textarea
+-   aria-label="Body"
++ <input
++   aria-label="Title"
+  />
+
+ ❯ tests/dialog-focus-ownership.test.ts:19:147
+     17| function flush(){const pending=[...frames];frames.clear();act(()=>pend…
+     18| it('opening frame never steals focus from a user-selected textarea',as…
+     19|  await act(async()=>root.render(render(true)));const body=document.que…
+       |                                                                                                                                                   ^
+     20| });
+     21| it('close cancels the old frame before a rapid reopen',async()=>{
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/dialog-focus-ownership.test.ts > close cancels the old frame before a rapid reopen
+AssertionError: expected 1 to be +0 // Object.is equality
+
+- Expected
++ Received
+
+- 0
++ 1
+
+ ❯ tests/dialog-focus-ownership.test.ts:23:69
+     21| it('close cancels the old frame before a rapid reopen',async()=>{
+     22|  await act(async()=>root.render(render(true)));expect(frames.size).toB…
+     23|  await act(async()=>root.render(render(false)));expect(frames.size).to…
+       |                                                                     ^
+     24|  await act(async()=>root.render(render(true)));expect(frames.size).toB…
+     25| });
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  2 failed | 1 passed (3)
+   Start at  02:19:23
+   Duration  3.00s (transform 61ms, setup 0ms, import 1.92s, tests 118ms, environment 773ms)

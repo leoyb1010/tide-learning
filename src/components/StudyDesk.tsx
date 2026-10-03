@@ -257,6 +257,7 @@ export function StudyDesk({
             />
             <button
               type="submit"
+              aria-label="用这个想法创建课程"
               disabled={!value.trim()}
               className="studio-press cta-glow inline-flex h-[46px] shrink-0 items-center gap-1.5 rounded-[14px] bg-[var(--red)] px-4 text-[14px] font-bold text-white transition-colors hover:bg-[var(--red-hover)] disabled:cursor-not-allowed disabled:bg-[var(--surface-inset)] disabled:text-[var(--ink4)] disabled:shadow-none"
             >

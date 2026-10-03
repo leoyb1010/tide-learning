@@ -50,7 +50,7 @@ export function Button({
 /* ============ Badge ============ */
 const TONES: Record<string, string> = {
   accent: "bg-accent-50 text-accent-700 ring-accent-200",
-  success: "bg-success/10 text-success ring-success/20",
+  success: "bg-[var(--ok-soft)] text-[var(--ok)] ring-success/20",
   warning: "bg-warning/10 text-warning ring-warning/20",
   error: "bg-error/10 text-error ring-error/20",
   muted: "bg-ink-50 text-ink-500 ring-ink-200",
@@ -60,7 +60,7 @@ const TONE_ALIAS: Record<string, string> = { tide: "accent", dawn: "warning" };
 export function Badge({ children, tone = "muted" }: { children: ReactNode; tone?: string }) {
   const key = TONE_ALIAS[tone] ?? tone;
   return (
-    <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.72rem] font-medium ring-1 ring-inset ${TONES[key] ?? TONES.muted}`}>
+    <span data-ui="badge" data-tone={key} className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[0.72rem] font-medium ring-1 ring-inset ${TONES[key] ?? TONES.muted}`}>
       {children}
     </span>
   );

@@ -1,0 +1,57 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/note-menu-keyboard.test.ts (13 tests | 3 failed | 9 skipped) 210ms
+   × notebook late A after unmount success=false cannot contaminate B 42ms
+   × notebook late A after scope change success=true cannot contaminate B 25ms
+   × notebook late A after scope change success=false cannot contaminate B 20ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/note-menu-keyboard.test.ts > notebook late A after unmount success=false cannot contaminate B
+AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times
+
+Received:
+
+  1st vi.fn() call:
+
+    Array [
+      "Old A failed",
+      Object {
+        "tone": "warn",
+      },
+    ]
+
+
+Number of calls: 1
+
+ ❯ tests/note-menu-keyboard.test.ts:79:24
+     77|  await choose();expect(replies).toHaveLength(2);
+     78|  await act(async()=>replies[0](new Response(JSON.stringify(success?{ok…
+     79|  expect(toastMock).not.toHaveBeenCalled();expect(document.querySelecto…
+       |                        ^
+     80|  await act(async()=>replies[1](new Response(JSON.stringify({ok:true,da…
+     81|  expect(document.querySelector('[role="dialog"]')?.textContent).toCont…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/3]⎯
+
+ FAIL  tests/note-menu-keyboard.test.ts > notebook late A after scope change success=true cannot contaminate B
+ FAIL  tests/note-menu-keyboard.test.ts > notebook late A after scope change success=false cannot contaminate B
+TypeError: Cannot read properties of undefined (reading 'click')
+ ❯ tests/note-menu-keyboard.test.ts:75:200
+
+ ❯ Proxy.process.env.NODE_ENV.exports.act node_modules/react/cjs/react.development.js:814:22
+ ❯ choose tests/note-menu-keyboard.test.ts:75:88
+ ❯ tests/note-menu-keyboard.test.ts:77:2
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/3]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  3 failed | 1 passed | 9 skipped (13)
+   Start at  02:13:41
+   Duration  5.04s (transform 290ms, setup 0ms, import 3.62s, tests 210ms, environment 993ms)

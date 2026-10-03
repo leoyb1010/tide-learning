@@ -23,6 +23,7 @@ import { track } from "@/lib/analytics-client";
 import { useHydratedClock } from "@/hooks/useHydratedClock";
 import { noteRelativeTime } from "@/lib/note-relative-time";
 import { useCaptureAuditTrace } from "@/hooks/useCaptureAuditTrace";
+import { useActionMenu } from "@/hooks/useActionMenu";
 import { useActiveCallback } from "@/hooks/useActiveCallback";
 import { renderMarkdown } from "@/lib/markdown";
 
@@ -493,7 +494,7 @@ interface TidyResult {
  * summary 走 /api/ai/note-summary；flashcards 走 /api/ai/review-card（落库）；
  * outline/actions/translate 走 /api/ai/note-transform。结果统一用 Dialog 展示。
  * v2.2：list/markdown 结果新增「存为笔记」按钮，POST /api/notes source=ai_transform 落库。
- * v3.0 双击修复：菜单项改 onPointerDown 提前响应；busy 项显示 spinner；请求加 15s 超时兜底复位。
+ * 原生 click 同时支持指针和键盘；同步锁防重复提交，超时后旧请求不能覆盖新结果。
  */
 function AiTidyMenu({
   scope,
@@ -514,7 +515,9 @@ function AiTidyMenu({
   const [copied, setCopied] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
+  const menu = useActionMenu(open, setOpen);
+  const submitRef = useRef(false);
+  const operationRef = useRef(0);
   // 超时兜底句柄：卸载/复位时清理，避免泄漏或误清后续请求的 busy
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const clearBusyTimeout = useCallback(() => {
@@ -524,37 +527,27 @@ function AiTidyMenu({
     }
   }, []);
 
-  // 点击外部关闭下拉
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
   // 卸载时清超时句柄
-  useEffect(() => clearBusyTimeout, [clearBusyTimeout]);
+  useEffect(() => () => { operationRef.current++; clearBusyTimeout(); }, [clearBusyTimeout]);
 
   const payload = "courseId" in scope ? { courseId: scope.courseId } : { noteIds: scope.noteIds };
 
   async function run(action: TidyAction) {
-    if (busy) return; // 请求进行中忽略重复触发（配合 onPointerDown 防双击重入）
-    setOpen(false);
+    if (submitRef.current) return;
+    submitRef.current = true;
+    const operation = ++operationRef.current;
+    menu.closeAfterAction();
     setBusy(action);
     setSaved(false);
     // 15s 超时兜底：无论请求 resolve 与否，到点强制复位 busy 并提示，避免菜单永久卡死
     clearBusyTimeout();
     timeoutRef.current = setTimeout(() => {
+      if (operation !== operationRef.current) return;
       timeoutRef.current = null;
-      setBusy((cur) => {
-        if (cur === action) {
-          toast("AI 整理超时，请稍后重试", { tone: "warn" });
-          return null;
-        }
-        return cur;
-      });
+      operationRef.current++; // A retry owns its own result and busy state.
+      submitRef.current = false;
+      setBusy(null);
+      toast("AI 整理超时，请稍后重试", { tone: "warn" });
     }, TIDY_TIMEOUT_MS);
     try {
       if (action === "summary") {
@@ -563,6 +556,7 @@ function AiTidyMenu({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ ...payload, mode: "summary" }),
         }).then((r) => r.json());
+        if (operation !== operationRef.current) return;
         if (!json.ok) return toast(json.error ?? "AI 总结失败", { tone: "warn" });
         const points = (json.data?.summary ?? []) as string[];
         if (points.length === 0) return toast("没有可总结的要点", { tone: "info" });
@@ -575,6 +569,7 @@ function AiTidyMenu({
           headers: { "content-type": "application/json" },
           body: JSON.stringify(payload),
         }).then((r) => r.json());
+        if (operation !== operationRef.current) return;
         if (!json.ok) return toast(json.error ?? "复习卡生成失败", { tone: "warn" });
         const count = (json.data?.count ?? 0) as number;
         setResult({ title: `${title} · 复习卡`, kind: "cards", count, action });
@@ -587,6 +582,7 @@ function AiTidyMenu({
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ ...payload, action }),
         }).then((r) => r.json());
+        if (operation !== operationRef.current) return;
         if (!json.ok) return toast(json.error ?? "AI 整理失败", { tone: "warn" });
         if (action === "actions") {
           const items = (json.data?.items ?? []) as string[];
@@ -602,10 +598,14 @@ function AiTidyMenu({
       }
       track("ai_note_tidy", { action, scope: "courseId" in scope ? "course" : "notes" });
     } catch {
+      if (operation !== operationRef.current) return;
       toast("AI 整理失败，请稍后重试", { tone: "warn" });
     } finally {
-      clearBusyTimeout();
-      setBusy(null);
+      if (operation === operationRef.current) {
+        submitRef.current = false;
+        clearBusyTimeout();
+        setBusy(null);
+      }
     }
   }
 
@@ -652,12 +652,17 @@ function AiTidyMenu({
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={menu.containerRef} style={open ? { zIndex: "var(--z-dropdown)" } : undefined}>
       <button
         type="button"
+        ref={menu.triggerRef}
+        onKeyDown={menu.onTriggerKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menu.id : undefined}
         onClick={() => setOpen((v) => !v)}
         disabled={busy !== null}
-        className={`studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45 ${
+        className={`studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45 ${
           compact ? "px-3 py-1.5 text-[12px]" : "px-3.5 py-2 text-[13px]"
         }`}
       >
@@ -671,7 +676,7 @@ function AiTidyMenu({
       </button>
 
       {open && (
-        <div className="studio-rise elev-3 absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] py-1">
+        <div id={menu.id} ref={menu.menuRef} role="menu" aria-label="整理笔记" onKeyDown={menu.onMenuKeyDown} className="studio-rise elev-3 absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] py-1">
           {TIDY_ITEMS.map((it) => {
             const Icon = it.Icon;
             const itemBusy = busy === it.key;
@@ -679,13 +684,11 @@ function AiTidyMenu({
               <button
                 key={it.key}
                 type="button"
-                // onPointerDown 提前响应：比 click 早一帧触发，防「点了没反应又点一下」的双击
-                onPointerDown={(e) => {
-                  e.preventDefault();
-                  void run(it.key);
-                }}
+                role="menuitem"
+                tabIndex={-1}
+                onClick={() => void run(it.key)}
                 disabled={busy !== null}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-60"
+                className="flex min-h-[44px] w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)] disabled:cursor-default disabled:opacity-60"
               >
                 {itemBusy ? (
                   <CircleNotch size={15} weight="bold" className="animate-spin text-[var(--red)]" />

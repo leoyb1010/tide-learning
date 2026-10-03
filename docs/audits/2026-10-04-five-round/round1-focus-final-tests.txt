@@ -1,0 +1,114 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/credit-reservation.test.ts (16 tests | 1 failed) 1709ms
+     × migrates historical reservations without fabricating an operation or reversal 12ms
+ ❯ tests/generation-job-lease.test.ts (10 tests | 1 failed) 1395ms
+     × preserves duplicate historical rows with null protocol fields while enforcing new non-null keys 10ms
+ ❯ tests/restore-adversarial.test.ts (4 tests | 4 failed) 19ms
+     × rejects an empty archive without deleting live assets 9ms
+     × rejects multiple asset roots without selecting an arbitrary one 3ms
+     × restores a valid single-root snapshot and leaves a database safety backup 2ms
+     × cleans temporary plaintext on failed decryption 2ms
+ ❯ tests/backup-encryption-adversarial.test.ts (1 test | 1 failed) 9ms
+     × does not publish or retain plaintext when encryption fails 7ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 7 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/backup-encryption-adversarial.test.ts > encrypted snapshot publication > does not publish or retain plaintext when encryption fails
+Error: spawnSync sqlite3 ENOENT
+ ❯ tests/backup-encryption-adversarial.test.ts:12:5
+     10|     root = mkdtempSync(join(tmpdir(), "tide-backup-failure-"));
+     11|     const database = join(root, "test.db"), output = join(root, "backu…
+     12|     execFileSync("sqlite3", [database, "create table proof(value); ins…
+       |     ^
+     13|     writeFileSync(key, "synthetic-key-at-least-twenty-bytes");
+     14|     // Activate only the base provider: no AES cipher is available, so…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/7]⎯
+
+ FAIL  tests/credit-reservation.test.ts > durable credit reservation on isolated SQLite > migrates historical reservations without fabricating an operation or reversal
+Error: spawnSync sqlite3 ENOENT
+ ❯ tests/credit-reservation.test.ts:102:5
+    100|       "prisma/migrations/20260812060000_llm_operation_reversal/migrati…
+    101|     ), "utf8");
+    102|     execFileSync("sqlite3", [legacyDb], {
+       |     ^
+    103|       input: `
+    104|         CREATE TABLE "CreditReservation" (
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/7]⎯
+
+ FAIL  tests/generation-job-lease.test.ts > GenerationJob lease migration > preserves duplicate historical rows with null protocol fields while enforcing new non-null keys
+Error: spawnSync sqlite3 ENOENT
+ ❯ tests/generation-job-lease.test.ts:68:5
+     66|     const legacyDb = join(tempDir, "legacy.db");
+     67|     const migrationSql = readFileSync(migrationPath, "utf8");
+     68|     execFileSync("sqlite3", [legacyDb], {
+       |     ^
+     69|       input: `
+     70|         CREATE TABLE "GenerationJob" (
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/7]⎯
+
+ FAIL  tests/restore-adversarial.test.ts > offline restore preserves original data until validation > rejects an empty archive without deleting live assets
+Error: spawnSync sqlite3 ENOENT
+ ❯ fixture tests/restore-adversarial.test.ts:10:3
+      8|   const root = mkdtempSync(join(tmpdir(), "tide-restore-test-")); root…
+      9|   const source = join(root, "source.db"), target = join(root, "target.…
+     10|   execFileSync("sqlite3", [source, "create table proof(value); insert …
+       |   ^
+     11|   execFileSync("sqlite3", [target, "create table proof(value); insert …
+     12|   mkdirSync(assets); writeFileSync(join(assets, "keep.txt"), "original…
+ ❯ tests/restore-adversarial.test.ts:30:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/7]⎯
+
+ FAIL  tests/restore-adversarial.test.ts > offline restore preserves original data until validation > rejects multiple asset roots without selecting an arbitrary one
+Error: spawnSync sqlite3 ENOENT
+ ❯ fixture tests/restore-adversarial.test.ts:10:3
+      8|   const root = mkdtempSync(join(tmpdir(), "tide-restore-test-")); root…
+      9|   const source = join(root, "source.db"), target = join(root, "target.…
+     10|   execFileSync("sqlite3", [source, "create table proof(value); insert …
+       |   ^
+     11|   execFileSync("sqlite3", [target, "create table proof(value); insert …
+     12|   mkdirSync(assets); writeFileSync(join(assets, "keep.txt"), "original…
+ ❯ tests/restore-adversarial.test.ts:35:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/7]⎯
+
+ FAIL  tests/restore-adversarial.test.ts > offline restore preserves original data until validation > restores a valid single-root snapshot and leaves a database safety backup
+Error: spawnSync sqlite3 ENOENT
+ ❯ fixture tests/restore-adversarial.test.ts:10:3
+      8|   const root = mkdtempSync(join(tmpdir(), "tide-restore-test-")); root…
+      9|   const source = join(root, "source.db"), target = join(root, "target.…
+     10|   execFileSync("sqlite3", [source, "create table proof(value); insert …
+       |   ^
+     11|   execFileSync("sqlite3", [target, "create table proof(value); insert …
+     12|   mkdirSync(assets); writeFileSync(join(assets, "keep.txt"), "original…
+ ❯ tests/restore-adversarial.test.ts:40:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/7]⎯
+
+ FAIL  tests/restore-adversarial.test.ts > offline restore preserves original data until validation > cleans temporary plaintext on failed decryption
+Error: spawnSync sqlite3 ENOENT
+ ❯ fixture tests/restore-adversarial.test.ts:10:3
+      8|   const root = mkdtempSync(join(tmpdir(), "tide-restore-test-")); root…
+      9|   const source = join(root, "source.db"), target = join(root, "target.…
+     10|   execFileSync("sqlite3", [source, "create table proof(value); insert …
+       |   ^
+     11|   execFileSync("sqlite3", [target, "create table proof(value); insert …
+     12|   mkdirSync(assets); writeFileSync(join(assets, "keep.txt"), "original…
+ ❯ tests/restore-adversarial.test.ts:48:15
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/7]⎯
+
+
+ Test Files  4 failed | 119 passed (123)
+      Tests  7 failed | 905 passed | 13 skipped (925)
+   Start at  02:32:00
+   Duration  71.44s (transform 2.80s, setup 0ms, import 20.28s, tests 26.19s, environment 3.75s)

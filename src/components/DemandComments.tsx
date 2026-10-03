@@ -238,6 +238,7 @@ export function DemandComments({
               />
               <Button onClick={() => submit(null, rootDraft)} disabled={sending || !rootDraft.trim()}>
                 <PaperPlaneRight size={15} weight="bold" />
+                <span className="sr-only">发送讨论</span>
               </Button>
             </div>
           )

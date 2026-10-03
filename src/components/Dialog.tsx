@@ -53,9 +53,9 @@ export function Dialog({
     // 初始焦点优先落在业务输入上（data-autofocus > 表单控件 > 其它可聚焦），绝不默认落到
     // 右上角关闭按钮。querySelector 对逗号并列选择器按 DOM 序返回首个命中，而关闭按钮在 DOM
     // 中先于表单控件，故必须分层查询而非把 [data-autofocus] 与 button 逗号并列。
-    requestAnimationFrame(() => {
+    const focusFrame = requestAnimationFrame(() => {
       const panel = panelRef.current;
-      if (!panel) return;
+      if (!panel || panel.contains(document.activeElement)) return;
       const target =
         panel.querySelector<HTMLElement>("[data-autofocus]") ??
         panel.querySelector<HTMLElement>("input:not([type='hidden']),textarea,select") ??
@@ -63,6 +63,7 @@ export function Dialog({
       target?.focus();
     });
     return () => {
+      cancelAnimationFrame(focusFrame);
       document.body.style.overflow = prev;
       document.removeEventListener("keydown", onKey);
       // 关闭 / 卸载时还原来源焦点并清空锚点，为下次打开重新记录做准备。

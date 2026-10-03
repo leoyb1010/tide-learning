@@ -1,0 +1,29 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+
+ RUN  v4.1.11 <repo>
+
+ ❯ tests/note-menu-keyboard.test.ts (7 tests | 1 failed | 6 skipped) 112ms
+   × notes tidy supports native click activation once and recovers after a provider error 111ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/note-menu-keyboard.test.ts > notes tidy supports native click activation once and recovers after a provider error
+AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times
+ ❯ tests/note-menu-keyboard.test.ts:47:69
+     45|  await act(async()=>root.render(notesView()));await act(async()=>trigg…
+     46|  const item=[...document.querySelectorAll<HTMLButtonElement>('button')…
+     47|  await act(async()=>{item.click();item.click();});expect(fetchMock).to…
+       |                                                                     ^
+     48|  await act(async()=>resolve(new Response(JSON.stringify({ok:false,erro…
+     49|  await act(async()=>triggerFor('notes tidy').click());await act(async(…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  01:58:38
+   Duration  5.06s (transform 301ms, setup 0ms, import 3.67s, tests 112ms, environment 1.06s)

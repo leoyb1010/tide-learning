@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useActionMenu } from "@/hooks/useActionMenu";
 import { Sparkle, CaretDown, ListBullets, ListChecks, Translate, FileText, Copy, Check } from "@phosphor-icons/react";
 import { Dialog } from "@/components/Dialog";
 import { useToast } from "@/components/Toast";
@@ -37,21 +38,26 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
   const [result, setResult] = useState<TidyResult | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const menuRef = useRef<HTMLDivElement>(null);
-
+  const menu = useActionMenu(open, setOpen);
+  const submitRef = useRef(false);
+  const operationRef = useRef(0);
+  const scopeKey = JSON.stringify({ noteIds: noteIds.slice(0, 80), title });
+  const currentScope = useRef(scopeKey);
+  currentScope.current = scopeKey;
+  const invalidate = useCallback(() => { operationRef.current++; }, []);
+  useEffect(() => {
+    submitRef.current = false;
+    setBusy(null); setResult(null); setDialogOpen(false);
+    return invalidate;
+  }, [scopeKey, invalidate]);
   const empty = noteIds.length === 0;
 
-  useEffect(() => {
-    if (!open) return;
-    const onDown = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open]);
-
   async function run(action: Action) {
-    setOpen(false);
+    if (submitRef.current) return;
+    submitRef.current = true;
+    const operation = ++operationRef.current;
+    const isCurrent = () => operation === operationRef.current && scopeKey === currentScope.current;
+    menu.closeAfterAction();
     setBusy(action);
     try {
       const json = await fetch("/api/ai/note-transform", {
@@ -59,6 +65,7 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ noteIds: noteIds.slice(0, 80), action }),
       }).then((r) => r.json());
+      if (!isCurrent()) return;
       if (!json.ok) return toast(json.error ?? "AI 整理失败", { tone: "warn" });
 
       if (action === "actions") {
@@ -74,9 +81,10 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
       setDialogOpen(true);
       track("ai_note_tidy", { action, scope: "notebook" });
     } catch {
+      if (!isCurrent()) return;
       toast("AI 整理失败，请稍后重试", { tone: "warn" });
     } finally {
-      setBusy(null);
+      if (isCurrent()) { submitRef.current = false; setBusy(null); }
     }
   }
 
@@ -92,13 +100,18 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
   }
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div className="relative" ref={menu.containerRef} style={open ? { zIndex: "var(--z-dropdown)" } : undefined}>
       <button
         type="button"
+        ref={menu.triggerRef}
+        onKeyDown={menu.onTriggerKeyDown}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menu.id : undefined}
         onClick={() => setOpen((v) => !v)}
         disabled={busy !== null || empty}
         title={empty ? "本笔记本还没有笔记" : undefined}
-        className="studio-press inline-flex items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45"
+        className="studio-press inline-flex whitespace-nowrap min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] disabled:opacity-45"
       >
         <Sparkle size={14} weight="fill" className="text-[var(--red)]" />
         {busy ? "整理中…" : "AI 整理本笔记本"}
@@ -106,15 +119,17 @@ export default function NotebookAiTidy({ noteIds, title }: { noteIds: string[]; 
       </button>
 
       {open && !empty && (
-        <div className="studio-rise absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--lift)]">
+        <div id={menu.id} ref={menu.menuRef} role="menu" aria-label="整理本笔记本" onKeyDown={menu.onMenuKeyDown} className="studio-rise absolute right-0 z-30 mt-1.5 w-44 overflow-hidden rounded-[12px] border border-[var(--border)] bg-[var(--surface)] py-1 shadow-[var(--lift)]">
           {ITEMS.map((it) => {
             const Icon = it.Icon;
             return (
               <button
                 key={it.key}
                 type="button"
+                role="menuitem"
+                tabIndex={-1}
                 onClick={() => run(it.key)}
-                className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
+                className="flex min-h-[44px] w-full items-center gap-2.5 px-3.5 py-2 text-left text-[13px] font-medium text-[var(--ink2)] transition-colors hover:bg-[var(--surface2)] hover:text-[var(--ink)]"
               >
                 <Icon size={15} className="text-[var(--ink3)]" /> {it.label}
               </button>

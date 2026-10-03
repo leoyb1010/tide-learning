@@ -5,6 +5,7 @@ import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { PrismaClient } from '@prisma/client';
+import { createAuditContext } from './audit-context.mjs';
 import { restrictToLocalApp } from './audit-browser-network.mjs';
 const base = process.env.BASE_URL || 'http://127.0.0.1:3100';
 assert(['localhost', '127.0.0.1', '[::1]'].includes(new URL(base).hostname));
@@ -17,7 +18,7 @@ const prisma = new PrismaClient();
 const browser = await chromium.launch({headless:true});
 const report = {round, routes:[], journeys:[], failures:[], limits:['Synthetic seeded fixtures only; no live payment, LLM, OAuth, APNs or production data','Native app screens are not exercised by this browser matrix']};
 const stamp = `Five-round-${round}-${Date.now()}`;
-let notebook, note, buyerActor, marketFixture, previewFixture;
+let notebook, note, buyerActor, reviewerActor, marketFixture, previewFixture;
 async function pages(dir) {
  const rows=[];
  for(const e of await readdir(dir,{withFileTypes:true})) {
@@ -48,6 +49,26 @@ async function revealDocument(page) {
  assert(height<60000,'fixture page exceeds capture bound; inspect separately');
  for(let y=0;y<height;y+=step){await page.evaluate(value=>scrollTo(0,value),y);await settleVisible(page);}
  await page.evaluate(()=>scrollTo(0,0));await settleVisible(page);
+}
+async function exerciseMenu(page, trigger, label) {
+ await trigger.focus();await page.keyboard.press('Enter');
+ const menu=page.getByRole('menu');await menu.waitFor({state:'visible'});
+ const items=menu.getByRole('menuitem');const count=await items.count();assert(count>1);
+ const focused=locator=>locator.evaluate(element=>element===document.activeElement);
+ assert(await focused(items.first()),'menu did not focus first item after Enter');
+ await page.keyboard.press('ArrowUp');assert(await focused(items.last()),'ArrowUp did not wrap');
+ await page.keyboard.press('Home');assert(await focused(items.first()),'Home did not select first');
+ await page.keyboard.press('End');assert(await focused(items.last()),'End did not select last');
+ const focusStyle=await items.last().evaluate(element=>({visible:element.matches(':focus-visible'),outline:getComputedStyle(element).outlineStyle,width:getComputedStyle(element).outlineWidth}));
+ assert(focusStyle.visible&&focusStyle.outline!=='none'&&focusStyle.width!=='0px','keyboard focus not visibly indicated');
+ await snap(page,label+'-keyboard-focus',false);
+ await page.keyboard.press('Escape');await menu.waitFor({state:'hidden'});assert(await focused(trigger),'Escape did not return focus');
+ await page.keyboard.press('Space');await menu.waitFor({state:'visible'});assert(await focused(items.first()));
+ await page.keyboard.press('Tab');await menu.waitFor({state:'hidden'});
+ assert(!(await focused(trigger)),'Tab was trapped at trigger');assert(await page.evaluate(()=>document.activeElement!==document.body),'Tab lost focus');
+ await trigger.focus();await page.keyboard.press('ArrowUp');await menu.waitFor({state:'visible'});assert(await focused(items.last()));
+ await page.keyboard.press('Shift+Tab');await menu.waitFor({state:'hidden'});assert(!(await focused(trigger)),'Shift+Tab was trapped at trigger');
+ return {items:count,focusStyle};
 }
 async function check(name, task) {
  try {await task();report.journeys.push({name,status:'passed'});} catch(e) {report.failures.push({name,error:e.message});report.journeys.push({name,status:'failed'});}
@@ -84,9 +105,8 @@ async function assertReady(page,source,fixtures) {
  return {heading,level};
 }
 async function login(options,user) {
- const ctx=await browser.newContext({...options, serviceWorkers:'block'});
+ const ctx=await createAuditContext(browser,options,base);
  ctx.setDefaultTimeout(15_000);ctx.setDefaultNavigationTimeout(20_000);
- await restrictToLocalApp(ctx,base);
  if(user && typeof user==='object') {
   await ctx.addCookies([{name:'tide_session',value:user.token,url:base,httpOnly:true,sameSite:'Strict'}]);
  } else if(user) {
@@ -103,12 +123,27 @@ try {
  previewFixture=await prisma.course.findFirstOrThrow({where:{title:'课件双协议 E2E 临时课程',slug:{startsWith:'e2e-courseware-'}},include:{lessons:{orderBy:{sortOrder:'asc'},take:1}}});
  const source=previewFixture.lessons[0];
  assert(source?.htmlJson&&source.renderSourceHash,'embed fixture must provide actual current HTML');
+ if(round==='1') {
+  // Calibration only: retain the exact stack from the upstream instrumentation
+  // error. Actual product contexts below still require zero pageerrors.
+  const original=await browser.newContext({serviceWorkers:'block'});await restrictToLocalApp(original,base);
+  const probe=await original.newPage();const errors=[];probe.on('pageerror',error=>errors.push({name:error.name,message:error.message,stack:error.stack}));
+  await probe.goto(`${base}/courses/${previewFixture.slug}/preview`,{waitUntil:'networkidle'});
+  await probe.getByRole('tab',{name:'翻页',exact:true}).waitFor({state:'visible'});
+  assert(errors.some(error=>error.name==='SecurityError'&&error.message.includes('serviceWorker')),'upstream sandbox instrumentation calibration changed; reassess guard');
+  report.harnessCalibration={source:'playwright-core/lib/server/browserContext.js serviceWorkers=block init script',errors};await original.close();
+ }
+
  marketFixture=await prisma.course.create({data:{slug:`synthetic-market-${Date.now()}`,title:previewFixture.title,category:previewFixture.category,level:previewFixture.level,status:'published',visibility:'public',origin:'user_created',authorUserId:learner.id,sharedStatus:'shared',genStatus:'ready',designJson:previewFixture.designJson,priceCredits:0,lessons:{create:{title:source.title,summary:source.summary,sortOrder:source.sortOrder,contentType:source.contentType,isFree:true,status:'published',blocksJson:source.blocksJson,htmlJson:source.htmlJson,renderSourceHash:source.renderSourceHash,renderEngine:source.renderEngine,designJson:source.designJson}}}});
  const marketCourse=marketFixture;
  const buyer=await prisma.user.create({data:{email:`buyer-${Date.now()}@example.test`,nickname:'Synthetic Buyer',profile:{create:{}}}});
  const token=randomBytes(32).toString('hex');
  await prisma.session.create({data:{id:createHash('sha256').update(token).digest('hex'),userId:buyer.id,expiresAt:new Date(Date.now()+3600_000)}});
  buyerActor={id:buyer.id,token};
+ const reviewer=await prisma.user.create({data:{email:`reviewer-${Date.now()}@example.test`,nickname:'Synthetic Reviewer',role:'reviewer'}});
+ const reviewToken=randomBytes(32).toString('hex');
+ await prisma.session.create({data:{id:createHash('sha256').update(reviewToken).digest('hex'),userId:reviewer.id,expiresAt:new Date(Date.now()+3600_000)}});
+ reviewerActor={id:reviewer.id,token:reviewToken};
  const pageNotes=Array.from({length:61},(_,i)=>({id:`audit-${round}-${Date.now()}-${String(i).padStart(3,'0')}`,userId:buyer.id,title:`Synthetic note ${i+1}`,contentMd:`Synthetic pagination ${i+1}`,kind:'text',source:'manual',updatedAt:new Date('2026-01-01T00:00:00Z')}));
  await prisma.note.createMany({data:pageNotes});
  notebook=await prisma.notebook.create({data:{userId:learner.id,title:stamp}});
@@ -132,7 +167,7 @@ try {
     if(source==='courses/[id]/preview') route=`/courses/${previewFixture.slug}/preview`;
     const ctx=route.startsWith('/admin')?admin:route==='/login'||source==='courses/[id]/preview'?guest:route.startsWith('/market/')?buyer:user;
     const page=await ctx.newPage();const errors=[];
-    page.on('pageerror',e=>errors.push(e.message));
+    page.on('pageerror',e=>errors.push(e.stack||e.message));
     const row={source,route,variant,expected:expected??route,status:'failed'};
     try {
      assert(!route.includes('missing-fixture'),'demand fixture missing');
@@ -151,9 +186,22 @@ try {
       assert((await page.frameLocator('iframe[title="AI 课件"]').locator('h1,.lead,.q,.body').first().innerText()).trim());
      }
      await revealDocument(page);
+     if(source==='.'||source==='desk'||source==='courses') {
+      row.contrast=await page.locator('[data-testid="course-trial"], [data-ui="badge"][data-tone="success"]').evaluateAll(nodes=>nodes.map(node=>{
+       const style=getComputedStyle(node);
+       const rgb=value=>{const values=value.match(/[\d.]+/g)?.map(Number);if(!values||values.length<3)throw new Error(`Unrecognized computed color ${value}`);return values;};
+       const foreground=rgb(style.color),background=rgb(style.backgroundColor);
+       const luminance=color=>color.slice(0,3).map(value=>{const n=value/255;return n<=.04045?n/12.92:((n+.055)/1.055)**2.4;}).reduce((sum,n,i)=>sum+n*[.2126,.7152,.0722][i],0);
+       const a=luminance(foreground),b=luminance(background);
+       return {kind:node.matches('[data-testid="course-trial"]')?'trial':'success',label:node.textContent.trim(),foreground:style.color,background:style.backgroundColor,opaque:background.length===3||background[3]===1,ratio:(Math.max(a,b)+.05)/(Math.min(a,b)+.05)};
+      }));
+      assert(row.contrast.some(sample=>sample.kind==='trial')&&row.contrast.some(sample=>sample.kind==='success'),'contrast fixture lacks trial or success labels');
+      for(const sample of row.contrast){assert(sample.opaque,'contrast measurement requires an opaque matched surface');assert(sample.ratio>=4.5,`course label contrast ${sample.ratio}: ${sample.label}`);}
+     }
+
      row.layout=await page.evaluate(()=>({theme:document.documentElement.dataset.theme??"system",systemDark:matchMedia("(prefers-color-scheme: dark)").matches,reducedMotion:matchMedia("(prefers-reduced-motion: reduce)").matches,surface:getComputedStyle(document.documentElement).getPropertyValue("--surface"),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,height:document.documentElement.scrollHeight,heading:[...document.querySelectorAll('h1')].map(e=>e.textContent),unnamedButtons:[...document.querySelectorAll('button')].filter(e=>!e.textContent.trim()&&!e.getAttribute('aria-label')&&!e.getAttribute('title')).length}));
-     row.unnamedButtons=await page.getByRole('button',{name:'',exact:true}).count();
-     assert.equal(row.unnamedButtons,0,'visible button has no accessible name');
+     row.unnamedButtonDetails=await page.getByRole('button',{name:'',exact:true}).evaluateAll(nodes=>nodes.map(node=>({html:node.outerHTML.slice(0,1000),box:{x:node.getBoundingClientRect().x,y:node.getBoundingClientRect().y,width:node.getBoundingClientRect().width,height:node.getBoundingClientRect().height}})));
+     row.unnamedButtons=row.unnamedButtonDetails.length;
      if(source==='.'||source==='desk') row.sections=await page.locator('main section, main [data-reveal], main > div > div').evaluateAll(nodes=>nodes.map(node=>({tag:node.tagName,classes:node.className,box:{top:node.getBoundingClientRect().top,height:node.getBoundingClientRect().height},opacity:getComputedStyle(node).opacity,visibility:getComputedStyle(node).visibility})));
      row.screenshot=await snap(page,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}`,true,false);
      await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
@@ -166,12 +214,17 @@ try {
      assert((colorScheme==='dark'?['#191d25']:['#fff','#ffffff']).includes(row.layout.surface.trim()),'effective theme surface differs from requested variant');
      assert.equal(row.layout.reducedMotion,reducedMotion==='reduce');
 
+     assert.equal(row.unnamedButtons,0,'visible button has no accessible name');
      assert(row.layout.overflow<=2,`horizontal overflow ${row.layout.overflow}px`);
      assert.equal(errors.length,0,`unexpected browser errors: ${errors.join('; ')}`);
      row.status='render-pass-interactions-separate';
     }catch(e){row.error=e.message;row.failureScreenshot=await snap(page,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}-failure`,false).catch(()=>null);report.failures.push({name:variant+':'+route,error:e.message});}
-    row.errors=errors;report.routes.push(row);await page.close();
+    row.errors=errors;report.routes.push(row);assert.equal(ctx.serviceWorkers().length,0,'audit context unexpectedly has a service worker');await page.close();
    }
+   const probe=await guest.newPage();
+   await probe.goto(base+'/login',{waitUntil:'networkidle'});
+   const registration=await probe.evaluate(async()=>{try{await navigator.serviceWorker.register('/synthetic-audit-sw.js');return 'registered';}catch(error){return error.name;}});
+   assert.equal(registration,'NotAllowedError');assert.equal(guest.serviceWorkers().length,0);await probe.close();
    const page=await user.newPage();
    await page.addInitScript(()=>{
     window.__captureTrace=[];const ids=new WeakMap();let next=0;
@@ -252,6 +305,66 @@ try {
      assert((await page.locator('body').innerText()).includes(titleB));
     }finally{release();await page.unroute('**/api/notes');if(initialState==='empty'){await prisma.note.deleteMany({where:{notebookId:targetBook.id}});await prisma.notebook.delete({where:{id:targetBook.id}});}}
    });
+   await check(variant+':note export and AI menus keyboard navigation and real export',async()=>{
+    await page.goto(`${base}/notes/${note.id}`,{waitUntil:'networkidle'});
+    await exerciseMenu(page,page.getByRole('button',{name:'导出',exact:true}),variant+'-export');
+    const exported=await user.request.get(`${base}/api/notes/export?format=md&noteId=${note.id}`);
+    assert.equal(exported.status(),200);assert((await exported.text()).includes(`Retry ${round} ${variant}`));
+    await page.goto(`${base}/notes/notebook/${notebook.id}`,{waitUntil:'networkidle'});
+    await exerciseMenu(page,page.getByRole('button',{name:'AI 整理本笔记本',exact:true}),variant+'-notebook-tidy');
+    await page.goto(`${base}/notes`,{waitUntil:'networkidle'});
+    await exerciseMenu(page,page.getByRole('button',{name:'AI 整理',exact:true}).first(),variant+'-notes-tidy');
+   });
+   await check(variant+':keyboard AI error retry synthetic result saved as actual note',async()=>{
+    await page.goto(`${base}/notes`,{waitUntil:'networkidle'});
+    let calls=0;const resultText=`Synthetic summary ${round} ${variant}`;
+    await page.route('**/api/ai/note-summary',route=>{
+     calls++;const body=route.request().postDataJSON();assert(body.noteIds?.length>0);assert.equal(body.mode,'summary');
+     return route.fulfill({status:calls===1?503:200,contentType:'application/json',body:JSON.stringify(calls===1?{ok:false,error:'Synthetic AI unavailable'}:{ok:true,data:{summary:[resultText]}})});
+    });
+    try{
+     const trigger=page.getByRole('button',{name:'AI 整理',exact:true}).first();
+     await trigger.focus();await page.keyboard.press('Enter');await page.getByRole('menuitem',{name:'AI 总结',exact:true}).focus();await page.keyboard.press('Enter');
+     await page.getByText('Synthetic AI unavailable',{exact:true}).waitFor();assert.equal(calls,1);
+     await trigger.focus();await page.keyboard.press('Space');await page.getByRole('menuitem',{name:'AI 总结',exact:true}).focus();await page.keyboard.press('Space');
+     const dialog=page.getByRole('dialog');await dialog.waitFor({state:'visible'});assert((await dialog.innerText()).includes(resultText));assert.equal(calls,2);
+     await snap(page,variant+'-keyboard-ai-result',false);
+     const before=await prisma.note.count({where:{userId:learner.id,source:'ai_transform',contentMd:{contains:resultText}}});assert.equal(before,0);
+     await dialog.getByRole('button',{name:'存为笔记',exact:true}).click();
+     await dialog.getByRole('button',{name:'已保存',exact:true}).waitFor();
+     assert.equal(await prisma.note.count({where:{userId:learner.id,source:'ai_transform',contentMd:{contains:resultText}}}),1);
+     await page.keyboard.press('Escape');await dialog.waitFor({state:'hidden'});
+     assert(await trigger.evaluate(element=>element===document.activeElement),'AI result dismissal did not restore its trigger focus');
+     await page.reload({waitUntil:'networkidle'});
+     assert((await page.locator('body').innerText()).includes('AI整理·当前笔记'));
+    }finally{await page.unroute('**/api/ai/note-summary');}
+   });
+   await check(variant+':author manual course create retry edit cancel and persisted courseware',async()=>{
+    const creator=await buyer.newPage();const errors=[];creator.on('pageerror',e=>errors.push(e.message));let createdCourse;
+    const title=`Synthetic manual ${round} ${variant}`,body=`Synthetic lesson content ${round} ${variant}`;
+    try{
+     await creator.goto(base+'/create',{waitUntil:'networkidle'});await creator.getByRole('button',{name:'空白建课',exact:true}).click();
+     const titleInput=creator.getByPlaceholder('比如：我的产品设计方法课');await titleInput.fill(title);
+     await creator.route('**/api/courses',route=>route.request().method()==='POST'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,error:'Synthetic course retry'})}):route.continue());
+     await creator.getByRole('button',{name:'创建空白课程',exact:true}).click();await creator.getByText('Synthetic course retry',{exact:true}).waitFor();assert.equal(await titleInput.inputValue(),title);
+     assert.equal(await prisma.course.count({where:{authorUserId:buyerActor.id,title}}),0);await creator.unroute('**/api/courses');
+     const created=creator.waitForResponse(r=>r.url().endsWith('/api/courses')&&r.request().method()==='POST');await creator.getByRole('button',{name:'创建空白课程',exact:true}).click();
+     const response=await created;assert.equal(response.status(),200);createdCourse=(await response.json()).data.course;
+     await creator.getByText(`《${title}》已建立`,{exact:true}).waitFor();await creator.getByRole('button',{name:'编辑',exact:true}).first().waitFor();
+     assert.equal(await prisma.course.count({where:{authorUserId:buyerActor.id,title}}),1);
+     const first=await prisma.lesson.findFirstOrThrow({where:{courseId:createdCourse.id},orderBy:{sortOrder:'asc'}});
+     await creator.getByRole('button',{name:'编辑',exact:true}).first().click();const dialog=creator.getByRole('dialog');
+     await dialog.getByRole('button',{name:'插入块',exact:true}).click();await dialog.getByPlaceholder('正文',{exact:true}).fill(body);
+     await creator.route(`**/api/lessons/${first.id}/blocks`,route=>route.request().method()==='PUT'?route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,error:'Synthetic block retry'})}):route.continue());
+     await dialog.getByRole('button',{name:'保存并重排课件',exact:true}).click();await creator.getByText('Synthetic block retry',{exact:true}).waitFor();assert.equal(await dialog.getByPlaceholder('正文',{exact:true}).inputValue(),body);
+     await creator.unroute(`**/api/lessons/${first.id}/blocks`);await dialog.getByRole('button',{name:'保存并重排课件',exact:true}).click();await dialog.waitFor({state:'hidden'});
+     const saved=await prisma.lesson.findUniqueOrThrow({where:{id:first.id}});assert(saved.blocksJson.includes(body));assert(saved.htmlJson&&saved.renderSourceHash,'deterministic courseware was not produced');
+     await creator.goto(`${base}/create?manual=${createdCourse.id}`,{waitUntil:'networkidle'});await creator.getByRole('button',{name:'编辑',exact:true}).first().click();assert.equal(await dialog.getByPlaceholder('正文',{exact:true}).inputValue(),body);
+     await dialog.getByPlaceholder('正文',{exact:true}).fill('Cancelled synthetic change');await dialog.getByRole('button',{name:'取消',exact:true}).click();
+     assert((await prisma.lesson.findUniqueOrThrow({where:{id:first.id}})).blocksJson.includes(body));
+     await snap(creator,variant+'-author-manual-course');assert.equal(errors.length,0,errors.join('; '));
+    }finally{await creator.close();if(createdCourse)await prisma.course.deleteMany({where:{id:createdCourse.id,authorUserId:buyerActor.id}});}
+   });
    await check(variant+':buyer SSR 61 notes Load more has no gaps or duplicates',async()=>{
     const list=await buyer.newPage();
     try{
@@ -267,6 +380,27 @@ try {
      assert.deepEqual([...actual].sort(),pageNotes.map(n=>n.id).sort());
      await snap(list,variant+'-61-notes-complete');
     }finally{await list.close();}
+   });
+   await check(variant+':reviewer actual approval retry keeps author and buyer state consistent',async()=>{
+    const ctx=await login(opts,reviewerActor);const review=await ctx.newPage();
+    const errors=[];review.on('pageerror',e=>errors.push(e.message));
+    try{
+     await prisma.course.update({where:{id:marketFixture.id},data:{sharedStatus:'pending'}});
+     await review.goto(base+'/admin/moderation',{waitUntil:'networkidle'});assert.equal(new URL(review.url()).pathname,'/admin/moderation');
+     const card=review.getByRole('article').filter({hasText:marketFixture.title});await card.waitFor({state:'visible'});
+     await card.getByRole('button',{name:'拒绝',exact:true}).click();await card.getByPlaceholder('填写或从下方模板选择理由，将通知作者').fill('Cancelled synthetic reason');await card.getByRole('button',{name:'取消',exact:true}).click();
+     assert.equal((await prisma.course.findUniqueOrThrow({where:{id:marketFixture.id}})).sharedStatus,'pending');
+     await review.route('**/api/admin/moderation/course',route=>route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({ok:false,error:'Synthetic review retry'})}));
+     await card.getByRole('button',{name:'批准上架',exact:true}).click();await review.getByText('Synthetic review retry',{exact:true}).waitFor();assert(await card.isVisible());
+     await review.unroute('**/api/admin/moderation/course');const before=await prisma.auditLog.count({where:{operatorId:reviewerActor.id,targetId:marketFixture.id}});
+     await card.getByRole('button',{name:'批准上架',exact:true}).click();await card.waitFor({state:'hidden'});
+     assert.equal((await prisma.course.findUniqueOrThrow({where:{id:marketFixture.id}})).sharedStatus,'shared');
+     assert.equal(await prisma.auditLog.count({where:{operatorId:reviewerActor.id,targetId:marketFixture.id}}),before+1);
+     const repeated=await ctx.request.post(base+'/api/admin/moderation/course',{data:{courseId:marketFixture.id,action:'approve'}});assert.equal(repeated.status(),409);
+     assert.equal(await prisma.auditLog.count({where:{operatorId:reviewerActor.id,targetId:marketFixture.id}}),before+1);
+     await review.reload({waitUntil:'networkidle'});assert.equal(await review.getByRole('article').filter({hasText:marketFixture.title}).count(),0);
+     await snap(review,variant+'-reviewer-approval');assert.equal(errors.length,0,errors.join('; '));
+    }finally{await prisma.course.update({where:{id:marketFixture.id},data:{sharedStatus:'shared'}});await ctx.close();}
    });
    await check(variant+':free buyer collect repeat hide and restore preserves ownership',async()=>{
     const request=method=>buyer.request.fetch(base+'/api/market/collect',{method,headers:{origin:new URL(base).origin},data:{courseId:marketFixture.id}});
@@ -289,6 +423,7 @@ try {
  if(notebook) await prisma.notebook.deleteMany({where:{id:notebook.id}});
  if(marketFixture) await prisma.course.deleteMany({where:{id:marketFixture.id,slug:marketFixture.slug}});
  if(previewFixture) await prisma.course.deleteMany({where:{id:previewFixture.id,slug:previewFixture.slug}});
+ if(reviewerActor) await prisma.user.deleteMany({where:{id:reviewerActor.id}});
  if(buyerActor) await prisma.user.deleteMany({where:{id:buyerActor.id}});
  await prisma.$disconnect();
 }

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useState } from "react";
+import { useActionMenu } from "@/hooks/useActionMenu";
 import {
   DownloadSimple, CaretDown, FileMd, FileHtml, FileText, BracketsCurly, Printer,
 } from "@phosphor-icons/react";
@@ -54,48 +55,19 @@ export function ExportMenu({
   compact?: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const menuId = useId();
-
-  // 点击外部 / Esc 关闭
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (e: MouseEvent) => {
-      if (boxRef.current && !boxRef.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
-
-  // 关闭后把焦点还给触发按钮（无障碍：焦点不丢，参照 SharePanel wasOpen 范式）。
-  // 仅在「打开→关闭」跃迁时 rAF 还焦；初次挂载不抢焦，避免加载即 focus 打断阅读顺序。
-  const wasOpen = useRef(false);
-  useEffect(() => {
-    if (!open && wasOpen.current) {
-      const raf = requestAnimationFrame(() => triggerRef.current?.focus?.());
-      wasOpen.current = open;
-      return () => cancelAnimationFrame(raf);
-    }
-    wasOpen.current = open;
-  }, [open]);
+  const menu = useActionMenu(open, setOpen);
 
   function run(format: Fmt) {
     track("note_export", { format, scope: scope.kind });
     // 附件响应，浏览器直接下载 / 打印版新标签打开供 Cmd+P
     if (format === "print") window.open(buildUrl(scope, format), "_blank", "noopener");
     else window.location.href = buildUrl(scope, format);
-    setOpen(false);
+    menu.closeAfterAction();
   }
 
   const triggerCls = compact
-    ? "studio-press inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] sm:min-h-0"
-    : "studio-press inline-flex min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]";
+    ? "studio-press inline-flex whitespace-nowrap min-h-[44px] shrink-0 items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-3.5 py-2 text-[13px] font-semibold text-[var(--ink2)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)] hover:text-[var(--ink)] sm:min-h-0"
+    : "studio-press inline-flex whitespace-nowrap min-h-[44px] items-center gap-1.5 rounded-[12px] border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-[13px] font-semibold text-[var(--ink)] shadow-[var(--card)] transition-colors hover:border-[var(--border2)]";
 
   return (
     // 打开时把触发器容器抬进一个高于同级的堆叠上下文：详情页下方的「AI 一键多转」面板
@@ -103,18 +75,19 @@ export function ExportMenu({
     // 本菜单（绝对定位 + z-dropdown 仅在自身上下文内比较，跨上下文失效）。给容器加就近的
     // relative + z-dropdown 使整棵菜单子树浮出，任意复用场景通用。关闭时不占层级。
     <div
-      ref={boxRef}
+      ref={menu.containerRef}
       className="relative"
       style={open ? { zIndex: "var(--z-dropdown)" } : undefined}
     >
       <button
-        ref={triggerRef}
+        ref={menu.triggerRef}
+        onKeyDown={menu.onTriggerKeyDown}
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={triggerCls}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
+        aria-controls={open ? menu.id : undefined}
       >
         <DownloadSimple size={compact ? 14 : 15} weight="bold" /> {label}
         <CaretDown size={12} weight="bold" className={`transition-transform ${open ? "rotate-180" : ""}`} />
@@ -122,7 +95,9 @@ export function ExportMenu({
 
       {open && (
         <div
-          id={menuId}
+          id={menu.id}
+          ref={menu.menuRef}
+          onKeyDown={menu.onMenuKeyDown}
           role="menu"
           aria-label="选择导出格式"
           style={{ zIndex: "var(--z-dropdown)" }}
@@ -136,6 +111,7 @@ export function ExportMenu({
               key={key}
               type="button"
               role="menuitem"
+              tabIndex={-1}
               onClick={() => run(key)}
               className="flex min-h-[44px] w-full items-center gap-2.5 rounded-[10px] px-2.5 py-2 text-left transition-colors hover:bg-[var(--surface-inset)]"
             >
