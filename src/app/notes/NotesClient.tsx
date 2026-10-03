@@ -20,6 +20,7 @@ import { NoteGallery } from "@/components/NoteGallery";
 import NotebookGrid from "@/components/NotebookGrid";
 import { ExportMenu } from "@/components/ExportMenu";
 import { track } from "@/lib/analytics-client";
+import { useActiveCallback } from "@/hooks/useActiveCallback";
 import { renderMarkdown } from "@/lib/markdown";
 
 // 供 NoteTimeline / NoteGallery 复用的行类型（唯一真相源）
@@ -451,10 +452,8 @@ export default function NotesClient({ initialData }: { initialData: NotesInitial
       <ComposeDialog
         open={composeOpen}
         onClose={() => setComposeOpen(false)}
-        onCreated={() => {
-          setComposeOpen(false);
-          refreshAll();
-        }}
+        onCreated={() => setComposeOpen(false)}
+        onPersisted={refreshAll}
       />
     </div>
   );
@@ -973,13 +972,16 @@ export function ComposeDialog({
   open,
   onClose,
   onCreated,
+  onPersisted,
   prefillNotebookId,
 }: {
   open: boolean;
   onClose: () => void;
   onCreated: (noteId?: string) => void;
+  onPersisted?: () => void;
   prefillNotebookId?: string;
 }) {
+  const refreshPersisted = useActiveCallback(() => onPersisted?.());
   const [entry, setEntry] = useState<CaptureEntry>("menu");
   const { opts, addLocalTag } = useComposeOptions(open);
 
@@ -1029,15 +1031,15 @@ export function ComposeDialog({
 
       {entry === "write" && (
         <WritePanel
-          onCreated={onCreated}
+          onCreated={onCreated} onPersisted={refreshPersisted}
           options={opts}
           onTagCreated={addLocalTag}
           prefillNotebookId={prefillNotebookId}
         />
       )}
-      {entry === "link" && <LinkImportPanel onCreated={onCreated} />}
-      {entry === "image" && <UploadPanel kind="image" onCreated={onCreated} />}
-      {entry === "attach" && <UploadPanel kind="attach" onCreated={onCreated} />}
+      {entry === "link" && <LinkImportPanel onCreated={onCreated} onPersisted={refreshPersisted} />}
+      {entry === "image" && <UploadPanel kind="image" onCreated={onCreated} onPersisted={refreshPersisted} />}
+      {entry === "attach" && <UploadPanel kind="attach" onCreated={onCreated} onPersisted={refreshPersisted} />}
     </Dialog>
   );
 }
@@ -1049,17 +1051,22 @@ export function ComposeDialog({
  * 越权隔离由后端负责：notebookId/tagIds/courseId 均按 userId 二次校验（route 已实现）。
  */
 function WritePanel({
-  onCreated,
+  onCreated: notifyCreated,
+  onPersisted,
   options,
   onTagCreated,
   prefillNotebookId,
 }: {
   onCreated: (id?: string) => void;
+  onPersisted: () => void;
   options: ComposeOptions;
   onTagCreated: (t: ComposeTagOpt) => void;
   prefillNotebookId?: string;
 }) {
-  const { toast } = useToast();
+  const onCreated = useActiveCallback(notifyCreated);
+  const submitRef = useRef(false);
+  const { toast: notifyToast } = useToast();
+  const toast = useActiveCallback(notifyToast);
   const [title, setTitle] = useState("");
   const [contentMd, setContentMd] = useState("");
   const [saving, setSaving] = useState(false);
@@ -1113,6 +1120,8 @@ function WritePanel({
 
   async function submit() {
     if (!contentMd.trim()) return toast("笔记内容不能为空", { tone: "warn" });
+    if (submitRef.current) return;
+    submitRef.current = true;
     setSaving(true);
     try {
       const res = await fetch("/api/notes", {
@@ -1135,16 +1144,18 @@ function WritePanel({
         has_course: !!courseId,
       });
       toast("已记下", { tone: "success" });
+      onPersisted();
       onCreated(res.data?.id);
     } catch {
       toast("保存失败，请稍后重试", { tone: "warn" });
     } finally {
+      submitRef.current = false;
       setSaving(false);
     }
   }
 
   return (
-    <div className="space-y-3">
+    <fieldset disabled={saving} className="space-y-3">
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
@@ -1263,19 +1274,24 @@ function WritePanel({
           <FloppyDisk size={14} weight="bold" /> {saving ? "保存中…" : "保存"}
         </button>
       </div>
-    </div>
+    </fieldset>
   );
 }
 
 /** 链接导入：url → POST /api/notes/import-url，服务端抓取正文。 */
-function LinkImportPanel({ onCreated }: { onCreated: (id?: string) => void }) {
-  const { toast } = useToast();
+function LinkImportPanel({ onCreated: notifyCreated, onPersisted }: { onCreated: (id?: string) => void; onPersisted: () => void }) {
+  const onCreated = useActiveCallback(notifyCreated);
+  const { toast: notifyToast } = useToast();
+  const toast = useActiveCallback(notifyToast);
+  const submitRef = useRef(false);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function submit() {
     const v = url.trim();
     if (!v) return toast("请输入链接", { tone: "warn" });
+    if (submitRef.current) return;
+    submitRef.current = true;
     setBusy(true);
     try {
       const res = await fetch("/api/notes/import-url", {
@@ -1286,10 +1302,12 @@ function LinkImportPanel({ onCreated }: { onCreated: (id?: string) => void }) {
       if (!res.ok) return toast(res.error ?? "导入失败", { tone: "warn" });
       track("note_import_url", {});
       toast("已导入网页正文", { tone: "success" });
+      onPersisted();
       onCreated(res.data?.id);
     } catch {
       toast("导入失败，请稍后重试", { tone: "warn" });
     } finally {
+      submitRef.current = false;
       setBusy(false);
     }
   }
@@ -1297,6 +1315,7 @@ function LinkImportPanel({ onCreated }: { onCreated: (id?: string) => void }) {
   return (
     <div className="space-y-3">
       <input
+        disabled={busy}
         value={url}
         onChange={(e) => setUrl(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && !busy && submit()}
@@ -1382,8 +1401,10 @@ type UploadPhase =
  *     后端 formData() 拿不到 file → 「缺少上传文件」）。XHR 不 setRequestHeader 即天然正确。
  * 边界：本组件为 client，只 fetch 自有 API，不引任何 server 链。
  */
-function UploadPanel({ kind, onCreated }: { kind: "image" | "attach"; onCreated: (id?: string) => void }) {
-  const { toast } = useToast();
+function UploadPanel({ kind, onCreated: notifyCreated, onPersisted }: { kind: "image" | "attach"; onCreated: (id?: string) => void; onPersisted: () => void }) {
+  const onCreated = useActiveCallback(notifyCreated);
+  const { toast: notifyToast } = useToast();
+  const toast = useActiveCallback(notifyToast);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
@@ -1463,6 +1484,7 @@ function UploadPanel({ kind, onCreated }: { kind: "image" | "attach"; onCreated:
         });
         track("note_attachment", { is_image: kind === "image" });
         toast("已上传并保存", { tone: "success" });
+        onPersisted();
         onCreated(body.data.noteId);
         return;
       }

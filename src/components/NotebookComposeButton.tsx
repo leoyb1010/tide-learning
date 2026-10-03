@@ -40,10 +40,8 @@ export default function NotebookComposeButton({
         open={open}
         onClose={() => setOpen(false)}
         prefillNotebookId={notebookId}
-        onCreated={() => {
-          setOpen(false);
-          router.refresh();
-        }}
+        onCreated={() => setOpen(false)}
+        onPersisted={() => router.refresh()}
       />
     </>
   );

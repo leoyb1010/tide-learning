@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
  *  - 配 @/* 别名与 tsconfig 一致，使测试可用 `@/lib/...` 导入。
  */
 export default defineConfig({
+  oxc: { jsx: { runtime: "automatic" } },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),

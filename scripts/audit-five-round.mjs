@@ -74,11 +74,14 @@ try {
      const content=await page.locator('body').innerText();
      assert(!/This page could not be found|Application error|页面不存在|找不到该笔记/.test(content),'wrong or missing-resource screen');
      assert(content.length>30,'empty page');
-     row.layout=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,height:document.documentElement.scrollHeight,heading:[...document.querySelectorAll('h1')].map(e=>e.textContent),unnamedButtons:[...document.querySelectorAll('button')].filter(e=>!e.textContent.trim()&&!e.getAttribute('aria-label')&&!e.getAttribute('title')).length}));
+     row.layout=await page.evaluate(()=>({theme:document.documentElement.dataset.theme??"system",systemDark:matchMedia("(prefers-color-scheme: dark)").matches,reducedMotion:matchMedia("(prefers-reduced-motion: reduce)").matches,surface:getComputedStyle(document.documentElement).getPropertyValue("--surface"),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,height:document.documentElement.scrollHeight,heading:[...document.querySelectorAll('h1')].map(e=>e.textContent),unnamedButtons:[...document.querySelectorAll('button')].filter(e=>!e.textContent.trim()&&!e.getAttribute('aria-label')&&!e.getAttribute('title')).length}));
      await snap(page,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}`);
      await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
      await page.keyboard.press('Tab');
      row.keyboard=await page.evaluate(()=>({tag:document.activeElement.tagName,label:document.activeElement.getAttribute('aria-label')||document.activeElement.textContent?.trim().slice(0,80)}));
+     assert.equal(row.layout.systemDark,colorScheme==='dark');
+     assert.equal(row.layout.reducedMotion,reducedMotion==='reduce');
+     await page.screenshot({path:path.join(out,`${variant}-${source==='.'?'home':source.replaceAll('/','-').replaceAll('[','').replaceAll(']','')}-bottom.png`),fullPage:false});
      assert(row.layout.overflow<=2,`horizontal overflow ${row.layout.overflow}px`);
      assert.equal(errors.length,0,`unexpected browser errors: ${errors.join('; ')}`);
      row.status='render-pass-interactions-separate';
@@ -116,13 +119,49 @@ try {
     await page.getByRole('button',{name:'编辑',exact:true}).waitFor();
     assert.equal((await prisma.note.findUniqueOrThrow({where:{id:note.id}})).contentMd,text);
    });
+   await check(variant+':persisted A late response cannot dismiss draft B',async()=>{
+    await page.goto(`${base}/notes/notebook/${notebook.id}`,{waitUntil:'networkidle'});
+    const titleA=stamp+' '+variant+' A',titleB=stamp+' '+variant+' B';
+    let release;const held=new Promise(resolve=>{release=resolve;});
+    let saved;const persisted=new Promise(resolve=>{saved=resolve;});
+    let hold=true;
+    await page.route('**/api/notes',async route=>{
+     if(route.request().method()!=='POST'||!hold)return route.continue();
+     hold=false;const response=await route.fetch();const json=await response.json();saved(json.data.id);await held;await route.fulfill({response});
+    });
+    try{
+     await page.getByRole('button',{name:'在此笔记本记一条',exact:true}).click();
+     await page.getByPlaceholder('标题（可留空）').fill(titleA);
+     await page.getByPlaceholder('随手写点什么…支持 Markdown').fill('Synthetic A');
+     await page.getByRole('button',{name:'保存',exact:true}).click();
+     const idA=await persisted;
+     assert.equal((await prisma.note.findUniqueOrThrow({where:{id:idA}})).title,titleA);
+     await page.keyboard.press('Escape');
+     await page.getByRole('dialog').waitFor({state:'hidden'});
+     await page.getByRole('button',{name:'在此笔记本记一条',exact:true}).click();
+     await page.getByPlaceholder('标题（可留空）').fill(titleB);
+     await page.getByPlaceholder('随手写点什么…支持 Markdown').fill('Synthetic B');
+     const completion=page.waitForResponse(r=>r.url().endsWith('/api/notes')&&r.request().method()==='POST');
+     release();await completion;
+     await page.getByRole('link').filter({hasText:titleA}).waitFor();
+     assert(await page.getByRole('dialog').isVisible());
+     assert.equal(await page.getByPlaceholder('随手写点什么…支持 Markdown').inputValue(),'Synthetic B');
+     await snap(page,variant+'-late-A-preserved-B');
+     await page.getByRole('button',{name:'保存',exact:true}).click();
+     await page.getByRole('dialog').waitFor({state:'hidden'});
+     await page.reload({waitUntil:'networkidle'});
+     assert.equal(await prisma.note.count({where:{userId:learner.id,title:{in:[titleA,titleB]}}}),2);
+     assert((await page.locator('body').innerText()).includes(titleA));
+     assert((await page.locator('body').innerText()).includes(titleB));
+    }finally{release();await page.unroute('**/api/notes');}
+   });
    await page.close();await user.close();await admin.close();await guest.close();
   }
  }
 }finally {
  await writeFile(path.join(out,'matrix.json'),JSON.stringify(report,null,2));
  await browser.close();
- if(note) await prisma.note.deleteMany({where:{id:note.id}});
+ if(notebook) await prisma.note.deleteMany({where:{notebookId:notebook.id}});
  if(notebook) await prisma.notebook.deleteMany({where:{id:notebook.id}});
  await prisma.$disconnect();
 }

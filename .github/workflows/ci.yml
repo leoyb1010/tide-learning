@@ -42,6 +42,7 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: dependencies
         run: npm ci
 
       - name: Install browser runtime
@@ -69,9 +70,6 @@ jobs:
 
       - name: Unit tests
         run: npm test
-
-      - name: Dependency audit
-        run: npm audit --audit-level=low
 
       - name: Build
         run: npm run build
@@ -124,6 +122,10 @@ jobs:
           restored_media_count="$(find "$RUNNER_TEMP/restored-data/media" -type f | wc -l)"
           test "$source_media_count" -ge 4
           test "$restored_media_count" = "$source_media_count"
+
+      - name: Dependency audit
+        if: ${{ always() && steps.dependencies.outcome == 'success' }}
+        run: npm audit --audit-level=low
 
   native:
     name: Unsigned native builds and offline policy tests
